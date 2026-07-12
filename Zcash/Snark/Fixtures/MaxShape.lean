@@ -95,21 +95,21 @@ theorem deriveChallenges_at_captured_shape (n : ℕ) (fs : FiatShamir Fp G)
     (init : List (TranscriptElt Fp G)) (ps : ProofString (shape n) Fp G) :
     deriveChallenges fs init ps =
       let t := init ++ subProofBlocks (fun p : Fin (shape n).numProofs =>
-        absorbPoints (ps.adviceCommitments p))
+        absorbPoints (ps.adviceCommitments p)) ++ [.challenge]
       let theta := fs.squeeze t
-      let t := t ++ [.scalar theta] ++ subProofBlocks (fun p : Fin (shape n).numProofs =>
+      let t := t ++ subProofBlocks (fun p : Fin (shape n).numProofs =>
         subProofBlocks (fun l : Fin (shape n).numLookups =>
           [TranscriptElt.point (ps.lookupPermutedInput p l),
-           TranscriptElt.point (ps.lookupPermutedTable p l)]))
+           TranscriptElt.point (ps.lookupPermutedTable p l)])) ++ [.challenge]
       let beta := fs.squeeze t
-      let t := t ++ [.scalar beta]
+      let t := t ++ [.challenge]
       let gamma := fs.squeeze t
-      let t := t ++ [.scalar gamma]
+      let t := t
         ++ subProofBlocks (fun p : Fin (shape n).numProofs => absorbPoints (ps.permutationProduct p))
         ++ subProofBlocks (fun p : Fin (shape n).numProofs => absorbPoints (ps.lookupProduct p))
-        ++ [TranscriptElt.point ps.vanishingRandom]
+        ++ [TranscriptElt.point ps.vanishingRandom] ++ [.challenge]
       let y := fs.squeeze t
-      let t := t ++ [.scalar y] ++ absorbPoints ps.hPieces
+      let t := t ++ absorbPoints ps.hPieces ++ [.challenge]
       let x := fs.squeeze t
       let evalElts := subProofBlocks (fun p : Fin (shape n).numProofs =>
         absorbScalars (ps.instanceEvals p))
@@ -121,25 +121,24 @@ theorem deriveChallenges_at_captured_shape (n : ℕ) (fs : FiatShamir Fp G)
             absorbPermSet (ps.permutationSetEvals p s)))
         ++ subProofBlocks (fun p : Fin (shape n).numProofs =>
           subProofBlocks (fun l : Fin (shape n).numLookups => absorbLookup (ps.lookupEvals p l)))
-      let t := t ++ [.scalar x] ++ evalElts
+      let t := t ++ evalElts ++ [.challenge]
       let x1 := fs.squeeze t
-      let t := t ++ [.scalar x1]
+      let t := t ++ [.challenge]
       let x2 := fs.squeeze t
-      let t := t ++ [.scalar x2] ++ [TranscriptElt.point ps.multiopenQPrime]
+      let t := t ++ [TranscriptElt.point ps.multiopenQPrime] ++ [.challenge]
       let x3 := fs.squeeze t
-      let t := t ++ [.scalar x3] ++ absorbScalars ps.multiopenU
+      let t := t ++ absorbScalars ps.multiopenU ++ [.challenge]
       let x4 := fs.squeeze t
-      let t := t ++ [.scalar x4] ++ [TranscriptElt.point ps.ipaS]
+      let t := t ++ [TranscriptElt.point ps.ipaS] ++ [.challenge]
       let xi := fs.squeeze t
-      let t := t ++ [.scalar xi]
+      let t := t ++ [.challenge]
       let z := fs.squeeze t
-      let t := t ++ [.scalar z]
       let ipaRes := (List.finRange (shape n).k).foldl
         (fun (st : List (TranscriptElt Fp G) × List Fp) j =>
           let t := st.1 ++ [TranscriptElt.point (ps.ipaRounds j).1,
-            TranscriptElt.point (ps.ipaRounds j).2]
+            TranscriptElt.point (ps.ipaRounds j).2, TranscriptElt.challenge]
           let uj := fs.squeeze t
-          (t ++ [TranscriptElt.scalar uj], st.2 ++ [uj])) (t, [])
+          (t, st.2 ++ [uj])) (t, [])
       { theta := theta, beta := beta, gamma := gamma, y := y, x := x,
         x1 := x1, x2 := x2, x3 := x3, x4 := x4, xi := xi, z := z,
         ipaRound := fun j => ipaRes.2.getD j.val 0 } :=

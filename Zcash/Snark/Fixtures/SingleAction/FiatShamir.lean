@@ -1,4 +1,5 @@
 import Zcash.Snark.Fixtures.SingleAction.Fixture
+import Zcash.Snark.Fixtures.ScheduleMarker
 
 /-!
 # Fiat–Shamir schedule check for the single-action capture
@@ -6,7 +7,8 @@ import Zcash.Snark.Fixtures.SingleAction.Fixture
 The single-action analog of `Zcash.Snark.Fixtures.MultiAction.FiatShamir`, on the same design: Blake2b
 is intentionally taken at the random-oracle boundary; here `capturedFs` acts as a fixture oracle over
 Rust-captured transcript events, returning each captured challenge only when `deriveChallenges`
-presents the captured transcript prefix. This checks the absorb/squeeze order for the typed verifier
+presents the captured transcript prefix (re-encoded to the challenge-marker transcript by
+`markerSchedule`). This checks the absorb/squeeze order for the typed verifier
 transcript after Blake2b initialization, and then connects the resulting FS-derived fingerprint
 (`nonInteractiveFingerprint`, i.e. `assemble` at `deriveChallenges`) to the captured single-action MSM.
 The per-sub-proof absorb interleavings are exercised at length 1 here; the multi-action coverage is
@@ -57,12 +59,18 @@ def capturedScheduleIncludesInit : Bool :=
 theorem capturedScheduleIncludesInit_eq_true : capturedScheduleIncludesInit = true := by
   native_decide
 
-/-- Fixture Fiat–Shamir oracle: returns a captured challenge only at a Rust-captured transcript prefix.
-Unknown prefixes return `missingChallenge`, which is checked above not to be one of the captured
-challenges. -/
+/-- The captured schedule re-encoded to `deriveChallenges`'s challenge-marker transcript
+(`markerSchedule`): the capture records re-absorption prefixes, the model writes a `challenge` marker
+per squeeze and never feeds the challenge back — same absorb events, same challenge values. -/
+def markerScheduleEntries : List (List (TranscriptElt Fp G) × Fp) :=
+  markerSchedule capturedScheduleEntries
+
+/-- Fixture Fiat–Shamir oracle: returns a captured challenge only at a Rust-captured transcript prefix,
+re-encoded to the challenge-marker transcript (`markerScheduleEntries`). Unknown prefixes return
+`missingChallenge`, which is checked above not to be one of the captured challenges. -/
 def capturedFs : FiatShamir Fp G := {
   squeeze := fun t =>
-    match capturedScheduleEntries.find? (fun e => decide (e.1 = t)) with
+    match markerScheduleEntries.find? (fun e => decide (e.1 = t)) with
     | some e => e.2
     | none => missingChallenge
 }
