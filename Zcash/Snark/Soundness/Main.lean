@@ -5,6 +5,7 @@ import Zcash.Snark.Soundness.Consistency
 import Zcash.Snark.Soundness.IpaSoundness
 import Zcash.Snark.Soundness.Deployed.IpaPeel
 import Zcash.Snark.Soundness.Deployed.Verification
+import Zcash.Snark.Soundness.Forking.Assembly
 
 /-!
 # Soundness composition: conditional, and the deployed accept condition
@@ -29,10 +30,12 @@ commitment is opened up to its declared blinding — see
    equation `DeployedIpaVerifierEq`. Fidelity of that closed form to the Rust is the
    transcription layer (`assembleFinalMsm`/`ipaFold`, checked by the fingerprint), not re-proved
    here.
-2. `FiatShamirTree` (*residual*) — the equation yields a forked transcript
+2. `FiatShamirTree` (*legacy residual*) — the equation yields a forked transcript
    (`ForkedTranscript`, as data): the deployed tree opening the pinned `P`/`v`; bundles the
    Fiat–Shamir forking with the extraction content it supplies (inventory in its docstring).
-   `ForkedTranscript.ofAccepts` composes steps 1–2.
+   `ForkedTranscript.ofAccepts` composes steps 1–2. Its (a)–(c) content is discharged on the live
+   forking path (`Soundness.Forking.Rewind`, `deployed_forking_relation` — a computable reduction —
+   and the Vesta `_forking_*` capstones), leaving the random-oracle rewinding as the floor.
 3. The fork *either* peels cleanly onto `IpaAcceptV` — then `ipa_soundV` extracts the opening
    witness and `orchard_verifier_deployed_opening_of_forked`/`_constraint_of_forked` conclude
    `S` — *or* `NontrivialRelation.ofUnopenedFork` (*proven*, via
@@ -170,6 +173,18 @@ theorem ipaRelation_of_acceptV (urs : URS G) (b : Fin (2 ^ urs.k) → Fp) (P : G
   have hib : innerProduct a b = commitGen b a := by simp only [innerProduct, commitGen, smul_eq_mul]
   rw [hib]; exact hv
 
+/-- The `Σ'`-**data** companion of `ipaRelation_of_acceptV`: the *computed* opening witness (from
+`ipa_extractV`). The deployed reduction opens through this rather than the `∃`-shaped version, so the
+opening is carried as data — at prime order `∃ a, IpaRelation …` is vacuously satisfiable (any point has
+a `g`-preimage), while the *computed* witness cannot be produced without the accepting transcript. -/
+def ipaRelation_extract (urs : URS G) (b : Fin (2 ^ urs.k) → Fp) (P : G) (v : Fp)
+    (t : IpaTreeV Fp G urs.k) (h : IpaAcceptV urs.g b P v t) :
+    Σ' a, IpaRelation urs P b v a :=
+  let s := ipa_extractV urs.g b P v t h
+  ⟨s.1, s.2.1, by
+    have hib : innerProduct s.1 b = commitGen b s.1 := by simp only [innerProduct, commitGen, smul_eq_mul]
+    rw [hib]; exact s.2.2⟩
+
 /-- The deployed commitment the IPA verifier opens (`multiopenCommitment` with `urs`'s generators
 transported to the proof's `shape.k`): the pinned `P`, read off `(vk, ps, ch)`. Reducible, so it
 is defeq to its body for matching against `DeployedIpaVerifierEq`'s leading term. -/
@@ -256,11 +271,14 @@ augmented `(g, U, W)` basis, here arriving as bridge-supplied tree data:
     `S`/`ξ` blinding poly against the declared opening needs a representation of the adversary
     point `S` (ξ-side rewinding or AGM), so it is not a deterministic rewrite.
 
-Deriving (a)–(d) under random-oracle Fiat–Shamir is open. The per-leaf `g`/`U`/`W` separation is
-*derived* — its failure computes a relation (`NontrivialRelation.ofDeployedTree`) — but `S`/`ξ`
-is not peeled, it lives in (d). `b`/`z`/`blind` are bridge-mediated (the protocol fixes
-`b = evalVector urs.k ch.x3`, telescoping at the leaf to `b₀ = computeB ch.x3 ·`, and
-`z = ch.z`); `v` is pinned, and `P` is pinned up to the declared `pU`/`pW`. -/
+This `FiatShamirTree` is the *legacy* bundled bridge; (a)–(c)'s content is now discharged on the live
+forking path (`Soundness.Forking.Rewind`'s `deployed_forking_relation` — a *computable* reduction returning
+the opening as data — assembled from `Forking.Extractor`/`Forking.Assembly`, and the Vesta
+`_forking_*`/`_rewind` capstones), leaving only (d)'s `S`/`ξ` representation and the random-oracle rewinding
+itself as the floor. The per-leaf `g`/`U`/`W` separation is *derived* — its failure computes a relation
+(`NontrivialRelation.ofDeployedTree`) — but `S`/`ξ` is not peeled, it lives in (d). `b`/`z`/`blind` are
+bridge-mediated (the protocol fixes `b = evalVector urs.k ch.x3`, telescoping at the leaf to
+`b₀ = computeB ch.x3 ·`, and `z = ch.z`); `v` is pinned, and `P` is pinned up to the declared `pU`/`pW`. -/
 def FiatShamirTree [DecidableEq G] [Inhabited G] {shape : Shape} (urs : URS G) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp G) (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
     (b : Fin (2 ^ urs.k) → Fp) (z blind : Fp) : Type _ :=
@@ -276,6 +294,38 @@ def ForkedTranscript.ofAccepts [DecidableEq G] [Inhabited G] {shape : Shape} (ur
     (hFS : FiatShamirTree urs hk vk ps ch b z blind) :
     ForkedTranscript urs hk vk ps ch b z blind :=
   hFS (deployedAccepts_verifierEq urs hk vk ps ch haccepts)
+
+/-- The Fiat–Shamir **forking** hypothesis — the genuine residual (the random-oracle floor). On halo2's
+explicit verifier equation, rewinding the random oracle yields the 3-special-soundness forking *output*, as
+data: the declared `U`/`W` components `pU`/`pW` of the pinned commitment (the section note above) and a
+`DeployedIpaTreeV` whose every node records three accepting continuations at distinct nonzero per-round
+challenges and whose every leaf carries the flat closed-form verifier equation (`ForkAccept`), opening the
+declared commitment `deployedCommitment − [pU]u − [pW]w`. This is exactly the rewinding content that cannot be
+discharged in Lean; everything downstream of having it is a theorem (`fiatShamirTree_of_forking`). -/
+def FiatShamirForking [DecidableEq G] [Inhabited G] {shape : Shape} (urs : URS G) (hk : shape.k = urs.k)
+    (vk : VerifyingKey shape Fp G) (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
+    (b : Fin (2 ^ urs.k) → Fp) (z blind : Fp) : Type _ :=
+  DeployedIpaVerifierEq (hk ▸ urs.g) urs.w urs.u vk ps ch →
+    Σ' (pU pW : Fp) (t : DeployedIpaTreeV Fp G urs.k),
+      ForkAccept urs.g b urs.u urs.w z
+        (deployedCommitment urs hk vk ps ch - pU • urs.u - pW • urs.w) (multiopenValue vk ps ch) blind t
+
+/-- **The tree-assembly discharge.** The forking output (`FiatShamirForking`) *builds* the `FiatShamirTree`
+bridge: the forking supplies the declared components `pU`/`pW` and the distinct-challenge accepting
+transcripts, and the deterministic assembly `forkAccept_to_acceptV` (threading the per-round fold to the
+leaves, reconciling each flat closed-form equation to the reformulated leaf check) turns them into the
+`ForkedTranscript`'s `DeployedIpaAcceptV`. So the residual narrows from the handwave "an accepting verifier
+equation yields the whole 3-ary tree" to the genuine random-oracle floor "the rewinding yields the forked
+transcripts": the tree assembly itself — the node `L`/`R`↦value/blinding fold and the adjusted-commitment
+and leaf reconciliation — is a theorem, `sorry`/`axiom`-free. -/
+def fiatShamirTree_of_forking [DecidableEq G] [Inhabited G] {shape : Shape} (urs : URS G)
+    (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G) (ps : ProofString shape Fp G)
+    (ch : Challenges shape.k Fp) (b : Fin (2 ^ urs.k) → Fp) (z blind : Fp)
+    (hForking : FiatShamirForking urs hk vk ps ch b z blind) :
+    FiatShamirTree urs hk vk ps ch b z blind := by
+  intro hEq
+  obtain ⟨pU, pW, t, hFork⟩ := hForking hEq
+  exact ⟨t, pU, pW, forkAccept_to_acceptV _ _ _ _ _ t hFork⟩
 
 /-! ## The constraint-side hypotheses are unsatisfiable at a prime-order curve
 
