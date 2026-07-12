@@ -45,7 +45,10 @@ inductive TranscriptElt (F G : Type*) where
   deriving DecidableEq
 
 /-- The Fiat–Shamir hash, hand-waved: squeezes a field challenge from the transcript absorbed so far.
-In the deployed verifier this is Blake2b; neither it nor the random-oracle reduction is modeled. -/
+In the deployed verifier this is Blake2b, idealized as a random oracle (`Soundness.Forking.Oracle`). Given that
+idealization, challenge-vector uniformity has a standalone justification
+(`Soundness.Forking.Rewind.roChallenges_ipaRound_uniform`, for the fixed proof string); what stays unmodeled is
+the querying-adversary experiment and its query-loss, and Blake2b-as-random-oracle itself. -/
 structure FiatShamir (F G : Type*) where
   squeeze : List (TranscriptElt F G) → F
 

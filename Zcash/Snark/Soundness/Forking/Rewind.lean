@@ -17,7 +17,11 @@ Second, the probability chain replaces a posited forked transcript tree by an ac
 `deployed_forking_soundness_of_bridge` exposes the remaining prover-as-oracle bridge explicitly. The bridge's
 deterministic content is discharged below (`deployedVerifierEq_iff_flatAccept` and
 `deployedVerifierEq_iff_flatAccept_adaptive`); the remaining floor is the execution-semantics identification
-for a rewound RO adversary plus the random-oracle uniformity axiom carried by `hprob`.
+for a rewound RO adversary — the querying-adversary/query-loss experiment that would *derive* the accept
+probability of `hprob` — plus Blake2b-as-random-oracle. Challenge-vector uniformity is justified separately:
+`roChallenges_ipaRound_uniform` shows `hprob`'s uniform measure is the one a uniform random oracle induces. It
+is a standalone theorem, consumed by no capstone, and covers the fixed proof string only — see its section
+below for the precise scope.
 -/
 
 namespace Zcash.Snark
@@ -120,6 +124,54 @@ theorem roChallenges_reprogramRounds {shape : Shape} (O : List (TranscriptElt Fp
       | exact reprogramRounds_apply_short O init ps χ (by
           simp only [preIpaTranscript, List.length_append, List.length_cons, List.length_nil]
           omega)
+
+/-! ## Challenge-vector uniformity: a standalone justification for `hprob`'s measure
+
+`hprob` is stated over `PMF.uniformOfFintype (Fin k → Fp)`, the uniform measure on the IPA round-challenge
+vector. That a random oracle induces this distribution was an axiom; it is now a theorem:
+
+* `roChallenges_ipaRound_apply` — each round challenge is the oracle's answer at that round's transcript prefix,
+  `(roChallenges O init ps).ipaRound j = O (φ j)`, `φ = roundTranscriptFin (preIpaTranscript init ps) ps.ipaRounds`.
+* `roChallenges_ipaRound_uniform` — the `k` prefixes are pairwise distinct (`roundTranscriptFin_injective`), so
+  reading a uniform random oracle at them (`uniformOfFintype_map_eval_injective`) is the uniform challenge vector.
+
+**Scope.** This is a *standalone* justification, not a step in any capstone: nothing consumes
+`roChallenges_ipaRound_uniform`, and every `hprob` below is stated directly over `PMF.uniformOfFintype`. The
+theorem shows that measure is what a uniform random oracle induces; it is not substituted into the reduction.
+It has two limits. It samples the oracle only at the `k` round prefixes — the marginal on the round vector, not
+a full query domain. And it is for the fixed proof string `ps`: in the `_adaptive`/`_rewind` events the
+reprogrammed prefixes depend on `χ`, so tying `hprob`'s measure to a rewound-oracle experiment there belongs to
+the execution-semantics floor (a forger querying `O`, with query-loss — `Forking.Oracle`), above `hprob`, not
+this theorem. -/
+
+/-- Each round challenge is the oracle's answer at that round's transcript prefix:
+`(roChallenges O init ps).ipaRound j = O (roundTranscriptFin (preIpaTranscript init ps) ps.ipaRounds j)`.
+`roChallenges` is `deriveChallenges` through `ofOracle O`, whose squeeze is `O`, so this is
+`deriveChallenges_ipaRound_eq` at the oracle — the challenge vector depends on the oracle's values at the `k`
+prefixes alone. -/
+theorem roChallenges_ipaRound_apply {shape : Shape} (O : List (TranscriptElt Fp G) → Fp)
+    (init : List (TranscriptElt Fp G)) (ps : ProofString shape Fp G) (j : Fin shape.k) :
+    (roChallenges O init ps).ipaRound j
+      = O (roundTranscriptFin (preIpaTranscript init ps) ps.ipaRounds j) :=
+  deriveChallenges_ipaRound_eq (ofOracle O) init ps j
+
+/-- **Challenge-vector uniformity from a uniform random oracle.** Sampling the oracle uniformly over its query
+domain — the finite set `↥(Set.range φ)` of the `k` round prefixes
+`φ = roundTranscriptFin (preIpaTranscript init ps) ps.ipaRounds` — and reading its answers (`fun O j => O ⟨φ j, _⟩`,
+the round-challenge vector by `roChallenges_ipaRound_apply`) is distributed as
+`PMF.uniformOfFintype (Fin shape.k → Fp)`. This is `uniformOfFintype_map_eval_injective` at `φ`, whose injectivity
+(`roundTranscriptFin_injective`, the prefixes are distinct) makes the `k` answers independent-uniform. For its
+scope — a standalone justification of `hprob`'s measure, over the fixed-`ps` marginal, consumed by no capstone —
+see the section above. -/
+theorem roChallenges_ipaRound_uniform [DecidableEq G] {shape : Shape}
+    (init : List (TranscriptElt Fp G)) (ps : ProofString shape Fp G) :
+    (PMF.uniformOfFintype
+        (↥(Set.range (roundTranscriptFin (preIpaTranscript init ps) ps.ipaRounds)) → Fp)).map
+        (fun O j => O (Equiv.ofInjective _
+          (roundTranscriptFin_injective (preIpaTranscript init ps) ps.ipaRounds) j))
+      = PMF.uniformOfFintype (Fin shape.k → Fp) :=
+  uniformOfFintype_map_eval_injective _
+    (roundTranscriptFin_injective (preIpaTranscript init ps) ps.ipaRounds)
 
 open scoped ENNReal in
 open Classical in
@@ -399,7 +451,9 @@ the **algebra half**: `deployedVerifierEq_iff_flatAccept` proves halo2's actual 
 not an assumption. The round-by-round ordering behind the prefix-respecting `Prover` shape is likewise a
 theorem (`Soundness.Forking.Ordering`, sealed to the deployed schedule by `deriveChallenges_ipaRound_eq`;
 `proverRoundPoint_proverOfRounds` below reads the fixed round points off `proverOfRounds` on every challenge
-path). The residual is then only the random-oracle uniformity axiom (`Forking.Oracle`). -/
+path). The residual is then only the random-oracle adversary experiment above `hprob` (the querying forger and
+its query-loss) and Blake2b-as-random-oracle — challenge-vector uniformity is justified standalone
+(`roChallenges_ipaRound_uniform`; see its section, consumed by no capstone). -/
 
 /-- The prover-strategy tree the deployed non-interactive proof realises: at each IPA round it commits the
 proof's **fixed** round points `(Lⱼ, Rⱼ)` (they are written in the proof string, so the continuation ignores
@@ -528,7 +582,9 @@ with the eval vector `evalVector shape.k ch.x3` and the adjusted commitment `mul
 the deterministic content of the prover-as-oracle bridge, now a **theorem**, not an assumption: chaining
 `deployedVerifierEq_cf` (the verifier equation is `CF = 0`), `flatAccept_proverOfRounds` (`flatAccept` of the
 tree is that same `CF = 0`), and `foldAllFin_evalVector` (the `U`-coefficient is `computeB`). The only residual
-is the random-oracle uniformity axiom on the accept *measure* (`Forking.Oracle`). -/
+is the random-oracle adversary experiment above `hprob` (the querying forger and its query-loss) and
+Blake2b-as-random-oracle — the uniform *measure* of `hprob` is justified standalone
+(`roChallenges_ipaRound_uniform`; see its section). -/
 theorem deployedVerifierEq_iff_flatAccept {shape : Shape} [DecidableEq Fp] [DecidableEq G] [Inhabited G]
     (g : Fin (2 ^ shape.k) → G) (w u : G) (vk : VerifyingKey shape Fp G) (ps : ProofString shape Fp G)
     (ch : Challenges shape.k Fp) :
@@ -554,7 +610,9 @@ string at that path (pre-IPA fields fixed, IPA fields the path outputs), and
 `flatAccept P` at the vector. So the corresponding capstones' `hprob` (`Soundness.Vesta`, the `_adaptive`
 pair) is the accept probability of an adaptive strategy — the object rewinding produces — rather than of one
 fixed proof. What remains is the execution-semantics identification (that a rewound random-oracle adversary
-*induces* such a staged strategy, with its RO-query loss) and the random-oracle uniformity axiom. The
+*induces* such a staged strategy, with its RO-query loss) and Blake2b-as-random-oracle; the uniform measure of
+`hprob` is justified standalone (`roChallenges_ipaRound_uniform`; see its section), for the fixed proof string —
+the adaptive splices' χ-dependent prefixes are part of this same floor. The
 transcript-ordering and reprogramming content is internalized by `Forking.Ordering`,
 `roChallenges_reprogramRounds`, and the Vesta `_adaptive_rewind` capstones. -/
 
@@ -663,9 +721,11 @@ deterministic content is a theorem for every staged strategy, and the round-by-r
 behind the prefix-respecting shape is likewise proven and sealed to the deployed derivation
 (`Soundness.Forking.Ordering`, `deriveChallenges_ipaRound_eq`; `proverRoundPoint_proverOfRounds` for the
 tree side). Its execution-semantics content is the residual prover-as-oracle floor — that a rewound
-random-oracle adversary *induces* such a staged strategy — alongside the random-oracle uniformity axiom on
-the accept *probability* (the uniform measure of `hprob`, `Forking.Oracle`) — that the challenges are
-uniform, independent, rewindable random-oracle draws. -/
+random-oracle adversary *induces* such a staged strategy, with its query-loss, deriving the accept probability
+of `hprob` — alongside Blake2b-as-random-oracle. The uniform *measure* of `hprob` has its own justification:
+`roChallenges_ipaRound_uniform` shows it is what a uniform random oracle induces for the fixed proof string. That
+theorem is standalone (consumed by no capstone; see its section), so it justifies the measure choice without
+itself discharging the floor above. -/
 
 open scoped ENNReal in
 open Classical in
@@ -682,10 +742,12 @@ folds along each challenge path to `flatAccept Q`. The deterministic content of 
 `proverOfRounds ps.ipaRounds ps.ipaC ps.ipaF`, whose per-path `flatAccept` *is* the verifier's accept), so
 `hbridge` is *dischargeable* — but this theorem still takes it as an explicit hypothesis (it has not been
 rewired to consume that identity; doing so also needs the `S`-opening fact `commit urs s = ps.ipaS`). With
-`hbridge` supplied, the residual is *only* the random-oracle uniformity axiom on the accept probability — every
-other link (extraction, root-consistency, value placement, the `u`-vs-`u⁻¹` convention) is a theorem, as is
-the round-by-round transcript ordering (`Soundness.Forking.Ordering`, sealed by
-`deriveChallenges_ipaRound_eq`). This is the granular replacement for the monolithic `FiatShamirTree`. -/
+`hbridge` supplied, the residual is *only* the random-oracle adversary experiment above `hprob` — a querying
+forger and the rewinding query-loss that would derive its accept probability — plus Blake2b-as-random-oracle.
+Every other link (challenge-vector uniformity, now derived by `roChallenges_ipaRound_uniform`; extraction;
+root-consistency; value placement; the `u`-vs-`u⁻¹` convention) is a theorem, as is the round-by-round transcript
+ordering (`Soundness.Forking.Ordering`, sealed by `deriveChallenges_ipaRound_eq`). This is the granular
+replacement for the monolithic `FiatShamirTree`. -/
 noncomputable def deployed_forking_soundness_of_bridge [DecidableEq G] [Inhabited G] (urs : URS G)
     (b : Fin (2 ^ urs.k) → Fp) (v ξ z blind : Fp) (aMulti aDep s : Fin (2 ^ urs.k) → Fp)
     (Q : Prover Fp G urs.k) (accepts : (Fin urs.k → Fp) → Prop)

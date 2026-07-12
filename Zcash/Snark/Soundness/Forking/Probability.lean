@@ -45,6 +45,30 @@ theorem uniformOfFintype_toOuterMeasure_finset [Fintype α] [Nonempty α] (E : F
   rw [PMF.toOuterMeasure_apply_finset]
   simp only [PMF.uniformOfFintype_apply, Finset.sum_const, nsmul_eq_mul, div_eq_mul_inv]
 
+/-- Pushing the uniform distribution on `A` forward along a bijection `e : A ≃ B` gives the uniform distribution
+on `B`: each `b` has the single preimage `e.symm b`, of uniform mass `(card A)⁻¹ = (card B)⁻¹`. The building block
+for `uniformOfFintype_map_eval_injective`. -/
+theorem map_uniformOfFintype_equiv {A B : Type*} [Fintype A] [Nonempty A] [Fintype B] [Nonempty B]
+    (e : A ≃ B) : (PMF.uniformOfFintype A).map e = PMF.uniformOfFintype B := by
+  refine PMF.ext (fun b => ?_)
+  rw [PMF.map_apply, tsum_eq_single (e.symm b) (fun a ha => ?_)]
+  · simp only [PMF.uniformOfFintype_apply, Equiv.apply_symm_apply, if_pos, Fintype.card_congr e]
+  · rw [if_neg]
+    intro hb
+    exact ha (e.injective ((e.apply_symm_apply b).symm ▸ hb.symm))
+
+/-- Reading a uniform random function at finitely many distinct points is uniform. For injective `φ : ι → T`,
+sampling the oracle uniformly over its query domain — the finite set `↥(Set.range φ)` of the points `φ i` — and
+reading its answers `i ↦ O (φ i)` is distributed as `PMF.uniformOfFintype (ι → α)`. `Equiv.ofInjective φ hφ`
+reindexes the query cells by `ι`; injectivity is what makes it a bijection, so the reading map is an equivalence
+and `map_uniformOfFintype_equiv` applies. The random-oracle core of challenge-vector uniformity
+(`Soundness.Forking.Rewind.roChallenges_ipaRound_uniform`). -/
+theorem uniformOfFintype_map_eval_injective {ι T α : Type*} [Fintype ι] [DecidableEq ι] [DecidableEq T]
+    [Fintype α] [Nonempty α] (φ : ι → T) (hφ : Function.Injective φ) :
+    (PMF.uniformOfFintype (↥(Set.range φ) → α)).map (fun O i => O (Equiv.ofInjective φ hφ i))
+      = PMF.uniformOfFintype (ι → α) :=
+  map_uniformOfFintype_equiv (Equiv.arrowCongr (Equiv.ofInjective φ hφ).symm (Equiv.refl α))
+
 /-- **The multi-round forking lemma (probabilistic form).** If, over the random-oracle-uniform challenge
 *vector* `Fin d → α`, the prover's accept probability exceeds the knowledge error
 `kerr (card α) d / (card α)^d` (`= 3d/N` as a fraction), then a full `(3,…,3)` forking tree of accepting

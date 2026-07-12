@@ -446,9 +446,11 @@ rewinding shares the pre-IPA prefix; IPA fields the strategy's own outputs along
 accept probability of an adaptive round-strategy — the object rewinding produces — not one fixed proof's
 accept measure: the static-dichotomy caveat of the `_deployed` capstone does not apply at this rung. What
 remains is the execution-semantics identification (that a rewound random-oracle adversary *induces* such a
-staged strategy, with its RO-query loss), the random-oracle uniformity axiom in `hprob`, and the structural
-witnesses (`z ≠ 0`, `hg0`, the `S`-opening `hs` — with `ps.ipaS` splice-invariant, so one `s` serves every
-path). The transcript-ordering and reprogramming content is already on this path through the
+staged strategy, with its RO-query loss — deriving the accept probability of `hprob`), Blake2b-as-random-oracle,
+and the structural witnesses (`z ≠ 0`, `hg0`, the `S`-opening `hs` — with `ps.ipaS` splice-invariant, so one `s`
+serves every path). The uniform measure of `hprob` is justified standalone
+(`Forking.Rewind.roChallenges_ipaRound_uniform`, for the fixed proof string; consumed by no capstone). The
+transcript-ordering and reprogramming content is already on this path through the
 `_adaptive_rewind` capstone. The `⊕' NontrivialRelation` caveat is unchanged — vacuous at Vesta's prime
 order. -/
 noncomputable def orchard_verifier_vesta_forking_opening_adaptive [Fact (HasseBound Vesta.curve)] [DecidableEq VestaG]
@@ -493,11 +495,13 @@ bridge discharged.** The constraint companion of `orchard_verifier_vesta_forking
 adaptive accept event and internally-proven bridge, routed to the gate-satisfaction seam
 (`hquot`/`hgood` → `circuitSatViaGates`, `hencodes`) at the *claimed* value `multiopenValue`, pinned by the
 value-recovery hypothesis `hξ` (honest blinding, or a `1/p`-measure set of post-`S` challenges for a
-malicious blinder, `blinder_value_recovery_badSet`). Residual: the execution-semantics identification, the
-random-oracle uniformity axiom in `hprob`, and the structural witnesses; the static-dichotomy caveat does not
-apply at this rung. The transcript-ordering and reprogramming content is discharged by the staged
-rewinding capstones below. `hquot`/`hgood` retain the ∀-openings shape — unsatisfiable at Vesta for any decode
-that genuinely reads the witness. -/
+malicious blinder, `blinder_value_recovery_badSet`). Residual: the execution-semantics identification (the
+querying adversary and its query-loss, deriving `hprob`), Blake2b-as-random-oracle, and the structural
+witnesses; the uniform measure of `hprob` is justified standalone
+(`Forking.Rewind.roChallenges_ipaRound_uniform`, for the fixed proof string; consumed by no capstone); the
+static-dichotomy caveat does not apply at this rung. The transcript-ordering and reprogramming content is
+discharged by the staged rewinding capstones below. `hquot`/`hgood` retain the ∀-openings shape —
+unsatisfiable at Vesta for any decode that genuinely reads the witness. -/
 noncomputable def orchard_verifier_vesta_forking_constraint_adaptive [Fact (HasseBound Vesta.curve)]
     [DecidableEq VestaG] [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp)
@@ -549,7 +553,9 @@ The terminal readings, ordered by how much of the prover-as-oracle and rewinding
   bridge proven for every such strategy (`deployedVerifierEq_iff_flatAccept_adaptive`). Their `hprob` is an
   adaptive strategy's accept probability — the object rewinding produces — so the static-dichotomy caveat
   falls away; what remains is the execution-semantics identification that a rewound random-oracle adversary
-  *induces* such a strategy, with its RO-query loss, plus the random-oracle uniformity axiom.
+  *induces* such a strategy, with its RO-query loss (deriving the accept probability), plus
+  Blake2b-as-random-oracle. The uniform measure of `hprob` is justified standalone
+  (`Forking.Rewind.roChallenges_ipaRound_uniform`, for the fixed proof string; consumed by no capstone).
 * **Constant, rewound** — the `_rewind` forms below state the constant rung's accept events over
   **reprogrammed-oracle runs** (`reprogramRounds`), deriving the `{ch with ipaRound := χ}` round-vector
   surgery from the rewinding primitive via `roChallenges_reprogramRounds` — the transcript-ordering module
@@ -573,9 +579,11 @@ at `roChallenges (reprogramRounds O init ps χ) init ps` — the deployed schedu
 reprogrammed at the `k` round prefixes — rather than an unexplained `{ch with ipaRound := χ}` surgery.
 `roChallenges_reprogramRounds` proves the two events equal, so the round-vector semantics of the forking
 measure is *derived* from the rewinding primitive, consuming the transcript ordering. Residuals
-are unchanged: `z ≠ 0`, the nonzero generator `hg0`, the `S`-opening `hs`, and the random-oracle uniformity
-axiom in `hprob` — including the constant rung's static-dichotomy scope: `hprob` is still the *fixed*
-proof's accept measure over the whole challenge space (see
+are unchanged: `z ≠ 0`, the nonzero generator `hg0`, the `S`-opening `hs`, and — above `hprob` — the querying
+adversary and its query-loss plus Blake2b-as-random-oracle (the uniform measure of `hprob` is justified
+standalone, `Forking.Rewind.roChallenges_ipaRound_uniform`, for the fixed proof string) — including the constant
+rung's static-dichotomy scope: `hprob` is still the *fixed* proof's accept measure over the whole challenge
+space (see
 `orchard_verifier_vesta_forking_opening_deployed`); the `_adaptive`/`_adaptive_rewind` rungs are the
 attack-event forms. -/
 noncomputable def orchard_verifier_vesta_forking_opening_rewind [Fact (HasseBound Vesta.curve)] [DecidableEq VestaG]
@@ -649,8 +657,9 @@ reprogrammed-oracle runs on each strategy-spliced proof. For each challenge path
 spliced proof's IPA round prefixes and the deployed schedule is re-run. `roChallenges_reprogramRounds` turns
 that run into round-vector replacement, and `roChallenges_spliceIpa_pre` removes the irrelevant spliced
 pre-IPA fields. The residual is unchanged from the staged rung: the execution-semantics identification that a
-rewound random-oracle adversary induces such a strategy, with its RO-query loss, plus the uniformity axiom in
-`hprob`. -/
+rewound random-oracle adversary induces such a strategy, with its RO-query loss (deriving the accept probability
+of `hprob`), plus Blake2b-as-random-oracle — the uniform measure of `hprob` is justified standalone
+(`Forking.Rewind.roChallenges_ipaRound_uniform`, for the fixed proof string; consumed by no capstone). -/
 noncomputable def orchard_verifier_vesta_forking_opening_adaptive_rewind [Fact (HasseBound Vesta.curve)]
     [DecidableEq VestaG] [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG)
