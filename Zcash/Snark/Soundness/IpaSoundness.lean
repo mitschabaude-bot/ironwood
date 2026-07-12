@@ -31,8 +31,8 @@ variable {F G : Type*} [Field F] [AddCommGroup G] [Module F G]
 /-- Three-point linear-coefficient functional. For distinct `u₁,u₂,u₃` there are coefficients
 `l₁,l₂,l₃` with `Σ lᵢ = 0`, `Σ lᵢuᵢ = 1`, `Σ lᵢuᵢ² = 0` — i.e. `p ↦ Σ lᵢ·p(uᵢ)` reads off the
 coefficient of `u` from any degree-≤2 `p`. (The `lᵢ` are the `u`-coefficients of the Lagrange basis.) -/
-theorem vandermonde3 (u₁ u₂ u₃ : F) (h12 : u₁ ≠ u₂) (h13 : u₁ ≠ u₃) (h23 : u₂ ≠ u₃) :
-    ∃ l₁ l₂ l₃ : F, (l₁ + l₂ + l₃ = 0) ∧ (l₁ * u₁ + l₂ * u₂ + l₃ * u₃ = 1)
+def vandermonde3 (u₁ u₂ u₃ : F) (h12 : u₁ ≠ u₂) (h13 : u₁ ≠ u₃) (h23 : u₂ ≠ u₃) :
+    Σ' (l₁ l₂ l₃ : F), (l₁ + l₂ + l₃ = 0) ∧ (l₁ * u₁ + l₂ * u₂ + l₃ * u₃ = 1)
       ∧ (l₁ * u₁ ^ 2 + l₂ * u₂ ^ 2 + l₃ * u₃ ^ 2 = 0) := by
   have d12 : u₁ - u₂ ≠ 0 := sub_ne_zero.mpr h12
   have d13 : u₁ - u₃ ≠ 0 := sub_ne_zero.mpr h13
@@ -193,22 +193,22 @@ def IpaAcceptV : {d : ℕ} → (Fin (2 ^ d) → G) → (Fin (2 ^ d) → F) → G
         IpaAcceptV (foldGens g u₂) (foldGens b u₂) (P + u₂⁻¹ • L + u₂ • R) (v + u₂⁻¹ • Lv + u₂ • Rv) t₂ ∧
         IpaAcceptV (foldGens g u₃) (foldGens b u₃) (P + u₃⁻¹ • L + u₃ • R) (v + u₃⁻¹ • Lv + u₃ • Rv) t₃
 
-/-- **Full IPA knowledge soundness — the opening relation, derived from acceptance.** An accepting
-transcript tree yields a single witness `a` that both opens the commitment and gives the claimed inner
-product:
-`∃ a, commit g a = P ∧ commit b a = v` (and `commit b a = ⟨a, b⟩`). The two conjuncts share the same `a`
-— the explicit Vandermonde combination — by applying `ipa_round_commit_with_coeffs` to the commitment
-(`G`) and the inner product (`G := F`, generators `b`) with one set of coefficients. Binding-free. This is
-`IpaRelation` (`commit a = P ∧ ⟨a,b⟩ = v`) discharged from the verifier's accept. -/
-theorem ipa_soundV : {d : ℕ} → (g : Fin (2 ^ d) → G) → (b : Fin (2 ^ d) → F) → (P : G) → (v : F) →
+/-- **The IPA special-soundness extractor, as computed data.** The witness `a` is *constructed*
+(not merely shown to exist): the explicit `append` of Vandermonde combinations of the three
+sub-witnesses. Returning it as `Σ'` data (rather than behind an `∃`) is what makes the deployed
+opening a genuine reduction — the caller *has* the witness — instead of the prime-order-vacuous
+"an opening exists" (any group point has a `g`-preimage by prime order, so `∃ a, …` alone carries
+no content). Computable: `vandermonde3` and the fold are field arithmetic, and `ipa_round_commit_with_coeffs`
+only *proves* the two openings, it does not choose data. -/
+def ipa_extractV : {d : ℕ} → (g : Fin (2 ^ d) → G) → (b : Fin (2 ^ d) → F) → (P : G) → (v : F) →
     (t : IpaTreeV F G d) → IpaAcceptV g b P v t →
-    ∃ a : Fin (2 ^ d) → F, commitGen g a = P ∧ commitGen b a = v
+    Σ' a : Fin (2 ^ d) → F, commitGen g a = P ∧ commitGen b a = v
   | 0, g, b, P, v, .leaf c, h => ⟨fun _ => c, h.1.symm, h.2.symm⟩
   | _ + 1, g, b, P, v, .node L R Lv Rv u₁ u₂ u₃ t₁ t₂ t₃, h => by
       obtain ⟨h12, h13, h23, hu₁, hu₂, hu₃, ha₁, ha₂, ha₃⟩ := h
-      obtain ⟨c₁, hP₁, hv₁⟩ := ipa_soundV (foldGens g u₁) (foldGens b u₁) _ _ t₁ ha₁
-      obtain ⟨c₂, hP₂, hv₂⟩ := ipa_soundV (foldGens g u₂) (foldGens b u₂) _ _ t₂ ha₂
-      obtain ⟨c₃, hP₃, hv₃⟩ := ipa_soundV (foldGens g u₃) (foldGens b u₃) _ _ t₃ ha₃
+      obtain ⟨c₁, hP₁, hv₁⟩ := ipa_extractV (foldGens g u₁) (foldGens b u₁) _ _ t₁ ha₁
+      obtain ⟨c₂, hP₂, hv₂⟩ := ipa_extractV (foldGens g u₂) (foldGens b u₂) _ _ t₂ ha₂
+      obtain ⟨c₃, hP₃, hv₃⟩ := ipa_extractV (foldGens g u₃) (foldGens b u₃) _ _ t₃ ha₃
       obtain ⟨l₁, l₂, l₃, hl0, hl1, hl2⟩ := vandermonde3 u₁ u₂ u₃ h12 h13 h23
       refine ⟨append (l₁ • (u₁ • c₁) + l₂ • (u₂ • c₂) + l₃ • (u₃ • c₃)) (l₁ • c₁ + l₂ • c₂ + l₃ • c₃),
         ?_, ?_⟩
@@ -218,6 +218,14 @@ theorem ipa_soundV : {d : ℕ} → (g : Fin (2 ^ d) → G) → (b : Fin (2 ^ d) 
       · rw [commitGen_append]
         exact ipa_round_commit_with_coeffs (loHalf b) (hiHalf b) v Lv Rv c₁ c₂ c₃ u₁ u₂ u₃ l₁ l₂ l₃
           hl0 hl1 hl2 hu₁ hu₂ hu₃ hv₁ hv₂ hv₃
+
+/-- **Full IPA knowledge soundness — the opening relation, derived from acceptance.** The
+`∃`-shaped projection of `ipa_extractV` for callers that only need existence (`ipaRelation_of_acceptV`).
+The soundness content is in `ipa_extractV`'s *computed* witness; this forgets it to a `Prop`. -/
+theorem ipa_soundV {d : ℕ} (g : Fin (2 ^ d) → G) (b : Fin (2 ^ d) → F) (P : G) (v : F)
+    (t : IpaTreeV F G d) (h : IpaAcceptV g b P v t) :
+    ∃ a : Fin (2 ^ d) → F, commitGen g a = P ∧ commitGen b a = v :=
+  ⟨(ipa_extractV g b P v t h).1, (ipa_extractV g b P v t h).2⟩
 
 /-! ## The multiopen batch decode
 
