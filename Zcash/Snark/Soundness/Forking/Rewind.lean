@@ -14,14 +14,12 @@ identification is load-bearing in the `_rewind` Vesta capstones.
 Second, the probability chain replaces a posited forked transcript tree by an accept-probability hypothesis:
 `extractable_of_prob` yields an `Extractable` challenge tree, `proverAccept_forkValid` turns it into a
 `DeployedForkValid` certificate, `deployed_forking_relation` extracts the opened value, and
-`deployed_forking_soundness_of_bridge` exposes the remaining prover-as-oracle bridge explicitly. The bridge's
-deterministic content is discharged below (`deployedVerifierEq_iff_flatAccept` and
-`deployedVerifierEq_iff_flatAccept_adaptive`); the remaining floor is the execution-semantics identification
-for a rewound RO adversary — the querying-adversary/query-loss experiment that would *derive* the accept
-probability of `hprob` — plus Blake2b-as-random-oracle. Challenge-vector uniformity is justified separately:
-`roChallenges_ipaRound_uniform` shows `hprob`'s uniform measure is the one a uniform random oracle induces. It
-is a standalone theorem, consumed by no capstone, and covers the fixed proof string only — see its section
-below for the precise scope.
+`deployed_forking_soundness_of_bridge` isolates the remaining prover-as-oracle bridge. Its deterministic
+content is proven below (`deployedVerifierEq_iff_flatAccept`, `deployedVerifierEq_iff_flatAccept_adaptive`).
+The floor left is the execution-semantics identification for a rewound RO adversary — the
+querying-adversary/query-loss experiment that would *derive* `hprob`'s accept probability — plus
+Blake2b-as-random-oracle. The uniform *measure* of `hprob` is justified standalone by
+`roChallenges_ipaRound_uniform` (see its section for the scope).
 -/
 
 namespace Zcash.Snark
@@ -31,8 +29,8 @@ variable {G : Type*} [AddCommGroup G] [Module Fp G]
 /-- A random-oracle-backed Fiat–Shamir instance: the squeeze *is* the oracle `O`. -/
 def ofOracle (O : List (TranscriptElt Fp G) → Fp) : FiatShamir Fp G := ⟨O⟩
 
-/-- The non-interactive challenges a proof induces under random oracle `O` (the deployed verifier's own
-Fiat–Shamir coins): `deriveChallenges` through `ofOracle O`. -/
+/-- The challenges a proof induces under random oracle `O` — the deployed verifier's own Fiat–Shamir coins,
+`deriveChallenges` run through `ofOracle O`. -/
 def roChallenges {shape : Shape} (O : List (TranscriptElt Fp G) → Fp)
     (init : List (TranscriptElt Fp G)) (ps : ProofString shape Fp G) : Challenges shape.k Fp :=
   deriveChallenges (ofOracle O) init ps
@@ -41,13 +39,13 @@ def roChallenges {shape : Shape} (O : List (TranscriptElt Fp G) → Fp)
 
 The forking layer redraws the IPA round-challenge vector `χ` and evaluates the verifier at
 `{ch with ipaRound := χ}`; the random-oracle model rewinds by *reprogramming* the oracle
-(`Soundness.Forking.Oracle.reprogram`) at round prefixes and re-running the schedule. These are the same
-operation, and `roChallenges_reprogramRounds` proves it, consuming the round-by-round transcript ordering
-(`Soundness.Forking.Ordering`): the round prefixes are pairwise distinct and longer than every
-pre-IPA squeeze input (`roundTranscriptFin_length`/`_injective`), so reprogramming them changes exactly the
-round challenges (`deriveChallenges_ipaRound_eq`, the seal) and nothing upstream. This puts the ordering
-module on the Fiat–Shamir path: the `_rewind` capstones (`Soundness.Vesta`) state their accept probability
-over reprogrammed-oracle runs and reach the `_deployed` capstones through this identification. -/
+(`Soundness.Forking.Oracle.reprogram`) at the round prefixes and re-running the schedule. These are the same
+operation, and `roChallenges_reprogramRounds` proves it. The round prefixes are pairwise distinct and longer
+than every pre-IPA squeeze input (`roundTranscriptFin_length`/`_injective`), so reprogramming them changes
+exactly the round challenges (`deriveChallenges_ipaRound_eq`, the seal) and nothing upstream — which is why the
+proof consumes the round-by-round transcript ordering (`Soundness.Forking.Ordering`). This puts the ordering
+module on the Fiat–Shamir path: the `_rewind` capstones (`Soundness.Vesta`) state their accept probability over
+reprogrammed-oracle runs and reach the `_deployed` capstones through this identification. -/
 
 open Classical in
 /-- The `k`-point extension of `reprogram`: reprogram the oracle at *every* IPA round prefix of the fixed
@@ -106,11 +104,10 @@ private theorem Challenges.ext' {k : ℕ} {F : Type*} {c₁ c₂ : Challenges k 
 
 /-- **Redrawing the round vector is reprogramming the deployed oracle.** Running the deployed schedule under
 the oracle reprogrammed at all `k` round prefixes yields exactly the honest run with its IPA round vector
-replaced by `χ`: the pre-IPA challenges are untouched (their squeeze inputs are no longer than the base,
-`reprogramRounds_apply_short`), and round `j`'s challenge is the reprogrammed answer `χ j` — by the
-transcript-ordering seal `deriveChallenges_ipaRound_eq`. This is the vector-semantics ⇔ rewinding
-identification the forking layer's `{ch with ipaRound := χ}` events rest on, and the load-bearing consumer
-of `Soundness.Forking.Ordering`. -/
+replaced by `χ`. The pre-IPA challenges are untouched (their squeeze inputs are no longer than the base,
+`reprogramRounds_apply_short`), and round `j`'s challenge is the reprogrammed answer `χ j` — the
+transcript-ordering seal `deriveChallenges_ipaRound_eq`. This is the identification the forking layer's
+`{ch with ipaRound := χ}` events rest on, and the load-bearing consumer of `Soundness.Forking.Ordering`. -/
 theorem roChallenges_reprogramRounds {shape : Shape} (O : List (TranscriptElt Fp G) → Fp)
     (init : List (TranscriptElt Fp G)) (ps : ProofString shape Fp G) (χ : Fin shape.k → Fp) :
     roChallenges (reprogramRounds O init ps χ) init ps
@@ -135,14 +132,16 @@ vector. That a random oracle induces this distribution was an axiom; it is now a
 * `roChallenges_ipaRound_uniform` — the `k` prefixes are pairwise distinct (`roundTranscriptFin_injective`), so
   reading a uniform random oracle at them (`uniformOfFintype_map_eval_injective`) is the uniform challenge vector.
 
-**Scope.** This is a *standalone* justification, not a step in any capstone: nothing consumes
+**Scope.** This is a *standalone* justification, not a link in any capstone: nothing consumes
 `roChallenges_ipaRound_uniform`, and every `hprob` below is stated directly over `PMF.uniformOfFintype`. The
 theorem shows that measure is what a uniform random oracle induces; it is not substituted into the reduction.
-It has two limits. It samples the oracle only at the `k` round prefixes — the marginal on the round vector, not
-a full query domain. And it is for the fixed proof string `ps`: in the `_adaptive`/`_rewind` events the
-reprogrammed prefixes depend on `χ`, so tying `hprob`'s measure to a rewound-oracle experiment there belongs to
-the execution-semantics floor (a forger querying `O`, with query-loss — `Forking.Oracle`), above `hprob`, not
-this theorem. -/
+It has two limits:
+
+* it samples the oracle only at the `k` round prefixes — the marginal on the round vector, not a full query
+  domain;
+* it is for the fixed proof string `ps`. In the `_adaptive`/`_rewind` events the reprogrammed prefixes depend
+  on `χ`, so tying `hprob`'s measure to a rewound-oracle experiment there belongs to the execution-semantics
+  floor (a forger querying `O`, with query-loss — `Forking.Oracle`), above `hprob`, not this theorem. -/
 
 /-- Each round challenge is the oracle's answer at that round's transcript prefix:
 `(roChallenges O init ps).ipaRound j = O (roundTranscriptFin (preIpaTranscript init ps) ps.ipaRounds j)`.
@@ -177,10 +176,10 @@ open scoped ENNReal in
 open Classical in
 /-- **Accept-measure monotonicity into the capstones' `hprob`.** The deployed accept (`DeployedAccepts`,
 the `assemble?` guards plus the MSM identity) implies the explicit verifier equation pointwise
-(`deployedAccepts_verifierEq`), so a threshold beaten by the *deployed-accept* event is beaten by the
-`DeployedIpaVerifierEq` event the capstones consume — stated over arbitrary proof-string/challenge-record
-families so it covers the constant, `_rewind`, and `_adaptive_rewind` event shapes alike. Use this to feed
-a capstone `hprob` from a genuine deployed-accept probability. -/
+(`deployedAccepts_verifierEq`), so any threshold beaten by the *deployed-accept* event is beaten by the
+`DeployedIpaVerifierEq` event the capstones consume. Stated over arbitrary proof-string/challenge-record
+families, it covers the constant, `_rewind`, and `_adaptive_rewind` event shapes alike — use it to feed a
+capstone `hprob` from a genuine deployed-accept probability. -/
 theorem kerr_lt_verifierEq_of_deployedAccepts [DecidableEq G] [Inhabited G] {shape : Shape}
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
     (psf : (Fin shape.k → Fp) → ProofString shape Fp G)
@@ -199,12 +198,12 @@ theorem kerr_lt_verifierEq_of_deployedAccepts [DecidableEq G] [Inhabited G] {sha
 
 This closes the deterministic chain. From the flat forking output threading halo2's *adjusted* commitment
 `P' = ⟨aDep,G⟩ = multiopen − [v]g₀ + [ξ]⟨s,G⟩` (the verifier's `add_constant_term(-v)` plus the synthetic
-blinding `[ξ]S`), `deployed_forking_tree` extracts an opening of `P'` to inner product `0`, and the
-adjusted-commitment theorem (`ipaRelation_unshift` on `b₀ = 1`, then `ipaRelation_unblind_value`
-*unconditionally*) lifts it to an opening of the *multiopen* commitment `⟨aMulti,G⟩` to its **true** value
-`v − ξ·⟨s,b⟩`. So every step from the rewinding output to the deployed inner-product relation is a theorem;
-the residual is `DeployedForkValid` (the rewinding itself), the `g`-span/adjusted form, `b₀ = 1`, and
-Blake2b-as-random-oracle. -/
+blinding `[ξ]S`), `deployed_forking_tree` extracts an opening of `P'` to inner product `0`; the
+adjusted-commitment theorems then lift it to an opening of the *multiopen* commitment `⟨aMulti,G⟩` to its
+**true** value `v − ξ·⟨s,b⟩` — `ipaRelation_unshift` (keyed on `b₀ = 1`) restores the value and
+`ipaRelation_unblind_value` strips the blinding *unconditionally*. So every link from the rewinding output to
+the deployed inner-product relation is a theorem; the residual is `DeployedForkValid` (the rewinding itself),
+the `g`-span/adjusted form, `b₀ = 1`, and Blake2b-as-random-oracle. -/
 
 /-- **The deployed forking opening.** A flat forking output (`DeployedForkValid`, no posited decomposition)
 threading halo2's adjusted commitment `⟨aDep,G⟩ = ⟨aMulti,G⟩ − [v]g₀ + [ξ]⟨s,G⟩` yields an inner-product
@@ -214,8 +213,8 @@ opening of the multiopen commitment `⟨aMulti,G⟩` to the value `v − ξ·⟨
 (`deployed_forking_tree`) opens `⟨aDep,G⟩` to inner product `0`; `ipaRelation_unshift`
 (keyed on `b₀ = 1`) restores the value, and `ipaRelation_unblind_value` strips the synthetic blinding
 *unconditionally* — reporting that opened value whatever the prover's blinder `s` is (no `⟨s,b⟩ = 0`
-assumed; the honest case `⟨s,b⟩ = 0` recovers the claimed `v`). Every deterministic tie from rewinding to the
-opening is now proven. As a *computable* `def`, the opening is returned as **computed data**
+assumed; the honest case `⟨s,b⟩ = 0` recovers the claimed `v`). As a *computable* `def`, the opening is
+returned as **computed data**
 (`ipaRelation_extract`), not the prime-order-vacuous `∃ a, …`: neither the opening witness nor the relation
 coefficients can be produced without the `cert` (the discrete-log preimage the reviewer's vacuity witness
 needs is not computable), so this reduction is genuinely non-vacuous. The `deployed_forking_soundness*`
@@ -247,25 +246,24 @@ def deployed_forking_relation [DecidableEq G] [Inhabited G] (urs : URS G)
 
 /-! ## Closing the rewinding gap: the forked transcripts are *produced* by the probability
 
-`deployed_forking_relation` still took `DeployedForkValid` (the forked transcripts) as a hypothesis. This
+`deployed_forking_relation` still took `DeployedForkValid` (the forked transcripts) as a hypothesis; this
 discharges it. In the random-oracle model the challenge vector is uniform, so the prover's accept event is a
 finite set whose measure is its accept *probability*. When that probability exceeds the knowledge error
 `kerr/Nᵏ = 3k/N`, `extractable_of_prob` — the averaging argument that *is* the multi-round forking lemma —
 forces a full `(3,…,3)` forking tree to exist, and `proverAccept_forkValid` reads off the `DeployedForkValid`
-certificate. So the rewinding output is no longer assumed: it is produced by the accept probability beating
-the knowledge error, in the ideal RO model. The residual is exactly Blake2b-as-random-oracle (what makes the
-challenge uniform), the prover-as-strategy `P`, and the standard structural/honest-prover facts. -/
+certificate. So the rewinding output is no longer assumed: the accept probability beating the knowledge error
+produces it, in the ideal RO model. The residual is Blake2b-as-random-oracle (what makes the challenge
+uniform), the prover-as-strategy `P`, and the standard structural/honest-prover facts. -/
 
 open scoped ENNReal in
 open Classical in
 /-- **Challenge inversion is measure-preserving.** Componentwise inversion `χ ↦ (·⁻¹) ∘ χ` is an involution
 on `Fin d → Fp` — a field satisfies `a⁻¹⁻¹ = a` for *every* `a` (including `0`, since `0⁻¹ = 0`) — hence a
-bijection of the uniform random-oracle sample space onto itself. So relabelling the challenge vector by
-inversion leaves any accept event's probability unchanged. This is the probabilistic half of the
-consistency bridge: the deployed verifier folds generators by `foldGens g u⁻¹` (`foldAll`) while the
-extraction tree folds by `foldGens g u`, and the two accept events differ by exactly this inversion — so they
-have the same accept probability, and the soundness hypothesis on the tree predicate is the deployed
-verifier's accept probability. -/
+bijection of the uniform random-oracle sample space onto itself, so inverting the challenge vector leaves any
+accept event's probability unchanged. This is the probabilistic half of the consistency bridge: the deployed
+verifier folds generators by `foldGens g u⁻¹` (`foldAll`) while the extraction tree folds by `foldGens g u`,
+so the two accept events differ by exactly this inversion — equal probability, and the soundness hypothesis on
+the tree predicate is the deployed verifier's accept probability. -/
 theorem uniformOfFintype_measure_inv {d : ℕ} (acc : (Fin d → Fp) → Prop) :
     (PMF.uniformOfFintype (Fin d → Fp)).toOuterMeasure
         (Finset.univ.filter (fun χ : Fin d → Fp => acc (fun i => (χ i)⁻¹)))
@@ -310,10 +308,10 @@ theorem blinder_shift_badSet_measure (δ c : Fp) (hδ : δ ≠ 0) :
 
 /-- The deployed accept condition along one challenge path, in the **flat verifier's** IPA fold convention:
 generators (and eval vector) fold by `foldGens · u⁻¹` — exactly halo2's `foldAll`/`computeS` direction — rather
-than the extraction tree's `foldGens · u` (`proverAccept`). Everything else (the commitment fold `[u⁻¹]L + [u]R`,
-the leaf check) is identical. Its `CF`-fold is intended to match `DeployedIpaVerifierEq` — `deployedVerifierEq_cf`
-identifies the verifier equation with `CF = 0`, and the per-path identification is supplied as the explicit
-`hbridge` of `deployed_forking_soundness_of_bridge`, not proved here. -/
+than the extraction tree's `foldGens · u` (`proverAccept`). Everything else — the commitment fold
+`[u⁻¹]L + [u]R`, the leaf check — is identical. Its `CF`-fold matches `DeployedIpaVerifierEq`
+(`deployedVerifierEq_cf` identifies the verifier equation with `CF = 0`); the per-path identification is the
+explicit `hbridge` of `deployed_forking_soundness_of_bridge`, not proved here. -/
 def flatAccept : {d : ℕ} → Prover Fp G d → (Fin (2 ^ d) → G) → (Fin (2 ^ d) → Fp) → (U W : G) → (z : Fp) →
     G → (Fin d → Fp) → Prop
   | 0, .leaf c f, g, b, U, W, z, Pwhole, _ =>
@@ -385,14 +383,14 @@ open scoped ENNReal in
 /-- **The forking soundness for an abstract prover strategy.** For a strategy tree `P`, if its accept event
 `proverAccept P …` has probability exceeding the knowledge error `kerr (card Fp) k / (card Fp)ᵏ` (`= 3k/N`)
 over the uniform challenge vector, then the multiopen commitment `⟨aMulti,G⟩` opens to its **true** value
-`v − ξ·⟨s,b⟩` — or a nontrivial relation. `extractable_of_prob` (the averaging argument) turns the probability
-into a forking tree, `proverAccept_forkValid` into a `DeployedForkValid` certificate, and
-`deployed_forking_relation` into the opening. This is the **abstract** layer: `P` is an arbitrary strategy and
-the challenge vector is taken uniform. Tying it to the deployed verifier — that the actual proof realizes such
-a `P` whose accept event is `DeployedIpaVerifierEq`, over the random-oracle-derived challenge — is the explicit
-bridge of `deployed_forking_soundness_of_bridge`. The residual is that bridge (the prover-as-oracle / Blake2b
-floor) together with the structural facts (`b₀ = 1`, the adjusted/`g`-span form `hP`); the synthetic blinder is
-stripped unconditionally (no `s(x) = 0` assumed). -/
+`v − ξ·⟨s,b⟩` — or a nontrivial relation. The chain: `extractable_of_prob` (the averaging argument) turns the
+probability into a forking tree, `proverAccept_forkValid` into a `DeployedForkValid` certificate, and
+`deployed_forking_relation` into the opening. This is the **abstract** layer — `P` is an arbitrary strategy,
+the challenge vector uniform. Tying it to the deployed verifier (that the actual proof realizes such a `P`
+whose accept event is `DeployedIpaVerifierEq`, over the RO-derived challenge) is the explicit bridge
+`deployed_forking_soundness_of_bridge`. The residual is that bridge (the prover-as-oracle / Blake2b floor) and
+the structural facts (`b₀ = 1`, the adjusted/`g`-span form `hP`); the synthetic blinder is stripped
+unconditionally (no `s(x) = 0` assumed). -/
 noncomputable def deployed_forking_soundness [DecidableEq G] [Inhabited G] (urs : URS G)
     (b : Fin (2 ^ urs.k) → Fp) (v ξ z blind : Fp) (aMulti aDep s : Fin (2 ^ urs.k) → Fp)
     (P : Prover Fp G urs.k) (hz : z ≠ 0) (hb0 : b 0 = 1)
@@ -418,14 +416,13 @@ noncomputable def deployed_forking_soundness [DecidableEq G] [Inhabited G] (urs 
 
 open scoped ENNReal in
 open Classical in
-/-- **The deployed forking soundness, in the verifier's own fold convention.** Identical to
-`deployed_forking_soundness`, but the accept-probability hypothesis is stated with `flatAccept` — the flat
-verifier predicate folding generators by `foldGens g u⁻¹`, exactly halo2's `foldAll`/`computeS` direction —
-rather than the extraction tree's `proverAccept` (`foldGens g u`). The two have equal accept probability
-(`proverAccept_measure_eq_flatAccept`, via the measure-preserving challenge inversion), so this is a faithful
-restatement in the verifier's own `u⁻¹` fold convention, with the `u`-vs-`u⁻¹` consistency gap discharged by
-theorem. The hypothesis is still the *strategy* predicate `flatAccept Q`; identifying `Q` with the deployed
-proof is the explicit bridge of `deployed_forking_soundness_of_bridge`. -/
+/-- **The deployed forking soundness, in the verifier's own fold convention.** `deployed_forking_soundness`
+with the accept-probability hypothesis stated over `flatAccept` — folding generators by `foldGens g u⁻¹`,
+halo2's `foldAll`/`computeS` direction — instead of the extraction tree's `proverAccept` (`foldGens g u`). The
+two have equal accept probability (`proverAccept_measure_eq_flatAccept`, via the measure-preserving challenge
+inversion), so the `u`-vs-`u⁻¹` consistency gap is discharged by theorem. The hypothesis is still the
+*strategy* predicate `flatAccept Q`; identifying `Q` with the deployed proof is the explicit bridge
+`deployed_forking_soundness_of_bridge`. -/
 noncomputable def deployed_forking_soundness_flat [DecidableEq G] [Inhabited G] (urs : URS G)
     (b : Fin (2 ^ urs.k) → Fp) (v ξ z blind : Fp) (aMulti aDep s : Fin (2 ^ urs.k) → Fp)
     (Q : Prover Fp G urs.k) (hz : z ≠ 0) (hb0 : b 0 = 1)
@@ -690,64 +687,47 @@ theorem deployedVerifierEq_iff_flatAccept_adaptive {shape : Shape} [DecidableEq 
 
 /-! ## The deterministic content of the prover-as-oracle bridge `hbridge` is proven
 
-`hbridge` (the hypothesis of `deployed_forking_soundness_of_bridge` below) says: the deployed verifier's accept
-event, as a function of the challenge vector, is the flat predicate `flatAccept Q` of a prefix-respecting prover
-strategy `Q`. This is a **pointwise** (deterministic) identification — it carries no probability.
+`hbridge` (the hypothesis of `deployed_forking_soundness_of_bridge` below) is the **pointwise**
+identification — it carries no probability — of the deployed verifier's accept event, as a function of the
+challenge vector, with the flat predicate `flatAccept Q` of a prefix-respecting prover strategy `Q`.
 
-Its deterministic content is now **proven**: `deployedVerifierEq_iff_flatAccept` (above) proves halo2's actual
-verifier equation `DeployedIpaVerifierEq` *is* `flatAccept (proverOfRounds ps.ipaRounds ps.ipaC ps.ipaF)` at the
-challenge vector. The earlier "needs a separate round-by-round transcript-semantics layer" is done inside the
-model: the tree is `proverOfRounds` (its round points fixed by the proof string, its leaf the final opening —
-the Fiat–Shamir prefix-determination), and each path's `flatAccept` matches the verifier equation by
-`flatAccept_proverOfRounds` (`flatAccept` ↔ `CF = 0`) composed with `deployedVerifierEq_cf` (`CF = 0` ↔ the
-verifier equation).
+Its deterministic content is a **theorem**: `deployedVerifierEq_iff_flatAccept` (the constant strategy
+`proverOfRounds ps.ipaRounds ps.ipaC ps.ipaF`, round points fixed by the proof string) and
+`deployedVerifierEq_iff_flatAccept_adaptive` (every staged strategy) prove halo2's actual verifier equation
+`DeployedIpaVerifierEq` *is* `flatAccept` at the challenge vector — `flatAccept_proverOfRounds`
+(`flatAccept` ↔ `CF = 0`) composed with `deployedVerifierEq_cf` (`CF = 0` ↔ the equation). The round-by-round
+transcript ordering behind the prefix-respecting shape is likewise proven and sealed to the deployed schedule
+(`Soundness.Forking.Ordering`, `deriveChallenges_ipaRound_eq`; `proverRoundPoint_proverOfRounds` for the tree
+side).
 
-**Status.** `hbridge` is *discharged* in the deployed opening capstone
-`orchard_verifier_vesta_forking_opening_deployed` (`Soundness.Vesta`): that theorem takes halo2's **actual**
-verifier accept `DeployedIpaVerifierEq` (no abstract `hbridge`) and proves the bridge internally via
-`deployedVerifierEq_iff_flatAccept`, at the cost of the `S`-opening witness `commit urs s = ps.ipaS` (and
-the `shape.k`↔`urs.k` transport, discharged by `subst`). **Scope of the discharge:** the `_deployed` pair
-instantiates the *constant* strategy `proverOfRounds` — the fixed proof string — so its `hprob` is that fixed
-proof's accept measure over the whole challenge space (the static dichotomy), *not* the Fiat–Shamir attack
-event. The staged discharge — `deployedVerifierEq_iff_flatAccept_adaptive` and the `_adaptive` capstones
-(`Soundness.Vesta`) — extends the bridge theorem to *every* prefix-respecting strategy (`spliceIpa` /
-`pathData`), so `hprob` there is the accept probability of a round-adaptive adversary, the object rewinding
-produces. What `hbridge` still names beyond that is the execution-semantics identification — that a rewound
-random-oracle adversary *induces* such a staged strategy, with its RO-query loss (the out-of-Lean
-execution-semantics floor). The abstract theorems —
-`deployed_forking_soundness_of_bridge` below, and `orchard_verifier_vesta_forking_opening`/`_constraint` —
-retain `hbridge` as that *modular* hypothesis (they are stated over an abstract `accepts`/`Q`): its
-deterministic content is a theorem for every staged strategy, and the round-by-round transcript ordering
-behind the prefix-respecting shape is likewise proven and sealed to the deployed derivation
-(`Soundness.Forking.Ordering`, `deriveChallenges_ipaRound_eq`; `proverRoundPoint_proverOfRounds` for the
-tree side). Its execution-semantics content is the residual prover-as-oracle floor — that a rewound
-random-oracle adversary *induces* such a staged strategy, with its query-loss, deriving the accept probability
-of `hprob` — alongside Blake2b-as-random-oracle. The uniform *measure* of `hprob` has its own justification:
-`roChallenges_ipaRound_uniform` shows it is what a uniform random oracle induces for the fixed proof string. That
-theorem is standalone (consumed by no capstone; see its section), so it justifies the measure choice without
-itself discharging the floor above. -/
+**Where it is discharged.** The Vesta capstones (`Soundness.Vesta`) take halo2's **actual** accept
+`DeployedIpaVerifierEq` — no abstract `hbridge` — and prove the bridge internally, at the cost of the
+`S`-opening witness `commit urs s = ps.ipaS` (and the `shape.k`↔`urs.k` transport, by `subst`). The `_deployed`
+pair uses the *constant* strategy, so its `hprob` is that fixed proof's accept measure over the whole challenge
+space — the static dichotomy, *not* the Fiat–Shamir attack event; the `_adaptive` pair uses `spliceIpa`/
+`pathData`, so its `hprob` is a round-adaptive adversary's accept probability, the object rewinding produces.
+The abstract theorems (`deployed_forking_soundness_of_bridge` below,
+`orchard_verifier_vesta_forking_opening`/`_constraint`) keep `hbridge` as a *modular* hypothesis over an
+abstract `accepts`/`Q`.
+
+What `hbridge` still names is the execution-semantics floor: a rewound random-oracle adversary *induces* such a
+staged strategy, with its RO-query loss, deriving `hprob`'s accept probability — alongside
+Blake2b-as-random-oracle. The uniform *measure* of `hprob` is justified standalone
+(`roChallenges_ipaRound_uniform`; see its section). -/
 
 open scoped ENNReal in
 open Classical in
-/-- **The deployed forking soundness from an explicit prover-as-oracle bridge.** This is the honest top of the
-forking chain. It takes the deployed verifier's *actual* accept event `accepts χ` — the verifier on the proof
-at challenge vector `χ`, the proof being a function of `χ` is the Fiat–Shamir/random-oracle model — together
-with the **explicit** faithfulness bridge `hbridge` identifying that event with the strategy predicate
-`flatAccept Q`, and concludes the deployed opening from the accept *probability*.
-
-`flatAccept` folds generators by `foldGens g u⁻¹`, exactly halo2's `compute_s` direction, so the verifier
-equation `DeployedIpaVerifierEq` — which `deployedVerifierEq_cf` identifies with the closed form `CF = 0` —
-folds along each challenge path to `flatAccept Q`. The deterministic content of `hbridge` is **proven** by
-`deployedVerifierEq_iff_flatAccept` (the proof string read as the prefix-respecting `Prover`
-`proverOfRounds ps.ipaRounds ps.ipaC ps.ipaF`, whose per-path `flatAccept` *is* the verifier's accept), so
-`hbridge` is *dischargeable* — but this theorem still takes it as an explicit hypothesis (it has not been
-rewired to consume that identity; doing so also needs the `S`-opening fact `commit urs s = ps.ipaS`). With
-`hbridge` supplied, the residual is *only* the random-oracle adversary experiment above `hprob` — a querying
-forger and the rewinding query-loss that would derive its accept probability — plus Blake2b-as-random-oracle.
-Every other link (challenge-vector uniformity, now derived by `roChallenges_ipaRound_uniform`; extraction;
-root-consistency; value placement; the `u`-vs-`u⁻¹` convention) is a theorem, as is the round-by-round transcript
-ordering (`Soundness.Forking.Ordering`, sealed by `deriveChallenges_ipaRound_eq`). This is the granular
-replacement for the monolithic `FiatShamirTree`. -/
+/-- **The deployed forking soundness from an explicit prover-as-oracle bridge.** The honest top of the forking
+chain: from the deployed verifier's *actual* accept event `accepts χ` (the proof a function of `χ` — the
+Fiat–Shamir/random-oracle model), the **explicit** faithfulness bridge `hbridge` identifying it with the
+strategy predicate `flatAccept Q`, and the accept *probability* beating the knowledge error, it concludes the
+deployed opening. `hbridge`'s deterministic content is a theorem (`deployedVerifierEq_iff_flatAccept`; see the
+section above), so it is *dischargeable* — this theorem keeps it as an explicit hypothesis (discharging it in
+place also needs the `S`-opening fact `commit urs s = ps.ipaS`). With `hbridge` supplied, the residual is
+*only* the random-oracle adversary experiment above `hprob` (a querying forger and the rewinding query-loss)
+plus Blake2b-as-random-oracle; every other link — challenge-vector uniformity (`roChallenges_ipaRound_uniform`),
+extraction, root-consistency, value placement, the `u`-vs-`u⁻¹` convention, the transcript ordering — is a
+theorem. The granular replacement for the monolithic `FiatShamirTree`. -/
 noncomputable def deployed_forking_soundness_of_bridge [DecidableEq G] [Inhabited G] (urs : URS G)
     (b : Fin (2 ^ urs.k) → Fp) (v ξ z blind : Fp) (aMulti aDep s : Fin (2 ^ urs.k) → Fp)
     (Q : Prover Fp G urs.k) (accepts : (Fin urs.k → Fp) → Prop)

@@ -17,12 +17,12 @@ Vesta specialization additionally pins CompElliptic's one `native_decide` fact (
 witness `p_nsmul_Gpt` behind the curve order), likewise reached only through `Prop` positions.
 
 The same two checks cover the deployed forking reductions that return their result as *computed
-data*: `ipa_extractV` (the IPA opening witness), `ipaRelation_extract`, `produceDeployed` and
-`deployed_forking_tree` (the root-consistent tree extraction), and `deployed_forking_relation`
-(the end-to-end multiopen opening). Their non-vacuity is exactly that they are computable — the
-witness cannot be produced without the certificate — so a `sorry` or a `noncomputable` dependency
-would defeat them, and the pins freeze that. Their axiom sets are the standard classical trio,
-`Classical.choice` again reaching only erased `Prop` positions.
+data* — `ipa_extractV` (the IPA opening witness), `ipaRelation_extract`, `produceDeployed`/
+`deployed_forking_tree` (the root-consistent tree extraction), `deployed_forking_relation` (the
+end-to-end multiopen opening). Their non-vacuity *is* their computability — the witness cannot be
+produced without the certificate — so a `sorry` or a `noncomputable` dependency would defeat them,
+and these pins freeze that. Their axiom sets are the standard classical trio, `Classical.choice`
+again reaching only erased `Prop` positions.
 -/
 
 open Zcash.Snark

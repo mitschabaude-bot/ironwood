@@ -33,7 +33,7 @@ commitment is opened up to its declared blinding — see
 2. `FiatShamirTree` (*legacy residual*) — the equation yields a forked transcript
    (`ForkedTranscript`, as data): the deployed tree opening the pinned `P`/`v`; bundles the
    Fiat–Shamir forking with the extraction content it supplies (inventory in its docstring).
-   `ForkedTranscript.ofAccepts` composes steps 1–2. Its (a)–(c) content is discharged on the live
+   `ForkedTranscript.ofAccepts` composes 1–2 above. Its (a)–(c) content is discharged on the live
    forking path (`Soundness.Forking.Rewind`, `deployed_forking_relation` — a computable reduction —
    and the Vesta `_forking_*` capstones), leaving the random-oracle rewinding as the floor.
 3. The fork *either* peels cleanly onto `IpaAcceptV` — then `ipa_soundV` extracts the opening
@@ -173,10 +173,10 @@ theorem ipaRelation_of_acceptV (urs : URS G) (b : Fin (2 ^ urs.k) → Fp) (P : G
   have hib : innerProduct a b = commitGen b a := by simp only [innerProduct, commitGen, smul_eq_mul]
   rw [hib]; exact hv
 
-/-- The `Σ'`-**data** companion of `ipaRelation_of_acceptV`: the *computed* opening witness (from
+/-- The `Σ'`-data companion of `ipaRelation_of_acceptV`: the *computed* opening witness (from
 `ipa_extractV`). The deployed reduction opens through this rather than the `∃`-shaped version, so the
 opening is carried as data — at prime order `∃ a, IpaRelation …` is vacuously satisfiable (any point has
-a `g`-preimage), while the *computed* witness cannot be produced without the accepting transcript. -/
+a `g`-preimage), while the computed witness cannot be produced without the accepting transcript. -/
 def ipaRelation_extract (urs : URS G) (b : Fin (2 ^ urs.k) → Fp) (P : G) (v : Fp)
     (t : IpaTreeV Fp G urs.k) (h : IpaAcceptV urs.g b P v t) :
     Σ' a, IpaRelation urs P b v a :=
@@ -255,7 +255,7 @@ theorem ForkedTranscript.nonempty_of_opening [DecidableEq G] [Inhabited G] {shap
   rw [hcancel, hv]
   exact ht
 
-/-- The forking bridge — the *residual* assumption. Its premise is halo2's explicit verifier
+/-- **The forking bridge — the residual assumption.** Its premise is halo2's explicit verifier
 equation `DeployedIpaVerifierEq` (which `deployedAccepts_verifierEq` proves the deployed accept
 entails); it produces a `ForkedTranscript`. It bundles the Fiat–Shamir *forking* with the
 special-soundness *extraction* content the forked transcripts would pin by Vandermonde over the
@@ -267,7 +267,7 @@ augmented `(g, U, W)` basis, here arriving as bridge-supplied tree data:
 (c) the leaf `g`-representation `aP` of the folded commitment (`DeployedIpaTreeV`'s leaf data);
     and
 (d) the commitment's declared `U`/`W` components `pU`/`pW` (the section note above) and the
-    adjusted-commitment step `P' = P − [v]g₀ + [ξ]S`: re-expressing the value term and the
+    adjusted-commitment identity `P' = P − [v]g₀ + [ξ]S`: re-expressing the value term and the
     `S`/`ξ` blinding poly against the declared opening needs a representation of the adversary
     point `S` (ξ-side rewinding or AGM), so it is not a deterministic rewrite.
 
@@ -295,7 +295,7 @@ def ForkedTranscript.ofAccepts [DecidableEq G] [Inhabited G] {shape : Shape} (ur
     ForkedTranscript urs hk vk ps ch b z blind :=
   hFS (deployedAccepts_verifierEq urs hk vk ps ch haccepts)
 
-/-- The Fiat–Shamir **forking** hypothesis — the genuine residual (the random-oracle floor). On halo2's
+/-- **The Fiat–Shamir forking hypothesis — the genuine residual (random-oracle floor).** On halo2's
 explicit verifier equation, rewinding the random oracle yields the 3-special-soundness forking *output*, as
 data: the declared `U`/`W` components `pU`/`pW` of the pinned commitment (the section note above) and a
 `DeployedIpaTreeV` whose every node records three accepting continuations at distinct nonzero per-round

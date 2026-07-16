@@ -48,8 +48,9 @@ import Zcash.Snark.Soundness.Deployed.Ipa
 import Zcash.Snark.Soundness.Deployed.IpaPeel
 import Zcash.Snark.Soundness.Deployed.TrustBoundary
 import Zcash.Snark.Soundness.Deployed.Verification
--- Fiat–Shamir forking development: random-oracle discharge of the forked transcript tree, and
--- round-by-round soundness by tying each IPA round challenge to the transcript prefix that commits it.
+-- The Fiat–Shamir forking development: discharges the forked transcript tree in the random-oracle
+-- model, and proves round-by-round soundness by tying each IPA round challenge to the transcript
+-- prefix that commits it.
 import Zcash.Snark.Soundness.Forking.Oracle
 import Zcash.Snark.Soundness.Forking.Tree
 import Zcash.Snark.Soundness.Forking.Probability

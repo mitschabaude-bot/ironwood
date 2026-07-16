@@ -3,7 +3,7 @@ import Zcash.Snark.Verifier.FiatShamir
 /-!
 # Captured Fiat–Shamir schedules, re-encoded to the challenge-marker transcript
 
-The Rust `ChallengeRecorder` captures record each squeeze's transcript prefix in the *re-absorption*
+The Rust `ChallengeRecorder` captures each squeeze's transcript prefix in the *re-absorption*
 encoding: after a squeeze, the challenge value is fed back into the running transcript as a `.scalar`,
 and no marker is written. `deriveChallenges` instead models the deployed transcript with the
 `TranscriptElt.challenge` domain marker — halo2 writes the `BLAKE2B_PREFIX_CHALLENGE` byte before each
@@ -21,7 +21,7 @@ variable {F G : Type*}
 
 /-- The fold behind `markerSchedule`: `prev` is the previous entry already re-encoded (its prefix ends
 with the `challenge` marker), `oldLen` the previous entry's prefix length in the captured encoding.
-Each step drops the one re-absorbed challenge that opens every post-squeeze block of the captured
+Each iteration drops the one re-absorbed challenge that opens every post-squeeze block of the captured
 encoding, keeps the block's absorbs, and appends the marker. -/
 def markerSchedule.go (prev : List (TranscriptElt F G) × F) (oldLen : ℕ) :
     List (List (TranscriptElt F G) × F) → List (List (TranscriptElt F G) × F)

@@ -136,10 +136,10 @@ computes the same thing — halo2 batch-inverts the round challenges with ff's `
 which leaves a zero challenge at zero — so at `uⱼ = 0` the equation and the Rust agree
 term for term. The corner is faithful in both directions: nothing about acceptance can be
 shown from this form that the deployed verifier would not exhibit. The forking *extractor*, by
-contrast, requires the three sibling challenges at each node to be nonzero (the Vandermonde
-recovery and `u⁻¹` fold need cancellable challenges), and pays that extra bad challenge per round
-in the knowledge-error count `Soundness.Forking.Tree.kerr` — so this totality is only about the
-equation's definedness, not the extractor's admissible challenges. -/
+contrast, needs the three sibling challenges at each node to be nonzero (the Vandermonde recovery
+and `u⁻¹` fold need cancellable challenges), paying for that extra bad challenge per round in the
+knowledge-error count `Soundness.Forking.Tree.kerr` — so this totality concerns only the equation's
+definedness, not the extractor's admissible challenges. -/
 def DeployedIpaVerifierEq {shape : Shape} [DecidableEq F] [DecidableEq G] [Inhabited G]
     (g : Fin (2 ^ shape.k) → G) (w u : G)
     (vk : VerifyingKey shape F G) (ps : ProofString shape F G) (ch : Challenges shape.k F) : Prop :=

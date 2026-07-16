@@ -3,37 +3,36 @@ import Mathlib
 /-!
 # Multi-round tree extraction (the Fiat–Shamir forking compounding)
 
-This module establishes, by a counting/averaging induction over the `d` rounds, that if the prover's
-accepting set of challenge vectors is large enough — more than the threshold count `kerr` — then a full
-`(3,…,3)`-tree of accepting challenge vectors exists (`Extractable`). It is self-contained: the multi-round
-existence *is* the `kerr` count below, not an iteration of the per-round cubic bound in
-`Soundness.Forking.Probability`.
+If the prover's accepting set of challenge vectors is large enough — more than the threshold count `kerr` —
+a full `(3,…,3)`-tree of accepting challenge vectors exists (`Extractable`). Proved by a counting/averaging
+induction over the `d` rounds, and self-contained: the multi-round existence *is* the `kerr` count below, not
+an iteration of the per-round cubic bound in `Soundness.Forking.Probability`.
 
-`kerr (card α) d` is a tree-existence threshold as a count out of `(card α)^d`; as a fraction it is `3d/N`
-(`N = card α`), a **conservative upper bound** on that threshold (the tight value is `1 − (1 − 3/N)^d`). The
-`3` is the price of requiring **nonzero** challenges — the IPA's `u⁻¹` fold needs each `uⱼ ≠ 0` — not vanilla
-3-special-soundness (error `≈ 2d/N`). This is the *tree-existence* threshold, not the end-to-end Fiat–Shamir
-knowledge error (which additionally carries the random-oracle query-count factor). `Extractable` holds
-whenever the accept probability exceeds `3d/N`.
+`kerr (card α) d` is a count out of `(card α)^d`; as a fraction it is `3d/N` (`N = card α`), a conservative
+upper bound on the true threshold (whose tight value is `1 − (1 − 3/N)^d`). The `3` is the price of requiring
+nonzero challenges — the IPA's `u⁻¹` fold needs each `uⱼ ≠ 0` — rather than vanilla 3-special-soundness
+(error `≈ 2d/N`). This is the tree-existence threshold, not the end-to-end Fiat–Shamir knowledge error, which
+additionally carries the random-oracle query-count factor. `Extractable` holds whenever the accept
+probability exceeds `3d/N`.
 
-This is the abstract combinatorial core; the deployed verifier instantiates `acc` with its own accept
-predicate, and the per-node `(g,U,W)` decomposition is recovered separately (special-soundness / Vandermonde).
+The abstract combinatorial core: the deployed verifier instantiates `acc` with its own accept predicate, and
+the per-node `(g,U,W)` decomposition is recovered separately (special-soundness / Vandermonde).
 -/
 
 namespace Zcash.Snark
 
 variable {α : Type*}
 
-/-- A conservative tree-existence-threshold count for the nonzero-challenge `(3,…,3)`-tree over a size-`N`
-challenge set and `d` rounds: `kerr N (d+1) = 3·N^d + N·kerr N d`, `kerr N 0 = 0`. As a fraction of `N^d` it
-is `3d/N` — an upper bound; the tight threshold is `1 − (1 − 3/N)^d`. -/
+/-- The tree-existence-threshold count for the nonzero-challenge `(3,…,3)`-tree over a size-`N` challenge set
+and `d` rounds. As a fraction of `N^d` it is `3d/N` — a conservative upper bound; the tight threshold is
+`1 − (1 − 3/N)^d`. -/
 def kerr (N : ℕ) : ℕ → ℕ
   | 0 => 0
   | d + 1 => 3 * N ^ d + N * kerr N d
 
-/-- A `(3,…,3)`-tree of accepting challenge vectors exists for `acc`: at each of the `d` rounds, three
+/-- A `(3,…,3)`-tree of accepting challenge vectors for `acc`: at each of the `d` rounds, three
 pairwise-distinct nonzero challenges, each extending to an accepting subtree. The forking output's challenge
-skeleton — what rewinding must produce, here shown to exist from a large enough accepting set. -/
+skeleton — what rewinding must produce, shown to exist above the `kerr` threshold by `extractable_of_kerr_lt`. -/
 def Extractable [Zero α] : {d : ℕ} → ((Fin d → α) → Prop) → Prop
   | 0, acc => acc Fin.elim0
   | _ + 1, acc => ∃ u₁ u₂ u₃ : α, u₁ ≠ u₂ ∧ u₁ ≠ u₃ ∧ u₂ ≠ u₃ ∧ u₁ ≠ 0 ∧ u₂ ≠ 0 ∧ u₃ ≠ 0 ∧
@@ -54,11 +53,10 @@ theorem card_filter_eq_sum_slice [Fintype α] [DecidableEq α] {d : ℕ}
 
 /-- **Multi-round tree extraction.** If the prover's accepting set of `d`-round challenge vectors exceeds the
 knowledge-error count `kerr N d` (`N = card α`), a full `(3,…,3)`-tree of accepting challenge vectors exists.
-By induction on rounds: at each round the accepting count splits over the first challenge (`card_filter_eq_sum_slice`),
-and an averaging argument forces at least four first challenges whose continuations are themselves above the
-`d`-round threshold — three of them nonzero, recursed by the induction hypothesis. This is the deterministic
-core of the Fiat–Shamir forking: the rewinding produces this tree whenever the accept probability beats the
-knowledge error `3d/N`. -/
+Induction on rounds: the accepting count splits over the first challenge (`card_filter_eq_sum_slice`), and
+averaging forces at least four first challenges whose continuations again beat the `d`-round threshold — three
+of them nonzero, recursed by the induction hypothesis. The deterministic core of the Fiat–Shamir forking:
+rewinding produces this tree whenever the accept probability beats the knowledge error `3d/N`. -/
 theorem extractable_of_kerr_lt [Fintype α] [DecidableEq α] [Zero α] :
     ∀ {d : ℕ} (acc : (Fin d → α) → Prop) [DecidablePred acc],
       kerr (Fintype.card α) d < (Finset.univ.filter acc).card → Extractable acc

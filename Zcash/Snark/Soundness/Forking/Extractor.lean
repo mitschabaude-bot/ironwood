@@ -10,9 +10,9 @@ Building `ForkAccept` from the forking output needs each node's value/blinding c
 recovered from the three accepting continuations. `ipa_round_commit_with_coeffs` already *cancels* arbitrary
 `L`/`R` cross-terms by Vandermonde and recovers the parent commitment; this module supplies the *recovery*
 counterpart for the scalar value/blinding fold: given the three folded scalars at distinct nonzero
-challenges, the parent scalar and its two cross-terms exist and interpolate them.
+challenges, the parent scalar and its two cross-terms exist and fold back to them.
 
-`vandermonde3_recover` is the scalar 3-special-soundness step: the linear map
+`vandermonde3_recover` is the scalar 3-special-soundness recovery: the linear map
 `(v, Lv, Rv) ↦ (v + uᵢ⁻¹·Lv + uᵢ·Rv)ᵢ` is injective at three distinct nonzero challenges (a quadratic with
 three roots is zero), hence surjective, so any triple of folded values is hit.
 -/
@@ -198,7 +198,7 @@ either the deployed accept predicate for the deployed commitment `⟨aDep, g⟩`
 deployed whole (`NontrivialRelation.ofCombinationCollision` — the binding branch) forces the recovered
 `(P, v)` to *be* the deployed `(⟨aDep,g⟩, vDep)`. Genuinely non-vacuous: this is a computable `def`
 (decidable `if`, no `Classical.choose`), so neither branch's *data* can be fabricated without the `cert` —
-the discrete-log preimage the reviewer's prime-order vacuity witness needs is not computable. The residual is
+the discrete-log preimage a prime-order vacuity witness would need is not computable. The residual is
 supplying `DeployedForkValid` (the rewinding) and the DLR/Blake2b hardness floor. -/
 def deployed_forking_tree [DecidableEq F] [DecidableEq G] {U W : G} {z : F} (hz : z ≠ 0)
     {d : ℕ} (g : Fin (2 ^ d) → G) (b : Fin (2 ^ d) → F) (aDep : Fin (2 ^ d) → F) (vDep blindDep : F)

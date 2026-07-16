@@ -4,11 +4,11 @@ import Zcash.Snark.Core.Group
 /-!
 # Knowledge soundness: the polynomial-commitment / inner-product-argument layer
 
-The transcription layer established faithfulness: the deployed verifier collapses to the
-fingerprint MSM, and the Lean assembly reproduces it (the captured match,
-`Zcash.Snark.Fingerprint`). This module begins soundness — that an accepting proof implies the
-prover knows a valid witness — via the special soundness of the inner-product argument (IPA), the
-cryptographic core of the halo2 opening.
+This module begins knowledge soundness: an accepting proof implies the prover knows a valid
+witness, via the special soundness of the inner-product argument (IPA) — the cryptographic core of
+the halo2 opening. It follows the transcription layer, which established faithfulness (the deployed
+verifier collapses to the fingerprint MSM, reproduced by the Lean assembly; the captured match,
+`Zcash.Snark.Fingerprint`).
 
 The IPA proves knowledge of a coefficient vector `a` (a polynomial) behind a commitment `P = ⟨a, G⟩`
 that opens to a value `v` at a point — i.e. `⟨a, b⟩ = v` for the evaluation vector `b = (1, x, x², …)`.

@@ -12,7 +12,7 @@ one challenge path, not the three the 3-special-soundness tree needs. The honest
 (a rewinding/forking reduction): if the prover makes the verifier accept with probability `ε` over a random
 oracle, beating the knowledge error forces the full `(3,…,3)` forking tree to exist.
 
-This module supplies that probabilistic step over the uniform challenge of the random-oracle model
+This module supplies that probabilistic argument over the uniform challenge of the random-oracle model
 (`Forking.Oracle.uniformChallenge`):
 
 * `uniformOfFintype_toOuterMeasure_finset` — a finite event has uniform probability `|E| / |domain|`
@@ -25,10 +25,10 @@ This module supplies that probabilistic step over the uniform challenge of the r
   `Soundness.Forking.Tree.extractable_of_kerr_lt`: beating the error in *probability* is beating the
   knowledge-error *count*, which forces the tree.
 
-The tree existence goes **directly** through the `kerr` count — it does not iterate a per-round `ε³` bound, so
-the catastrophic `ε^{3ᵈ}` composition never arises. What stays the random-oracle floor is the
-prover-as-oracle-function model that pins each round's accepting set (and the adaptive RO-query loss), plus the
-idealization that Blake2b is a random oracle.
+The tree existence goes *directly* through the `kerr` count — it does not iterate a per-round `ε³` bound, so
+the catastrophic `ε^{3ᵈ}` composition never arises. The remaining random-oracle floor — the
+prover-as-oracle-function model pinning each round's accepting set, the adaptive RO-query loss, and
+Blake2b-as-random-oracle — is laid out in `Forking.Oracle`.
 -/
 
 namespace Zcash.Snark
@@ -76,8 +76,8 @@ challenge vectors exists (`Extractable acc`). Composing the uniform-measure iden
 (`uniformOfFintype_toOuterMeasure_finset`) with the deterministic counting core (`extractable_of_kerr_lt`):
 beating the error in *probability* is beating the knowledge-error *count*, which forces the tree. This is the
 `acc ⇒ frk` reduction across all `d` rounds — what the random oracle's uniformity buys, once Blake2b is
-modeled as that oracle. The remaining floor is the prover-as-oracle-function model pinning `acc` to the
-deployed verifier, and Blake2b-as-random-oracle itself. -/
+modeled as that oracle. The remaining floor — the prover-as-oracle-function model pinning `acc` to the
+deployed verifier, and Blake2b-as-random-oracle — is laid out in `Forking.Oracle`. -/
 theorem extractable_of_prob [Fintype α] [DecidableEq α] [Zero α] [Nonempty α] {d : ℕ}
     (acc : (Fin d → α) → Prop) [DecidablePred acc]
     (h : (kerr (Fintype.card α) d : ℝ≥0∞) / Fintype.card (Fin d → α)

@@ -5,8 +5,8 @@ import Zcash.Snark.Soundness.Consistency
 /-!
 # IPA knowledge soundness: the commitment-soundness of one round (3-special)
 
-This begins the genuine inner-product-argument knowledge-soundness proof — deriving the opening relation
-`commit g a = P` from the verifier's accept, rather than assuming it.
+This begins the inner-product-argument knowledge-soundness proof — deriving the opening relation
+`commit g a = P` from the verifier's accept, not assuming it.
 
 The key fact: one IPA round is 3-special-sound for the commitment. At a round the verifier folds
 `g' = g_lo + u⁻¹·g_hi` and `P' = P + u⁻¹·L + u·R` (the prover's cross-terms `L`,`R` fixed before the
@@ -15,12 +15,12 @@ parent commitment is pinned: `commit g a = P` for an `a` assembled from the `c�
 combination that extracts the linear-in-`u` coefficient. Two challenges suffice to extract the witness but
 leave `commit g a − P = (u₁+u₂)·X` undetermined; three kill it.
 
-This round step needs no binding — it is pure module linear algebra. (Binding enters only for uniqueness
+This round fold needs no binding — it is pure module linear algebra. (Binding enters only for uniqueness
 of the opening.)
 
 * `vandermonde3` — the three-point functional reading off a degree-≤2 polynomial's linear
   coefficient from its samples.
-* `ipa_round_commit_sound` — the round step as a lemma: three sub-openings at distinct nonzero
+* `ipa_round_commit_sound` — the round fold as a lemma: three sub-openings at distinct nonzero
   challenges pin the parent commitment. Pure module linear algebra, no binding.
 -/
 
@@ -28,9 +28,9 @@ namespace Zcash.Snark
 
 variable {F G : Type*} [Field F] [AddCommGroup G] [Module F G]
 
-/-- Three-point linear-coefficient functional. For distinct `u₁,u₂,u₃` there are coefficients
-`l₁,l₂,l₃` with `Σ lᵢ = 0`, `Σ lᵢuᵢ = 1`, `Σ lᵢuᵢ² = 0` — i.e. `p ↦ Σ lᵢ·p(uᵢ)` reads off the
-coefficient of `u` from any degree-≤2 `p`. (The `lᵢ` are the `u`-coefficients of the Lagrange basis.) -/
+/-- Three-point linear-coefficient functional, returned as computed data: for distinct `u₁,u₂,u₃` it
+constructs coefficients `l₁,l₂,l₃` with `Σ lᵢ = 0`, `Σ lᵢuᵢ = 1`, `Σ lᵢuᵢ² = 0` — so `p ↦ Σ lᵢ·p(uᵢ)`
+reads off the `u`-coefficient of any degree-≤2 `p`. (The `lᵢ` are the `u`-coefficients of the Lagrange basis.) -/
 def vandermonde3 (u₁ u₂ u₃ : F) (h12 : u₁ ≠ u₂) (h13 : u₁ ≠ u₃) (h23 : u₂ ≠ u₃) :
     Σ' (l₁ l₂ l₃ : F), (l₁ + l₂ + l₃ = 0) ∧ (l₁ * u₁ + l₂ * u₂ + l₃ * u₃ = 1)
       ∧ (l₁ * u₁ ^ 2 + l₂ * u₂ ^ 2 + l₃ * u₃ ^ 2 = 0) := by
@@ -219,9 +219,9 @@ def ipa_extractV : {d : ℕ} → (g : Fin (2 ^ d) → G) → (b : Fin (2 ^ d) �
         exact ipa_round_commit_with_coeffs (loHalf b) (hiHalf b) v Lv Rv c₁ c₂ c₃ u₁ u₂ u₃ l₁ l₂ l₃
           hl0 hl1 hl2 hu₁ hu₂ hu₃ hv₁ hv₂ hv₃
 
-/-- **Full IPA knowledge soundness — the opening relation, derived from acceptance.** The
-`∃`-shaped projection of `ipa_extractV` for callers that only need existence (`ipaRelation_of_acceptV`).
-The soundness content is in `ipa_extractV`'s *computed* witness; this forgets it to a `Prop`. -/
+/-- The `∃`-shaped projection of `ipa_extractV`, for callers that only need existence
+(`ipaRelation_of_acceptV`): it forgets the *computed* witness to a `Prop`. The soundness content lives in
+`ipa_extractV` (the milestone); this is the existential wrapper. -/
 theorem ipa_soundV {d : ℕ} (g : Fin (2 ^ d) → G) (b : Fin (2 ^ d) → F) (P : G) (v : F)
     (t : IpaTreeV F G d) (h : IpaAcceptV g b P v t) :
     ∃ a : Fin (2 ^ d) → F, commitGen g a = P ∧ commitGen b a = v :=

@@ -7,8 +7,8 @@ import Zcash.Snark.Core.Field
 
 `Verifier.FiatShamir` derives challenges through an opaque `squeeze : List (TranscriptElt F G) → F`. The
 deployed verifier instantiates it with Blake2b; discharging the Fiat–Shamir assumption models
-that hash as a **random oracle** — a function whose answers are uniform and that we can **reprogram** at a
-single query (the rewinding primitive the forking argument needs).
+that hash as a random oracle — a function whose answers are uniform and that we can reprogram at a
+single query (`reprogram`; the rewinding primitive the forking argument needs).
 
 This module supplies the random-oracle primitives the forking development is framed with:
 
@@ -19,7 +19,7 @@ This module supplies the random-oracle primitives the forking development is fra
   `Fp`, hence lands in a finite "bad" set of size `d` with probability `d / p`. This is the Schwartz–Zippel
   exclusion budget and the source of the forking-collision bounds.
 
-## The distributional model: `hprob`'s measure is justified standalone; the adversary experiment is the floor
+## The measure of `hprob` is justified standalone
 
 The forking probability (`Soundness.Forking.Probability`, `Soundness.Forking.Tree`) is stated over the uniform
 measure `PMF.uniformOfFintype (Fin k → Fp)` on the IPA round-challenge vector. That a uniform random oracle
@@ -35,15 +35,16 @@ independent-uniform. Reprogramming (`reprogram`) resamples one prefix's answer �
 idealizations are part of "`O` is a uniform random function", not extra assumptions: the transcript encoding is
 injective / self-delimiting, so distinct `TranscriptElt` sequences hit distinct Blake2b inputs (halo2 writes
 fixed-width points and scalars behind domain-prefix bytes, so absorb-order collisions cannot occur); and the
-`Challenge255 → F_p` decoding is taken as exactly uniform. halo2 reduces 64 hash bytes with
-`FromUniformBytes<64>`, whose reduction bias is ≈ `p/2⁵¹² < 2⁻²⁵⁶` per squeeze — negligible but nonzero, and
-not composed into any stated bound.
+`Challenge255 → F_p` decoding is taken as exactly uniform (`uniformChallenge`, whose residual reduction bias
+is negligible but nonzero and uncomposed).
 
 So the uniform measure of `hprob` is justified standalone, not posited — no `axiom`, no `sorry` — and its own
 input, that `O` is a random oracle, is the standard Fiat–Shamir/ROM assumption (no concrete hash is provably a
 random oracle).
 
-The distributional floor left is the **adversary experiment above `hprob`**, not its measure. A full
+## The floor above `hprob`: the adversary experiment
+
+The distributional floor left is the *adversary experiment above `hprob`*, not its measure. A full
 knowledge-soundness reduction would model the Fiat–Shamir forger as a machine querying `O` and *derive* the
 accept probability of `hprob` from its advantage `ε`, paying the query-loss `ε → ε/Q`. That is not modeled:
 `hprob` is the hypothesis — the adversary's accept probability over the (now provably uniform, reprogrammable)
@@ -58,11 +59,13 @@ that out-of-Lean floor; see the quantifier-shape caveats there.) `uniformChallen
 directly-consumed uniformity consequence — it supplies the `1/p` `ξ`-randomization budget
 (`blinder_shift_badSet_measure`, `Soundness.Vesta.blinder_value_recovery_badSet`).
 
-Two scope notes, both part of that floor, not the derived uniformity. **Existence-only:** beating `kerr` proves
-the extracted witness *exists* (a counting argument over the challenge space), not that an expected-polynomial-time
-extractor computes it. **Uncomposed budgets:** the per-hypothesis exclusions (`z ≠ 0`, the `ξ`-recovery, `1/p`
-each) and the `3k/p` tree threshold are stated separately, not composed into one end-to-end bound — the
-composition belongs with the query-loss accounting.
+Two scope notes, both part of that floor, not the derived uniformity:
+
+* **Existence-only.** Beating `kerr` proves the extracted witness *exists* (a counting argument over the
+  challenge space), not that an expected-polynomial-time extractor computes it.
+* **Uncomposed budgets.** The per-hypothesis exclusions (`z ≠ 0`, the `ξ`-recovery, `1/p` each) and the
+  `3k/p` tree threshold are stated separately, not composed into one end-to-end bound — the composition
+  belongs with the query-loss accounting.
 -/
 
 namespace Zcash.Snark
@@ -91,7 +94,10 @@ theorem reprogram_ne {O : List (TranscriptElt F G) → F} {t t' : List (Transcri
 
 /-! ## The uniform-challenge idealization -/
 
-/-- The random-oracle idealization of a fresh squeeze: a uniform field challenge over `Fp`. -/
+/-- The random-oracle idealization of a fresh squeeze: a uniform field challenge over `Fp`. This idealizes
+halo2's `Challenge255 → F_p` decoding as exactly uniform; halo2 reduces 64 hash bytes with
+`FromUniformBytes<64>`, whose reduction bias is ≈ `p/2⁵¹² < 2⁻²⁵⁶` per squeeze — negligible but nonzero, and
+not composed into any stated bound. -/
 noncomputable def uniformChallenge : PMF Fp := PMF.uniformOfFintype Fp
 
 /-- A fresh squeeze lands in a finite bad set of size `d` with probability `d / p` (`p = card Fp`) — the

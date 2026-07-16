@@ -4,13 +4,12 @@ import Zcash.Snark.Fixtures.ScheduleMarker
 /-!
 # Fiat–Shamir schedule check for the single-action capture
 
-The single-action analog of `Zcash.Snark.Fixtures.MultiAction.FiatShamir`, on the same design: Blake2b
-is intentionally taken at the random-oracle boundary; here `capturedFs` acts as a fixture oracle over
-Rust-captured transcript events, returning each captured challenge only when `deriveChallenges`
-presents the captured transcript prefix (re-encoded to the challenge-marker transcript by
-`markerSchedule`). This checks the absorb/squeeze order for the typed verifier
-transcript after Blake2b initialization, and then connects the resulting FS-derived fingerprint
-(`nonInteractiveFingerprint`, i.e. `assemble` at `deriveChallenges`) to the captured single-action MSM.
+Checks the deployed Fiat–Shamir absorb/squeeze order against the single-action Rust capture, then connects
+the resulting FS-derived fingerprint (`nonInteractiveFingerprint`, i.e. `assemble` at `deriveChallenges`)
+to the captured single-action MSM. The single-action analog of `Zcash.Snark.Fixtures.MultiAction.FiatShamir`,
+on the same design: Blake2b is taken at the random-oracle boundary, and `capturedFs` acts as a fixture oracle
+over Rust-captured transcript events, returning each captured challenge only when `deriveChallenges` presents
+the captured prefix (re-encoded to the challenge-marker transcript by `markerSchedule`).
 The per-sub-proof absorb interleavings are exercised at length 1 here; the multi-action coverage is
 `Zcash.Snark.Fixtures.MultiAction.FiatShamir`.
 

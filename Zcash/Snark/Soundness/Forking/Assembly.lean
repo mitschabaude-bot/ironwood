@@ -4,7 +4,7 @@ import Zcash.Snark.Soundness.Deployed.IpaPeel
 /-!
 # Structural special-soundness assembly (eliminating the monolithic `FiatShamirTree`)
 
-`FiatShamirTree` currently assumes, in one opaque step, that an accepting deployed verifier equation yields a
+`FiatShamirTree` currently assumes, as one opaque bundle, that an accepting deployed verifier equation yields a
 `DeployedIpaTreeV` with `DeployedIpaAcceptV`. That bundles (i) the random-oracle / rewinding *forking* — a
 cryptographic assumption that genuinely cannot be discharged in Lean — with (ii) a purely **structural**
 bridge from accepting transcripts to the recursive ternary IPA tree, which is a proof-engineering problem,
@@ -31,14 +31,14 @@ leaf check. Bridging them:
 6. **ternary assembly** — three transcripts diverging at distinct nonzero `u` (the forking output) give a
    `DeployedIpaTreeV` node via Vandermonde (`vandermonde3`, `ipa_round_commit_sound`), recursed to the tree.
 
-Steps 1–5 are proven below: the closed-form verifier equation folds round by round into the recursive tree
-structure and reconciles to the `DeployedIpaAcceptV` leaf. Step 6's special-soundness *extraction* is now
-likewise proven on the live flat path — `Soundness.Forking.Extractor.produceDeployed` /
+Parts 1–5 are proven below: the closed-form verifier equation folds round by round into the recursive tree
+structure and reconciles to the `DeployedIpaAcceptV` leaf. The ternary assembly's special-soundness
+*extraction* is now likewise proven on the live flat path — `Soundness.Forking.Extractor.produceDeployed` /
 `deployed_forking_tree` recover the round points' `(g,U,W)` representation by Vandermonde from
 decomposition-free `DeployedForkValid` certificates; the *posited* node decomposition survives only on the
-legacy `ForkAccept`/`FiatShamirForking` route (`Soundness.Main`). What stays the irreducible residual is
-the random-oracle rewinding that *produces* the forked transcripts (with its query loss) — the honest
-floor; the structural fold this module proves is the part downstream of having the transcripts.
+legacy `ForkAccept`/`FiatShamirForking` route (`Soundness.Main`). What stays the irreducible residual is the
+random-oracle rewinding that *produces* the forked transcripts (with its query loss) — the honest floor; the
+structural fold this module proves is the part downstream of having the transcripts.
 -/
 
 namespace Zcash.Snark
@@ -47,7 +47,7 @@ variable {F G : Type*} [Field F] [AddCommGroup G] [Module F G]
 
 /-- The IPA rounds' contribution to the verifier equation: `Σⱼ ([uⱼ⁻¹] Lⱼ + [uⱼ] Rⱼ)`, pairing each prover
 round `(Lⱼ, Rⱼ)` with its challenge `uⱼ`. This is the `roundSum` term of `deployed_verification_eq`'s closed
-form, named so the per-round fold (step 4 of the roadmap) can peel it. -/
+form, named so the per-round closed-form fold (`CF_cons`, below) can peel it. -/
 def roundSum (rounds : List (G × G)) (u : List F) : G :=
   ((rounds.zip u).map (fun p => p.2⁻¹ • p.1.1 + p.2 • p.1.2)).sum
 
@@ -64,7 +64,7 @@ theorem roundSum_cons (L R : G) (rounds : List (G × G)) (u₀ : F) (u : List F)
     roundSum ((L, R) :: rounds) (u₀ :: u) = (u₀⁻¹ • L + u₀ • R) + roundSum rounds u := by
   simp [roundSum]
 
-/-! ## Step 3 — the `computeB` round recursion (the `b`-value fold) -/
+/-! ## The `computeB` round recursion (the `b`-value fold) -/
 
 /-- The `computeB` fold's running point after `|u|` rounds is `x ^ (2 ^ |u|)` (it squares each round). The
 auxiliary tracking the second fold component, needed to peel `computeB`'s leading round. -/
@@ -79,13 +79,13 @@ theorem computeB_pt {F : Type*} [CommRing F] (x : F) (u : List F) :
 
 /-- One round of `computeB`: the leading challenge `u₀` contributes the factor `1 + u₀ · x ^ (2 ^ |tail|)` to
 the product over the remaining challenges. The `b`-value fold underlying the deployed IPA's `[-c·b·z]U`
-coefficient, peeled in step with the generators and the round-sum. -/
+coefficient, peeled alongside the generators and the round-sum. -/
 theorem computeB_cons {F : Type*} [CommRing F] (x u₀ : F) (tail : List F) :
     computeB x (u₀ :: tail) = computeB x tail * (1 + u₀ * x ^ (2 ^ tail.length)) := by
   rw [computeB, computeB, List.reverse_cons, List.foldl_append, List.foldl_cons, List.foldl_nil,
     ← computeB_pt x tail]
 
-/-! ## Step 4a — the commitment/generator side of the closed-form equation folds per round
+/-! ## The commitment/generator side of the closed-form equation folds per round
 
 The closed-form verifier equation (`deployed_verification_eq`) is `gPart + [-c·b·z]·U + [-f]·W`, where the
 `gPart` collects the adjusted commitment, the round-sum, and the folded generator. The `U`/`W` terms do not
@@ -108,7 +108,7 @@ theorem gPart_cons (L R : G) (rounds : List (G × G)) (u₀ : F) (u : List F)
   simp only [gPart, roundSum_cons, foldAll]
   abel
 
-/-! ## Step 4b — the eval-vector fold telescopes to `computeB`
+/-! ## The eval-vector fold telescopes to `computeB`
 
 The deployed tree (`DeployedIpaAcceptV`) folds the eval vector `b = (1, x, x², …)` by `foldGens b uᵢ` per
 round and reads the single leaf value `b₀`. The flat verifier equation's `U`-coefficient is the global
@@ -118,7 +118,7 @@ bridge between the recursive `b`-fold and the flat `computeB`. -/
 
 /-- One round of the eval-vector fold: folding `evalVector (k+1) x` by `foldGens · u` scales it by the factor
 `1 + u⁻¹·x^(2^k)` and drops to `evalVector k x`. (The same fold the generators undergo, on the value side.)
-This is the per-round step whose product over all rounds is `computeB`. -/
+This is the per-round factor whose product over all rounds is `computeB`. -/
 theorem foldGens_evalVector {F : Type*} [Field F] (k : ℕ) (x u : F) :
     foldGens (evalVector (k + 1) x) u = (1 + u⁻¹ * x ^ (2 ^ k)) • evalVector k x := by
   funext i
@@ -157,7 +157,7 @@ theorem foldAll_evalVector {F : Type*} [Field F] (x : F) (u : List F) :
     rw [foldGens_evalVector, inv_inv, foldAll_smul, Pi.smul_apply, ih, smul_eq_mul, computeB_cons]
     ring
 
-/-! ## Step 4 — the closed-form verifier equation folds one round (the keystone)
+/-! ## The closed-form verifier equation folds one round (the keystone)
 
 `CF` is the closed-form verifier equation's left-hand side, abstracted over the value/blinding coefficients:
 `gPart` (the commitment/generator side) plus `[Uc]·U + [Wc]·W`. For the deployed equation the coefficients
@@ -195,14 +195,15 @@ theorem CF_cons (Lg Rg U W : G) (Lv Lw Rv Rw : F) (rounds : List (G × G)) (u₀
   simp only [gPart]
   module
 
-/-! ## Step 5 — leaf reconciliation: the depth-0 closed form is the deployed tree's leaf check
+/-! ## Leaf reconciliation: the depth-0 closed form is the deployed tree's leaf check
 
 At depth 0 the generators are a single point `g 0` and the closed form has folded all rounds. With the value
 coefficient set to the deployed reference `Uc = -(z · b₀)` (where `b₀ = commitGen b (·↦c)` is the folded eval
 value, `foldAll_evalVector`) and `Wc = -f`, and the folded commitment given in its `(g, U, W)` representation
 `P = ⟨aP, g⟩ + [z·v]U + [blind]W`, the closed-form equation `CF [] [] g P c Uc U Wc W = 0` rearranges to
 exactly halo2's reformulated leaf relation — the `DeployedIpaAcceptV` leaf. This is where `z ≠ 0` is needed
-downstream (`NontrivialRelation.ofLeafPeel`) to cancel the `U`-side; here the reconciliation is the pure rearrangement. -/
+downstream (`NontrivialRelation.ofLeafPeel`) to cancel the `U`-side; here the reconciliation is the pure
+rearrangement. -/
 
 /-- **Leaf reconciliation.** The depth-0 closed-form equation, with the folded commitment in its `(g, U, W)`
 representation `P = ⟨aP, g⟩ + [z·v]U + [blind]W` and value coefficient `-(z·b₀)`, is the deployed tree's
@@ -219,7 +220,7 @@ theorem CF_leaf_to_acceptV (g : Fin (2 ^ 0) → G) (b : Fin (2 ^ 0) → F) (U W 
   simp only [CF, gPart, roundSum, foldAll, List.zip_nil_left, List.map_nil, List.sum_nil, add_zero]
   module
 
-/-! ## Step 6 — the tree assembly: the forking output yields `DeployedIpaAcceptV`
+/-! ## The tree assembly: the forking output yields `DeployedIpaAcceptV`
 
 `DeployedIpaTreeV` is a 3-ary special-soundness object, so it cannot come from a single accepting transcript:
 the forking procedure supplies, at each IPA round, three accepting continuations with a shared prefix and
@@ -228,10 +229,11 @@ distinct nonzero challenges. `ForkAccept` packages exactly that forking output �
 the *flat closed-form equation* at each leaf (an accepting transcript) in place of the reformulated check.
 
 `forkAccept_to_acceptV` is the deterministic assembly: it threads the recursion down to the leaves and
-reconciles each via `CF_leaf_to_acceptV`, turning the forking output into `DeployedIpaAcceptV` — which
-`NontrivialRelation.ofDeployedTree` + `ipa_soundV` then extract a witness from. This discharges the tree-assembly content
-of the Fiat–Shamir bridge: what stays is supplying `ForkAccept` itself (the rewinding that produces the
-distinct-challenge transcripts and pins each round point's `(g,U,W)` representation), the random-oracle floor. -/
+reconciles each via `CF_leaf_to_acceptV`, turning the forking output into `DeployedIpaAcceptV` — from which
+`NontrivialRelation.ofDeployedTree` and `ipa_soundV` extract a witness. This discharges the tree-assembly
+content of the Fiat–Shamir bridge: what stays is supplying `ForkAccept` itself (the rewinding that produces
+the distinct-challenge transcripts and pins each round point's `(g,U,W)` representation), the random-oracle
+floor. -/
 
 /-- The forking procedure's output, recursive over the special-soundness tree: the same per-round fold as
 `DeployedIpaAcceptV`, but each leaf carries the *flat closed-form verifier equation* (`CF … = 0`, an
@@ -255,9 +257,9 @@ def ForkAccept : {d : ℕ} → (Fin (2 ^ d) → G) → (Fin (2 ^ d) → F) → G
 /-- **The tree assembly.** The forking output `ForkAccept` yields the deployed accept predicate
 `DeployedIpaAcceptV`. By induction on the tree: each node's per-round fold is identical, and each leaf's flat
 closed-form equation is reconciled to the reformulated leaf check by `CF_leaf_to_acceptV`. This is the
-deterministic, `sorry`/`axiom`-free discharge of the tree-assembly handwave — the forking *output* is the
-input, and the recursive `DeployedIpaAcceptV` (hence, via `NontrivialRelation.ofDeployedTree`/`ipa_soundV`, an opening) is
-the proven consequence. -/
+deterministic, `sorry`/`axiom`-free discharge of the tree-assembly handwave: the forking *output* is the
+input, and `DeployedIpaAcceptV` is the proven consequence — from which `NontrivialRelation.ofDeployedTree`
+and `ipa_soundV` extract an opening. -/
 theorem forkAccept_to_acceptV {U W : G} {z : F} :
     {d : ℕ} → (g : Fin (2 ^ d) → G) → (b : Fin (2 ^ d) → F) → (P : G) → (v blind : F) →
       (t : DeployedIpaTreeV F G d) → ForkAccept g b U W z P v blind t →
@@ -276,7 +278,7 @@ theorem forkAccept_to_acceptV {U W : G} {z : F} :
 /-! ## The adjusted-commitment connection: halo2's verifier equation is the closed form
 
 The forking development runs on the closed form `CF`. To tie it to halo2's actual deployed verifier equation
-`DeployedIpaVerifierEq`, this step identifies the two: the verifier equation *is* `CF = 0` with the
+`DeployedIpaVerifierEq`, this identifies the two: the verifier equation *is* `CF = 0` with the
 **adjusted commitment** `P' = multiopen + [-v]g₀ + [ξ]S` (the value term `[-v]g₀` and the blinding poly `[ξ]S`
 folded into the commitment slot), `Uc = -c·b·z`, `Wc = -f`, over the proof's round points and IPA challenges.
 It is a pure reordering of the same seven group terms (`abel`). -/

@@ -24,7 +24,7 @@ sense in which the deployed verifier is the Fiat–Shamir image of the interacti
 
 ## Assumptions
 
-* The Fiat–Shamir assumption (the random-oracle step) — that these hashed challenges carry the
+* The Fiat–Shamir assumption (the random-oracle idealization) — that these hashed challenges carry the
   interactive verifier's soundness to the non-interactive setting. This is the explicit hand-wave. In
   the fingerprint match the challenges are taken from the captured real transcript, so the match never
   re-derives them and does not depend on this assumption.
@@ -140,7 +140,7 @@ def deriveChallenges {shape : Shape} {F G : Type*} [Zero F] (fs : FiatShamir F G
 
 /-- The deployed (non-interactive) verifier's fingerprint MSM: `assemble` at the Fiat–Shamir
 challenges (the multiopen grouping is re-derived in Lean by `constructIntermediateSets`). The
-Fiat–Shamir assumption (the random-oracle step) is what carries the interactive verifier's soundness to
+Fiat–Shamir assumption (the random-oracle idealization) is what carries the interactive verifier's soundness to
 this non-interactive MSM. -/
 def nonInteractiveFingerprint {shape : Shape} {F G : Type*} [Field F] [DecidableEq F] [DecidableEq G]
     [Inhabited G] (fs : FiatShamir F G) (init : List (TranscriptElt F G))

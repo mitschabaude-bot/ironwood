@@ -31,7 +31,7 @@ namespace Zcash.Snark
 
 open CompElliptic.Curves.Pasta CompElliptic.CurveForms.ShortWeierstrass CompElliptic.CurveOrder
 
-/-- The verifier group `E_q`, concretely: the points of the Vesta curve `y² = x³ + 5`. -/
+/-- The deployed verifier group `E_q`, concretely `SWPoint Vesta.curve`: the points of `y² = x³ + 5`. -/
 abbrev VestaG := SWPoint Vesta.curve
 
 /-- The Vesta group order as a proposition: every Vesta point is `p`-torsion, i.e. the group order
@@ -138,15 +138,14 @@ theorem orchard_verifier_vesta_constraint_of_forked [DecidableEq VestaG] [Inhabi
   orchard_verifier_deployed_constraint_of_forked urs hk vk ps ch fixedCols decodeAdvice
     decodeInstance y gates hpoly deg x fs hclean hquot hgood hencodes
 
-/-- The powers evaluation vector's leading entry is `1` (`b 0 = x⁰ = 1`), discharging the IPA's `hb0`
-structural fact for the concrete deployed `b = evalVector`. -/
+/-- The powers evaluation vector has leading entry `1` (`evalVector k x 0 = x⁰ = 1`), discharging the IPA's
+`hb0` structural fact at the concrete deployed `b = evalVector`. -/
 theorem evalVector_zero {F : Type*} [Field F] (k : ℕ) (x : F) : evalVector k x 0 = 1 := by
   simp [evalVector]
 
-/-- halo2's adjusted IPA witness: `aMulti` with its `g₀`-coefficient shifted by the claimed value and the
-synthetic blinder `ξ·s` folded in, so its commitment is the adjusted commitment `⟨aMulti,G⟩ − [v]g₀ + [ξ]S`.
-Making it a *definition* (rather than positing an `aDep` with a relation `hP`) discharges `hP` by the linearity
-of `commit`. -/
+/-- halo2's adjusted IPA witness: `aMulti` with its `g₀`-coefficient shifted by the claimed value `v` and the
+synthetic blinder `ξ·s` folded in, so `commit` sends it to the adjusted commitment `⟨aMulti,G⟩ − [v]g₀ + [ξ]S`.
+A *definition* (not a posited `aDep` with a relation `hP`), so `hP` holds by `commit`'s linearity. -/
 def adjustedWitness {k : ℕ} (aMulti s : Fin (2 ^ k) → Fp) (v ξ : Fp) : Fin (2 ^ k) → Fp :=
   aMulti - Pi.single 0 v + ξ • s
 
@@ -159,12 +158,11 @@ theorem commit_adjustedWitness {G : Type*} [AddCommGroup G] [Module Fp G] (urs :
   rw [adjustedWitness, commit_add, csub, commit_single, commit_smul]
 
 /-- **The deployed commitment lies in the `g`-span (discharging `hcommit`).** At Vesta's prime order a nonzero
-generator `urs.g 0` generates the whole group: `c ↦ c • g 0` is injective over the field `Fp` (a nonzero
-scalar is invertible) and `Fp` and `VestaG` have equal cardinality (`scalarFieldOrder`), so it is surjective —
-every group element, in particular `deployedCommitment`, is the `g`-commitment of some witness. So the
-`hcommit` tie is always satisfiable: it is the prime-order/`g`-span fact, the witness being the discrete log of
-`P` base `g 0` (existing but not feasibly constructible — the same DLR-side status as the
-`⊕' NontrivialRelation` disjunct). -/
+generator `urs.g 0` generates the whole group: `c ↦ c • g 0` is injective over `Fp` (nonzero scalars are
+invertible), and `Fp` and `VestaG` are equinumerous (`scalarFieldOrder`), so it is surjective — every group
+element, `deployedCommitment` included, is the `g`-commitment of some witness. So `hcommit` is always
+satisfiable: the witness is the discrete log of `P` base `g 0`, existing but not feasibly constructible —
+the same DLR-side status as the `⊕' NontrivialRelation` disjunct. -/
 theorem commit_surjective [Fact (HasseBound Vesta.curve)] (urs : URS VestaG) (hg0 : urs.g 0 ≠ 0)
     (P : VestaG) : ∃ aMulti : Fin (2 ^ urs.k) → Fp, commit urs aMulti = P := by
   have hinj : Function.Injective (fun c : Fp => c • urs.g 0) := by
@@ -186,9 +184,9 @@ open scoped ENNReal in
 /-- **The ξ-randomization budget behind the constraint capstone's value recovery.** A malicious blinder with
 `⟨s,b⟩ = δ ≠ 0` satisfies the value-recovery premise `ξ·⟨s,b⟩ = 0` — which pins the opened value back to the
 claimed `multiopenValue` — only at `ξ = 0`, a set of uniform random-oracle measure `≤ 1/p`. So the `hξ`
-hypothesis of `orchard_verifier_vesta_forking_constraint` is, for a nonzero blinder, satisfiable only on a
-`1/p`-measure set of post-`S` challenges: the Schwartz–Zippel `ξ`-exclusion (`blinder_shift_badSet_measure`)
-made explicit for the constraint side. -/
+hypothesis of `orchard_verifier_vesta_forking_constraint`, for a nonzero blinder, holds only on that
+`1/p`-measure set of post-`S` challenges: `blinder_shift_badSet_measure` made explicit for the constraint
+side. -/
 theorem blinder_value_recovery_badSet {k : ℕ} (s : Fin (2 ^ k) → Fp) (xEval : Fp)
     (hδ : innerProduct s (evalVector k xEval) ≠ 0) :
     uniformChallenge.toOuterMeasure
@@ -199,7 +197,7 @@ theorem blinder_value_recovery_badSet {k : ℕ} (s : Fin (2 ^ k) → Fp) (xEval 
 open scoped ENNReal in
 open Classical in
 /-- **The deployed Orchard opening over Vesta, via the forking refinements (no `FiatShamirTree`), with the
-structural facts discharged.** Routes the forking development to the concrete deployed instance. The multiopen
+structural facts discharged.** The multiopen
 evaluation vector is the concrete powers vector `b = evalVector urs.k xEval` (so `b 0 = 1` is *proved* by
 `evalVector_zero`, not assumed); the multiopen witness `aMulti` is *recovered* from the `g`-span
 (`commit_surjective`, from the nonzero generator `hg0`), so the `g`-span tie `hcommit` is **discharged** rather
@@ -246,9 +244,8 @@ open scoped ENNReal in
 open Classical in
 /-- **The deployed Orchard opening *and constraint* over Vesta, via the forking refinements (no
 `FiatShamirTree`), with the structural facts discharged.** The constraint-side companion of
-`orchard_verifier_vesta_forking_opening`: same concrete instance (`b = evalVector urs.k xEval`, so `b 0 = 1` is
-*proved*; `aMulti` recovered from the `g`-span so `hcommit` is discharged; the adjusted witness *constructed*
-so `hP` holds by linearity) and the same gate seam as `orchard_verifier_vesta_constraint_of_forked`
+`orchard_verifier_vesta_forking_opening`: the same discharged structural facts (`b 0 = 1`, `hcommit`, `hP` —
+see there) and the same gate seam as `orchard_verifier_vesta_constraint_of_forked`
 (`hquot`/`hgood` → `circuitSatViaGates`, `hencodes`). Unlike the opening, the circuit is checked at the
 *claimed* value `multiopenValue`, so the minimal value-recovery hypothesis `hξ : ξ·⟨s,b⟩ = 0` is retained — it
 pins the opened value `multiopenValue − ξ·⟨s,b⟩` (unique under binding) from the forking opening back to
@@ -301,10 +298,10 @@ noncomputable def orchard_verifier_vesta_forking_constraint [Fact (HasseBound Ve
     exact hencodes a ⟨hrel', hsat⟩
   · exact PSum.inr hrel
 
-/-- The deployed adjusted-commitment's value term `Σᵢ [-v].getD i • gᵢ` is `-v` on the single generator `g 0`
-(the value list `[-v]` has one entry, placed at index `0`). Lets the deployed verifier's adjusted commitment
-`multiopen + Σ[-v].getD·g` meet the capstone's `-v • g 0` form. Pure module algebra, stated over any
-`Fp`-module (the Vesta instances supply `Module Fp VestaG` at the call sites). -/
+/-- The deployed adjusted-commitment's value term `Σᵢ [-v].getD i • gᵢ` collapses to `-v • g 0` (the value
+list `[-v]` has one entry, at index `0`) — letting the verifier's adjusted commitment `multiopen + Σ[-v].getD·g`
+meet the capstone's `-v • g 0` form. Pure module algebra over any `Fp`-module (the Vesta instances supply
+`Module Fp VestaG` at the call sites). -/
 theorem sum_getD_single {k : ℕ} {G : Type*} [AddCommGroup G] [Module Fp G] (gg : Fin (2 ^ k) → G)
     (v : Fp) :
     (∑ i, ([-v].getD i.val 0 : Fp) • gg i) = -v • gg 0 := by
@@ -578,13 +575,9 @@ with the accept probability stated over **reprogrammed-oracle runs**: the event 
 at `roChallenges (reprogramRounds O init ps χ) init ps` — the deployed schedule re-run under the oracle
 reprogrammed at the `k` round prefixes — rather than an unexplained `{ch with ipaRound := χ}` surgery.
 `roChallenges_reprogramRounds` proves the two events equal, so the round-vector semantics of the forking
-measure is *derived* from the rewinding primitive, consuming the transcript ordering. Residuals
-are unchanged: `z ≠ 0`, the nonzero generator `hg0`, the `S`-opening `hs`, and — above `hprob` — the querying
-adversary and its query-loss plus Blake2b-as-random-oracle (the uniform measure of `hprob` is justified
-standalone, `Forking.Rewind.roChallenges_ipaRound_uniform`, for the fixed proof string) — including the constant
-rung's static-dichotomy scope: `hprob` is still the *fixed* proof's accept measure over the whole challenge
-space (see
-`orchard_verifier_vesta_forking_opening_deployed`); the `_adaptive`/`_adaptive_rewind` rungs are the
+measure is *derived* from the rewinding primitive, consuming the transcript ordering. Residuals and the constant rung's static-dichotomy scope are unchanged
+(see `orchard_verifier_vesta_forking_opening_deployed`; the uniform measure of `hprob` is justified standalone,
+`Forking.Rewind.roChallenges_ipaRound_uniform`); the `_adaptive`/`_adaptive_rewind` rungs are the
 attack-event forms. -/
 noncomputable def orchard_verifier_vesta_forking_opening_rewind [Fact (HasseBound Vesta.curve)] [DecidableEq VestaG]
     [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
@@ -651,15 +644,13 @@ noncomputable def orchard_verifier_vesta_forking_constraint_rewind [Fact (HasseB
 open scoped ENNReal in
 open Classical in
 /-- **The staged Orchard opening over Vesta, from oracle rewinding.**
-This is `orchard_verifier_vesta_forking_opening_adaptive` with the adaptive accept probability stated over
-reprogrammed-oracle runs on each strategy-spliced proof. For each challenge path `χ`, the proof string is
-`spliceIpa ps (pathData P χ).1 (pathData P χ).2.1 (pathData P χ).2.2`; the oracle is reprogrammed at that
-spliced proof's IPA round prefixes and the deployed schedule is re-run. `roChallenges_reprogramRounds` turns
-that run into round-vector replacement, and `roChallenges_spliceIpa_pre` removes the irrelevant spliced
-pre-IPA fields. The residual is unchanged from the staged rung: the execution-semantics identification that a
-rewound random-oracle adversary induces such a strategy, with its RO-query loss (deriving the accept probability
-of `hprob`), plus Blake2b-as-random-oracle — the uniform measure of `hprob` is justified standalone
-(`Forking.Rewind.roChallenges_ipaRound_uniform`, for the fixed proof string; consumed by no capstone). -/
+`orchard_verifier_vesta_forking_opening_adaptive` with `hprob` stated over reprogrammed-oracle runs on each
+strategy-spliced proof: for each challenge path `χ` the proof string is
+`spliceIpa ps (pathData P χ).1 (pathData P χ).2.1 (pathData P χ).2.2`, the oracle is reprogrammed at that
+spliced proof's IPA round prefixes, and the deployed schedule is re-run. `roChallenges_reprogramRounds` turns
+that run into round-vector replacement, and `roChallenges_spliceIpa_pre` drops the irrelevant spliced pre-IPA
+fields. The residual is unchanged from the staged rung (see
+`orchard_verifier_vesta_forking_opening_adaptive`). -/
 noncomputable def orchard_verifier_vesta_forking_opening_adaptive_rewind [Fact (HasseBound Vesta.curve)]
     [DecidableEq VestaG] [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG)
