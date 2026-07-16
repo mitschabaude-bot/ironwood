@@ -4,12 +4,11 @@ import Zcash.Snark.Soundness.AGM.ProbabilityVesta
 import Mathlib.Util.AssertNoSorry
 
 /-!
-# Checked trust boundary of the AGM break reductions
+# AGM trust-boundary checks
 
-The definitions below produce representations, openings, or discrete-log relations as data. They
-are deliberately plain `def`s: a dependency that selected data with `Classical.choice` would make
-the module fail to compile. `assert_no_sorry` and the guarded axiom reports additionally pin their
-proof dependencies.
+The definitions below compute representations, openings, or DL relations. They remain plain `def`s`,
+so they cannot select data with `Classical.choice`. `assert_no_sorry` and the guarded reports check
+their proof dependencies.
 -/
 
 open Zcash.Snark
@@ -121,9 +120,8 @@ assert_no_sorry Zcash.Security.BindingSignature.saplingImbalanceToDiscreteLog
 #guard_msgs (whitespace := lax) in
 #print axioms Zcash.Security.BindingSignature.NontrivialRelation.toDiscreteLog
 
-/-! The probability layer (`Soundness.AGM.Probability` / `.ProbabilityVesta`) consists of `theorem`s,
-not data-producing `def`s, so the plain-`def` discipline above does not apply to it; `assert_no_sorry`
-and the guarded axiom reports pin it the same way. -/
+/-! The probability layer contains theorems rather than data-producing definitions. The checks below
+pin its proof dependencies. -/
 
 assert_no_sorry hitProb_ge_inv_card
 assert_no_sorry relSet_card_le_succSet_card
@@ -148,10 +146,8 @@ assert_no_sorry orchard_deployed_relation_prob_le_of_generatorRO_textbookDL
 #guard_msgs (whitespace := lax) in
 #print axioms relation_prob_le_of_textbookDL
 
-/-! The deployed-curve endpoints additionally depend on CompElliptic's `native_decide` point-count
-axiom (`Vesta.p_nsmul_Gpt` — the unconditional Vesta group order trusts the native code evaluator):
-it enters every Vesta statement through the `Module Fp VestaG` instance. The generic layer above
-carries only the three standard axioms; the pins below record the difference explicitly. -/
+/-! The Vesta endpoints also depend on CompElliptic's `native_decide` point-count axiom through the
+`Module Fp VestaG` instance. The checks below record that extra dependency. -/
 
 /-- info: 'Zcash.Snark.orchard_relation_prob_le_of_textbookDL' depends on axioms: [propext,
 Classical.choice, Quot.sound,

@@ -191,12 +191,13 @@ open scoped ENNReal in
 open Classical in
 /-- Open the deployed Orchard commitment over Vesta using the forking result.
 
-`aMulti` represents the commitment after its declared `U` and `W` components are removed; the
-algebraic-prover layer must supply this data. The returned value is `multiopenValue − ξ·⟨s,b⟩`, so
-honest blinding recovers the claimed value. `hbridge` connects the accept event to a prover strategy,
-and `hprob` must beat the knowledge error.
+`aMulti` opens the commitment after removing its declared `U` and `W` components. Real commitments
+are blinded, so this adjusted point—not the raw commitment—has the `g`-only representation supplied
+by the algebraic prover. The returned value is `multiopenValue − ξ·⟨s,b⟩`; honest blinding makes the
+second term zero.
 
-This wrapper remains noncomputable because it selects an existential fork certificate;
+`hbridge` connects the accept event to the prover strategy, and `hprob` must beat the knowledge
+error. This definition remains noncomputable because it selects an existential fork certificate.
 `deployed_forking_relation` is the executable kernel for an explicit certificate. -/
 noncomputable def orchard_verifier_vesta_forking_opening [DecidableEq VestaG]
     [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
@@ -293,10 +294,12 @@ open Classical in
 /-- Open the deployed Orchard commitment for a fixed proof string.
 
 The accept event is halo2's verifier equation, and `deployedVerifierEq_iff_flatAccept` proves its
-bridge to the constant strategy. `hprob` measures this one proof over all round challenges, not the
-Fiat–Shamir attack event. `aMulti` and `s` represent their points after the declared `U` and `W`
-components are removed, and `hU` requires the combined `U` component to cancel. Use the adaptive
-variants for a prefix-respecting strategy and reprogrammed-oracle runs. -/
+bridge to the constant strategy. The multiopen and `S` witnesses open their points after removing
+declared `U` and `W` components; `hU` cancels the remaining `U` component.
+
+`hprob` measures this one proof over all round challenges, not the Fiat–Shamir attack event. It gives
+the static statement that acceptance above the knowledge-error threshold yields an opening. Use the
+adaptive variants for a prefix-respecting strategy and reprogrammed-oracle runs. -/
 noncomputable def orchard_verifier_vesta_forking_opening_deployed [DecidableEq VestaG]
     [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp)
@@ -346,7 +349,8 @@ open Classical in
 /-- Add the constraint conclusion to `orchard_verifier_vesta_forking_opening_deployed`.
 
 `hξ` restores the claimed value by proving the blinding shift is zero. `hprob` still measures one
-fixed proof. The `hquot` and `hgood` hypotheses retain the all-openings caveat. -/
+fixed proof, not the Fiat–Shamir attack event. The `hquot` and `hgood` hypotheses retain the
+all-openings caveat described by `orchard_verifier_deployed_constraint_of_forked`. -/
 noncomputable def orchard_verifier_vesta_forking_constraint_deployed [DecidableEq VestaG]
     [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp)
@@ -392,8 +396,9 @@ open Classical in
 /-- Open the deployed Orchard commitment for a prefix-respecting prover strategy.
 
 The verifier runs on the proof assembled for each challenge path, and
-`deployedVerifierEq_iff_flatAccept_adaptive` proves the bridge to `P`. Connecting a real
-random-oracle adversary to this strategy, including query loss, remains outside this theorem. -/
+`deployedVerifierEq_iff_flatAccept_adaptive` proves the bridge to `P`. Thus `hprob` measures an
+adaptive strategy rather than one fixed proof. Connecting a real random-oracle adversary to this
+strategy, including query loss, remains outside this theorem. -/
 noncomputable def orchard_verifier_vesta_forking_opening_adaptive [DecidableEq VestaG]
     [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp)
@@ -484,29 +489,25 @@ noncomputable def orchard_verifier_vesta_forking_constraint_adaptive
 
 /-! ## Forking capstones
 
-The endpoints differ in how much of the adversary and rewinding model they include:
+The endpoints differ in how much of the prover and rewinding model they include:
 
-* **Fixed proof** — the `_deployed` pair runs halo2's verifier on one proof string. Its `hprob`
-  measures acceptance over all round challenges, not a Fiat–Shamir attack.
-* **Round-adaptive** — the `_adaptive` pair runs the verifier on proofs assembled from a
-  prefix-respecting `Prover`. A real random-oracle adversary still has to induce that strategy with
-  the required probability and query loss.
-* **Rewound** — the `_rewind` and `_adaptive_rewind` pairs state those events over reprogrammed-oracle
-  runs. `roChallenges_reprogramRounds` derives the replaced round challenges; the adaptive form also
-  uses `roChallenges_spliceIpa_pre` to preserve the pre-IPA challenges.
-* **Abstract** — `orchard_verifier_vesta_forking_opening` and `_constraint` expose the remaining
-  prover-as-oracle identification as `hbridge`.
+* **Constant** — the `_deployed` pair uses one fixed proof. Its probability is over all round
+  challenges, not the Fiat–Shamir attack event.
+* **Staged** — the `_adaptive` pair uses a prefix-respecting strategy. Connecting a rewound
+  random-oracle adversary to that strategy, including query loss, remains open.
+* **Constant, rewound** — the `_rewind` pair states the constant event using reprogrammed-oracle runs.
+* **Staged, rewound** — the `_adaptive_rewind` pair combines a staged strategy with reprogrammed runs.
+* **Abstract** — the base pair receives the prover-to-acceptance bridge as `hbridge`.
 
-The legacy `_of_forked` endpoints remain checked but are no longer the main statements.
+The older `_of_forked` pair remains checked but is no longer the main endpoint.
 
-Every endpoint opens commitments after their declared `U` and `W` components are removed. Those
-adjusted points are what the algebraic prover represents. The deployed bridge endpoints also require
-the combined declared `U` component to vanish. Honest commitments have zero `U` component but may have
-nonzero `W` blinding.
+Every endpoint opens commitments after removing their declared `U` and `W` components. Real halo2
+commitments are blinded, so only these adjusted points have the required `g` representations. Honest
+commitments have no `U` component; their `W` components are the commitment blinds. `hU` cancels the
+total declared `U` component of the opened point.
 
-These wrappers are `noncomputable` because they obtain the fork certificate through `∃`. Code that
-needs computed output must call `deployed_forking_relation` with an explicit `DForkCert`, `aMulti`, and
-`hcommit`. -/
+These wrappers remain `noncomputable` because the fork certificate is existential. Executable code
+must call `deployed_forking_relation` with an explicit certificate and opening data. -/
 
 open scoped ENNReal in
 open Classical in

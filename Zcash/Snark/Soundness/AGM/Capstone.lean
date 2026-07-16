@@ -3,38 +3,31 @@ import Zcash.Snark.Soundness.AGM.Prover
 import Zcash.Snark.Soundness.Forking.Rewind
 
 /-!
-# Deployed capstone from an algebraic prover (issue #15, at the deployed level)
+# Deployed AGM opening or relation
 
-`Soundness.AGM.Peel` extracts an explicit relation witness from the algebraic prover's
-representations. This module wires that up to the deployed opening: `deployedAlgebraicRelation` is the
-data-carrying analogue of `Soundness.Forking.Rewind.deployed_forking_relation`, concluding the multiopen
-inner-product opening **or** an explicit `AugmentedRelationWitness` — with no `Classical.choice`.
+`Soundness.AGM.Peel` computes a relation from algebraic prover data. This module connects that result
+to the deployed opening. The result is either a multiopen IPA opening or an explicit relation, with
+no `Classical.choice`.
 
 ## The boundary with the Fiat–Shamir/forking layer
 
-Once the transcript is in hand with its representations (the AGM hypothesis, here the data
-`AlgebraicDeployedAcceptV`), both the opening and relation branches are explicit computed data. The
-operational forking layer must supply that transcript and its representations; a probability theorem
-may prove that this happens often enough, but must not select either output with `Classical.choice`.
-`deployedAlgebraicRelationWitness` exposes it in the `AlgebraicRelationWitness` form that
-`Soundness.AGM.Probability`'s discrete-log reduction consumes.
+Once the transcript and its representations are supplied, both result branches are computed data.
+The Fiat–Shamir/forking layer must provide those inputs and connect its acceptance probability to
+this execution. `deployedAlgebraicRelationWitness` returns the relation type used by the DL proof.
 
-At the deployed tie-in, note that `hP`'s vectors (`aDep`, `aMulti`, `s`) are `g`-only: real halo2
-commitments are blinded, so those representations are findable only for the **declared-components-adjusted**
-points — the `pU`/`pW`/`sU`/`sW` parameters of the Vesta forking capstones (`Soundness.Vesta`, section
-doc there) — not for the raw commitments. The bridge supplies the declarations from the prover's
-representations; they are pinned up to a computed relation.
+The vectors in `hP` use only `g`. Real halo2 commitments are blinded, so the Vesta endpoints first
+remove their declared `U` and `W` components. The algebraic prover supplies representations of those
+adjusted points.
 -/
 
 namespace Zcash.Snark
 
 variable {G : Type*} [AddCommGroup G] [Module Fp G]
 
-/-- **Computed deployed opening from an algebraic fork certificate.** The certificate's type enforces
-that every prover round point carries coefficients over the complete public `(g, U, W)` basis. Its
-erasure is checked by the ordinary deployed validity predicate, and the existing deterministic kernel
-then returns either the opening or a concrete relation. The relation branch is exposed in the exact
-representation form consumed by the fixed-slot DL reduction. -/
+/-- Compute a deployed IPA opening or relation from an algebraic fork certificate.
+
+Erasing the coefficients gives the certificate checked by `DeployedForkValid`. The relation branch
+uses the form expected by the fixed-slot DL reduction. -/
 def deployedAlgebraicForkingRelation [DecidableEq G] [Inhabited G] (urs : URS G)
     (b : Fin (2 ^ urs.k) → Fp) (v ξ z blind : Fp) (aMulti aDep s : Fin (2 ^ urs.k) → Fp)
     (cert : AlgebraicDForkCert (F := Fp) (augmentedBasis urs.g urs.u urs.w) urs.k)
@@ -49,10 +42,10 @@ def deployedAlgebraicForkingRelation [DecidableEq G] [Inhabited G] (urs : URS G)
   | PSum.inr hrel =>
       PSum.inr (AugmentedRelationWitness.toAlgebraicRelationWitness hrel)
 
-/-- **Computed deployed opening-or-DL endpoint.** Compose the representation-carrying deployed fork
-certificate with the fixed-slot DLR-to-DL adapter. The challenge slot and all other basis logs are
-fixed inputs. If the deployed kernel returns a relation, `fixedSlotExtractOrMiss` either extracts the
-slot's discrete log or records that this exact returned relation has coefficient zero there. -/
+/-- Run the deployed certificate and then the fixed-slot DL reduction.
+
+The result is an IPA opening, a DL solution, or proof that the returned relation missed the fixed
+challenge slot. -/
 def deployedAlgebraicForkingFixedSlot [DecidableEq G] [Inhabited G] (urs : URS G)
     (B : G) (challenge : AugmentedIndex (2 ^ urs.k))
     (embedding : FixedSlotEmbedding (F := Fp) B (augmentedBasis urs.g urs.u urs.w) challenge)
@@ -70,9 +63,10 @@ def deployedAlgebraicForkingFixedSlot [DecidableEq G] [Inhabited G] (urs : URS G
 
 /-! ## Concrete relation producer for the probability experiment -/
 
-/-- All explicit data needed to run the deployed algebraic kernel on one augmented public basis.
-The basis determines the URS exactly via `ursOfAugmentedBasis`; in particular this structure cannot
-silently swap in unrelated deployed generators. -/
+/-- Inputs needed to run the deployed algebraic kernel on one augmented public basis.
+
+The basis determines the URS through `ursOfAugmentedBasis`, so the instance cannot use unrelated
+generators. -/
 structure DeployedAlgebraicForkingInstance (k : ℕ)
     (basis : AugmentedIndex (2 ^ k) → G) where
   b : Fin (2 ^ k) → Fp
@@ -105,8 +99,7 @@ abbrev Opening {k : ℕ} {basis : AugmentedIndex (2 ^ k) → G}
     (commit (ursOfAugmentedBasis k basis) x.aMulti) x.b
     (x.v - x.ξ * innerProduct x.s x.b) a
 
-/-- Run one concrete deployed instance. Its relation branch is transported along the proven identity
-between the reconstructed URS basis and the exact sampled basis supplied to the instance. -/
+/-- Run one deployed instance and return its opening or relation on the supplied basis. -/
 def run [DecidableEq G] {k : ℕ} {basis : AugmentedIndex (2 ^ k) → G}
     (x : DeployedAlgebraicForkingInstance (G := G) k basis) :
     x.Opening ⊕' AlgebraicRelationWitness (F := Fp) basis := by
@@ -118,36 +111,31 @@ def run [DecidableEq G] {k : ℕ} {basis : AugmentedIndex (2 ^ k) → G}
       rw [augmentedBasis_ursOfAugmentedBasis] at hrel
       exact PSum.inr hrel
 
-/-- One concrete deployed algebraic instance produces a relation exactly when its computed `run`
-lands in the relation branch. This is a proposition about an explicit execution result, not an
-existentially selected relation. -/
+/-- Whether running this instance returns the relation branch. -/
 def ProducesRelation [DecidableEq G] {k : ℕ} {basis : AugmentedIndex (2 ^ k) → G}
     (x : DeployedAlgebraicForkingInstance (G := G) k basis) : Prop :=
   ∃ r, x.run = PSum.inr r
 
 end DeployedAlgebraicForkingInstance
 
-/-- The supplied deployed producer emits an explicit relation on this basis. This predicate is the
-consumer-side contract that an operational adversary must connect to its own accept event. -/
+/-- Whether the supplied instance for this basis exists and returns a relation. -/
 def deployedAlgebraicRelationProduced [DecidableEq G] {k : ℕ}
     (instances : ∀ basis : AugmentedIndex (2 ^ k) → G,
       Option (DeployedAlgebraicForkingInstance (G := G) k basis))
     (basis : AugmentedIndex (2 ^ k) → G) : Prop :=
   ∃ x, instances basis = some x ∧ x.ProducesRelation
 
-/-- Bases on which the supplied deployed producer computes an explicit relation. This is the exact
-event that the probability layer transports across a URS setup distribution. -/
+/-- Bases on which the supplied instance computes a relation. -/
 def deployedAlgebraicRelationEvent [DecidableEq G] {k : ℕ}
     (instances : ∀ basis : AugmentedIndex (2 ^ k) → G,
       Option (DeployedAlgebraicForkingInstance (G := G) k basis)) :
     Set (AugmentedIndex (2 ^ k) → G) :=
   { basis | deployedAlgebraicRelationProduced instances basis }
 
-/-- The concrete relation finder consumed by `Soundness.AGM.Probability`: on each sampled augmented
-basis, run the supplied deployed forking instance when one was produced, return `some` only on its
-computed relation branch, and return `none` when there is no valid certificate or the result is a
-valid opening. Thus the probability event is tied to the deployed producer, not an unrelated abstract
-relation oracle. -/
+/-- The relation finder used by the probability proof.
+
+It runs the supplied instance for each basis and returns only its computed relation branch. Missing
+instances and valid openings return `none`. -/
 def deployedAlgebraicRelationFinder [DecidableEq G] {k : ℕ}
     (instances : ∀ basis : AugmentedIndex (2 ^ k) → G,
       Option (DeployedAlgebraicForkingInstance (G := G) k basis)) :
@@ -161,8 +149,7 @@ def deployedAlgebraicRelationFinder [DecidableEq G] {k : ℕ}
       | PSum.inl _ => none
       | PSum.inr hrel => some hrel
 
-/-- The relation finder succeeds exactly on the explicit relation branch of the supplied deployed
-instance. This pins the event consumed by `relSet` to the computed capstone result. -/
+/-- The finder succeeds exactly when the supplied instance returns a relation. -/
 theorem deployedAlgebraicRelationFinder_isSome_iff [DecidableEq G] {k : ℕ}
     (instances : ∀ basis : AugmentedIndex (2 ^ k) → G,
       Option (DeployedAlgebraicForkingInstance (G := G) k basis))
@@ -177,13 +164,7 @@ theorem deployedAlgebraicRelationFinder_isSome_iff [DecidableEq G] {k : ℕ}
     | inl hopen => simp [DeployedAlgebraicForkingInstance.ProducesRelation, hrun]
     | inr hrel => simp [DeployedAlgebraicForkingInstance.ProducesRelation, hrun]
 
-/-- **The deployed opening from an algebraic prover.** Data-carrying analogue of
-`deployed_forking_relation`: given the algebraic prover's deployed transcript `t` *with its
-representations supplied as data* (`AlgebraicDeployedAcceptV`, in place of the existentially-extracted
-forking tree), the deployed opening either yields the multiopen inner-product relation, or an
-**explicit** `AugmentedRelationWitness` over `(g, U, W)` — computed from the accept equations and the
-leaf representation, the node representations being AGM admissibility data — with no
-`Classical.choice`. -/
+/-- Compute an IPA opening or explicit relation from an accepting deployed algebraic tree. -/
 def deployedAlgebraicRelation [DecidableEq G] [Inhabited G] (urs : URS G)
     (b : Fin (2 ^ urs.k) → Fp) (v ξ z blind : Fp) (aMulti aDep s : Fin (2 ^ urs.k) → Fp)
     (t : DeployedIpaTreeV Fp G urs.k) (hz : z ≠ 0) (hb0 : b 0 = 1)
@@ -202,9 +183,7 @@ def deployedAlgebraicRelation [DecidableEq G] [Inhabited G] (urs : URS G)
     exact PSum.inl ⟨_, ipaRelation_unblind_value urs (commit urs aMulti) b v ξ s _ h1⟩
   | inr hrel => exact PSum.inr hrel
 
-/-- The same, with the relation branch in the `AlgebraicRelationWitness (augmentedBasis …)` form that
-`Soundness.AGM.Probability`'s reduction (`relSet` / `succSet`) consumes — the explicit adversary output
-of the discrete-log reduction, sourced from the prover's representations. -/
+/-- As `deployedAlgebraicRelation`, with the relation converted for the probability proof. -/
 def deployedAlgebraicRelationWitness [DecidableEq G] [Inhabited G] (urs : URS G)
     (b : Fin (2 ^ urs.k) → Fp) (v ξ z blind : Fp) (aMulti aDep s : Fin (2 ^ urs.k) → Fp)
     (t : DeployedIpaTreeV Fp G urs.k) (hz : z ≠ 0) (hb0 : b 0 = 1)

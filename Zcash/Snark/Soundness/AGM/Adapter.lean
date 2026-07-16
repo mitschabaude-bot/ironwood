@@ -1,53 +1,40 @@
 import Zcash.Snark.Soundness.Deployed.Binding
 
 /-!
-# Algebraic-group-model layer: fixed-slot DL reductions for computed relations
+# AGM relations and the fixed-slot DL reduction
 
-The deployed soundness reductions return `NontrivialRelation g U W` as data: explicit coefficients
-for a nontrivial discrete-log relation among the augmented bases `(g, U, W)`. In a prime-order group
-such relations exist propositionally; the security content is that an efficient adversary should not
-be able to compute one.
+The deployed soundness code can return `NontrivialRelation g U W`: explicit coefficients for a
+relation among `(g, U, W)`. Merely proving that such a relation exists says nothing in a prime-order
+group. Computing its coefficients is the security break.
 
-This module records the algebraic core of the AGM/DLR-to-DL reduction that consumes that relation
-branch. The model follows Fuchsbauer–Kiltz–Loss (<https://eprint.iacr.org/2017/620>): the reduction
-receives a DL challenge, places it in **one basis slot fixed before the adversary runs**, and knows
-the discrete logs of every *other* slot. If the relation found by the adversary has a nonzero
-coefficient at that pre-fixed slot, the deterministic adapter recovers the challenge's discrete log.
+This module turns that relation into a plain discrete-log solution. Following
+Fuchsbauer–Kiltz–Loss (<https://eprint.iacr.org/2017/620>), the reduction places its DL challenge in
+one basis slot before the adversary runs and knows the logs of all other slots. It solves the
+challenge when the returned relation has a nonzero coefficient in that slot.
 
-The representation-carrying data types take limited scaffolding inspiration from ArkLib's AGM
-`Basic.lean`
-(<https://github.com/Verified-zkEVM/ArkLib/blob/main/ArkLib/AGM/Basic.lean#L13-L14>).
-ArkLib is not a dependency or a reference proof here: that file is a skeleton with unfinished
-adversary/TODO content. The operational prover/certificate model and reductions are proved in this
-repository.
+The representation types borrow basic structure from ArkLib's AGM `Basic.lean`
+(<https://github.com/Verified-zkEVM/ArkLib/blob/main/ArkLib/AGM/Basic.lean#L13-L14>). ArkLib is not a
+dependency or reference proof: its adversary layer is unfinished. This repository defines and
+proves the operational prover, certificate, and reductions used here.
 
 ## What is formalized here
 
 * Representations over a public basis (`GroupRepresentation`, `AlgebraicPoint`,
   `AlgebraicRelationWitness`).
-* The deterministic fixed-slot DLR-to-DL adapter (`discreteLogOfBasis_of_relation`) and its
-  collision / augmented-basis specializations.
-* The fixed-slot challenge game (`DLChallengeGame`): the challenge slot is part of the game, fixed
-  before any adversary output; extraction (`solveFromRelation`) is *conditional* on the found
-  relation hitting that slot (`hits`).
-* The finite accounting behind the probability wrapper: a nontrivial relation hits at least one slot
-  (`nonzeroCoeffSlots_nonempty`, `challengeHitCount_pos`), and at most all of them
-  (`challengeHitCount_le_total`, recorded for completeness; not consumed downstream). The lower
-  bound is what `Soundness.AGM.Probability` consumes; that module **formalizes**
-  the probability statement — a uniformly placed challenge slot is hit with probability ≥ `1 / |ι|`
-  (`hitProb_ge_inv_card`), the advantage-preserving reduction `Pr[relation]/|ι| ≤ Pr[DL solved]`
-  (`reduction_advantage_ge`), and binding from discrete-log hardness (`relation_prob_le_of_DL`).
+* The fixed-slot relation-to-DL adapter (`discreteLogOfBasis_of_relation`) and its collision and
+  augmented-basis forms.
+* The challenge game (`DLChallengeGame`) and conditional extractor (`solveFromRelation`).
+* The finite fact used by the probability proof: every nontrivial relation hits at least one slot.
+
 ## Computational boundary
 
-The probability wrapper is formalized in `Soundness.AGM.Probability`. `Soundness.AGM.Prover` makes
-representations part of the prover and fork-certificate types; `Soundness.AGM.Peel` and
-`Soundness.AGM.Capstone` compute either an IPA opening or an explicit relation; and
-`Soundness.AGM.ProbabilityVesta` instantiates the relation finder with that deployed producer.
+`Soundness.AGM.Prover` adds representations to prover and certificate data.
+`Soundness.AGM.Peel` and `.Capstone` compute an IPA opening or relation.
+`Soundness.AGM.Probability` proves the slot-loss bound, and `.ProbabilityVesta` applies it to Vesta.
 
-The remaining assumptions are named at their actual boundaries: the AGM idealization, textbook
-discrete-log hardness, the generator-hash random-oracle idealization used to derive the uniform-URS
-identification, and the random-oracle execution semantics used to obtain a fork certificate. The
-explicit-certificate path itself is computable.
+The explicit-certificate path is computable. Its assumptions are the AGM, plain-DL hardness, the
+generator random-oracle model for the URS, and the random-oracle execution that produces a fork
+certificate.
 -/
 
 namespace Zcash.Snark
@@ -58,10 +45,9 @@ variable {F G : Type*} [Field F] [AddCommGroup G] [Module F G]
 def representationEval {ι : Type*} [Fintype ι] (basis : ι → G) (coeffs : ι → F) : G :=
   ∑ i, coeffs i • basis i
 
-/-- An AGM representation of `target` over `basis`: coefficients whose MSM evaluates to `target`.
+/-- Coefficients over `basis` whose MSM equals `target`.
 
-In the algebraic-prover model this is the data every prover-output group element carries;
-`Soundness.AGM.Prover` puts it in the operational strategy and fork-certificate types. -/
+Every group element output by an algebraic prover carries this data. -/
 structure GroupRepresentation {ι : Type*} [Fintype ι] (basis : ι → G) (target : G) where
   coeffs : ι → F
   hEq : representationEval basis coeffs = target
@@ -89,17 +75,14 @@ end AlgebraicPoint
 theorem representationEval_fin {n : ℕ} (basis : Fin n → G) (coeffs : Fin n → F) :
     representationEval basis coeffs = commitGen basis coeffs := rfl
 
-/-- A point represented by one scalar multiple of a base. This is the plain discrete-log artifact.
+/-- A scalar `log` such that `log • B = target`.
 
-A DL-hardness reading of this artifact presumes `B ≠ 0` (a generator of the prime-order group): for
-`B = 0` the type is inhabited only by `target = 0`, and for `target = 0` it is trivially inhabited by
-`log = 0`. -/
+The cryptographic reading requires `B ≠ 0`. If `B = 0`, only `target = 0` is representable. -/
 structure DiscreteLogRepresentation (B target : G) where
   log : F
   hEq : log • B = target
 
-/-- A nontrivial algebraic relation over a finite public basis. This is the AGM object that a binding
-attack is reduced to: explicit coefficients, not just the proposition that a relation exists. -/
+/-- Explicit nonzero coefficients whose MSM over `basis` is zero. -/
 structure AlgebraicRelationWitness {ι : Type*} [Fintype ι] (basis : ι → G) where
   coeffs : ι → F
   nontrivial : coeffs ≠ 0
@@ -144,8 +127,7 @@ noncomputable def nonzeroCoeffSlots {ι : Type*} [Fintype ι] [DecidableEq ι] {
   classical
   simp [nonzeroCoeffSlots]
 
-/-- The finite accounting fact behind the random challenge-slot wrapper: a nontrivial relation has at
-least one challenge slot where extraction succeeds. -/
+/-- A nontrivial relation has at least one slot from which extraction succeeds. -/
 theorem nonzeroCoeffSlots_nonempty {ι : Type*} [Fintype ι] [DecidableEq ι] {basis : ι → G}
     (r : AlgebraicRelationWitness (F := F) basis) :
     r.nonzeroCoeffSlots.Nonempty := by
@@ -158,9 +140,9 @@ noncomputable def challengeHitCount {ι : Type*} [Fintype ι] [DecidableEq ι] {
     (r : AlgebraicRelationWitness (F := F) basis) : ℕ :=
   r.nonzeroCoeffSlots.card
 
-/-- The random-slot wrapper has a nonzero finite support of successful challenge placements: a
-uniformly placed challenge slot is hit with probability at least `1 / |ι|`. The probability statement
-is formalized in `Soundness.AGM.Probability` (`hitProb_ge_inv_card`), which consumes this lemma. -/
+/-- At least one challenge slot has a nonzero coefficient.
+
+`Soundness.AGM.Probability.hitProb_ge_inv_card` turns this count into a probability bound. -/
 theorem challengeHitCount_pos {ι : Type*} [Fintype ι] [DecidableEq ι] {basis : ι → G}
     (r : AlgebraicRelationWitness (F := F) basis) :
     0 < r.challengeHitCount := by
@@ -181,9 +163,8 @@ end AlgebraicRelationWitness
 
 /-- Public input to an algebraic relation adversary.
 
-The `params` field is for scalar or protocol data that is not itself a group element. The group-valued
-material visible to the AGM extractor is isolated in `basis`, so every group output can be represented
-over this finite public basis. -/
+`params` holds non-group protocol data. `basis` contains every public group element available for
+representing adversary outputs. -/
 structure AlgebraicAdversaryInput (Params ι : Type*) [Fintype ι] where
   params : Params
   basis : ι → G
@@ -224,11 +205,10 @@ theorem representationEval_eq_challenge_add_known {ι : Type*} [Fintype ι] [Dec
     _ = coeffs challenge • basis challenge + relationLogExcept logs coeffs challenge • B := by
           rw [hsum]
 
-/-- **Fixed-slot AGM DLR-to-DL adapter.** A nontrivial relation whose challenge-slot coefficient is
-nonzero, with known logs for every *other* basis element, recovers the discrete log of the challenge
-basis element. The challenge slot is a parameter fixed independently of the relation: this is the
-deterministic step a DL reduction runs after placing its challenge in slot `challenge` and observing
-a hit. -/
+/-- Recover the challenge slot's discrete log from a relation that has a nonzero coefficient there.
+
+The challenge slot is fixed before the relation is returned, and the logs of every other slot are
+known. -/
 def discreteLogOfBasis_of_relation {ι : Type*} [Fintype ι] [DecidableEq ι]
     (B : G) (basis : ι → G) (logs : ι → F) (challenge : ι)
     (r : AlgebraicRelationWitness (F := F) basis)
@@ -251,19 +231,16 @@ def discreteLogOfBasis_of_relation {ι : Type*} [Fintype ι] [DecidableEq ι]
     simpa [smul_smul, inv_mul_cancel₀ hcoeff] using hscale
   exact hlog.symm
 
-/-- Fixed-slot known-log embedding: the hidden DL challenge occupies the single slot `challenge`,
-fixed *before* the adversary runs, and the reduction knows the discrete logs of every **other** slot
-with respect to `base`. This is exactly the data an actual DL reduction possesses — it does *not*
-know the log of `basis challenge`, which is the point of the game. -/
+/-- A DL challenge placed in one slot, with known logs for every other slot.
+
+The challenge slot is fixed before the adversary runs. -/
 structure FixedSlotEmbedding {ι : Type*} [Fintype ι] (base : G) (basis : ι → G) (challenge : ι) where
   logs : ι → F
   known : ∀ i, i ≠ challenge → basis i = logs i • base
 
-/-- Plain discrete-log challenge game associated with an AGM public input.
+/-- A plain-DL game with the challenge placed in a fixed slot of an AGM input.
 
-The challenge slot is part of the game, sampled/fixed before any adversary output; the embedding
-knows the logs of the other slots only. A solution is the discrete log of the *pre-fixed* challenge
-slot — not of a slot chosen after seeing a relation. -/
+A solution is the log of that slot, not a slot chosen after seeing the relation. -/
 structure DLChallengeGame (Params ι : Type*) [Fintype ι] [DecidableEq ι] where
   input : AlgebraicAdversaryInput (G := G) Params ι
   base : G
@@ -277,10 +254,7 @@ abbrev Solution {Params ι : Type*} [Fintype ι] [DecidableEq ι]
     (game : DLChallengeGame (F := F) (G := G) Params ι) : Type _ :=
   DiscreteLogRepresentation (F := F) game.base (game.input.basis game.challenge)
 
-/-- The extraction-success event: the found relation has a nonzero coefficient at the game's
-pre-fixed challenge slot. Over a uniformly placed slot this happens with probability at least
-`challengeHitCount / |ι| ≥ 1 / |ι|` (`challengeHitCount_pos`); the probability accounting is
-formalized in `Soundness.AGM.Probability`. -/
+/-- The returned relation has a nonzero coefficient at the challenge slot. -/
 def hits {Params ι : Type*} [Fintype ι] [DecidableEq ι]
     (game : DLChallengeGame (F := F) (G := G) Params ι)
     (r : AlgebraicRelationWitness (F := F) game.input.basis) : Prop :=
@@ -292,10 +266,7 @@ theorem hits_iff_mem_nonzeroCoeffSlots {Params ι : Type*} [Fintype ι] [Decidab
     game.hits r ↔ game.challenge ∈ r.nonzeroCoeffSlots :=
   (r.mem_nonzeroCoeffSlots game.challenge).symm
 
-/-- Conditional extraction: a relation that hits the pre-fixed challenge slot solves the game. A
-relation that misses it does **not** — that failure branch is the price of a faithful fixed-slot
-game, and is what the probability wrapper in `Soundness.AGM.Probability` averages away over the slot
-placement. -/
+/-- Solve the game when the returned relation hits the challenge slot. -/
 def solveFromRelation {Params ι : Type*} [Fintype ι] [DecidableEq ι]
     (game : DLChallengeGame (F := F) (G := G) Params ι)
     (r : AlgebraicRelationWitness (F := F) game.input.basis)
@@ -306,18 +277,16 @@ def solveFromRelation {Params ι : Type*} [Fintype ι] [DecidableEq ι]
 
 end DLChallengeGame
 
-/-- The complete result of testing one *specific returned relation* against a pre-fixed challenge
-slot. The relation is retained in both branches: either it yields the requested discrete log, or its
-coefficient at that same slot is zero. This dependent result rules out accidentally proving a miss
-about a different existentially chosen relation. -/
+/-- The result of testing one returned relation at the fixed challenge slot.
+
+Both branches retain the same relation: either it yields the discrete log, or its coefficient at
+that slot is zero. -/
 abbrev FixedSlotRelationOutcome {ι : Type*} [Fintype ι] (B : G) (basis : ι → G)
     (challenge : ι) : Type _ :=
   Σ' r : AlgebraicRelationWitness (F := F) basis,
     DiscreteLogRepresentation (F := F) B (basis challenge) ⊕' (r.coeffs challenge = 0)
 
-/-- Computably classify the relation returned by the adversary at a slot fixed before it ran. A hit
-invokes the deterministic DLR-to-DL adapter; a miss returns the zero-coefficient proof for the exact
-same `r` stored in the dependent pair. -/
+/-- Extract a discrete log on a hit; otherwise return proof that the same relation missed the slot. -/
 def fixedSlotExtractOrMiss {ι : Type*} [Fintype ι] [DecidableEq ι] [DecidableEq F]
     (B : G) (basis : ι → G) (challenge : ι)
     (embedding : FixedSlotEmbedding (F := F) B basis challenge)
@@ -330,13 +299,11 @@ def fixedSlotExtractOrMiss {ι : Type*} [Fintype ι] [DecidableEq ι] [Decidable
   else
     exact PSum.inr (not_ne_iff.mp hhit)
 
-/-- The scalar contribution of the URS-generator part of an augmented relation after substituting known
-discrete logs `gLog i` for each `g i = gLog i • B`. -/
+/-- The URS part of a relation after substituting `g i = gLog i • B`. -/
 def relationGLog {n : ℕ} (gLog a : Fin n → F) : F :=
   commitGen gLog a
 
-/-- If each `gᵢ` is represented as `gLogᵢ • B`, then the URS part of the augmented relation is represented
-by the scalar MSM of those logs. -/
+/-- If `g i = gLog i • B`, the URS relation equals the scalar MSM of those logs times `B`. -/
 theorem commitGen_of_base_logs {n : ℕ} (B : G) (gLog a : Fin n → F) :
     commitGen (fun i => gLog i • B) a = relationGLog gLog a • B := by
   simp [relationGLog, commitGen, Finset.sum_smul, smul_smul, smul_eq_mul]
@@ -366,8 +333,7 @@ def augmentedBasis {n : ℕ} (g : Fin n → G) (U W : G) : AugmentedIndex n → 
   | Sum.inl i => g i
   | Sum.inr j => if j = 0 then U else W
 
-/-- Reconstruct a URS from an arbitrary augmented public basis. This is the basis presented by the
-probability experiment, split into its generator, `U`, and `W` components. -/
+/-- Split an augmented public basis into its URS generators, `U`, and `W`. -/
 def ursOfAugmentedBasis (k : ℕ) (basis : AugmentedIndex (2 ^ k) → G) : URS G :=
   { k := k
     g := fun i => basis (AugmentedIndex.gen i)
@@ -463,8 +429,7 @@ def groupRepresentationOfCollision (urs : URS G) {a a' : Fin (2 ^ urs.k) → F}
     GroupRepresentation (F := F) urs.g (0 : G) :=
   (relationWitnessOfCollision urs hneq hcollision).toGroupRepresentation
 
-/-- A commitment collision reduces to the plain discrete log of the pre-fixed challenge URS slot,
-provided the collision difference hits that slot, assuming known logs for all other URS generators. -/
+/-- Use a commitment collision to solve DL when its difference hits the fixed challenge slot. -/
 def discreteLogOfCollisionAtChallenge (urs : URS G) (B : G)
     {a a' : Fin (2 ^ urs.k) → F} (logs : Fin (2 ^ urs.k) → F)
     (challenge : Fin (2 ^ urs.k))
@@ -475,9 +440,7 @@ def discreteLogOfCollisionAtChallenge (urs : URS G) (B : G)
   discreteLogOfBasis_of_relation B urs.g logs challenge
     (relationWitnessOfCollision urs hneq hcollision) hknown hcoeff
 
-/-- An augmented deployed relation reduces to the plain discrete log of the pre-fixed challenge slot
-in `(gᵢ, U, W)`, provided its coefficient there is nonzero, assuming known logs for all other
-augmented generators. -/
+/-- Use an augmented relation to solve DL when it hits the fixed challenge slot. -/
 def discreteLogOfAugmentedRelationAtChallenge {n : ℕ} (B : G) (g : Fin n → G) (U W : G)
     (logs : AugmentedIndex n → F) (challenge : AugmentedIndex n)
     (r : AugmentedRelationWitness (F := F) g U W)
@@ -487,12 +450,9 @@ def discreteLogOfAugmentedRelationAtChallenge {n : ℕ} (B : G) (g : Fin n → G
   discreteLogOfBasis_of_relation B (augmentedBasis g U W) logs challenge
     r.toAlgebraicRelationWitness hknown hcoeff
 
-/-- Deterministic AGM-to-DL adapter for a relation whose pre-fixed challenge target is `U` — the
-`challenge := AugmentedIndex.u` instance of the fixed-slot embedding, with the known logs given
-directly on `g` and `W`.
+/-- Recover the discrete log of `U` from an augmented relation with a nonzero `U` coefficient.
 
-If every URS generator and `W` have known logs over `B`, then an augmented relation
-`⟨a,g⟩ + alpha·U + beta·W = 0` with `alpha ≠ 0` recovers the discrete log of `U` over `B`. -/
+The logs of every URS generator and `W` over `B` must be known. -/
 def discreteLogOfU_of_augmentedRelation {n : ℕ} (B : G) (g : Fin n → G) (U W : G)
     (gLog : Fin n → F) (wLog : F) (r : AugmentedRelationWitness (F := F) g U W)
     (hg : ∀ i, g i = gLog i • B) (hW : W = wLog • B) (halpha : r.α ≠ 0) :
@@ -526,9 +486,9 @@ def discreteLogOfU_of_augmentedRelation {n : ℕ} (B : G) (g : Fin n → G) (U W
     simpa [smul_smul, inv_mul_cancel₀ halpha] using hscale
   exact hlog.symm
 
-/-- Deterministic AGM-to-DL adapter for a relation whose pre-fixed challenge target is `W` — the
-`challenge := AugmentedIndex.w` instance of the fixed-slot embedding, with the known logs given
-directly on `g` and `U`. -/
+/-- Recover the discrete log of `W` from an augmented relation with a nonzero `W` coefficient.
+
+The logs of every URS generator and `U` over `B` must be known. -/
 def discreteLogOfW_of_augmentedRelation {n : ℕ} (B : G) (g : Fin n → G) (U W : G)
     (gLog : Fin n → F) (uLog : F) (r : AugmentedRelationWitness (F := F) g U W)
     (hg : ∀ i, g i = gLog i • B) (hU : U = uLog • B) (hbeta : r.β ≠ 0) :

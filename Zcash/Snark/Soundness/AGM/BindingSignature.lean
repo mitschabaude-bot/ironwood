@@ -3,13 +3,12 @@ import Zcash.Security.BindingSignature.Sapling
 import Zcash.Snark.Soundness.AGM.Adapter
 
 /-!
-# Binding-signature relations as AGM break data
+# Binding-signature relations as AGM inputs
 
-The binding-signature reduction computes `NontrivialRelation V R`. This module adapts that data to
-the generic AGM relation finder and, when `R ≠ 0`, computes the corresponding discrete log of `V`
-base `R`. `orchardImbalanceToDiscreteLog` and `saplingImbalanceToDiscreteLog` compose the complete
-pool-specific integer/no-overflow reductions with this consumer. No existential relation is
-introduced or eliminated.
+The binding-signature reduction computes `NontrivialRelation V R`. This module converts it to the
+generic AGM relation type and, when `R ≠ 0`, computes the discrete log of `V` base `R`. The Orchard
+and Sapling endpoints include their integer range and no-overflow checks. All relations remain
+explicit data.
 -/
 
 namespace Zcash.Security.BindingSignature
@@ -32,7 +31,7 @@ theorem representationEval_bindingSignatureBasis (V R : M) (α β : F) :
   simp [Zcash.Snark.representationEval, bindingSignatureBasis, bindingSignatureCoeffs,
     Fin.sum_univ_two]
 
-/-- View the computed binding-signature relation as the generic AGM adversary output. -/
+/-- Convert a binding-signature relation to the generic AGM relation type. -/
 def NontrivialRelation.toAlgebraicRelationWitness (V R : M)
     (r : NontrivialRelation (F := F) V R) :
     Zcash.Snark.AlgebraicRelationWitness (F := F) (bindingSignatureBasis V R) :=
@@ -54,7 +53,7 @@ def NontrivialRelation.toAlgebraicRelationWitness (V R : M)
       rw [representationEval_bindingSignatureBasis]
       simpa [Zcash.Snark.commitGen] using r.relation }
 
-/-- Compute `dlog_R V` from the computed two-base relation, provided `R` is nonzero. -/
+/-- Compute the discrete log of `V` base `R` from a two-base relation, assuming `R ≠ 0`. -/
 def NontrivialRelation.toDiscreteLog [DecidableEq F] (V R : M)
     (r : NontrivialRelation (F := F) V R)
     (hR : R ≠ 0) : Zcash.Snark.DiscreteLogRepresentation (F := F) R V := by
@@ -75,9 +74,7 @@ def NontrivialRelation.toDiscreteLog [DecidableEq F] (V R : M)
   · exact Zcash.Snark.discreteLogOfU_of_augmentedRelation R (Fin.elim0 : Fin 0 → M) V R
       Fin.elim0 1 r (fun i => Fin.elim0 i) (by simp) hα
 
-/-- **Orchard binding failure to a computed discrete log.** Compose the complete Orchard integer
-balance reduction with `NontrivialRelation.toDiscreteLog`: a verifying, range-bounded imbalanced
-bundle computes `dlog_R V`, assuming only that the randomness base is nonzero. -/
+/-- Turn a verifying, range-bounded Orchard imbalance into the discrete log of `V` base `R`. -/
 def orchardImbalanceToDiscreteLog {M : Type*} [AddCommGroup M]
     [Module (ZMod pallasScalarOrder) M]
     (V R : M) (actions : List (ℤ × ZMod pallasScalarOrder)) (vBalance : ℤ)
@@ -93,9 +90,7 @@ def orchardImbalanceToDiscreteLog {M : Type*} [AddCommGroup M]
   (NontrivialRelation.ofOrchardImbalance V R actions vBalance bsk hne hv hn hvBalance
     hExtract).toDiscreteLog V R hR
 
-/-- **Sapling binding failure to a computed discrete log.** Compose the complete Sapling integer
-balance reduction with `NontrivialRelation.toDiscreteLog`: a verifying, range-bounded imbalanced
-bundle computes `dlog_R V`, assuming only that the randomness base is nonzero. -/
+/-- Turn a verifying, range-bounded Sapling imbalance into the discrete log of `V` base `R`. -/
 def saplingImbalanceToDiscreteLog {M : Type*} [AddCommGroup M]
     [Module (ZMod jubjubScalarOrder) M]
     (V R : M) (spends outputs : List (ℤ × ZMod jubjubScalarOrder)) (vBalance : ℤ)

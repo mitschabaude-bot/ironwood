@@ -2,34 +2,27 @@ import Zcash.Snark.Soundness.Deployed.IpaPeel
 import Zcash.Snark.Soundness.AGM.Probability
 
 /-!
-# Algebraic-prover model: explicit relation witnesses from prover representations
+# Compute relation witnesses from algebraic prover data
 
-This module is the algebraic-group-model input boundary of issue #15, at the peel level. Every
-prover-emitted round point is paired with a representation over the complete public basis
-`(g, U, W)`, and every reduction below is a plain computable `def` producing either the clean
-transcript or the shared `NontrivialRelation` data used by the deployed soundness layer — replacing
-the Prop-level peel (`¬ IpaAcceptV` located by decidability) with data the DL reduction can consume.
+Each prover round point includes coefficients over `(g, U, W)`. The definitions below compute either
+a clean IPA transcript or an explicit `NontrivialRelation`. The relation coefficients are the
+difference between the prover's representation and the expected one; no witness is selected with
+`Classical.choice`.
 
-The peel returns an **explicit** `AugmentedRelationWitness` — whose coefficients are literally the
-prover's representation difference `aP - honest` — with no `Classical.choice`:
-
-* `separateOrRelationWitness` / `relationOfFoldGensWitness` / `deployedLeafPeelWitness` — data-carrying
-  analogues of the `Soundness.Deployed.Binding` / `Soundness.Deployed.IpaPeel` steps.
+* `separateOrRelationWitness`, `relationOfFoldGensWitness`, and `deployedLeafPeelWitness` implement
+  the corresponding deployed peel steps with explicit data.
 * `deployedToAcceptVWitness` — the recursive peel, returning `IpaAcceptV ⊕' AugmentedRelationWitness`.
-* `algebraicRelationOfDeployedAccept` — bridges the explicit witness into the
-  `AlgebraicRelationWitness (augmentedBasis g U W)` that the probability wrapper's reduction consumes.
+* `algebraicRelationOfDeployedAccept` converts the result to the form used by the probability proof.
 
-`Soundness.AGM.Capstone` wires this boundary to the deployed opening. The operational forking layer
-must supply both the transcript and these representations as data; it must not recover either with
-choice from an accept-probability existence theorem.
+`Soundness.AGM.Capstone` connects this peel to the deployed opening. The forking layer must supply
+the transcript and representations as data.
 -/
 
 namespace Zcash.Snark
 
 variable {F G : Type*} [Field F] [DecidableEq F] [AddCommGroup G] [Module F G]
 
-/-- Data version of `separate_or_relation`: the relation coefficients are the explicit difference
-`a - a'` from the prover's representations. -/
+/-- Compare two representations, returning equality or their explicit difference as a relation. -/
 def separateOrRelationWitness {n : ℕ} (g : Fin n → G) (U W : G)
     (a a' : Fin n → F) (α α' β β' : F)
     (e : commitGen g a + α • U + β • W = commitGen g a' + α' • U + β' • W) :
@@ -38,16 +31,13 @@ def separateOrRelationWitness {n : ℕ} (g : Fin n → G) (U W : G)
   · exact PSum.inl h
   · exact PSum.inr (NontrivialRelation.ofCombinationCollision e h)
 
-/-- Data version of `relation_of_foldGens`: an explicit witness over the folded generators lifts to
-an explicit witness over the originals. -/
+/-- Lift a relation over folded generators to the original generators. -/
 def relationOfFoldGensWitness {k : ℕ} (g : Fin (2 ^ (k + 1)) → G) (U W : G) (u : F)
     (r : AugmentedRelationWitness (F := F) (foldGens g u) U W) :
     AugmentedRelationWitness (F := F) g U W :=
   NontrivialRelation.ofFoldedGens u r
 
-/-- Data version of `deployed_leaf_peel`: taking the prover's leaf representation `aP` as **data**, the
-combined leaf equation either splits into the clean leaf checks or yields an **explicit**
-`AugmentedRelationWitness` over `(g, U, W)`. -/
+/-- Peel a deployed leaf into clean checks or an explicit relation over `(g, U, W)`. -/
 def deployedLeafPeelWitness {n : ℕ} {g : Fin n → G} {b : Fin n → F} {U W : G} {z : F}
     (aP : Fin n → F) {v blind c f : F} (hz : z ≠ 0)
     (e : commitGen g aP + (z * v) • U + blind • W
@@ -59,18 +49,14 @@ def deployedLeafPeelWitness {n : ℕ} {g : Fin n → G} {b : Fin n → F} {U W :
   | inl h => exact PSum.inl ⟨congrArg (commitGen g) h.1, mul_left_cancel₀ hz h.2.1⟩
   | inr hrel => exact PSum.inr hrel
 
-/-- Reassemble a prover-emitted deployed IPA point from its `g`, value, and blinding tracks. -/
+/-- Reassemble a deployed IPA point from its group, value, and blinding parts. -/
 def deployedRoundPoint (U W : G) (z : F) (L : G) (Lv Lw : F) : G :=
   L + (z * Lv) • U + Lw • W
 
-/-- Complete AGM representations for every group element output at a deployed IPA node.
+/-- Representations for every group point output by a deployed IPA tree.
 
-The tree stores each round point in components: its `g`-part (`L`/`R`), value coefficient
-(`Lv`/`Rv`), and blinding coefficient (`Lw`/`Rw`). The actual prover output is therefore
-`L + (z * Lv) • U + Lw • W` (and similarly for `R`). Each such point is represented over the
-*original* public basis `(g, U, W)`, including all descendants of the fork tree. Keeping the root
-basis fixed is the usual AGM convention and makes this data directly consumable by the relation
-reduction. -/
+Each round point combines its group, value, and blinding parts. Every node, including descendants,
+uses the original public basis `(g, U, W)`. -/
 def AlgebraicTreeRepresentations {n : ℕ} (g : Fin n → G) (U W : G) (z : F) :
     {d : ℕ} → DeployedIpaTreeV F G d → Type _
   | 0, .leaf _ _ _ => PUnit
@@ -83,21 +69,16 @@ def AlgebraicTreeRepresentations {n : ℕ} (g : Fin n → G) (U W : G) (z : F) :
       AlgebraicTreeRepresentations g U W z t₂ ×
       AlgebraicTreeRepresentations g U W z t₃
 
-/-- A deployed accepting tree together with the AGM data for every prover-emitted group point.
-
-Unlike the former abbreviation, this is a data type, not an alias for ordinary acceptance: callers
-cannot enter the algebraic capstone without supplying the node representations. -/
+/-- A deployed accepting tree with representations for every prover-emitted group point. -/
 structure AlgebraicDeployedAcceptV {d : ℕ} (g : Fin (2 ^ d) → G) (b : Fin (2 ^ d) → F)
     (U W : G) (z : F) (P : G) (v blind : F) (t : DeployedIpaTreeV F G d) : Type _ where
   accepts : DeployedIpaAcceptV g b U W z P v blind t
   representations : AlgebraicTreeRepresentations g U W z t
 
-/-- **Explicit-witness peel (algebraic prover).** From the accepting transcript, the deployed
-recursion yields either the clean `IpaAcceptV` transcript or an **explicit**
-`AugmentedRelationWitness` over `(g, U, W)` — its coefficients computed from the accept equations and
-the tree's *leaf* representation `aP`, with no `Classical.choice`. The node representations of
-`AlgebraicDeployedAcceptV` are AGM admissibility data, not consumed by this computation.
-Data-carrying analogue of `deployed_to_acceptV`. -/
+/-- Recursively peel an accepting deployed tree into a clean IPA transcript or explicit relation.
+
+The relation is computed from the acceptance equations and leaf representation. Node
+representations enforce the AGM input contract but are not used by this computation. -/
 def deployedToAcceptVWitnessCore {U W : G} {z : F} (hz : z ≠ 0) :
     {d : ℕ} → (g : Fin (2 ^ d) → G) → (b : Fin (2 ^ d) → F) → (P : G) → (v blind : F) →
       (t : DeployedIpaTreeV F G d) → DeployedIpaAcceptV g b U W z P v blind t →
@@ -118,21 +99,14 @@ def deployedToAcceptVWitnessCore {U W : G} {z : F} (hz : z ≠ 0) :
         | inr hr₂ => exact PSum.inr (relationOfFoldGensWitness g U W u₂ hr₂)
       | inr hr₁ => exact PSum.inr (relationOfFoldGensWitness g U W u₁ hr₁)
 
-/-- **Explicit-witness peel (algebraic prover).** The representation-bearing input is required at
-the public boundary; the deterministic peel then computes from its accepting transcript. -/
+/-- Run the deterministic peel on an accepting tree that includes its AGM representations. -/
 def deployedToAcceptVWitness {U W : G} {z : F} (hz : z ≠ 0) {d : ℕ}
     (g : Fin (2 ^ d) → G) (b : Fin (2 ^ d) → F) (P : G) (v blind : F)
     (t : DeployedIpaTreeV F G d) (h : AlgebraicDeployedAcceptV g b U W z P v blind t) :
     IpaAcceptV g b P v (projTree t) ⊕' AugmentedRelationWitness (F := F) g U W :=
   deployedToAcceptVWitnessCore hz g b P v blind t h.accepts
 
-/-- **Bridge to the probability wrapper.** From the algebraic prover's data-carrying accept, the
-deployed opening is either the clean `IpaAcceptV` transcript or an explicit
-`AlgebraicRelationWitness` over the augmented basis `(g, U, W)` — computed from the accept equations
-and the leaf representation, the node representations being AGM admissibility data — precisely the
-adversary output that `Soundness.AGM.Probability`'s reduction consumes (`succSet`/`relSet`), with
-**no** `Classical.choice`. This is the algebraic-prover model of issue #15 wired to the DL reduction
-at the peel level. -/
+/-- Return a clean IPA transcript or the explicit relation consumed by the probability proof. -/
 def algebraicRelationOfDeployedAccept {d : ℕ} {U W : G} {z : F} (hz : z ≠ 0)
     (g : Fin (2 ^ d) → G) (b : Fin (2 ^ d) → F) (P : G) (v blind : F)
     (t : DeployedIpaTreeV F G d) (h : AlgebraicDeployedAcceptV g b U W z P v blind t) :

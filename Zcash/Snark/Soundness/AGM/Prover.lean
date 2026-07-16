@@ -4,20 +4,18 @@ import Zcash.Snark.Soundness.Forking.Extractor
 /-!
 # Algebraic prover and forking-certificate interfaces
 
-An AGM prover does not return a bare group element: it returns the element together with coefficients
-over the complete public basis it received. This module puts that rule in the operational types used
-by the forking extractor.
+An AGM prover returns each group element with coefficients over its public basis. This module adds
+those coefficients to the types used by the forking extractor.
 
-`AlgebraicProver` is the prefix-determined prover strategy, with represented round points.
-`AlgebraicDForkCert` is the corresponding explicit `(3, …, 3)` certificate. Both erase to the ordinary
-forking types, while retaining the coefficient vectors needed to justify the AGM restriction.
+`AlgebraicProver` is the prefix-determined strategy. `AlgebraicDForkCert` is its explicit
+`(3, …, 3)` fork tree. Both erase to the ordinary forking types.
 -/
 
 namespace Zcash.Snark
 
 variable {F G : Type*} [Field F] [AddCommGroup G] [Module F G]
 
-/-- A prefix-determined prover whose every group output carries an AGM representation over `basis`. -/
+/-- A prefix-determined prover whose group outputs include coefficients over `basis`. -/
 inductive AlgebraicProver {ι : Type*} [Fintype ι] (basis : ι → G) : ℕ → Type _ where
   | leaf : F → F → AlgebraicProver basis 0
   | node {d : ℕ} : AlgebraicPoint (F := F) basis → AlgebraicPoint (F := F) basis →
@@ -25,8 +23,7 @@ inductive AlgebraicProver {ι : Type*} [Fintype ι] (basis : ι → G) : ℕ →
 
 namespace AlgebraicProver
 
-/-- Forget the coefficient vectors, yielding the ordinary prover strategy consumed by the existing
-forking predicate. -/
+/-- Erase coefficient vectors to obtain the ordinary prover strategy. -/
 def toProver {ι : Type*} [Fintype ι] {basis : ι → G} :
     {d : ℕ} → AlgebraicProver (F := F) basis d → Prover F G d
   | 0, .leaf c f => .leaf c f
@@ -34,8 +31,7 @@ def toProver {ι : Type*} [Fintype ι] {basis : ι → G} :
 
 end AlgebraicProver
 
-/-- A deployed forking certificate whose round points retain their AGM representations. The basis is
-fixed before the prover runs and is unchanged throughout all descendants of the fork tree. -/
+/-- A fork certificate whose round points include coefficients over one fixed public basis. -/
 inductive AlgebraicDForkCert {ι : Type*} [Fintype ι] (basis : ι → G) : ℕ → Type _ where
   | leaf : F → F → AlgebraicDForkCert basis 0
   | node {d : ℕ} : AlgebraicPoint (F := F) basis → AlgebraicPoint (F := F) basis → F → F → F →
@@ -44,8 +40,7 @@ inductive AlgebraicDForkCert {ι : Type*} [Fintype ι] (basis : ι → G) : ℕ 
 
 namespace AlgebraicDForkCert
 
-/-- Forget the coefficient vectors, preserving exactly the certificate checked by
-`DeployedForkValid`. -/
+/-- Erase coefficient vectors to obtain the certificate checked by `DeployedForkValid`. -/
 def toDForkCert {ι : Type*} [Fintype ι] {basis : ι → G} :
     {d : ℕ} → AlgebraicDForkCert (F := F) basis d → DForkCert F G d
   | 0, .leaf c f => .leaf c f
@@ -54,18 +49,16 @@ def toDForkCert {ι : Type*} [Fintype ι] {basis : ι → G} :
 
 end AlgebraicDForkCert
 
-/-- Acceptance of an algebraic prover is the deployed path predicate for its erased strategy. The
-algebraic restriction is carried by the strategy's type rather than added as a proposition. -/
+/-- Acceptance of the ordinary strategy obtained by erasing an algebraic prover's coefficients. -/
 def algebraicProverAccept {ι : Type*} [Fintype ι] {basis : ι → G} {d : ℕ}
     (P : AlgebraicProver (F := F) basis d) (g : Fin (2 ^ d) → G)
     (b : Fin (2 ^ d) → F) (U W : G) (z : F) (Pwhole : G) (χ : Fin d → F) : Prop :=
   proverAccept P.toProver g b U W z Pwhole χ
 
-/-- Zip a propositional `Extractable` tree for an algebraic strategy into the existence of a
-representation-carrying certificate. The round-point coefficient vectors come directly from the
-strategy; only the challenge tree remains behind `Extractable`'s existential proposition. The
-computed capstone therefore takes `AlgebraicDForkCert` itself as data rather than choosing this
-witness. -/
+/-- An `Extractable` algebraic strategy has a valid algebraic fork certificate.
+
+The strategy supplies the round-point coefficients. The challenge tree remains existential, so the
+computable endpoint takes an `AlgebraicDForkCert` as input instead of choosing one here. -/
 theorem algebraicProverAccept_forkValid {ι : Type*} [Fintype ι] {basis : ι → G} {U W : G} {z : F} :
     {d : ℕ} → (P : AlgebraicProver (F := F) basis d) → (g : Fin (2 ^ d) → G) →
       (b : Fin (2 ^ d) → F) → (Pwhole : G) →

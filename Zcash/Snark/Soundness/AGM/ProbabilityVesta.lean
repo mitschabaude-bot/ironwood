@@ -3,25 +3,18 @@ import Zcash.Snark.Soundness.AGM.Probability
 import Zcash.Snark.Soundness.AGM.Capstone
 
 /-!
-# Deployed-curve instantiation of the AGM probability wrapper (Vesta)
+# Vesta AGM probability bounds
 
-The generic probability wrapper (`Soundness.AGM.Probability`) specializes to the deployed *index
-shapes* — the augmented basis index `AugmentedIndex (2 ^ urs.k)` and the URS index `Fin (2 ^ urs.k)` —
-over the Vesta group `VestaG` with scalar field `Fp`. This is the concrete-curve endpoint of the
-"relation finder ⇒ discrete-log solver" reduction for the computed relation branch of the deployed
-Orchard verifier capstones.
+This module applies the generic relation-to-DL probability proof to Vesta and the deployed augmented
+basis `(g, U, W)`.
 
-**The uniform-basis seam.** In these theorems the producer acts on the reduction's *sampled* basis
-`scalarBasis B s` (uniform scalars times `B`), not on one fixed tuple of deployed generators.
-`OrchardUniformURSIdentification` states the exact setup requirement: the pushforward distribution
-of the deployed setup coins through its basis sampler equals the sampled-basis distribution.
-`orchard_uniformURSIdentification_of_generatorRO` derives that equality when the basis is read from
-a uniform group-valued random oracle at distinct parameter queries; the remaining setup idealization
-is the identification of halo2's concrete hash-to-curve with that oracle. The probability transfer
-below is therefore a theorem about the concrete relation event, rather than an assumed equality
-involving an otherwise arbitrary external probability. The operational adversary must still produce
-`DeployedAlgebraicForkingInstance` data and connect its accept event to that relation event; that is
-the Fiat–Shamir integration boundary.
+The reduction samples a basis as uniform scalar multiples of `B`.
+`OrchardUniformURSIdentification` says that the deployed setup has the same distribution.
+`orchard_uniformURSIdentification_of_generatorRO` proves this inside a uniform generator random-
+oracle model. Treating halo2's hash-to-curve as that oracle remains an assumption.
+
+The Fiat–Shamir layer must still produce `DeployedAlgebraicForkingInstance` values and relate its
+acceptance event to the relation event measured here.
 -/
 
 open scoped ENNReal
@@ -30,9 +23,7 @@ namespace Zcash.Snark
 
 open CompElliptic.Curves.Pasta CompElliptic.CurveForms.ShortWeierstrass CompElliptic.CurveOrder
 
-/-- Vesta specialization of the computed deployed opening-or-DL endpoint. All transcript and AGM
-representation data remain explicit inputs; the result is computed and preserves the precise
-relation in the fixed-slot miss branch. -/
+/-- Run the computed opening-or-DL endpoint over Vesta. All transcript and AGM data are explicit. -/
 def orchardDeployedAlgebraicForkingFixedSlot
     (urs : URS VestaG) (B : VestaG) (challenge : AugmentedIndex (2 ^ urs.k))
     (embedding : FixedSlotEmbedding (F := Fp) B (augmentedBasis urs.g urs.u urs.w) challenge)
@@ -59,9 +50,7 @@ noncomputable def orchardDeployedRelationSet (k : ℕ) (B : VestaG)
   exact Finset.univ.filter fun scalars =>
     deployedAlgebraicRelationProduced instances (scalarBasis B scalars)
 
-/-- The explicit producer-branch event is exactly the `relSet` consumed by the generic DL
-reduction. No deployed-accept probability is assumed here: the equality follows by executing the
-supplied instances and inspecting their computed sum branch. -/
+/-- The supplied instances' relation event equals the generic reduction's `relSet`. -/
 theorem orchard_deployed_relation_set_eq_relSet (k : ℕ) (B : VestaG)
     (instances : ∀ basis : AugmentedIndex (2 ^ k) → VestaG,
       Option (DeployedAlgebraicForkingInstance (G := VestaG) k basis)) :
@@ -72,9 +61,7 @@ theorem orchard_deployed_relation_set_eq_relSet (k : ℕ) (B : VestaG)
   simp only [orchardDeployedRelationSet, relSet, Finset.mem_filter, Finset.mem_univ, true_and]
   exact (deployedAlgebraicRelationFinder_isSome_iff instances (scalarBasis B scalars)).symm
 
-/-- **Deployed producer, advantage form.** The generic fixed-slot accounting instantiated with the
-actual relation finder obtained by running `DeployedAlgebraicForkingInstance.run` on every sampled
-augmented Vesta basis. This removes the formerly unrelated abstract `A` from the deployed endpoint. -/
+/-- Apply the fixed-slot probability bound to the supplied deployed Vesta instances. -/
 theorem orchard_deployed_reduction_advantage_ge (k : ℕ) (B : VestaG)
     (instances : ∀ basis : AugmentedIndex (2 ^ k) → VestaG,
       Option (DeployedAlgebraicForkingInstance (G := VestaG) k basis)) :
@@ -86,8 +73,7 @@ theorem orchard_deployed_reduction_advantage_ge (k : ℕ) (B : VestaG)
           (succSet B (deployedAlgebraicRelationFinder instances)) :=
   reduction_advantage_ge B (deployedAlgebraicRelationFinder instances)
 
-/-- **Deployed producer under textbook DL hardness.** Bound the relation probability of the concrete
-deployed algebraic producer, evaluated on the uniformly sampled augmented Vesta basis. -/
+/-- Bound the supplied instances' relation probability by textbook DL hardness. -/
 theorem orchard_deployed_relation_prob_le_of_textbookDL (k : ℕ) (B : VestaG)
     (instances : ∀ basis : AugmentedIndex (2 ^ k) → VestaG,
       Option (DeployedAlgebraicForkingInstance (G := VestaG) k basis))
@@ -98,9 +84,9 @@ theorem orchard_deployed_relation_prob_le_of_textbookDL (k : ℕ) (B : VestaG)
       ≤ Fintype.card (AugmentedIndex (2 ^ k)) * bound :=
   relation_prob_le_of_textbookDL B (deployedAlgebraicRelationFinder instances) hDL
 
-/-- The textbook-DL bound stated directly on the computed relation branch of the supplied deployed
-instances. This is the PR-28 side of the probability weld; an operational adversary must prove that
-its own relation-producing executions populate `instances`. -/
+/-- State the textbook-DL bound directly on the supplied instances' computed relation event.
+
+The Fiat–Shamir layer must show that its executions populate `instances`. -/
 theorem orchard_deployed_relation_event_prob_le_of_textbookDL (k : ℕ) (B : VestaG)
     (instances : ∀ basis : AugmentedIndex (2 ^ k) → VestaG,
       Option (DeployedAlgebraicForkingInstance (G := VestaG) k basis))
@@ -112,17 +98,13 @@ theorem orchard_deployed_relation_event_prob_le_of_textbookDL (k : ℕ) (B : Ves
   rw [orchard_deployed_relation_set_eq_relSet]
   exact orchard_deployed_relation_prob_le_of_textbookDL k B instances hDL
 
-/-- The deployed URS setup distribution is the sampled-basis distribution used by the fixed-slot
-reduction. `basisOf` exposes the augmented basis generated from the setup coins; the equality is of
-the complete pushforward PMFs, independent of any particular adversary or event. For a fixed URS
-this is intentionally not derivable merely from Vesta cyclicity. -/
+/-- The deployed setup and fixed-slot reduction produce the same augmented-basis distribution. -/
 def OrchardUniformURSIdentification {Ω : Type*} (setup : PMF Ω) (k : ℕ) (B : VestaG)
     (basisOf : Ω → AugmentedIndex (2 ^ k) → VestaG) : Prop :=
   setup.map basisOf =
     (PMF.uniformOfFintype (AugmentedIndex (2 ^ k) → Fp)).map (scalarBasis B)
 
-/-- Uniform group-valued random-oracle answers at the distinct parameter queries used to derive the
-augmented URS basis. This is a probability-event definition, not a data-producing reduction. -/
+/-- Uniform group-valued oracle answers at the parameter queries for the augmented URS basis. -/
 noncomputable def orchardGeneratorROSetup {T : Type*} [DecidableEq T]
     {k : ℕ} (query : AugmentedIndex (2 ^ k) → T) :
     PMF (↥(Set.range query) → VestaG) := by
@@ -135,16 +117,11 @@ def orchardGeneratorROBasis {T : Type*} {k : ℕ}
     (↥(Set.range query) → VestaG) → AugmentedIndex (2 ^ k) → VestaG :=
   fun O i => O ⟨query i, Set.mem_range_self i⟩
 
-/-- Reading the augmented URS basis from a uniform group-valued random oracle at distinct parameter
-queries satisfies `OrchardUniformURSIdentification`. This is the random-oracle model of halo2's
-deterministic parameter derivation (`gᵢ = H(0 || i)`, `W = H(1)`, `U = H(2)`): distinct queries give
-independent uniform Vesta points. For nonzero `B`, scalar multiplication by `B` is a bijection from
-`Fp` to `VestaG`, so that uniform point basis is exactly the sampled-scalar basis used by the
-fixed-slot reduction.
+/-- Distinct queries to a uniform group-valued oracle produce the sampled-basis distribution.
 
-This theorem discharges the former free-standing PMF equality inside the generator-RO model. The
-cryptographic identification of halo2's concrete hash-to-curve with that oracle remains the standard
-hash-to-curve-as-random-oracle idealization. -/
+This models halo2's parameter derivation (`gᵢ = H(0 || i)`, `W = H(1)`, `U = H(2)`). For `B ≠ 0`,
+scalar multiplication by `B` maps uniform scalars to uniform Vesta points. Identifying halo2's
+concrete hash-to-curve with this oracle remains an assumption. -/
 theorem orchard_uniformURSIdentification_of_generatorRO {T : Type*} [DecidableEq T]
     (k : ℕ) (B : VestaG) (hB : B ≠ 0)
     (query : AugmentedIndex (2 ^ k) → T) (hquery : Function.Injective query) :
@@ -177,8 +154,7 @@ theorem orchard_uniformURSIdentification_of_generatorRO {T : Type*} [DecidableEq
   simpa [orchardGeneratorROBasis] using
     (uniformOfFintype_map_eval_injective query hquery).trans hscalar.symm
 
-/-- A uniform-URS setup transports the concrete deployed-producer relation event exactly to the
-sampled-scalar event used by `relSet`. -/
+/-- Transfer the supplied relation event from a uniform URS setup to the sampled-scalar experiment. -/
 theorem orchard_deployed_relation_prob_eq_of_uniformURS {Ω : Type*} (setup : PMF Ω)
     (k : ℕ) (B : VestaG) (basisOf : Ω → AugmentedIndex (2 ^ k) → VestaG)
     (instances : ∀ basis : AugmentedIndex (2 ^ k) → VestaG,
@@ -205,9 +181,7 @@ theorem orchard_deployed_relation_prob_eq_of_uniformURS {Ω : Type*} (setup : PM
       simp only [Set.mem_preimage, deployedAlgebraicRelationEvent, Set.mem_setOf_eq,
         orchardDeployedRelationSet, Finset.mem_coe, Finset.mem_filter, Finset.mem_univ, true_and]
 
-/-- Transfer textbook-DL hardness to the concrete relation event under an explicit URS setup
-distribution. Unlike the former wrapper, the left side is an actual event determined by `basisOf`
-and the supplied data-producing instances, not an arbitrary probability variable. -/
+/-- Bound the supplied relation event under an explicit URS setup distribution. -/
 theorem orchard_deployed_relation_prob_le_of_uniformURS_textbookDL {Ω : Type*} (setup : PMF Ω)
     (k : ℕ) (B : VestaG) (basisOf : Ω → AugmentedIndex (2 ^ k) → VestaG)
     (instances : ∀ basis : AugmentedIndex (2 ^ k) → VestaG,
@@ -219,9 +193,7 @@ theorem orchard_deployed_relation_prob_le_of_uniformURS_textbookDL {Ω : Type*} 
   rw [orchard_deployed_relation_prob_eq_of_uniformURS setup k B basisOf instances hURS]
   exact orchard_deployed_relation_event_prob_le_of_textbookDL k B instances hDL
 
-/-- Under the generator random-oracle model, bound the concrete deployed relation event directly by
-textbook DL. The setup-identification equality is derived from distinct generator queries and Vesta's
-prime-order scalar action rather than supplied as a free-standing hypothesis. -/
+/-- Bound the supplied relation event by textbook DL in the generator random-oracle model. -/
 theorem orchard_deployed_relation_prob_le_of_generatorRO_textbookDL
     {T : Type*} [DecidableEq T] (k : ℕ) (B : VestaG) (hB : B ≠ 0)
     (query : AugmentedIndex (2 ^ k) → T) (hquery : Function.Injective query)
@@ -236,13 +208,7 @@ theorem orchard_deployed_relation_prob_le_of_generatorRO_textbookDL
     (orchardGeneratorROSetup query) k B (orchardGeneratorROBasis query) instances
     (orchard_uniformURSIdentification_of_generatorRO k B hB query hquery) hDL
 
-/-- **Binding from discrete-log hardness, at the deployed curve.** At the augmented basis *index*
-`AugmentedIndex (2 ^ urs.k)` over Vesta: if this reduction solves the discrete log of the challenge
-slot with probability at most `bound` (`DLAdvantageLE`), then an algebraic adversary against the
-sampled basis `scalarBasis B s` finds a nontrivial relation with probability at most `|ι| · bound`.
-Reading the sampled basis as the deployed `(g, U, W)` is the uniform-basis seam (module doc). Direct
-specialization of `relation_prob_le_of_DL` to `ι := AugmentedIndex (2 ^ urs.k)`, `F := Fp`,
-`G := VestaG`. -/
+/-- Over Vesta's augmented basis, embedded-DL hardness bounds relation finding by `|ι| · bound`. -/
 theorem orchard_relation_prob_le_of_DL
     (urs : URS VestaG) (B : VestaG)
     (A : (b : AugmentedIndex (2 ^ urs.k) → VestaG) →
@@ -252,10 +218,8 @@ theorem orchard_relation_prob_le_of_DL
       ≤ Fintype.card (AugmentedIndex (2 ^ urs.k)) * bound :=
   relation_prob_le_of_DL B A h
 
-/-- The deployed-curve advantage-preserving reduction: over the uniform product, the reduction's
-discrete-log-solving probability is at least `1/|ι|` times the algebraic adversary's relation-finding
-probability on the sampled basis (uniform-basis seam: module doc). Specialization of
-`reduction_advantage_ge` at the deployed index shape. -/
+/-- Over Vesta's augmented basis, DL-solving probability is at least relation probability divided by
+`|ι|`. -/
 theorem orchard_reduction_advantage_ge
     (urs : URS VestaG) (B : VestaG)
     (A : (b : AugmentedIndex (2 ^ urs.k) → VestaG) →
@@ -266,14 +230,11 @@ theorem orchard_reduction_advantage_ge
           (succSet B A) :=
   reduction_advantage_ge B A
 
-/-- **Commitment binding from plain discrete log (URS index shape).** Specializing the reduction to
-the URS *index* `Fin (2 ^ urs.k)` over Vesta: under textbook single-generator DL hardness for this
-reduction (`TextbookDLAdvantageLE`), an algebraic adversary finds a nontrivial relation over the
-sampled basis `scalarBasis B s` with probability at most `2^k · bound`. The binding reading — a
-commitment collision on the URS yields such a relation via its difference `a - a'`
-(`relationWitnessOfCollision`), so collisions are as hard as discrete log — additionally requires the
-uniform-basis seam (module doc): the deployed URS generators distributed as uniform multiples of a
-generator `B`. The statement itself is about the sampled basis; `urs` enters only through `urs.k`. -/
+/-- Over the Vesta URS-generator basis, textbook DL hardness bounds relation finding by
+`2^urs.k · bound`.
+
+A commitment collision yields such a relation through `relationWitnessOfCollision`. The deployed
+reading also requires the URS distribution described in the module documentation. -/
 theorem commitment_binding_prob_le_of_textbookDL
     (urs : URS VestaG) (B : VestaG)
     (A : (b : Fin (2 ^ urs.k) → VestaG) → Option (AlgebraicRelationWitness (F := Fp) b))
@@ -282,14 +243,7 @@ theorem commitment_binding_prob_le_of_textbookDL
       ≤ Fintype.card (Fin (2 ^ urs.k)) * bound :=
   relation_prob_le_of_textbookDL B A h
 
-/-- **Binding from *textbook* discrete-log hardness at the augmented basis index.** The
-`TextbookDLAdvantageLE` form of `orchard_relation_prob_le_of_DL`, at the index shape the deployed
-relation branch actually produces (`deployedAlgebraicRelationWitness` lands in
-`AlgebraicRelationWitness (augmentedBasis g U W)`, indexed by `AugmentedIndex (2 ^ urs.k)`): under
-standard single-generator DL hardness for the reduction built from `A`, an algebraic adversary
-against the sampled augmented basis finds a nontrivial relation with probability at most
-`|ι| · bound`. Uniform-basis seam as in the module doc; direct specialization of
-`relation_prob_le_of_textbookDL`. -/
+/-- Over Vesta's augmented basis, textbook DL hardness bounds relation finding by `|ι| · bound`. -/
 theorem orchard_relation_prob_le_of_textbookDL
     (urs : URS VestaG) (B : VestaG)
     (A : (b : AugmentedIndex (2 ^ urs.k) → VestaG) →

@@ -32,12 +32,10 @@ binding hypothesis. Instead we phrase binding as a reduction:
   ∃-closed relation Prop would be vacuous, since a relation always exists in a prime-order
   group.
 
-  "The bundle balances" then reduces to the discrete-log relation problem (DLR). The AGM handoff in
-  `Zcash.Snark.Soundness.AGM.BindingSignature` consumes the Orchard and Sapling relation branches as
-  computed plain-DL witnesses. This is the shape of the spec's argument: *if you can unbalance, you
-  can solve DL*. The relation and discrete-log problems are tightly equivalent (Jaeger and Tessaro,
-  https://eprint.iacr.org/2020/1213 Lemma 3 in general, but this case is very simple), so this is no
-  stronger than DL.
+  `Zcash.Snark.Soundness.AGM.BindingSignature` turns the computed Orchard and Sapling relations into
+  plain-DL solutions: *if you can unbalance, you can solve DL*. DLR and DL are tightly equivalent
+  (Jaeger and Tessaro, https://eprint.iacr.org/2020/1213, Lemma 3), so this assumes no more than DL
+  hardness.
 
 The range / no-overflow lift from field balance to integer balance is already built (`§ Integer
 balance` below: `intBalance_eq_zero_of_lt`, discharged per pool by `orchard_natAbs_lt` /
