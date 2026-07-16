@@ -163,7 +163,7 @@ invertible), and `Fp` and `VestaG` are equinumerous (`scalarFieldOrder`), so it 
 element, `deployedCommitment` included, is the `g`-commitment of some witness. So `hcommit` is always
 satisfiable: the witness is the discrete log of `P` base `g 0`, existing but not feasibly constructible —
 the same DLR-side status as the `⊕' NontrivialRelation` disjunct. -/
-theorem commit_surjective [Fact (HasseBound Vesta.curve)] (urs : URS VestaG) (hg0 : urs.g 0 ≠ 0)
+theorem commit_surjective (urs : URS VestaG) (hg0 : urs.g 0 ≠ 0)
     (P : VestaG) : ∃ aMulti : Fin (2 ^ urs.k) → Fp, commit urs aMulti = P := by
   have hinj : Function.Injective (fun c : Fp => c • urs.g 0) := by
     intro c c' h
@@ -176,7 +176,7 @@ theorem commit_surjective [Fact (HasseBound Vesta.curve)] (urs : URS VestaG) (hg
       rw [← one_smul Fp (urs.g 0), ← inv_mul_cancel₀ hd, mul_smul, h0, smul_zero]
   haveI : Fintype VestaG := Fintype.ofFinite VestaG
   have hcardeq : Fintype.card Fp = Fintype.card VestaG := by
-    rw [card_Fp, ← Nat.card_eq_fintype_card, Vesta.card_eq Fact.out]
+    rw [card_Fp, ← Nat.card_eq_fintype_card, Vesta.card_eq]
   obtain ⟨c, hc⟩ := ((Fintype.bijective_iff_injective_and_card _).mpr ⟨hinj, hcardeq⟩).surjective P
   exact ⟨Pi.single 0 c, by rw [commit_single]; exact hc⟩
 
@@ -208,7 +208,7 @@ the **true** opened value `multiopenValue − ξ·⟨s,b⟩`, with no `⟨s,b⟩
 `hbridge` (the irreducible random-oracle floor), plus the antecedents `z ≠ 0`, the nonzero generator `hg0`, and
 the accept probability `hprob` beating the knowledge error `kerr/Nᵏ`. The `⊕' NontrivialRelation` caveat is
 unchanged — vacuous at Vesta's prime order, the force in the out-of-Lean DLR/AGM layer. -/
-noncomputable def orchard_verifier_vesta_forking_opening [Fact (HasseBound Vesta.curve)] [DecidableEq VestaG]
+noncomputable def orchard_verifier_vesta_forking_opening [DecidableEq VestaG]
     [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp)
     (xEval ξ z blind : Fp) (s : Fin (2 ^ urs.k) → Fp)
@@ -259,7 +259,7 @@ discharged. The original `FiatShamirTree` reductions
 `⊕' NontrivialRelation` caveat is unchanged — vacuous at Vesta's prime order, the force in the out-of-Lean
 DLR/AGM layer. `hquot`/`hgood` retain the ∀-openings shape — unsatisfiable at Vesta for any decode that
 genuinely reads the witness (see `orchard_verifier_deployed_constraint_of_forked`'s caveat). -/
-noncomputable def orchard_verifier_vesta_forking_constraint [Fact (HasseBound Vesta.curve)] [DecidableEq VestaG]
+noncomputable def orchard_verifier_vesta_forking_constraint [DecidableEq VestaG]
     [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp)
     (xEval ξ z blind : Fp) (s : Fin (2 ^ urs.k) → Fp)
@@ -342,7 +342,7 @@ prefix-respecting strategy and `orchard_verifier_vesta_forking_opening_adaptive_
 should be stated over reprogrammed-oracle runs. The remaining floor there is not the deterministic bridge but
 the execution-semantics identification — a rewound random-oracle adversary induces such a strategy, with its
 RO-query loss. The `⊕' NontrivialRelation` caveat is unchanged — vacuous at Vesta's prime order. -/
-noncomputable def orchard_verifier_vesta_forking_opening_deployed [Fact (HasseBound Vesta.curve)] [DecidableEq VestaG]
+noncomputable def orchard_verifier_vesta_forking_opening_deployed [DecidableEq VestaG]
     [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp)
     (s : Fin (2 ^ urs.k) → Fp) (hz : ch.z ≠ 0) (hg0 : urs.g 0 ≠ 0) (hs : commit urs s = ps.ipaS)
@@ -396,7 +396,7 @@ adaptive form, use `orchard_verifier_vesta_forking_constraint_adaptive`; for the
 reprogrammed-oracle runs, use `orchard_verifier_vesta_forking_constraint_adaptive_rewind`. `hquot`/`hgood`
 retain the ∀-openings shape — unsatisfiable at Vesta for any decode that genuinely
 reads the witness (see `orchard_verifier_deployed_constraint_of_forked`'s caveat). -/
-noncomputable def orchard_verifier_vesta_forking_constraint_deployed [Fact (HasseBound Vesta.curve)] [DecidableEq VestaG]
+noncomputable def orchard_verifier_vesta_forking_constraint_deployed [DecidableEq VestaG]
     [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp)
     (s : Fin (2 ^ urs.k) → Fp)
@@ -450,7 +450,7 @@ serves every path). The uniform measure of `hprob` is justified standalone
 transcript-ordering and reprogramming content is already on this path through the
 `_adaptive_rewind` capstone. The `⊕' NontrivialRelation` caveat is unchanged — vacuous at Vesta's prime
 order. -/
-noncomputable def orchard_verifier_vesta_forking_opening_adaptive [Fact (HasseBound Vesta.curve)] [DecidableEq VestaG]
+noncomputable def orchard_verifier_vesta_forking_opening_adaptive [DecidableEq VestaG]
     [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp)
     (s : Fin (2 ^ urs.k) → Fp) (P : Prover Fp VestaG shape.k)
@@ -499,7 +499,7 @@ witnesses; the uniform measure of `hprob` is justified standalone
 static-dichotomy caveat does not apply at this rung. The transcript-ordering and reprogramming content is
 discharged by the staged rewinding capstones below. `hquot`/`hgood` retain the ∀-openings shape —
 unsatisfiable at Vesta for any decode that genuinely reads the witness. -/
-noncomputable def orchard_verifier_vesta_forking_constraint_adaptive [Fact (HasseBound Vesta.curve)]
+noncomputable def orchard_verifier_vesta_forking_constraint_adaptive
     [DecidableEq VestaG] [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp)
     (s : Fin (2 ^ urs.k) → Fp) (P : Prover Fp VestaG shape.k)
@@ -579,7 +579,7 @@ measure is *derived* from the rewinding primitive, consuming the transcript orde
 (see `orchard_verifier_vesta_forking_opening_deployed`; the uniform measure of `hprob` is justified standalone,
 `Forking.Rewind.roChallenges_ipaRound_uniform`); the `_adaptive`/`_adaptive_rewind` rungs are the
 attack-event forms. -/
-noncomputable def orchard_verifier_vesta_forking_opening_rewind [Fact (HasseBound Vesta.curve)] [DecidableEq VestaG]
+noncomputable def orchard_verifier_vesta_forking_opening_rewind [DecidableEq VestaG]
     [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG)
     (O : List (TranscriptElt Fp VestaG) → Fp) (init : List (TranscriptElt Fp VestaG))
@@ -607,7 +607,7 @@ runs, the round-vector semantics derived via `roChallenges_reprogramRounds`. The
 caveat is unchanged — see `orchard_verifier_deployed_constraint_of_forked`'s caveat — and so
 is the constant rung's static-dichotomy scope (see `orchard_verifier_vesta_forking_opening_deployed`); the
 `_adaptive_rewind` pair is the attack-event form. -/
-noncomputable def orchard_verifier_vesta_forking_constraint_rewind [Fact (HasseBound Vesta.curve)]
+noncomputable def orchard_verifier_vesta_forking_constraint_rewind
     [DecidableEq VestaG] [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG)
     (O : List (TranscriptElt Fp VestaG) → Fp) (init : List (TranscriptElt Fp VestaG))
@@ -651,7 +651,7 @@ spliced proof's IPA round prefixes, and the deployed schedule is re-run. `roChal
 that run into round-vector replacement, and `roChallenges_spliceIpa_pre` drops the irrelevant spliced pre-IPA
 fields. The residual is unchanged from the staged rung (see
 `orchard_verifier_vesta_forking_opening_adaptive`). -/
-noncomputable def orchard_verifier_vesta_forking_opening_adaptive_rewind [Fact (HasseBound Vesta.curve)]
+noncomputable def orchard_verifier_vesta_forking_opening_adaptive_rewind
     [DecidableEq VestaG] [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG)
     (O : List (TranscriptElt Fp VestaG) → Fp) (init : List (TranscriptElt Fp VestaG))
@@ -681,7 +681,7 @@ open Classical in
 /-- The constraint companion of `orchard_verifier_vesta_forking_opening_adaptive_rewind`: the staged
 round-adaptive capstone with its accept event grounded in reprogrammed-oracle runs on each spliced proof. The
 `hquot`/`hgood` caveat is unchanged — see `orchard_verifier_deployed_constraint_of_forked`'s caveat. -/
-noncomputable def orchard_verifier_vesta_forking_constraint_adaptive_rewind [Fact (HasseBound Vesta.curve)]
+noncomputable def orchard_verifier_vesta_forking_constraint_adaptive_rewind
     [DecidableEq VestaG] [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG)
     (O : List (TranscriptElt Fp VestaG) → Fp) (init : List (TranscriptElt Fp VestaG))

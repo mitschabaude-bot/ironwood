@@ -12,8 +12,8 @@ the Pallas *base* order, not the Pallas *scalar* order of the value commitment.
 The development stays generic over `[Field F]`; this module pins the instantiation `F_p = ZMod p`
 and records `|F_p| = p` (`card_Fp`), the cardinality the Schwartz–Zippel bound divides by. The
 Pasta construction itself is not needed for soundness; the one curve-level fact that is — the
-Vesta group order — is derived from the Hasse bound in `Zcash.Snark.Soundness.Vesta`, not
-assumed.
+Vesta group order — is proven unconditionally in `Zcash.Snark.Soundness.Vesta` (`vestaOrder`, from
+CompElliptic's `Pasta.Vesta.card_eq`), no longer an assumption.
 -/
 
 namespace Zcash.Snark
