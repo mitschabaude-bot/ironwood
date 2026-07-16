@@ -14,11 +14,14 @@ Orchard verifier capstones.
 **The uniform-basis seam.** In these theorems the producer acts on the reduction's *sampled* basis
 `scalarBasis B s` (uniform scalars times `B`), not on one fixed tuple of deployed generators.
 `OrchardUniformURSIdentification` states the exact setup requirement: the pushforward distribution
-of the deployed setup coins through its basis sampler equals the sampled-basis distribution. The
-probability transfer below is then a theorem about the concrete relation event, rather than an
-assumed equality involving an otherwise arbitrary external probability. The operational adversary
-must still produce `DeployedAlgebraicForkingInstance` data and connect its accept event to that
-relation event; that is the Fiat–Shamir integration boundary.
+of the deployed setup coins through its basis sampler equals the sampled-basis distribution.
+`orchard_uniformURSIdentification_of_generatorRO` derives that equality when the basis is read from
+a uniform group-valued random oracle at distinct parameter queries; the remaining setup idealization
+is the identification of halo2's concrete hash-to-curve with that oracle. The probability transfer
+below is therefore a theorem about the concrete relation event, rather than an assumed equality
+involving an otherwise arbitrary external probability. The operational adversary must still produce
+`DeployedAlgebraicForkingInstance` data and connect its accept event to that relation event; that is
+the Fiat–Shamir integration boundary.
 -/
 
 open scoped ENNReal
@@ -118,6 +121,62 @@ def OrchardUniformURSIdentification {Ω : Type*} (setup : PMF Ω) (k : ℕ) (B :
   setup.map basisOf =
     (PMF.uniformOfFintype (AugmentedIndex (2 ^ k) → Fp)).map (scalarBasis B)
 
+/-- Uniform group-valued random-oracle answers at the distinct parameter queries used to derive the
+augmented URS basis. This is a probability-event definition, not a data-producing reduction. -/
+noncomputable def orchardGeneratorROSetup {T : Type*} [DecidableEq T]
+    {k : ℕ} (query : AugmentedIndex (2 ^ k) → T) :
+    PMF (↥(Set.range query) → VestaG) := by
+  letI : Fintype VestaG := Fintype.ofFinite VestaG
+  exact PMF.uniformOfFintype (↥(Set.range query) → VestaG)
+
+/-- Read an augmented basis from the generator random oracle at its distinct parameter queries. -/
+def orchardGeneratorROBasis {T : Type*} {k : ℕ}
+    (query : AugmentedIndex (2 ^ k) → T) :
+    (↥(Set.range query) → VestaG) → AugmentedIndex (2 ^ k) → VestaG :=
+  fun O i => O ⟨query i, Set.mem_range_self i⟩
+
+/-- Reading the augmented URS basis from a uniform group-valued random oracle at distinct parameter
+queries satisfies `OrchardUniformURSIdentification`. This is the random-oracle model of halo2's
+deterministic parameter derivation (`gᵢ = H(0 || i)`, `W = H(1)`, `U = H(2)`): distinct queries give
+independent uniform Vesta points. For nonzero `B`, scalar multiplication by `B` is a bijection from
+`Fp` to `VestaG`, so that uniform point basis is exactly the sampled-scalar basis used by the
+fixed-slot reduction.
+
+This theorem discharges the former free-standing PMF equality inside the generator-RO model. The
+cryptographic identification of halo2's concrete hash-to-curve with that oracle remains the standard
+hash-to-curve-as-random-oracle idealization. -/
+theorem orchard_uniformURSIdentification_of_generatorRO {T : Type*} [DecidableEq T]
+    (k : ℕ) (B : VestaG) (hB : B ≠ 0)
+    (query : AugmentedIndex (2 ^ k) → T) (hquery : Function.Injective query) :
+    OrchardUniformURSIdentification
+      (orchardGeneratorROSetup query) k B
+      (orchardGeneratorROBasis query) := by
+  classical
+  letI : Fintype VestaG := Fintype.ofFinite VestaG
+  have hinj : Function.Injective (fun c : Fp => c • B) := by
+    intro c c' h
+    rcases eq_or_ne c c' with hcc | hcc
+    · exact hcc
+    · exfalso
+      apply hB
+      change c • B = c' • B at h
+      have hd : c - c' ≠ 0 := sub_ne_zero.mpr hcc
+      have hzero : (c - c') • B = 0 := by rw [sub_smul, h, sub_self]
+      rw [← one_smul Fp B, ← inv_mul_cancel₀ hd, mul_smul, hzero, smul_zero]
+  have hcard : Fintype.card Fp = Fintype.card VestaG := by
+    rw [card_Fp, ← Nat.card_eq_fintype_card, Vesta.card_eq]
+  let pointEquiv : Fp ≃ VestaG := Equiv.ofBijective (fun c : Fp => c • B)
+    ((Fintype.bijective_iff_injective_and_card _).mpr ⟨hinj, hcard⟩)
+  have hscalar :
+      (PMF.uniformOfFintype (AugmentedIndex (2 ^ k) → Fp)).map (scalarBasis B) =
+        PMF.uniformOfFintype (AugmentedIndex (2 ^ k) → VestaG) := by
+    simpa [scalarBasis, pointEquiv] using
+      (map_uniformOfFintype_equiv
+        (Equiv.arrowCongr (Equiv.refl (AugmentedIndex (2 ^ k))) pointEquiv))
+  unfold OrchardUniformURSIdentification orchardGeneratorROSetup
+  simpa [orchardGeneratorROBasis] using
+    (uniformOfFintype_map_eval_injective query hquery).trans hscalar.symm
+
 /-- A uniform-URS setup transports the concrete deployed-producer relation event exactly to the
 sampled-scalar event used by `relSet`. -/
 theorem orchard_deployed_relation_prob_eq_of_uniformURS {Ω : Type*} (setup : PMF Ω)
@@ -159,6 +218,23 @@ theorem orchard_deployed_relation_prob_le_of_uniformURS_textbookDL {Ω : Type*} 
       Fintype.card (AugmentedIndex (2 ^ k)) * bound := by
   rw [orchard_deployed_relation_prob_eq_of_uniformURS setup k B basisOf instances hURS]
   exact orchard_deployed_relation_event_prob_le_of_textbookDL k B instances hDL
+
+/-- Under the generator random-oracle model, bound the concrete deployed relation event directly by
+textbook DL. The setup-identification equality is derived from distinct generator queries and Vesta's
+prime-order scalar action rather than supplied as a free-standing hypothesis. -/
+theorem orchard_deployed_relation_prob_le_of_generatorRO_textbookDL
+    {T : Type*} [DecidableEq T] (k : ℕ) (B : VestaG) (hB : B ≠ 0)
+    (query : AugmentedIndex (2 ^ k) → T) (hquery : Function.Injective query)
+    (instances : ∀ basis : AugmentedIndex (2 ^ k) → VestaG,
+      Option (DeployedAlgebraicForkingInstance (G := VestaG) k basis))
+    {bound : ℝ≥0∞}
+    (hDL : TextbookDLAdvantageLE B (deployedAlgebraicRelationFinder instances) bound) :
+    (orchardGeneratorROSetup query).toOuterMeasure
+        (orchardGeneratorROBasis query ⁻¹' deployedAlgebraicRelationEvent instances) ≤
+      Fintype.card (AugmentedIndex (2 ^ k)) * bound :=
+  orchard_deployed_relation_prob_le_of_uniformURS_textbookDL
+    (orchardGeneratorROSetup query) k B (orchardGeneratorROBasis query) instances
+    (orchard_uniformURSIdentification_of_generatorRO k B hB query hquery) hDL
 
 /-- **Binding from discrete-log hardness, at the deployed curve.** At the augmented basis *index*
 `AugmentedIndex (2 ^ urs.k)` over Vesta: if this reduction solves the discrete log of the challenge

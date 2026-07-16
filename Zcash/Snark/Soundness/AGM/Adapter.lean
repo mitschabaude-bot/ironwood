@@ -45,8 +45,9 @@ representations part of the prover and fork-certificate types; `Soundness.AGM.Pe
 `Soundness.AGM.ProbabilityVesta` instantiates the relation finder with that deployed producer.
 
 The remaining assumptions are named at their actual boundaries: the AGM idealization, textbook
-discrete-log hardness, the uniform-URS distribution identification, and the random-oracle execution
-semantics used to obtain a fork certificate. The explicit-certificate path itself is computable.
+discrete-log hardness, the generator-hash random-oracle idealization used to derive the uniform-URS
+identification, and the random-oracle execution semantics used to obtain a fork certificate. The
+explicit-certificate path itself is computable.
 -/
 
 namespace Zcash.Snark

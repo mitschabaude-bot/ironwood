@@ -41,6 +41,9 @@ assert_no_sorry deployedAlgebraicRelationWitness
 assert_no_sorry orchardDeployedAlgebraicForkingFixedSlot
 assert_no_sorry orchardDeployedRelationSet
 assert_no_sorry OrchardUniformURSIdentification
+assert_no_sorry orchardGeneratorROSetup
+assert_no_sorry orchardGeneratorROBasis
+assert_no_sorry orchard_uniformURSIdentification_of_generatorRO
 assert_no_sorry Zcash.Security.BindingSignature.NontrivialRelation.toAlgebraicRelationWitness
 assert_no_sorry Zcash.Security.BindingSignature.NontrivialRelation.toDiscreteLog
 assert_no_sorry Zcash.Security.BindingSignature.orchardImbalanceToDiscreteLog
@@ -139,6 +142,7 @@ assert_no_sorry orchard_deployed_relation_set_eq_relSet
 assert_no_sorry orchard_deployed_relation_event_prob_le_of_textbookDL
 assert_no_sorry orchard_deployed_relation_prob_eq_of_uniformURS
 assert_no_sorry orchard_deployed_relation_prob_le_of_uniformURS_textbookDL
+assert_no_sorry orchard_deployed_relation_prob_le_of_generatorRO_textbookDL
 
 /-- info: 'Zcash.Snark.relation_prob_le_of_textbookDL' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs (whitespace := lax) in
@@ -172,3 +176,15 @@ CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
 CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
 #guard_msgs (whitespace := lax) in
 #print axioms orchard_deployed_relation_prob_le_of_uniformURS_textbookDL
+
+/-- info: 'Zcash.Snark.orchard_uniformURSIdentification_of_generatorRO' depends on axioms: [propext,
+Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms orchard_uniformURSIdentification_of_generatorRO
+
+/-- info: 'Zcash.Snark.orchard_deployed_relation_prob_le_of_generatorRO_textbookDL' depends on axioms:
+[propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms orchard_deployed_relation_prob_le_of_generatorRO_textbookDL

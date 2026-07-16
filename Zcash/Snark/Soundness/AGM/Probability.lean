@@ -53,8 +53,10 @@ lives outside Lean. `Soundness.AGM.Capstone.deployedAlgebraicRelationFinder` sup
 deployed producer, and `Soundness.AGM.ProbabilityVesta` instantiates these bounds with it. What
 remains assumed at those consumer boundaries is:
 (i) discrete-log hardness itself (the `DLAdvantageLE` hypothesis — an assumption by definition);
-(ii) the AGM idealization; and (iii) the uniform-URS distribution identification. None of these is
-the probability accounting formalized here.
+(ii) the AGM idealization; and (iii) a setup model for the URS distribution. The Vesta specialization
+derives (iii) from a uniform group-valued generator oracle at distinct parameter queries; identifying
+halo2's concrete hash-to-curve with that oracle remains an idealization. None of these is the
+probability accounting formalized here.
 -/
 
 open scoped ENNReal
