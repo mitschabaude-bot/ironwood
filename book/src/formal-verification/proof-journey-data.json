@@ -9,7 +9,7 @@
     },
     "agmStack": {
       "label": "PR #28 code head",
-      "ref": "891fecaca9c9b29e8b70c86b9e1e5ca293a92321",
+      "ref": "33b26085fd7e695d70cac4cc44c078a3fe5e49fa",
       "fetch": "pull/28/head"
     }
   },
@@ -39,7 +39,7 @@
       "label": "PR #28",
       "title": "AGM binding reduction",
       "url": "https://github.com/zcash/ironwood/pull/28",
-      "sha": "891feca",
+      "sha": "33b2608",
       "lane": "stack"
     },
     "30": {
