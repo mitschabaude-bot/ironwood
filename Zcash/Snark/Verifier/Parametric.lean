@@ -3,45 +3,28 @@ import Zcash.Snark.Verifier.FiatShamir
 /-!
 # Parametric verifier schedule obligations
 
-The generated fingerprint fixtures remain concrete empirical checks (`numProofs = 1` and `numProofs = 2`,
-plus any future selected captures). This module records the complementary generic obligation: the Lean verifier
-traverses every sub-proof by a `Fin shape.numProofs` fold, for arbitrary `shape.numProofs`.
-This is stronger than the Orchard consensus-scoped need: every consensus-valid action count
-`N ≤ 2^16 - 1` is one instantiation of the same `shape.numProofs` parameter.
+These theorems show that verifier assembly and the Fiat–Shamir schedule traverse every sub-proof for
+arbitrary `shape.numProofs`. Every consensus-valid Orchard action count is one instance.
 
-These theorems do not prove byte-for-byte Rust faithfulness; that boundary is still supplied by the
-capture/dumper plus selected fixtures. They make explicit that the Lean-side assembly and Fiat–Shamir
-schedule are not specialized to the current concrete fixtures.
-
-Most obligations here are definitional pins — `rfl`-provable restatements that fail loudly if a
-definition drifts. Two carry content beyond a pin: `subProofBlocks_length_const` (the flattened
-schedule carries exactly one block per sub-proof — none dropped, none duplicated) and
-`subProofOpeningQueries_commId_disjoint` (distinct sub-proofs' opening queries occupy disjoint
-commitment slots, so the multiopen grouping can never merge commitments across sub-proofs).
+They do not prove byte-level Rust faithfulness; the generated fixtures cover that boundary. Most are
+definitional pins. `subProofBlocks_length_const` proves that flattening neither drops nor duplicates a
+block, and `subProofOpeningQueries_commId_disjoint` prevents multiopen grouping across sub-proofs.
 -/
 
 namespace Zcash.Snark
 
-/-- Orchard's consensus maximum number of actions, hence the maximum `numProofs` for the Orchard
-bundle proof verified by this model.
+/-- Orchard's consensus maximum action count, and therefore the maximum `numProofs` in this model.
 
-The bound is a consensus rule, not an encoding artifact: `nActionsOrchard` is a `compactSize` (which
-admits values up to `2^64 - 1`), but the Zcash Protocol Specification §7.1.2 "Transaction Consensus
-Rules" requires `nActionsOrchard < 2^16` (NU5 onward), so `nActionsOrchard ≤ 2^16 - 1 = 65535`. The v5
-transaction format carrying it is defined by ZIP 225. -/
+The protocol requires `nActionsOrchard < 2^16`; this is a consensus bound, not an encoding limit. -/
 def orchardConsensusMaxProofs : ℕ := 2^16 - 1
 
-/-- The consensus-scoped subcase of the stronger parametric theorems below. Only the upper bound is
-load-bearing: a consensus-valid transaction verifies an Orchard proof only when it has at least one
-action (`proofsOrchard` is present iff `nActionsOrchard > 0`, ZIP 225), so `numProofs = 0` never
-reaches the deployed verifier and is not excluded here. -/
+/-- The consensus-scoped upper bound on `shape.numProofs`.
+
+Zero is not excluded because a transaction with no actions never invokes the Orchard verifier. -/
 def Shape.hasConsensusNumProofs (shape : Shape) : Prop :=
   shape.numProofs ≤ orchardConsensusMaxProofs
 
-/-- Flatten one list-producing block over all sub-proofs. This is the parametric shape shared by the
-assembly and Fiat–Shamir schedules: the number of blocks is exactly the ambient `numProofs`. (The
-restatements below also reuse it for the inner per-lookup / per-permutation-set folds, where the index
-runs over lookups or sets rather than sub-proofs.) -/
+/-- Flatten one list-valued block for each index. Assembly and the Fiat–Shamir schedule use this shape. -/
 def subProofBlocks {α : Type*} {numProofs : ℕ} (block : Fin numProofs → List α) : List α :=
   (List.ofFn block).flatten
 
@@ -150,10 +133,7 @@ theorem commId_subProofIdx_of_mem_subProofOpeningQueries {shape : Shape} {F G : 
     simp only [List.mem_cons, List.not_mem_nil, or_false] at hl
     rcases hl with rfl | rfl | rfl | rfl | rfl <;> rfl
 
-/-- Distinct sub-proofs' opening queries occupy disjoint commitment slots. `constructIntermediateSets`
-groups queries by `commId` (the Lean image of halo2 `construct_intermediate_sets`' pointer-identity
-keying), so the multiopen grouping can never merge commitments across sub-proofs — for any
-`numProofs`, not just the captured fixtures. -/
+/-- Distinct sub-proofs use disjoint commitment slots, so multiopen grouping cannot merge them. -/
 theorem subProofOpeningQueries_commId_disjoint {shape : Shape} {F G : Type*} [Field F]
     [Inhabited G] (vk : VerifyingKey shape F G) (ps : ProofString shape F G)
     (x xInv xNext xLast : F) {p p' : Fin shape.numProofs} (hpp : p ≠ p') :
@@ -192,12 +172,10 @@ theorem assembleQueries_parametric_numProofs {shape : Shape} {F G : Type*} [Fiel
       perProof ++ fixedQ ++ permCommonQ ++ vanishingQ :=
   rfl
 
-/-- The Fiat–Shamir challenge schedule is generic in `shape.numProofs`. The per-proof absorbs in this
-schedule are the generic folds exposed by `absorbPoints2_parametric_numProofs`,
-`absorbScalars2_parametric_numProofs`, and `absorbLookupPermuted_parametric_numProofs`.
-The hash output is intentionally outside these parametric lemmas: Blake2b is taken at the
-random-oracle boundary, while the concrete fixtures use a fixture oracle over the captured transcript
-events (`Zcash.Snark.Fixtures.SingleAction.FiatShamir`, `Zcash.Snark.Fixtures.MultiAction.FiatShamir`). -/
+/-- The Fiat–Shamir schedule is generic in `shape.numProofs`.
+
+This theorem pins the per-proof folds, not Blake2b. The concrete fixtures check captured transcript
+events with their fixture oracles. -/
 theorem deriveChallenges_parametric_numProofs {shape : Shape} {F G : Type*} [Zero F]
     (fs : FiatShamir F G) (init : List (TranscriptElt F G)) (ps : ProofString shape F G) :
     deriveChallenges fs init ps =

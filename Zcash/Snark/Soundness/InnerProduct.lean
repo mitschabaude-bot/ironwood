@@ -2,32 +2,21 @@ import Mathlib
 import Zcash.Snark.Core.Group
 
 /-!
-# Knowledge soundness: the polynomial-commitment / inner-product-argument layer
+# Inner-product opening relation
 
-This module begins knowledge soundness: an accepting proof implies the prover knows a valid
-witness, via the special soundness of the inner-product argument (IPA) — the cryptographic core of
-the halo2 opening. It follows the transcription layer, which established faithfulness (the deployed
-verifier collapses to the fingerprint MSM, reproduced by the Lean assembly; the captured match,
-`Zcash.Snark.Fingerprint`).
+This module defines the polynomial commitment and opening relation used by the IPA soundness proof.
 
-The IPA proves knowledge of a coefficient vector `a` (a polynomial) behind a commitment `P = ⟨a, G⟩`
-that opens to a value `v` at a point — i.e. `⟨a, b⟩ = v` for the evaluation vector `b = (1, x, x², …)`.
-The fingerprint MSM's `g`-part is this commitment, so the layer is expressed directly over the URS:
+The witness is a coefficient vector `a` with `P = ⟨a, G⟩` and `v = ⟨a, b⟩`, where
+`b = (1, x, x², …)`.
 
 * `commit` — `⟨a, G⟩ = Σᵢ aᵢ • gᵢ`, the polynomial commitment (the MSM's `g`-part).
 * `evalVector` / `innerProduct` — `b = (1, x, …, x^{n−1})` and `⟨a, b⟩` (the polynomial at `x`).
 * `IpaRelation` — the opening relation `⟨a, G⟩ = P ∧ ⟨a, b⟩ = v` the IPA is an argument of knowledge for.
-* `innerProduct_add_left` — `⟨·, b⟩` is additive in its left argument; together with `commit`'s linearity
-  (`commitGen_add_left` / `commitGen_smul_left` in `Zcash.Snark.Soundness.CommitFold`, via
-  `commit_eq_commitGen`) this is the algebra the round extractor folds with.
+* `innerProduct_add_left` gives the linearity used by the extractor.
 
-The IPA's witness fold is 2-special-sound per round: from two accepting transcripts that share the
-round commitments `(Lⱼ, Rⱼ)` but answer distinct challenges `uⱼ`, the round's witness is uniquely
-recoverable, and recursing over the `k` rounds extracts an `a` satisfying `IpaRelation`. The
-extractor is built in `Zcash.Snark.Soundness.Extraction`; the per-round folding rests on the
-linearity proved here. Opening uniqueness holds up to a computed discrete-log relation
-(`NontrivialDLRelation.ofIpaOpenings` in `Zcash.Snark.Soundness.CommitFold`); DLR hardness is
-consumed only at the computational layer.
+Two distinct challenges recover one round's witness halves. The recursive extractor is defined in
+`Soundness.IpaSoundness`. Opening non-uniqueness produces an explicit discrete-log relation; hardness
+is used only at the computational boundary.
 -/
 
 namespace Zcash.Snark
@@ -48,9 +37,7 @@ def evalVector (k : ℕ) (x : F) : Fin (2 ^ k) → F :=
 def innerProduct {n : ℕ} (a b : Fin n → F) : F :=
   ∑ i, a i * b i
 
-/-- The IPA opening relation: the witness `a` is the polynomial committed by `P` (`⟨a, G⟩ = P`) that
-opens to `v` at the point encoded by `b` (`⟨a, b⟩ = v`). The inner-product argument is an argument of
-knowledge for this relation; special soundness produces such an `a` from accepting transcripts. -/
+/-- The coefficient vector `a` commits to `P` and has inner product `v` with `b`. -/
 def IpaRelation (urs : URS G) (P : G) (b : Fin (2 ^ urs.k) → F) (v : F)
     (a : Fin (2 ^ urs.k) → F) : Prop :=
   commit urs a = P ∧ innerProduct a b = v
@@ -79,12 +66,8 @@ theorem innerProduct_single {n : ℕ} (i : Fin n) (x : F) (b : Fin n → F) :
   rw [Finset.sum_eq_single i (fun j _ hj => by rw [Pi.single_eq_of_ne hj, zero_mul])
     (fun h => absurd (Finset.mem_univ i) h), Pi.single_eq_same]
 
-/-- **The adjusted-commitment un-shift (halo2's value placement).** halo2's IPA verifier folds the claimed
-value into the commitment at `g₀` (`msm.add_constant_term(-v)`, so the opened commitment is `P − [v]g₀`) while
-checking the inner product on `U`; the two are reconciled by the evaluation vector's leading entry `b₀ = 1`
-(`evalVector` gives `b 0 = x^0 = 1`). So opening `P − [v]g₀` to inner product `0` *is* opening `P` to inner
-product `v`: shift the witness's `g₀`-coefficient by `v`. This is the exact halo2 invariant resolving the
-value living on `g₀` (the verifier equation) versus on `U` (the transcript tree). -/
+/-- Convert an opening of `P − [v]g₀` at value zero to an opening of `P` at value `v`, using
+`b 0 = 1`. -/
 theorem ipaRelation_unshift (urs : URS G) (P : G) (b : Fin (2 ^ urs.k) → F) (v : F)
     (a : Fin (2 ^ urs.k) → F) (hb0 : b 0 = 1)
     (h : IpaRelation urs (P - v • urs.g 0) b 0 a) :
@@ -104,14 +87,9 @@ theorem innerProduct_smul {n : ℕ} (c : F) (s b : Fin n → F) :
     innerProduct (c • s) b = c * innerProduct s b := by
   simp only [innerProduct, Pi.smul_apply, smul_eq_mul, mul_assoc, ← Finset.mul_sum]
 
-/-- **The synthetic-blinding strip (the opened value, unique under binding).** halo2's IPA folds a synthetic
-blinding commitment `[ξ]S` into the opened commitment, with `S = ⟨s, G⟩`. Stripping it — subtract `ξ·s` from
-the witness — opens the plain `P` to `v − ξ·⟨s, b⟩`. This is *unconditional*: it reports the opened value
-of `P` for the supplied `S`-opening `s` (distinct `S`-openings shift it while exhibiting a `g`-relation —
-binding pins it), whatever the blinder is. The verifier never checks `s`; `S` is prover-supplied. So the
-soundness content lives in how `v − ξ·⟨s, b⟩` relates to the claimed value, which the caller must pin (see
-`ipaRelation_unblind` for the honest-prover case, and `Soundness.Forking.Rewind` for the `ξ`-randomization that
-bounds a malicious blinder). -/
+/-- Remove `[ξ]S` from the commitment and `ξ·s` from the witness.
+
+The resulting opening value is `v − ξ·⟨s,b⟩`. -/
 theorem ipaRelation_unblind_value (urs : URS G) (P : G) (b : Fin (2 ^ urs.k) → F) (v ξ : F)
     (s a : Fin (2 ^ urs.k) → F)
     (h : IpaRelation urs (P + ξ • commit urs s) b v a) :
@@ -121,12 +99,7 @@ theorem ipaRelation_unblind_value (urs : URS G) (P : G) (b : Fin (2 ^ urs.k) →
   · rw [sub_eq_add_neg, ← neg_smul, commit_add, commit_smul, hc, neg_smul]; abel
   · rw [sub_eq_add_neg, ← neg_smul, innerProduct_add, innerProduct_smul, hi]; ring
 
-/-- **The synthetic-blinding strip, honest-prover case.** When the blinder vanishes at the evaluation point
-(`⟨s, b⟩ = 0` — halo2's prover sets `s_poly[0] -= s(x₃)` so `s(x₃) = 0`), stripping `[ξ]S` leaves the opened
-value at the claimed `v`. This is the `⟨s, b⟩ = 0` specialization of `ipaRelation_unblind_value`; a malicious
-prover need not satisfy it, which is exactly why `[ξ]S`'s soundness rests on `ξ` being drawn after `S`
-(`Soundness.Forking.Rewind`), not on this hypothesis. With `ipaRelation_unshift` it reconciles the adjusted
-commitment `P' = P − [v]g₀ + [ξ]S` with the plain `P`. -/
+/-- If `⟨s,b⟩ = 0`, removing `[ξ]S` preserves the claimed opening value. -/
 theorem ipaRelation_unblind (urs : URS G) (P : G) (b : Fin (2 ^ urs.k) → F) (v ξ : F)
     (s a : Fin (2 ^ urs.k) → F) (hs : innerProduct s b = 0)
     (h : IpaRelation urs (P + ξ • commit urs s) b v a) :
@@ -150,10 +123,7 @@ def foldVec {m : ℕ} (lo hi : Fin m → F) (u : F) : Fin m → F := lo + u • 
 def roundExtract {m : ℕ} (f₁ f₂ : Fin m → F) (u₁ u₂ : F) : (Fin m → F) × (Fin m → F) :=
   (f₁ - u₁ • ((u₁ - u₂)⁻¹ • (f₁ - f₂)), (u₁ - u₂)⁻¹ • (f₁ - f₂))
 
-/-- **2-special soundness of one IPA round.** The folded vectors at two distinct challenges `u₁ ≠ u₂`
-(produced from the same halves `lo, hi`) determine the halves — `roundExtract` recovers exactly
-`(lo, hi)`. A prover answering two challenges consistently is thus committed to a unique pair that folds
-back to the round witness, the algebraic heart of the IPA's special soundness. -/
+/-- Two distinct challenge folds uniquely recover the original vector halves. -/
 theorem roundExtract_correct {m : ℕ} (lo hi : Fin m → F) (u₁ u₂ : F) (h : u₁ ≠ u₂) :
     roundExtract (foldVec lo hi u₁) (foldVec lo hi u₂) u₁ u₂ = (lo, hi) := by
   have hsub : u₁ - u₂ ≠ 0 := sub_ne_zero.mpr h

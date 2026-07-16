@@ -4,25 +4,16 @@ import Mathlib.Util.AssertNoSorry
 /-!
 # Checked trust boundary of the deployed binding-reduction breaks
 
-Build-time enforcement of the breaks-as-computed-data discipline (see
-`Zcash.Security.RandomOracle`), following `Zcash.Security.Ledger.TrustBoundary`. The reductions'
-computability is compiler-enforced — they are plain `def`s, so a `noncomputable` dependency
-fails the build. What a build does not otherwise pin down is a `sorry` reached through some
-dependency, or an unexpected axiom; both checks below follow the elaborated dependency graph.
+This file checks that the binding reductions return computed data. They are plain `def`s, so Lean
+rejects noncomputable dependencies. The checks below also reject `sorry` and pin their axiom sets.
 
-The pinned sets include `Classical.choice`, entering only through Mathlib lemmas cited by the
-erased `Prop` certificate fields (`nontrivial`/`relation`) — harmless per the convention: had
-choice touched the break *data*, the definitions could not have compiled as plain `def`s. The
-Vesta specialization additionally pins CompElliptic's one `native_decide` fact (the prime-order
-witness `p_nsmul_Gpt` behind the curve order), likewise reached only through `Prop` positions.
+`Classical.choice` enters only through erased `Prop` certificate fields; it cannot affect the returned
+data because the reductions are computable. The Vesta result also depends on CompElliptic's
+`native_decide` proof of the curve-order witness.
 
-The same two checks cover the deployed forking reductions that return their result as *computed
-data* — `ipa_extractV` (the IPA opening witness), `ipaRelation_extract`, `produceDeployed`/
-`deployed_forking_tree` (the root-consistent tree extraction), `deployed_forking_relation` (the
-end-to-end multiopen opening). Their non-vacuity *is* their computability — the witness cannot be
-produced without the certificate — so a `sorry` or a `noncomputable` dependency would defeat them,
-and these pins freeze that. Their axiom sets are the standard classical trio, `Classical.choice`
-again reaching only erased `Prop` positions.
+The same checks cover the forking reductions `ipa_extractV`, `ipaRelation_extract`, `produceDeployed`,
+`deployed_forking_tree`, and `deployed_forking_relation`. Each computes its witness from an explicit
+certificate; an existential proof alone cannot produce that data.
 -/
 
 open Zcash.Snark

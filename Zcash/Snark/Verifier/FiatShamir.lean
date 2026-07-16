@@ -4,51 +4,35 @@ import Zcash.Snark.Core.Challenges
 import Zcash.Snark.Verifier.Assemble
 
 /-!
-# Fiat–Shamir: the challenge schedule (hash hand-waved)
+# Fiat–Shamir challenge schedule
 
-The deployed verifier is non-interactive: each challenge is a hash of the transcript absorbed so far,
-rather than a fresh verifier coin. The hash is Blake2b (`transcript.rs`, personalization
-`"Halo2-Transcript"`). Per project scope the hash is hand-waved *here*: this module models it as an abstract
-`squeeze` function (`FiatShamir`) and does not formalize Blake2b. The random-oracle idealization of the
-squeeze — reprogramming and the uniform-challenge bound the forking argument draws on — is separate, in
-`Zcash.Snark.Soundness.Forking.Oracle`.
+The deployed verifier derives each challenge by hashing the transcript absorbed so far. This module
+models halo2's Blake2b hash as the abstract `FiatShamir.squeeze`; it does not formalize Blake2b.
+Reprogramming and uniform-challenge results live in `Soundness.Forking.Oracle`.
 
-## What is pinned down
+`deriveChallenges` records the absorb/squeeze order from halo2's PLONK, multiopen, and commitment
+verifiers. `nonInteractiveFingerprint` runs `assemble` at those derived challenges.
 
-The schedule — which proof elements are absorbed before each challenge is squeezed — transcribed from
-`plonk/verifier.rs`, `multiopen/verifier.rs`, and `commitment/verifier.rs`. This makes precise the
-sense in which the deployed verifier is the Fiat–Shamir image of the interactive one
-(`Zcash.Snark.Challenges` as genuine coins): the two differ only in the source of the challenges, and
-`deriveChallenges` is that source. `nonInteractiveFingerprint` is then the deployed verifier's MSM,
-`assemble` at the FS-derived challenges.
-
-## Assumptions
-
-* The Fiat–Shamir assumption (the random-oracle idealization) — that these hashed challenges carry the
-  interactive verifier's soundness to the non-interactive setting. This is the explicit hand-wave. In
-  the fingerprint match the challenges are taken from the captured real transcript, so the match never
-  re-derives them and does not depend on this assumption.
+The remaining Fiat–Shamir assumption is that the hash behaves as a random oracle. The captured
+fingerprint checks do not use that assumption: they replay captured transcript events and challenges.
 -/
 
 namespace Zcash.Snark
 
-/-- An element written to the Fiat–Shamir transcript, carrying halo2's three Blake2b domain prefixes: a
-commitment (group point, via `common_point` / `read_point`, `BLAKE2B_PREFIX_POINT`), a scalar (via
-`common_scalar` / `read_scalar`, `BLAKE2B_PREFIX_SCALAR`), or the domain marker written before each
-squeeze (`BLAKE2B_PREFIX_CHALLENGE`). The `challenge` marker — rather than re-absorbing the squeezed value —
-is what makes consecutive squeezes differ, matching the deployed transcript (the prefix-byte writes persist
-in the hash state; the challenge value is never fed back). -/
+/-- A point, scalar, or challenge-domain marker written to the Fiat–Shamir transcript.
+
+The constructors correspond to halo2's three Blake2b domain prefixes. A squeeze absorbs `challenge`;
+it does not feed the resulting field element back into the transcript. -/
 inductive TranscriptElt (F G : Type*) where
   | point : G → TranscriptElt F G
   | scalar : F → TranscriptElt F G
   | challenge : TranscriptElt F G
   deriving DecidableEq
 
-/-- The Fiat–Shamir hash, hand-waved: squeezes a field challenge from the transcript absorbed so far.
-In the deployed verifier this is Blake2b, idealized as a random oracle (`Soundness.Forking.Oracle`). Given that
-idealization, challenge-vector uniformity has a standalone justification
-(`Soundness.Forking.Rewind.roChallenges_ipaRound_uniform`, for the fixed proof string); what stays unmodeled is
-the querying-adversary experiment and its query-loss, and Blake2b-as-random-oracle itself. -/
+/-- The abstract Fiat–Shamir hash: squeeze a field challenge from the absorbed transcript.
+
+The deployed hash is Blake2b. The model treats it as a random oracle; the querying adversary,
+query loss, and Blake2b justification remain outside this structure. -/
 structure FiatShamir (F G : Type*) where
   squeeze : List (TranscriptElt F G) → F
 
@@ -84,12 +68,10 @@ def absorbLookup {F G : Type*} (e : LookupEval F) : List (TranscriptElt F G) :=
   [.scalar e.productEval, .scalar e.productNextEval, .scalar e.permutedInputEval,
    .scalar e.permutedInputInvEval, .scalar e.permutedTableEval]
 
-/-- Derive the verifier's challenges by Fiat–Shamir, following the deployed schedule
-(`plonk/verifier.rs` → `multiopen/verifier.rs` → `commitment/verifier.rs`). Before each squeeze a
-`TranscriptElt.challenge` domain marker (halo2's `BLAKE2B_PREFIX_CHALLENGE` byte) is appended, and the
-squeezed challenge is *not* re-absorbed — matching the deployed Blake2b transcript, where the prefix-byte
-writes persist in the hash state and the challenge value is never fed back. `init` is the pre-absorbed
-prefix (the verifying-key hash and instance commitments). -/
+/-- Derive the verifier's challenges in halo2's deployed absorb/squeeze order.
+
+Each squeeze first appends `TranscriptElt.challenge`; the result is not re-absorbed. `init` contains
+the verifying-key hash and instance commitments absorbed before the proof. -/
 def deriveChallenges {shape : Shape} {F G : Type*} [Zero F] (fs : FiatShamir F G)
     (init : List (TranscriptElt F G)) (ps : ProofString shape F G) : Challenges shape.k F :=
   -- advice commitments → θ
@@ -138,10 +120,9 @@ def deriveChallenges {shape : Shape} {F G : Type*} [Zero F] (fs : FiatShamir F G
     x1 := x1, x2 := x2, x3 := x3, x4 := x4, xi := xi, z := z,
     ipaRound := fun j => ipaRes.2.getD j.val 0 }
 
-/-- The deployed (non-interactive) verifier's fingerprint MSM: `assemble` at the Fiat–Shamir
-challenges (the multiopen grouping is re-derived in Lean by `constructIntermediateSets`). The
-Fiat–Shamir assumption (the random-oracle idealization) is what carries the interactive verifier's soundness to
-this non-interactive MSM. -/
+/-- The deployed verifier's fingerprint MSM: `assemble` at the Fiat–Shamir challenges.
+
+The random-oracle assumption is what transfers interactive soundness to this non-interactive MSM. -/
 def nonInteractiveFingerprint {shape : Shape} {F G : Type*} [Field F] [DecidableEq F] [DecidableEq G]
     [Inhabited G] (fs : FiatShamir F G) (init : List (TranscriptElt F G))
     (vk : VerifyingKey shape F G) (ps : ProofString shape F G) : Msm shape.k F G :=

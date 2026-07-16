@@ -2,23 +2,20 @@ import Zcash.Snark.Verifier.Assemble
 import Zcash.Snark.Soundness.Deployed.Fold
 
 /-!
-# The deployed accept entails halo2's explicit IPA verifier equation (structural faithfulness)
+# Deployed acceptance implies the explicit IPA verifier equation
 
-`eval_assembleFinalMsm` evaluates the assembled fingerprint MSM in closed form;
-`deployed_gterm_foldAll` identifies its `g`-term as `[-c]·G'₀`. This module welds them into
-halo2's published IPA verification equation and ties it to the deployed accept condition, pinning
-the opened object `P`/`v` to the proof:
+This module combines `eval_assembleFinalMsm` and `deployed_gterm_foldAll` into halo2's IPA equation
+and ties that equation to the deployed accept condition:
 
 * `multiopenCommitment` / `multiopenValue` — the `P` and `v` halo2's IPA verifier opens, read off the
   multiopen assembly on `(vk, ps, ch)`.
-* `deployed_verification_eq` — `(assembleFinalMsm …).eval` *is* the explicit equation
+* `deployed_verification_eq` — `(assembleFinalMsm …).eval` is the explicit equation
   `P + [-v]g₀ + [ξ]S + Σ(rounds) + [-c·b·z]U + [-f]W + [-c]G'₀`.
 * `DeployedIpaVerifierEq` — that equation set to the identity.
-* the `…?_eq_some` reconciliation — the deployed accept uses the *rejecting* `assemble?`; when it
+* the `…?_eq_some` lemmas — deployed acceptance uses the rejecting `assemble?`; when it
   returns `some m`, `m` is the non-rejecting `assembleFinalMsm`, so the equation transfers.
 
-This discharges the assembly↔equation correspondence separately from the bridge; what the bridge
-still covers is inventoried at `FiatShamirTree` (`Zcash.Snark.Soundness.Main`).
+The remaining bridge obligations are listed at `FiatShamirTree` in `Soundness.Main`.
 -/
 
 namespace Zcash.Snark

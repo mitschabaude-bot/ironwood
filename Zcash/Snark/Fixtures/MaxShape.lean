@@ -3,19 +3,12 @@ import Zcash.Snark
 /-!
 # Verifier-shape fixture: the captured Orchard shape at any action count
 
-The parametric verifier obligations of `Zcash.Snark.Verifier.Parametric`, specialized to the captured
-Orchard verifier shape (`Fixture`/`Fixture2`) with the action count `numProofs` a free parameter `n`. The
-verifying key, proof string, and challenges stay universally quantified — nothing is evaluated at a
-concrete `n`. What is pinned: the per-sub-proof folds elaborate at the captured Orchard column/query
-dimensions for every `n`, so drift in a parametric statement fails to elaborate here.
+This specializes `Verifier.Parametric` to the captured Orchard column and query dimensions while
+leaving the action count `n` free. The verifying key, proof, and challenges remain arbitrary.
 
-Not a Rust/Halo2 capture, and no Rust/Lean MSM match: a real max-action fixture would need a
-65,535-action Rust capture, and the single- and multi-action captures remain the empirical regressions for
-that boundary.
-
-Every consensus-valid bundle has `n ≤ orchardConsensusMaxProofs` (see that definition for the protocol
-spec §7.1.2 rule); `shape_hasConsensusNumProofs` records that each such `n` — the maximum included —
-instantiates this shape, and the folds hold for arbitrary `n` regardless.
+This is not a Rust capture or an MSM match. The single- and multi-action fixtures test that boundary.
+`shape_hasConsensusNumProofs` records that every consensus-valid action count, including the maximum,
+instantiates this shape.
 -/
 
 namespace Zcash.Snark.FixtureMax
@@ -24,8 +17,7 @@ open Zcash.Snark
 
 abbrev G := ℕ
 
-/-- The captured Orchard verifier shape (`Fixture`/`Fixture2`), with the action count `numProofs` left
-as the parameter `n`. Every other dimension is the captured Orchard column/query layout. -/
+/-- The captured Orchard verifier shape with `numProofs` left as the parameter `n`. -/
 def shape (n : ℕ) : Shape := {
   k := 11,
   numProofs := n,
@@ -43,9 +35,7 @@ def shape (n : ℕ) : Shape := {
 theorem shape_numProofs (n : ℕ) : (shape n).numProofs = n :=
   rfl
 
-/-- `n ≤ orchardConsensusMaxProofs` gives `(shape n).hasConsensusNumProofs`, so every consensus-valid
-action count instantiates the captured shape. (The bound is the protocol-spec consensus rule; see
-`orchardConsensusMaxProofs`.) -/
+/-- Every action count within the consensus bound instantiates the captured shape. -/
 theorem shape_hasConsensusNumProofs {n : ℕ} (hn : n ≤ orchardConsensusMaxProofs) :
     (shape n).hasConsensusNumProofs :=
   hn

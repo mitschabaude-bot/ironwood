@@ -4,17 +4,11 @@ import Zcash.Snark.Soundness.Forking.Tree
 import Zcash.Snark.Soundness.Forking.Probability
 
 /-!
-# The deployed special-soundness extractor (Fiat–Shamir forking, part 2)
+# Recover a deployed IPA tree from three forks
 
-Building `ForkAccept` from the forking output needs each node's value/blinding cross-terms `Lv/Rv/Lw/Rw`
-recovered from the three accepting continuations. `ipa_round_commit_with_coeffs` already *cancels* arbitrary
-`L`/`R` cross-terms by Vandermonde and recovers the parent commitment; this module supplies the *recovery*
-counterpart for the scalar value/blinding fold: given the three folded scalars at distinct nonzero
-challenges, the parent scalar and its two cross-terms exist and fold back to them.
-
-`vandermonde3_recover` is the scalar 3-special-soundness recovery: the linear map
-`(v, Lv, Rv) ↦ (v + uᵢ⁻¹·Lv + uᵢ·Rv)ᵢ` is injective at three distinct nonzero challenges (a quadratic with
-three roots is zero), hence surjective, so any triple of folded values is hit.
+Three accepting continuations determine a parent commitment and its two round terms. The same
+Vandermonde calculation recovers the parent value, blinding, and their round terms. This module uses
+those recoveries to build a root-consistent deployed IPA tree.
 -/
 
 namespace Zcash.Snark
@@ -22,11 +16,7 @@ namespace Zcash.Snark
 variable {F : Type*} [Field F]
 variable {G : Type*} [AddCommGroup G] [Module F G]
 
-/-- **Group 3-special-soundness recovery.** Given target folded commitments `P₁,P₂,P₃ : G` at three distinct
-nonzero challenges, there is a parent commitment `P` and cross-terms `L, R : G` with `P + uᵢ⁻¹•L + uᵢ•R = Pᵢ`.
-The commitment counterpart of `vandermonde3_recover`: the bottom-up extractor recovers each node's commitment
-and its two cross-terms from the three accepting continuations (the explicit Lagrange combination of the
-`Pᵢ`, with the same coefficients as the scalar recovery). -/
+/-- Recover a parent commitment and round terms from three folded commitments. -/
 def vandermonde3_recover_group {u₁ u₂ u₃ : F}
     (h12 : u₁ ≠ u₂) (h13 : u₁ ≠ u₃) (h23 : u₂ ≠ u₃) (hu₁ : u₁ ≠ 0) (hu₂ : u₂ ≠ 0) (hu₃ : u₃ ≠ 0)
     (P₁ P₂ P₃ : G) :
@@ -49,10 +39,7 @@ def vandermonde3_recover_group {u₁ u₂ u₃ : F}
             + (u₃ / ((u₃ - u₁) * (u₃ - u₂))) • P₃, ?_, ?_, ?_⟩ <;>
     match_scalars <;> field_simp <;> ring
 
-/-- **Uniqueness of the per-round recovery.** The fold map `(P, L, R) ↦ (P + uᵢ⁻¹•L + uᵢ•R)ᵢ` is injective at
-three distinct nonzero challenges: two roots folding to the same three children are equal. (A degree-≤2 system
-with an invertible Vandermonde matrix has a unique solution.) This pins the bottom-up recovered root — it is
-*the* instance consistent with the children, so it matches whatever the deployed verifier equation pins. -/
+/-- Three distinct nonzero challenges uniquely determine the parent and round terms. -/
 theorem fold_inj {u₁ u₂ u₃ : F} (h12 : u₁ ≠ u₂) (h13 : u₁ ≠ u₃) (h23 : u₂ ≠ u₃)
     (hu₁ : u₁ ≠ 0) (hu₂ : u₂ ≠ 0) (hu₃ : u₃ ≠ 0) {P L R P' L' R' : G}
     (e₁ : P + u₁⁻¹ • L + u₁ • R = P' + u₁⁻¹ • L' + u₁ • R')
@@ -89,10 +76,7 @@ theorem fold_inj {u₁ u₂ u₃ : F} (h12 : u₁ ≠ u₂) (h13 : u₁ ≠ u₃
   have hL : L - L' = 0 := by linear_combination (norm := module) f₁ - u₁ • hP - (u₁ * u₁) • hR
   exact ⟨sub_eq_zero.mp hP, sub_eq_zero.mp hL, sub_eq_zero.mp hR⟩
 
-/-- **Scalar 3-special-soundness recovery.** Given target folded values `t₁, t₂, t₃` at three distinct
-nonzero challenges, there is a parent value `v` and cross-terms `Lv, Rv` with `v + uᵢ⁻¹·Lv + uᵢ·Rv = tᵢ`.
-The value/blinding counterpart of `ipa_round_commit_with_coeffs`: the deployed tree's per-node `Lv/Rv`
-(resp. `Lw/Rw`) are pinned by the three accepting continuations. -/
+/-- Recover a parent scalar and round terms from three folded scalars. -/
 def vandermonde3_recover {u₁ u₂ u₃ : F}
     (h12 : u₁ ≠ u₂) (h13 : u₁ ≠ u₃) (h23 : u₂ ≠ u₃) (hu₁ : u₁ ≠ 0) (hu₂ : u₂ ≠ 0) (hu₃ : u₃ ≠ 0)
     (t₁ t₂ t₃ : F) :
@@ -117,28 +101,18 @@ def vandermonde3_recover {u₁ u₂ u₃ : F}
 
 /-! ## The root-consistent producer: threading the deployed commitment
 
-To pin the extracted root to the deployed commitment — rather than a *free* root, disconnected from the
-deployed instance — we thread the deployed commitment-*whole* `Pwhole = P + [z·v]U + [blind]W` top-down.
-`DForkCert`/`DeployedForkValid` carry, at each node, the prover's round point `(L, R)` (the rewound
-transcript's commitment) so the whole folds by it; at each leaf they assert the flat verifier leaf equation
-for the folded whole. The producer `produceDeployed` recovers the cross-terms bottom-up by Vandermonde and
-additionally proves the recovered root whole *equals* `Pwhole`: the recovered whole and `Pwhole` fold to the
-same three child wholes, so `fold_inj` forces them equal. This is root consistency — the residual collapses to
-supplying `DeployedForkValid` (the rewinding) and Blake2b. -/
+`DForkCert` stores the prover's round points and three challenges at each node. `DeployedForkValid`
+threads the deployed commitment through every path. `produceDeployed` recovers the tree bottom-up and
+uses `fold_inj` to prove that its root is the original deployed commitment.
+-/
 
-/-- A deployed forking certificate: the prover's round point `(L, R)` at each node (the rewound transcript's
-commitment), the three challenges, and the final opening `(c, f)` at each leaf. It carries the round points,
-so the deployed commitment-whole can be folded by them top-down rather than recovered. -/
+/-- A fork tree containing each round point, three challenges, and each leaf opening. -/
 inductive DForkCert (F G : Type*) : ℕ → Type _ where
   | leaf : F → F → DForkCert F G 0
   | node {d : ℕ} : G → G → F → F → F →
       DForkCert F G d → DForkCert F G d → DForkCert F G d → DForkCert F G (d + 1)
 
-/-- The deployed forking acceptance condition: the deployed commitment-whole `Pwhole`, folded by the prover's
-round points `(L, R)` down each path, satisfies the flat verifier leaf equation
-`Pwhole = ⟨c,g⟩ + [z·⟨c,b⟩]U + [f]W` at every leaf (with distinct nonzero challenges at each node). The forking
-output stated *about the deployed instance* — the rewound transcripts accept against the threaded deployed
-commitment, with no decomposition posited. -/
+/-- Every path in a fork certificate satisfies the deployed flat verifier equation. -/
 def DeployedForkValid : {d : ℕ} → (Fin (2 ^ d) → G) → (Fin (2 ^ d) → F) → (U W : G) → (z : F) → G →
     DForkCert F G d → Prop
   | 0, g, b, U, W, z, Pwhole, .leaf c f =>
@@ -149,12 +123,7 @@ def DeployedForkValid : {d : ℕ} → (Fin (2 ^ d) → G) → (Fin (2 ^ d) → F
         DeployedForkValid (foldGens g u₂) (foldGens b u₂) U W z (Pwhole + u₂⁻¹ • L + u₂ • R) c₂ ∧
         DeployedForkValid (foldGens g u₃) (foldGens b u₃) U W z (Pwhole + u₃⁻¹ • L + u₃ • R) c₃
 
-/-- **The root-consistent deployed producer.** Threading the deployed commitment-whole `Pwhole`, a valid
-deployed forking output yields a transcript tree with `DeployedIpaAcceptV` whose recovered root whole
-`P + [z·v]U + [blind]W` is *exactly* `Pwhole`. The cross-terms are recovered bottom-up by Vandermonde; the
-root whole is pinned by `fold_inj` — it and `Pwhole` fold to the same three child
-wholes (the recursion's invariant), so they coincide. No posited decomposition, and the root is the deployed
-commitment, not a free one: root consistency, proven. -/
+/-- Build an accepting deployed IPA tree whose recovered root equals `Pwhole`. -/
 def produceDeployed {U W : G} {z : F} : {d : ℕ} → (g : Fin (2 ^ d) → G) → (b : Fin (2 ^ d) → F) →
     (Pwhole : G) → (cert : DForkCert F G d) → DeployedForkValid g b U W z Pwhole cert →
     Σ' (P : G) (v blind : F) (t : DeployedIpaTreeV F G d),
@@ -190,16 +159,9 @@ def produceDeployed {U W : G} {z : F} : {d : ℕ} → (g : Fin (2 ^ d) → G) �
           (key u₁ P₁ v₁ bl₁ eP₁ ev₁ eb₁ hw₁) (key u₂ P₂ v₂ bl₂ eP₂ ev₂ eb₂ hw₂)
           (key u₃ P₃ v₃ bl₃ eP₃ ev₃ eb₃ hw₃)).1
 
-/-- **Root-consistent extraction (the deployed `FiatShamirTree`), as a computable reduction.** Threading the
-deployed commitment-whole `⟨aDep, g⟩ + [z·vDep]U + [blindDep]W`, a valid deployed forking output *computes*
-either the deployed accept predicate for the deployed commitment `⟨aDep, g⟩` / value `vDep`, or a nontrivial
-`(g, U, W)` relation. `produceDeployed` gives a tree whose recovered root whole equals the deployed whole;
-`ipa_extractV` *computes* that root's opening witness (not the vacuous `∃`), and matching it against the
-deployed whole (`NontrivialRelation.ofCombinationCollision` — the binding branch) forces the recovered
-`(P, v)` to *be* the deployed `(⟨aDep,g⟩, vDep)`. Genuinely non-vacuous: this is a computable `def`
-(decidable `if`, no `Classical.choose`), so neither branch's *data* can be fabricated without the `cert` —
-the discrete-log preimage a prime-order vacuity witness would need is not computable. The residual is
-supplying `DeployedForkValid` (the rewinding) and the DLR/Blake2b hardness floor. -/
+/-- Compute either an accepting deployed IPA tree or a nontrivial `(g, U, W)` relation.
+
+The input certificate is explicit, and this definition uses no `Classical.choose`. -/
 def deployed_forking_tree [DecidableEq F] [DecidableEq G] {U W : G} {z : F} (hz : z ≠ 0)
     {d : ℕ} (g : Fin (2 ^ d) → G) (b : Fin (2 ^ d) → F) (aDep : Fin (2 ^ d) → F) (vDep blindDep : F)
     (cert : DForkCert F G d)
@@ -225,34 +187,18 @@ def deployed_forking_tree [DecidableEq F] [DecidableEq G] {U W : G} {z : F} (hz 
 
 /-! ## The prover-as-oracle-function model: from the abstract forking tree to `DeployedForkValid`
 
-`extractable_of_prob` (`Soundness.Forking.Probability`) gives a *bare* `(3,…,3)` challenge tree (`Extractable`)
-once the accept probability beats the knowledge error. To feed `produceDeployed`/`deployed_forking_tree`, that
-abstract tree must be filled with the prover's round points and openings — the data a `DForkCert` records.
+`extractable_of_prob` returns only a challenge tree. `Prover` supplies the round points and leaf
+openings chosen along each prefix. `proverAccept_forkValid` combines them into a `DForkCert`.
 
-`Prover` is the prover's strategy as a tree: at each round the cross-commitment `(L, R)` it sends *before* the
-challenge, then a continuation per challenge; at the leaf its final opening `(c, f)`. The tree shape enforces
-that the round point depends only on the prefix (the challenges already sent) — exactly the Fiat–Shamir
-prover-as-oracle-function structure, with the round point committed before the next challenge is squeezed.
+Connecting a real Fiat–Shamir adversary to this strategy type remains outside this module.
+-/
 
-`proverAccept` reads off the deployed accept condition along one challenge path: fold the deployed
-commitment-whole by the prover's round points down the path and check the flat verifier leaf equation.
-`proverAccept_forkValid` is the assembly: any `Extractable` tree for that accept predicate *is* a valid
-`DeployedForkValid` certificate — zip the prover's round points/openings with the tree's challenges. This is
-the deterministic bridge from the probabilistic forking tree to the deployed forking output; what stays the
-floor is that the *deployed* prover realizes this `Prover`/`proverAccept` shape (the faithful transcript
-model) and Blake2b-as-random-oracle. -/
-
-/-- A prover's strategy tree for the `d`-round IPA: at each round the cross-commitment `(L, R)` it sends
-*before* the challenge, then a continuation per challenge; at the leaf its final opening `(c, f)`. The tree
-shape enforces the Fiat–Shamir prefix-determination — the round point is fixed before the challenge. -/
+/-- A prefix-determined IPA prover strategy with round points and leaf openings. -/
 inductive Prover (F G : Type*) : ℕ → Type _ where
   | leaf : F → F → Prover F G 0
   | node {d : ℕ} : G → G → (F → Prover F G d) → Prover F G (d + 1)
 
-/-- The deployed accept condition along one challenge path `χ`: fold the deployed commitment-whole `Pwhole` by
-the prover's round points down `χ` (and the generators/eval-vector accordingly), then check the flat verifier
-leaf equation `Pwhole = ⟨c,g⟩ + [z·⟨c,b⟩]U + [f]W` at the bottom. The single-path version of
-`DeployedForkValid`, indexed by the prover strategy. -/
+/-- The deployed accept condition along one challenge path through a prover strategy. -/
 def proverAccept : {d : ℕ} → Prover F G d → (Fin (2 ^ d) → G) → (Fin (2 ^ d) → F) → (U W : G) → (z : F) → G →
     (Fin d → F) → Prop
   | 0, .leaf c f, g, b, U, W, z, Pwhole, _ =>
@@ -261,12 +207,7 @@ def proverAccept : {d : ℕ} → Prover F G d → (Fin (2 ^ d) → G) → (Fin (
       proverAccept (cont (χ 0)) (foldGens g (χ 0)) (foldGens b (χ 0)) U W z
         (Pwhole + (χ 0)⁻¹ • L + (χ 0) • R) (Fin.tail χ)
 
-/-- **The prover-as-oracle assembly.** A `(3,…,3)` `Extractable` tree for the prover's accept predicate yields
-a valid `DeployedForkValid` certificate: zip the prover's round points and openings with the tree's distinct
-challenges. By recursion on the prover/tree — each node takes its round point from the prover and its three
-challenges from `Extractable`, each leaf its opening from the prover, and the per-leaf accept conditions are
-exactly `Extractable`'s. This bridges the probabilistic forking tree (`extractable_of_prob`) to the deployed
-forking output that `deployed_forking_tree` consumes. -/
+/-- Combine an `Extractable` challenge tree with a prover strategy to obtain a valid fork certificate. -/
 theorem proverAccept_forkValid {U W : G} {z : F} : {d : ℕ} → (P : Prover F G d) → (g : Fin (2 ^ d) → G) →
     (b : Fin (2 ^ d) → F) → (Pwhole : G) → Extractable (proverAccept P g b U W z Pwhole) →
     ∃ cert : DForkCert F G d, DeployedForkValid g b U W z Pwhole cert

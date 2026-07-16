@@ -2,62 +2,44 @@ import Zcash.Snark.Verifier.FiatShamir
 import Zcash.Snark.Soundness.Forking.Extractor
 
 /-!
-# Round-by-round Fiat–Shamir transcript ordering
+# Fiat–Shamir round ordering
 
-`Verifier.FiatShamir.deriveChallenges` squeezes the IPA round challenges with a `foldl` over the rounds that,
-at round `j`, appends the round point `(Lⱼ, Rⱼ)` to the running transcript and *then* squeezes `uⱼ` from it:
+`deriveChallenges` appends each IPA round point `(Lⱼ, Rⱼ)` before squeezing its challenge `uⱼ`:
 
     (List.finRange shape.k).foldl (fun (t, us) j =>
         let t := t ++ [.point Lⱼ, .point Rⱼ, .challenge]
         (t, us ++ [squeeze t])) (t₀, [])
 
-This module makes the online ordering that `foldl` enforces explicit and proves it — the transcript-ordering
-half of the prover-as-oracle bridge (`Soundness.Forking.Rewind`): the deployed schedule's own derivation
-has the dependency structure the `Prover`/rewinding tree (`Soundness.Forking.Extractor.Prover`) assumes.
+This module proves that the deployed schedule has the prefix ordering assumed by the prover strategy
+and rewinding proofs.
 
-* `roundTranscript` — the transcript prefix `uⱼ` is squeezed from (the running `t` above, at round `j`).
-* `roundTranscript_succ` — round `j+1`'s transcript is round `j`'s extended by exactly `(L_{j+1}, R_{j+1})`
-  and the challenge marker: each round point is absorbed *before* that round's challenge and *after* every
-  earlier round's challenge.
-* `roundPoint_mem_roundTranscript` — `(Lⱼ, Rⱼ)` lies in the prefix `uⱼ` is squeezed from, so `uⱼ` is a
-  function of a transcript containing `(Lⱼ, Rⱼ)`: the round point is fixed before its challenge and cannot
-  depend on it (while later points, appended after, may depend on `uⱼ`).
-* `roundTranscript_prefix_mono` — the base transcript `t₀` (through `z`) is a prefix of every round's
-  transcript, and round transcripts grow monotonically, so no round's squeeze can see a *later* round's point.
+* `roundTranscript` is the prefix used to squeeze one round challenge.
+* `roundTranscript_succ` and `roundTranscript_prefix_mono` show how those prefixes grow.
+* `roundPoint_mem_roundTranscript` shows that the current point is present before its challenge.
 
-That `(Lⱼ, Rⱼ)` and the challenge marker do not depend on `uⱼ` is *structural*: `roundTranscript` is a
-function of `t₀` and the round points alone, and the squeezed `uⱼ` never re-enters it (halo2's
-no-self-absorption). Tying the round points themselves to a challenge-prefix-respecting `Prover` strategy —
-`Lⱼ, Rⱼ` chosen from `u₀ … u_{j-1}` but not `uⱼ` — is `Prover`/`proverAccept`'s node/continuation shape; this
-module supplies the transcript side that shape mirrors.
+Halo2 does not reabsorb squeezed challenges. The `Prover` type separately ensures that each round
+point depends only on earlier challenges.
 -/
 
 namespace Zcash.Snark
 
 variable {F G : Type*}
 
-/-- The transcript prefix the round-`j` IPA challenge `uⱼ` is squeezed from, given the base transcript `t₀`
-(everything absorbed through `z`) and the round points `rounds i = (Lᵢ, Rᵢ)`: it is the running `t` in
-`deriveChallenges`'s IPA `foldl` at round `j` — `t₀` followed by `[.point Lᵢ, .point Rᵢ, .challenge]` for
-every `i ≤ j`. -/
+/-- The transcript prefix used to squeeze the round-`j` IPA challenge. -/
 def roundTranscript (t₀ : List (TranscriptElt F G)) (rounds : ℕ → G × G) :
     ℕ → List (TranscriptElt F G)
   | 0 => t₀ ++ [.point (rounds 0).1, .point (rounds 0).2, .challenge]
   | j + 1 =>
       roundTranscript t₀ rounds j ++ [.point (rounds (j + 1)).1, .point (rounds (j + 1)).2, .challenge]
 
-/-- **Each round point is absorbed before its challenge, after all earlier challenges.** Round `j+1`'s
-transcript is round `j`'s extended by exactly `(L_{j+1}, R_{j+1})` and the challenge marker — so `(Lⱼ, Rⱼ)`
-enters the transcript strictly between `u_{j-1}`'s squeeze and `uⱼ`'s. -/
+/-- Extend a round transcript with the next point and challenge marker. -/
 theorem roundTranscript_succ (t₀ : List (TranscriptElt F G)) (rounds : ℕ → G × G) (j : ℕ) :
     roundTranscript t₀ rounds (j + 1)
       = roundTranscript t₀ rounds j
         ++ [.point (rounds (j + 1)).1, .point (rounds (j + 1)).2, .challenge] :=
   rfl
 
-/-- **Monotone growth from the base transcript.** `t₀` (everything through `z`) is a prefix of every round's
-transcript, and round `j`'s transcript is a prefix of round `j+1`'s — so no round's squeeze can see a later
-round's point. -/
+/-- The base and earlier round transcripts are prefixes of every later round transcript. -/
 theorem roundTranscript_prefix_mono (t₀ : List (TranscriptElt F G)) (rounds : ℕ → G × G) (j : ℕ) :
     t₀ <+: roundTranscript t₀ rounds j
       ∧ roundTranscript t₀ rounds j <+: roundTranscript t₀ rounds (j + 1) := by
@@ -67,31 +49,18 @@ theorem roundTranscript_prefix_mono (t₀ : List (TranscriptElt F G)) (rounds : 
     | succ j ih => exact ih.trans ⟨_, (roundTranscript_succ t₀ rounds j).symm⟩
   · exact ⟨_, (roundTranscript_succ t₀ rounds j).symm⟩
 
-/-- **The round point is fixed before its challenge.** `(Lⱼ, Rⱼ)` occurs in the prefix
-`uⱼ = squeeze (roundTranscript t₀ rounds j)` is squeezed from, so `uⱼ` is a function of a transcript already
-containing the round point — which therefore cannot depend on its own challenge. -/
+/-- The round-`j` point is present in the transcript before `uⱼ` is squeezed. -/
 theorem roundPoint_mem_roundTranscript (t₀ : List (TranscriptElt F G)) (rounds : ℕ → G × G) (j : ℕ) :
     TranscriptElt.point (rounds j).1 ∈ roundTranscript t₀ rounds j ∧
       TranscriptElt.point (rounds j).2 ∈ roundTranscript t₀ rounds j := by
   cases j <;> exact ⟨by simp [roundTranscript], by simp [roundTranscript]⟩
 
-/-- The round-`j` IPA challenge as the deployed schedule squeezes it: from the round-`j` transcript, which
-contains `(Lⱼ, Rⱼ)` (`roundPoint_mem_roundTranscript`) and never the challenge `uⱼ` itself.
-`deriveChallenges_ipaRound_eq_roundChallenge` pins the deployed derivation to this form. -/
+/-- Squeeze the round-`j` IPA challenge from its round transcript. -/
 def roundChallenge (fs : FiatShamir F G) (t₀ : List (TranscriptElt F G)) (rounds : ℕ → G × G)
     (j : ℕ) : F :=
   fs.squeeze (roundTranscript t₀ rounds j)
 
-/-- **The deployed schedule's IPA `foldl` builds the round-by-round transcript.** Folding the round points in
-`L` — at each `i`, appending `[.point Lᵢ, .point Rᵢ, .challenge]` to the running transcript and squeezing —
-the final transcript is the base `t₀` followed by every round's point-pair and challenge marker, in order.
-
-This lambda matches the IPA `foldl` of `Verifier.FiatShamir.deriveChallenges` (`rp = ps.ipaRounds`,
-`L = List.finRange shape.k`). It documents the transcript side of that fold: the deployed verifier absorbs
-the round points sequentially — each `(Lᵢ, Rᵢ)` before its own challenge is squeezed and after every earlier
-round's — and the squeezed challenges never re-enter the transcript (halo2's no-self-absorption). The
-instantiation against the actual derivation is carried by the challenge-side companion `ipaFold_challenges`,
-inside the seal `deriveChallenges_ipaRound_eq` that a schedule refactor would break. -/
+/-- The transcript part of the deployed IPA `foldl` is the base followed by each round's absorb block. -/
 theorem ipaFold_transcript {ι : Type*} (fs : FiatShamir F G) (rp : ι → G × G)
     (L : List ι) (t₀ : List (TranscriptElt F G)) (us₀ : List F) :
     (L.foldl (fun st i =>
@@ -106,25 +75,17 @@ theorem ipaFold_transcript {ι : Type*} (fs : FiatShamir F G) (rp : ι → G × 
 
 /-! ## The Prover-tree side: each round point is prefix-determined
 
-`Soundness.Forking.Extractor.Prover` is `node (L R : G) (cont : F → Prover d)`: the round point `(L, R)` is a
-field of the node — fixed — while `cont` takes the round challenge. So the *type* already forbids `(Lⱼ, Rⱼ)`
-depending on `uⱼ`; below we read that off as a theorem, matching the transcript ordering above.
+In `Prover.node`, the round point is fixed before the challenge selects a continuation. The theorem
+below states that two paths with the same prefix therefore have the same next round point.
 -/
 
-/-- The round point `(Lⱼ, Rⱼ)` the prover strategy `P` commits at depth `j` down the challenge path `χ`:
-descend `j` nodes following the earlier challenges `χ 0, …, χ (j-1)`, then read the reached node's fixed
-`(L, R)` (`none` past the leaf). -/
+/-- The prover's round point at depth `j` along challenge path `χ`. -/
 def proverRoundPoint : {d : ℕ} → Prover F G d → (Fin d → F) → ℕ → Option (G × G)
   | 0, _, _, _ => none
   | _ + 1, .node L R _, _, 0 => some (L, R)
   | _ + 1, .node _ _ cont, χ, j + 1 => proverRoundPoint (cont (χ 0)) (Fin.tail χ) j
 
-/-- **The Prover tree fixes each round point before its challenge.** The depth-`j` round
-point depends only on the earlier challenges `χ 0, …, χ (j-1)` — the path descended to reach the node — not on
-that round's own challenge `χ j` or any later one: two paths agreeing on their first `j` entries yield the same
-depth-`j` round point. This is the tree side of the transcript ordering (`roundPoint_mem_roundTranscript`):
-`(Lⱼ, Rⱼ)` is prefix-determined, so the modeled prover commits it before seeing `uⱼ`, exactly as the deployed
-transcript absorbs `(Lⱼ, Rⱼ)` before squeezing `uⱼ`. -/
+/-- The round point at depth `j` depends only on the first `j` challenges. -/
 theorem proverRoundPoint_prefix : {d : ℕ} → (P : Prover F G d) → (χ χ' : Fin d → F) → (j : ℕ) →
     (∀ i : Fin d, (i : ℕ) < j → χ i = χ' i) →
     proverRoundPoint P χ j = proverRoundPoint P χ' j
@@ -139,19 +100,11 @@ theorem proverRoundPoint_prefix : {d : ℕ} → (P : Prover F G d) → (χ χ' :
 
 /-! ## Sealing the module to the deployed derivation
 
-The lemmas above are stated over `roundTranscript`, a *reconstruction* of `deriveChallenges`'s IPA fold. To
-rule out drift between the reconstruction and the deployed schedule, `deriveChallenges_ipaRound_eq` proves
-the deployed round challenges *are* the round-by-round squeezes: `(deriveChallenges fs init ps).ipaRound j`
-is `fs.squeeze` of the round-`j` transcript over the named base `preIpaTranscript init ps` and the proof's
-own round points, and `roundTranscriptFin_eq_roundTranscript` / `deriveChallenges_ipaRound_eq_roundChallenge`
-identify the sealed object with the reconstruction — so the ordering trio transports to the deployed
-derivation rather than holding only of a mirror. Any refactor of `deriveChallenges` that changes the IPA
-absorb order breaks the seal. -/
+The earlier lemmas use a reconstructed round transcript. `deriveChallenges_ipaRound_eq` proves that
+the deployed schedule uses exactly that transcript, so any ordering change breaks the theorem.
+-/
 
-/-- The transcript `deriveChallenges` has absorbed when its IPA fold starts: `init`, then every pre-IPA
-absorb block with its challenge markers, through the `z` marker. The chain never re-absorbs a squeezed
-challenge (halo2's no-self-absorption), so it is a function of `init` and the proof string alone — no
-`FiatShamir` argument. `deriveChallenges_ipaRound_eq` pins this to the deployed derivation. -/
+/-- The transcript prefix before the deployed IPA round fold begins. -/
 def preIpaTranscript {shape : Shape} (init : List (TranscriptElt F G)) (ps : ProofString shape F G) :
     List (TranscriptElt F G) :=
   let t := init ++ absorbPoints2 ps.adviceCommitments ++ [.challenge]
@@ -173,9 +126,7 @@ def preIpaTranscript {shape : Shape} (init : List (TranscriptElt F G)) (ps : Pro
   let t := t ++ [.challenge]
   t
 
-/-- The challenge side of the IPA `foldl` (companion of `ipaFold_transcript`, which characterizes the
-transcript side): the accumulated challenge list is `us₀` extended by, for each round position `m`, the
-squeeze of the base extended by the first `m + 1` rounds' absorb blocks. -/
+/-- The challenges produced by the deployed IPA `foldl`. -/
 theorem ipaFold_challenges {ι : Type*} (fs : FiatShamir F G) (rp : ι → G × G)
     (L : List ι) (t₀ : List (TranscriptElt F G)) (us₀ : List F) :
     (L.foldl (fun st i =>
@@ -194,8 +145,7 @@ theorem ipaFold_challenges {ι : Type*} (fs : FiatShamir F G) (rp : ι → G × 
         List.flatten_cons, List.flatten_nil, Function.comp_def, List.append_assoc,
         List.cons_append, List.nil_append]
 
-/-- `roundTranscript` in take-and-flatten form: the base followed by the first `j + 1` rounds' absorb
-blocks — the shape `ipaFold_challenges` produces, bridging the fold to the recursion. -/
+/-- Express `roundTranscript` as the base followed by the first `j + 1` absorb blocks. -/
 theorem roundTranscript_eq_take (t₀ : List (TranscriptElt F G)) (rounds : ℕ → G × G) (j : ℕ) :
     roundTranscript t₀ rounds j
       = t₀ ++ ((List.range (j + 1)).map (fun i =>
@@ -208,8 +158,7 @@ theorem roundTranscript_eq_take (t₀ : List (TranscriptElt F G)) (rounds : ℕ 
         List.flatten_append, List.append_assoc]
       simp
 
-/-- The round-`j` transcript over `Fin`-indexed round points — the form the deployed schedule's
-`Fin shape.k → G × G` rounds produce directly. -/
+/-- The round-`j` transcript for a `Fin`-indexed round vector. -/
 def roundTranscriptFin {k : ℕ} (t₀ : List (TranscriptElt F G)) (rounds : Fin k → G × G) (j : Fin k) :
     List (TranscriptElt F G) :=
   t₀ ++ (((List.finRange k).take (j.val + 1)).map (fun i =>
@@ -224,8 +173,7 @@ private theorem length_flatten_map_triple {ι : Type*} (f g h : ι → Transcrip
         List.length_nil, length_flatten_map_triple f g h l]
       omega
 
-/-- Each round's absorb block has three elements, so the round-`j` transcript extends the base by exactly
-`3 · (j + 1)` — the length arithmetic behind "distinct rounds have distinct transcripts". -/
+/-- The round-`j` transcript extends the base by `3 · (j + 1)` elements. -/
 theorem roundTranscriptFin_length {k : ℕ} (t₀ : List (TranscriptElt F G)) (rounds : Fin k → G × G)
     (j : Fin k) :
     (roundTranscriptFin t₀ rounds j).length = t₀.length + 3 * (j.val + 1) := by
@@ -236,8 +184,7 @@ theorem roundTranscriptFin_length {k : ℕ} (t₀ : List (TranscriptElt F G)) (r
     List.length_take, List.length_finRange]
   omega
 
-/-- Distinct rounds squeeze from distinct transcripts (their lengths differ by `3 · |j − j'|`) — the fact
-that lets the oracle be reprogrammed at one round's prefix without touching any other round's challenge. -/
+/-- Distinct rounds squeeze from distinct transcript prefixes. -/
 theorem roundTranscriptFin_injective {k : ℕ} (t₀ : List (TranscriptElt F G))
     (rounds : Fin k → G × G) :
     Function.Injective (roundTranscriptFin t₀ rounds) := by
@@ -246,10 +193,7 @@ theorem roundTranscriptFin_injective {k : ℕ} (t₀ : List (TranscriptElt F G))
   rw [roundTranscriptFin_length, roundTranscriptFin_length] at hlen
   exact Fin.ext (by omega)
 
-/-- **The mirror↔seal identification.** The `Fin`-indexed round transcript — the sealed object — is
-`roundTranscript` at (any `ℕ`-extension of) the same round points: below `j` the wrap-around never fires.
-This is what transports the ordering lemmas (`roundTranscript_succ` / `roundPoint_mem_roundTranscript` /
-`roundTranscript_prefix_mono`) to the deployed derivation through the seal. -/
+/-- The `Fin`-indexed round transcript equals the recursive `roundTranscript`. -/
 theorem roundTranscriptFin_eq_roundTranscript {k : ℕ} (t₀ : List (TranscriptElt F G))
     (rounds : Fin k → G × G) (j : Fin k) :
     roundTranscriptFin t₀ rounds j
@@ -268,14 +212,9 @@ theorem roundTranscriptFin_eq_roundTranscript {k : ℕ} (t₀ : List (Transcript
       TranscriptElt.challenge]) (Fin.ext ?_)
     simp [Nat.mod_eq_of_lt hn]
 
-/-- **The anti-drift seal: the deployed schedule's IPA challenges are the round-by-round squeezes.**
-`(deriveChallenges fs init ps).ipaRound j` is exactly `fs.squeeze` of the round-`j` transcript over the
-named base `preIpaTranscript init ps` and the proof's own round points `ps.ipaRounds`. Through the
-identification `roundTranscriptFin_eq_roundTranscript` (and the `roundChallenge` form below),
-`roundTranscript_succ` / `roundPoint_mem_roundTranscript` / `roundTranscript_prefix_mono` then hold *of the
-deployed derivation itself*: each `(Lⱼ, Rⱼ)` is absorbed before `uⱼ` is squeezed, and
-`uⱼ` is sampled from the prefix containing it. A refactor of `deriveChallenges` that changes the IPA
-absorb order breaks this theorem. -/
+/-- The deployed round challenge is squeezed from the corresponding `roundTranscriptFin`.
+
+This theorem pins the ordering model to `deriveChallenges`. -/
 theorem deriveChallenges_ipaRound_eq {shape : Shape} [Zero F] (fs : FiatShamir F G)
     (init : List (TranscriptElt F G)) (ps : ProofString shape F G) (j : Fin shape.k) :
     (deriveChallenges fs init ps).ipaRound j
@@ -285,9 +224,7 @@ theorem deriveChallenges_ipaRound_eq {shape : Shape} [Zero F] (fs : FiatShamir F
     List.getElem?_range (by simp)]
   rfl
 
-/-- The seal in `roundChallenge` form: the deployed round-`j` challenge is `roundChallenge` at the deployed
-base `preIpaTranscript` and (any `ℕ`-extension of) the proof's round points — so the ordering trio above
-holds verbatim of the transcripts the deployed schedule actually squeezes. -/
+/-- Restate `deriveChallenges_ipaRound_eq` using `roundChallenge`. -/
 theorem deriveChallenges_ipaRound_eq_roundChallenge {shape : Shape} [Zero F] (fs : FiatShamir F G)
     (init : List (TranscriptElt F G)) (ps : ProofString shape F G) (j : Fin shape.k) :
     (deriveChallenges fs init ps).ipaRound j
