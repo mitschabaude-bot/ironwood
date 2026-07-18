@@ -51,6 +51,15 @@ import Zcash.Snark.Soundness.Deployed.Verification
 -- The reusable Fiat–Shamir forking kernel and its concrete adversary producer.
 import Zcash.Snark.Soundness.Forking
 import Zcash.Snark.Soundness.Main
+-- Multiopen decode reconstruction: bind the IPA witness to real verifier columns recovered from
+-- batched openings (`Multiopen.Decode`), the compatibility layer exposing the propositional binding
+-- interface over fs-adversary's `NontrivialRelation`/`ForkedTranscript` apparatus (`Multiopen.Compat`),
+-- the `x₄` multiopen rewinding (`Multiopen.Deployed`), and the discharge fixtures
+-- (`Multiopen.DecodeFixture`).
+import Zcash.Snark.Soundness.Multiopen.Decode
+import Zcash.Snark.Soundness.Multiopen.Compat
+import Zcash.Snark.Soundness.Multiopen.Deployed
+import Zcash.Snark.Soundness.Multiopen.DecodeFixture
 import Zcash.Snark.Soundness.Vesta
 -- AGM binding reduction: consume computed deployed relations through the fixed-slot discrete-log
 -- adapter and representation-carrying algebraic-prover model (#15).
