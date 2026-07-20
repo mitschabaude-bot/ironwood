@@ -829,6 +829,35 @@ theorem computedDeployedAlgebraicInstanceFromTape_runRelation_isSome
     x.runRelation.isSome :=
   computedDeployedAlgebraicInstance_runRelation_isSome basis vk init A O tape.toCoins hwin hinst
 
+/-! ## Executable knowledge soundness
+
+The computed AGM instance runs to an IPA opening or an explicit relation. The opening branch feeds
+the extracted witness to the deployed circuit encoder — the same conditional constraint interface
+(`hcirc`/`hencodes`) the deployed `_of_forked` capstones take, `hcirc` constraining the single
+extracted witness the run yields, not every opening. The relation branch passes the discrete-log
+break through. This drives the deployed knowledge-soundness dichotomy `S ⊕' relation` from the
+executable `AlgebraicDForkCert`, rather than the legacy existential fork above the knowledge error
+(`hprob`). Making `circuitSat` faithful (the multiopen decode binding) is the remaining
+constraint-decode gap. -/
+
+/-- **Executable SNARK dichotomy from one computed instance.** Either the deployed circuit statement
+`S` holds (via the run's clean opening and `hcirc` at that single extracted witness) or an explicit
+augmented-basis relation is produced (a discrete-log break). No `hprob`/`ForkedTranscript`: the
+opening is the computed `DeployedAlgebraicForkingInstance.run` output. -/
+def DeployedAlgebraicForkingInstance.runToSnark {k : ℕ}
+    {basis : AugmentedIndex (2 ^ k) → VestaG}
+    (x : DeployedAlgebraicForkingInstance (G := VestaG) k basis)
+    {circuitSat : (Fin (2 ^ k) → Fp) → Prop}
+    (hcirc : ∀ o : x.Opening, x.run = PSum.inl o → circuitSat o.1)
+    {S : Prop}
+    (hencodes : ∀ a, SnarkRelation (ursOfAugmentedBasis k basis)
+        (commit (ursOfAugmentedBasis k basis) x.aMulti) x.b
+        (x.v + x.z⁻¹ * x.vU - x.ξ * innerProduct x.s x.b) circuitSat a → S) :
+    S ⊕' AlgebraicRelationWitness (F := Fp) basis :=
+  match h : x.run with
+  | PSum.inl opening => PSum.inl (hencodes opening.1 ⟨opening.2, hcirc opening h⟩)
+  | PSum.inr rel => PSum.inr rel
+
 /-! ## Computed basis-indexed producer -/
 
 /-- A basis-indexed family with one common transcript prefix, so every basis uses the same extractor
@@ -868,6 +897,35 @@ def relationFinder (family : ComputedAlgebraicFSFamily shape) :
     match (family.instanceAttempt basis coins).output with
     | none => none
     | some x => x.runRelation
+
+/-- The finder that returns only the *direct relation* branch of the computed run. On a produced
+instance, `runToSnark` falls into its relation (discrete-log break) branch exactly when this finder
+succeeds; otherwise it yields the circuit statement `S`. -/
+def snarkRelationFinder (family : ComputedAlgebraicFSFamily shape) :
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG) → family.Coins →
+      Option (AlgebraicRelationWitness (F := Fp) basis) :=
+  fun basis coins =>
+    match (family.instanceAttempt basis coins).output with
+    | none => none
+    | some x =>
+      match x.run with
+      | PSum.inr rel => some rel
+      | PSum.inl _ => none
+
+/-- **Direct-relation branch bounded by discrete log.** Under textbook DL hardness for the
+run-relation finder, the probability that the computed producer returns its *direct relation* branch
+(`run = inr`) is at most `|basis|` times the DL advantage — a fixed-slot reduction instance. This is
+one term only: it carries no acceptance event, no circuit statement `S`, and no extractor-failure
+slice. `snarkFailure_prob_le_of_textbookDL` combines it with those into the full
+`accept ∧ no clean opening` knowledge-soundness bound. -/
+theorem snarkRelation_prob_le_of_textbookDL
+    (B : VestaG) (family : ComputedAlgebraicFSFamily shape) {bound : ℝ≥0∞}
+    (hDL : TextbookDLWithCoinsAdvantageLE B family.snarkRelationFinder bound) :
+    (PMF.uniformOfFintype
+        ((AugmentedIndex (2 ^ shape.k) → Fp) × family.Coins)).toOuterMeasure
+        (relSetWithCoins B family.snarkRelationFinder)
+      ≤ Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound :=
+  relationWithCoins_prob_le_of_textbookDL B family.snarkRelationFinder hDL
 
 /-- The real binding-attack event for one oracle table. -/
 def bindingWin (family : ComputedAlgebraicFSFamily shape)
@@ -1128,6 +1186,87 @@ theorem binding_prob_le_of_generatorRO_textbookDL
   binding_prob_le_of_uniformURS_textbookDL (orchardGeneratorROSetup query) B family
     (orchardGeneratorROBasis query)
     (orchard_uniformURSIdentification_of_generatorRO shape.k B hB query hquery) hDL
+
+/-! ## Knowledge-soundness probability composition
+
+`runToSnark` yields the circuit statement `S` exactly on the clean-opening branch (`run = inl`).
+The theorem below bounds the complementary event — an accepting run on which the producer returns
+no clean opening — by the recursive query loss plus `|basis|` times the discrete-log advantage. The
+two failure modes are a missing instance and the direct-relation branch. This is the composition
+`snarkRelation_prob_le_of_textbookDL` alone does not carry. -/
+
+/-- A produced instance whose run is a clean IPA opening — the branch on which `runToSnark` returns
+`S`. Its negation is a missing instance or the direct-relation branch. -/
+def hasCleanOpening (family : ComputedAlgebraicFSFamily shape)
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG) (coins : family.Coins) : Prop :=
+  ∃ x, (family.instanceAttempt basis coins).output = some x ∧ ∃ o, x.run = PSum.inl o
+
+/-- Accepting runs (`z ≠ 0`) on which the operational producer returns no instance. The acceptance
+event is the plain deployed accept, not a binding mismatch (contrast `failedBinding`). -/
+def acceptExtractionFailure (family : ComputedAlgebraicFSFamily shape)
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG) : Set family.Coins :=
+  {coins | fsWinsFull (family.adversary basis) (fullAlgebraicAcceptZ basis (family.vk basis))
+      (algebraicFullPrefixesPre family.init) (algebraicFullPrefixes family.init) coins.1 ∧
+    ¬ (family.instanceAttempt basis coins).output.isSome}
+
+/-- Accepting extractor failure on one basis is bounded by the recursive query loss. -/
+theorem acceptExtractionFailure_measure_le (family : ComputedAlgebraicFSFamily shape)
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG) :
+    (PMF.uniformOfFintype family.Coins).toOuterMeasure (family.acceptExtractionFailure basis)
+      ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) := by
+  apply uniformOfFintype_prod_fiber_bound
+    (fun tape => computedAlgebraicInstanceFailureSet basis (family.vk basis) family.init
+      (family.adversary basis) tape)
+  intro tape
+  exact computedAlgebraicInstanceFailure_measure_le basis (family.vk basis) family.init
+    (family.adversary basis) tape (family.queryBound basis)
+
+/-- **Knowledge-soundness probability composition.** On an accepting run (`z ≠ 0`), the executable
+producer returns a clean opening — from which `runToSnark` yields the circuit statement `S` — except
+with probability at most the recursive query loss `(Q+k)·3/|Fp|` plus `|basis|` times the
+discrete-log advantage. The failure modes are a missing instance (`acceptExtractionFailure`) and the
+direct-relation branch (a discrete-log break, `snarkRelation_prob_le_of_textbookDL`). The residual
+`z = 0` slice (a further `(Q+1)/|Fp|`) is excluded by the `z ≠ 0` guard. -/
+theorem snarkFailure_prob_le_of_textbookDL
+    (B : VestaG) (family : ComputedAlgebraicFSFamily shape) {bound : ℝ≥0∞}
+    (hDL : TextbookDLWithCoinsAdvantageLE B family.snarkRelationFinder bound) :
+    (PMF.uniformOfFintype
+        ((AugmentedIndex (2 ^ shape.k) → Fp) × family.Coins)).toOuterMeasure
+        {p | fsWinsFull (family.adversary (scalarBasis B p.1))
+              (fullAlgebraicAcceptZ (scalarBasis B p.1) (family.vk (scalarBasis B p.1)))
+              (algebraicFullPrefixesPre family.init) (algebraicFullPrefixes family.init) p.2.1 ∧
+            ¬ family.hasCleanOpening (scalarBasis B p.1) p.2}
+      ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
+        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+  classical
+  refine le_trans (MeasureTheory.measure_mono
+    (show {p : (AugmentedIndex (2 ^ shape.k) → Fp) × family.Coins |
+        fsWinsFull (family.adversary (scalarBasis B p.1))
+          (fullAlgebraicAcceptZ (scalarBasis B p.1) (family.vk (scalarBasis B p.1)))
+          (algebraicFullPrefixesPre family.init) (algebraicFullPrefixes family.init) p.2.1 ∧
+        ¬ family.hasCleanOpening (scalarBasis B p.1) p.2} ⊆
+      {p | p.2 ∈ family.acceptExtractionFailure (scalarBasis B p.1)} ∪
+      (↑(relSetWithCoins B family.snarkRelationFinder) :
+        Set ((AugmentedIndex (2 ^ shape.k) → Fp) × family.Coins)) from ?_))
+    (le_trans (MeasureTheory.measure_union_le _ _) ?_)
+  · intro p hp
+    obtain ⟨hacc, hnoclean⟩ := hp
+    by_cases hsome : (family.instanceAttempt (scalarBasis B p.1) p.2).output.isSome
+    · refine Or.inr ?_
+      obtain ⟨x, hx⟩ := Option.isSome_iff_exists.mp hsome
+      simp only [Finset.mem_coe, relSetWithCoins, Finset.mem_filter, Finset.mem_univ, true_and]
+      show (family.snarkRelationFinder (scalarBasis B p.1) p.2).isSome
+      simp only [snarkRelationFinder, hx]
+      cases hrun : x.run with
+      | inl o => exact absurd ⟨x, hx, o, hrun⟩ hnoclean
+      | inr rel => rfl
+    · exact Or.inl ⟨hacc, hsome⟩
+  · refine add_le_add ?_ (snarkRelation_prob_le_of_textbookDL B family hDL)
+    apply uniformOfFintype_prod_fiber_bound_right
+      (fun coeffs : AugmentedIndex (2 ^ shape.k) → Fp =>
+        family.acceptExtractionFailure (scalarBasis B coeffs))
+    intro coeffs
+    exact family.acceptExtractionFailure_measure_le (scalarBasis B coeffs)
 
 end ComputedAlgebraicFSFamily
 

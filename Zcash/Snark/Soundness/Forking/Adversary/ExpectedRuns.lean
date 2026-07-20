@@ -11,11 +11,20 @@ The proof counts finite tapes exactly. `card_scanRank_lt_mul_le` bounds how many
 the second success, `sum_eval_pi` marginalizes independent child tapes, and `paidList` matches the
 two scans in `nextForkChallenge`.
 
-## Remaining floor
+## Accepted efficiency floor
 
-This module does not derive fork spread from Fiat–Shamir advantage. An unconditional runtime bound
-must also price grinding runs that reach sparse nodes; composing that slice with this theorem is
-the remaining Attema–Fehr–Klooß efficiency step.
+Fork spread is an *efficiency* assumption on the extractor, not a soundness one. It bounds the
+extractor's expected run count — how many times the reduction re-runs the adversary (the `.runs`
+counter), not Lean execution time — so that discrete-log extraction is expected-polynomial-time.
+Every soundness and probability bound in the stack holds with no fork-spread hypothesis.
+
+It does, though, gate the *computational* reading: the `TextbookDLWithCoinsAdvantageLE` premise can
+be discharged from standard discrete-log hardness only once the reduction is efficient, since that
+hardness bounds only efficient reductions. Without fork spread the run count stays finite but
+worst-case exponential (`recursiveAlgebraicForkFrom_runs_le`, `(2n+1)^k`), so the premise has no
+standard-hardness witness. Removing the condition is the Attema–Fehr–Klooß grinding step — a sparse
+node is expensive to scan but reached with matching rarity, so expected work stays polynomial — a
+known, self-contained development accepted here as a boundary rather than derived.
 -/
 
 namespace Zcash.Snark

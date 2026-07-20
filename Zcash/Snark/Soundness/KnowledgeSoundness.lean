@@ -41,6 +41,12 @@ This layer is sound relative to the following, each kept explicit rather than hi
   ownership, value balance, nullifiers) is a separate workstream; this layer proves the verifier sound
   relative to the given VK, ending at "the witness satisfies the VK's constraint system."
 
+Extractor efficiency is a separate boundary, not a soundness assumption: the forking extractor's
+expected-polynomial run count rests on *fork spread* (`Forking.Adversary.ExpectedRuns`), a condition
+on the reduction's cost, not on whether extraction succeeds. The soundness bounds above do not use
+it, but discharging their discrete-log premise from *standard* (efficient-adversary) hardness does —
+the reduction must be proven efficient first.
+
 ## For human review
 Check that `SnarkRelation` is the intended relation, that the four assumptions above are the right ones
 and acceptably standard, and that the captured fingerprint match (`Zcash.Snark.Fixture`) is for the

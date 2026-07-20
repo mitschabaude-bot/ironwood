@@ -392,7 +392,7 @@
       ],
       "residuals": [
         "Identify deployed Blake2b and halo2's concrete hash-to-curve with their modeled random oracles, and assume Vesta DL hardness.",
-        "The exact extractor bound is pointwise and polynomial for the fixed deployed field; the sharper field-uniform AFK expected-time bound is not formalized."
+        "The extractor has an unconditional worst-case pointwise run bound and, under fork spread, a formalized expected-run bound; only the unconditional field-uniform AFK expected-time bound that removes fork spread is not formalized."
       ],
       "durationMs": 10000
     },

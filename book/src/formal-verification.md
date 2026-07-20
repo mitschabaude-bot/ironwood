@@ -63,9 +63,12 @@ Following the pattern of CompElliptic's
 distinguishes general theorems from concrete, closed computational facts, and holds them to
 different trust standards.
 
-**General, quantified theorems** (the soundness statements and security reductions) must
-rest only on the standard classical axioms `propext`, `Classical.choice`, and `Quot.sound`.
-No `sorry`, no additional axioms, no compiler trust.
+**General, quantified theorems** (the soundness statements and security reductions) rest, in
+their abstract form over an arbitrary `Fp`-module, only on the standard classical axioms
+`propext`, `Classical.choice`, and `Quot.sound` — no `sorry`, no additional axioms, no compiler
+trust. Instantiated at the concrete Vesta curve they additionally inherit one compiler-trust
+axiom: CompElliptic's curve point-count, a closed computational fact discharged by `native_decide`
+(below). The per-theorem `#print axioms` pins record exactly which endpoints carry it.
 
 **Concrete, closed facts with no free variables** may additionally use `native_decide`
 (which discharges a goal by running compiled native code, adding a compiler-trust axiom) and

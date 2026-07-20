@@ -55,8 +55,13 @@ assert_no_sorry computedAlgebraicInstanceFailure_measure_le
 assert_no_sorry AlgebraicRelationWitness.augment
 assert_no_sorry DeployedAlgebraicForkingInstance.runRelation
 assert_no_sorry DeployedAlgebraicForkingInstance.runRelation_isSome_of_mismatch
+assert_no_sorry DeployedAlgebraicForkingInstance.runToSnark
 assert_no_sorry ComputedAlgebraicFSFamily.relationFinder
 assert_no_sorry ComputedAlgebraicFSFamily.relationFinder_isSome_of_bindingWin
+assert_no_sorry ComputedAlgebraicFSFamily.snarkRelationFinder
+assert_no_sorry ComputedAlgebraicFSFamily.snarkRelation_prob_le_of_textbookDL
+assert_no_sorry ComputedAlgebraicFSFamily.acceptExtractionFailure_measure_le
+assert_no_sorry ComputedAlgebraicFSFamily.snarkFailure_prob_le_of_textbookDL
 assert_no_sorry ComputedAlgebraicFSFamily.binding_prob_le_of_textbookDL
 assert_no_sorry ComputedAlgebraicFSFamily.binding_prob_le_of_uniformURS_textbookDL
 assert_no_sorry ComputedAlgebraicFSFamily.binding_prob_le_of_generatorRO_textbookDL
@@ -275,3 +280,25 @@ Classical.choice, Quot.sound,
 CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
 #guard_msgs (whitespace := lax) in
 #print axioms bindingWin_unbounded_measure_le
+
+/-! The executable knowledge-soundness producer drives the computed instance to the deployed SNARK
+dichotomy `S ⊕' relation` from the `AlgebraicDForkCert`, retiring the legacy `hprob` path for the
+constraint conclusion. -/
+
+/-- info: 'Zcash.Snark.DeployedAlgebraicForkingInstance.runToSnark' depends on axioms: [propext,
+Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms DeployedAlgebraicForkingInstance.runToSnark
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamily.snarkRelation_prob_le_of_textbookDL' depends on
+axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms ComputedAlgebraicFSFamily.snarkRelation_prob_le_of_textbookDL
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamily.snarkFailure_prob_le_of_textbookDL' depends on
+axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms ComputedAlgebraicFSFamily.snarkFailure_prob_le_of_textbookDL
