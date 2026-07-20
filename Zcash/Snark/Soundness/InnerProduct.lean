@@ -78,8 +78,7 @@ theorem ipaRelation_unshift (urs : URS G) (P : G) (b : Fin (2 ^ urs.k) → F) (v
   · rw [innerProduct_add, innerProduct_single, hi, hb0, mul_one, zero_add]
 
 /-- Convert an opening of `P − [v]g₀` at value `w` to an opening of `P` at value `w + v`, using
-`b 0 = 1` — the value-general form of `ipaRelation_unshift`, needed when the whole commitment
-carries a declared `U` component and the base opening value is nonzero. -/
+`b 0 = 1`. This generalizes `ipaRelation_unshift` to nonzero starting values. -/
 theorem ipaRelation_unshift_value (urs : URS G) (P : G) (b : Fin (2 ^ urs.k) → F) (v w : F)
     (a : Fin (2 ^ urs.k) → F) (hb0 : b 0 = 1)
     (h : IpaRelation urs (P - v • urs.g 0) b w a) :

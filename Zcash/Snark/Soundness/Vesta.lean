@@ -402,8 +402,8 @@ prover strategy.
 
 The verifier runs on the proof assembled for each challenge path, and
 `deployedVerifierEq_iff_flatAccept_adaptive` proves the bridge to `P`. Thus `hprob` measures an
-adaptive strategy rather than one fixed proof. Connecting a real random-oracle adversary to this
-strategy, including query loss, remains outside this theorem. -/
+adaptive strategy rather than one fixed proof. The executable adversary path is in
+`Soundness.Forking.Adversary.Algebraic`. -/
 noncomputable def legacy_orchard_verifier_vesta_forking_opening_adaptive [DecidableEq VestaG]
     [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp)
@@ -450,8 +450,8 @@ open Classical in
 /-- **Legacy propositional capstone.** Add the constraint conclusion to
 `legacy_orchard_verifier_vesta_forking_opening_adaptive`.
 
-`hξ` restores the claimed value. Connecting the Fiat–Shamir adversary and its query loss remains
-outside this theorem. The `hquot` and `hgood` hypotheses retain the all-openings caveat. -/
+`hξ` restores the claimed value. The `hquot` and `hgood` hypotheses retain the all-openings caveat.
+The executable adversary path is in `Soundness.Forking.Adversary.Algebraic`. -/
 noncomputable def legacy_orchard_verifier_vesta_forking_constraint_adaptive
     [DecidableEq VestaG] [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp)
@@ -495,26 +495,14 @@ noncomputable def legacy_orchard_verifier_vesta_forking_constraint_adaptive
 
 /-! ## Legacy propositional forking capstones
 
-The endpoints differ in how much of the prover and rewinding model they include:
+These compatibility wrappers cover fixed proofs, prefix-respecting strategies, and their
+reprogrammed-oracle forms. Their `_of_forked` kernels are computable when given explicit
+certificates, but the wrappers select existential certificates and therefore remain
+`noncomputable`.
 
-* **Constant** — the `_deployed` pair uses one fixed proof. Its probability is over all round
-  challenges, not the Fiat–Shamir attack event.
-* **Staged** — the `_adaptive` pair uses a prefix-respecting strategy. Connecting a rewound
-  random-oracle adversary to that strategy, including query loss, remains open.
-* **Constant, rewound** — the `_rewind` pair states the constant event using reprogrammed-oracle runs.
-* **Staged, rewound** — the `_adaptive_rewind` pair combines a staged strategy with reprogrammed runs.
-* **Abstract** — the base pair receives the prover-to-acceptance bridge as `hbridge`.
-
-The explicit-certificate `_of_forked` pair remains checked and computable; the wrappers below are
-the legacy existence-form endpoints.
-
-Every endpoint opens commitments after removing their declared `U` and `W` components. Real halo2
-commitments are blinded, so only these adjusted points have the required `g` representations. Honest
-commitments have no `U` component; their `W` components are the commitment blinds. `hU` cancels the
-total declared `U` component of the opened point.
-
-These wrappers remain `noncomputable` because the fork certificate is existential. Executable code
-must call `deployed_forking_relation` with an explicit certificate and opening data. -/
+Each endpoint removes declared `U` and `W` components before opening the commitment; `hU` cancels the
+total `U` component. The executable arbitrary-query path is in
+`Soundness.Forking.Adversary.Algebraic`. -/
 
 open scoped ENNReal in
 open Classical in

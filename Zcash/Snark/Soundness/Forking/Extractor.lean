@@ -113,7 +113,7 @@ inductive DForkCert (F G : Type*) : ℕ → Type _ where
       DForkCert F G d → DForkCert F G d → DForkCert F G d → DForkCert F G (d + 1)
 
 /-- The number of accepting leaves stored in a forking certificate: `1` at a leaf, tripled at each
-round. This is the certificate's replay size, not the number of attempts used to find it. -/
+round. It counts certificate replays, not extraction attempts. -/
 def DForkCert.treeRuns : {d : ℕ} → DForkCert F G d → ℕ
   | 0, .leaf _ _ => 1
   | _ + 1, .node _ _ _ _ _ c₁ c₂ c₃ => c₁.treeRuns + c₂.treeRuns + c₃.treeRuns

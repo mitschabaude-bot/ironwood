@@ -32,26 +32,21 @@ def Extractable [Zero α] : {d : ℕ} → ((Fin d → α) → Prop) → Prop
 
 /-! ## The round-by-round ladder
 
-`Extractable` doubles as a state function on challenge prefixes: a state is *doomed* when its
-continuation predicate is not extractable. A doomed state's escaping challenges — zero, or one
-whose continuation is extractable — number at most three, because three distinct nonzero escapes
-assemble the `Extractable` node. An accepted vector therefore either certifies extraction at the
-root or escapes doom at some round: the per-round structure the Fiat–Shamir query loss prices
-(`Soundness.Forking.Adversary`). -/
+Call a challenge prefix *doomed* when its continuation is not `Extractable`. At most three
+challenges escape a doomed state: zero and at most two extractable continuations. An accepted
+vector therefore proves extraction or escapes at some round, which is the event charged by the
+Fiat–Shamir query loss. -/
 
-/-- The drawn challenge vector escapes doom somewhere along the ladder: at some round the state so
-far is not extractable, yet the drawn challenge is zero or makes the continuation extractable. The
-per-round event the escape budget prices. -/
+/-- The challenge vector reaches a doomed state and then draws zero or an extractable
+continuation. -/
 def LadderEscape [Zero α] : {d : ℕ} → ((Fin d → α) → Prop) → (Fin d → α) → Prop
   | 0, _, _ => False
   | _ + 1, acc, χ =>
       (¬ Extractable acc ∧ (χ 0 = 0 ∨ Extractable (fun rest => acc (Fin.cons (χ 0) rest))))
       ∨ LadderEscape (fun rest => acc (Fin.cons (χ 0) rest)) (Fin.tail χ)
 
-/-- **The ladder walk.** An accepted challenge vector either certifies extraction outright — the
-whole accept predicate is extractable — or escapes doom at some round: acceptance is depth-`0`
-extractability, and a round with an extractable continuation either had an extractable state
-already or witnesses the escape. -/
+/-- **Ladder walk.** An accepted challenge vector either makes the root `Extractable` or escapes
+a doomed state at some round. -/
 theorem extractable_or_ladderEscape [Zero α] :
     {d : ℕ} → (acc : (Fin d → α) → Prop) → (χ : Fin d → α) → acc χ →
     Extractable acc ∨ LadderEscape acc χ
@@ -70,10 +65,8 @@ theorem extractable_or_ladderEscape [Zero α] :
         · exact Or.inr (Or.inl ⟨hdoom, Or.inr hext⟩)
       · exact Or.inr (Or.inr hesc)
 
-/-- **The doomed state's escape set is three challenges at most.** When the state is not
-extractable, at most two distinct nonzero challenges have extractable continuations — a third
-would assemble the `Extractable` node — so with the zero challenge the escape set sits inside a
-three-element set. -/
+/-- **Doomed-state escape bound.** A nonextractable state has at most two nonzero extractable
+continuations; including zero, its escape set lies in three challenges. -/
 theorem escapeSet_subset_triple [Zero α] {d : ℕ} {acc : (Fin (d + 1) → α) → Prop}
     (hdoom : ¬ Extractable acc) :
     ∃ a b : α, {u : α | u = 0 ∨ Extractable (fun rest => acc (Fin.cons u rest))}
@@ -110,9 +103,8 @@ theorem escapeSet_subset_triple [Zero α] {d : ℕ} {acc : (Fin (d + 1) → α) 
       · exact absurd ⟨c, hc0, hc⟩ hne
 
 open Classical in
-/-- The round-`j` escape set of the ladder: empty once the state is extractable, otherwise the
-doomed state's escaping challenges — zero, or one whose continuation is extractable. Indexed
-companion of `LadderEscape`; consumes the earlier challenges only (`ladderEscapeSet_congr`). -/
+/-- The round-`j` escape set: empty at an extractable state, otherwise zero and the extractable
+continuations. It depends only on earlier challenges. -/
 def ladderEscapeSet [Zero α] : {d : ℕ} → ((Fin d → α) → Prop) → (Fin d → α) → ℕ → Set α
   | 0, _, _, _ => ∅
   | _ + 1, acc, _, 0 =>

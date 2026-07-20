@@ -193,10 +193,7 @@ theorem roundTranscriptFin_injective {k : ℕ} (t₀ : List (TranscriptElt F G))
   rw [roundTranscriptFin_length, roundTranscriptFin_length] at hlen
   exact Fin.ext (by omega)
 
-/-- The round-`j` transcript, split at its last absorb block: the base-and-earlier-rounds prefix,
-then round `j`'s own `[L, R, marker]` block. The decomposition behind reading a round's committed
-points off its own transcript (`roundTranscriptFin_getElem?_fst`/`_snd`) and truncating a
-transcript to an earlier round (`roundTranscriptFin_take`). -/
+/-- Split the round-`j` transcript into its earlier prefix and final `[L, R, marker]` block. -/
 theorem roundTranscriptFin_eq_append {k : ℕ} (t₀ : List (TranscriptElt F G))
     (rounds : Fin k → G × G) (j : Fin k) :
     roundTranscriptFin t₀ rounds j
@@ -225,8 +222,7 @@ theorem roundTranscriptFin_preBlock_length {k : ℕ} (t₀ : List (TranscriptElt
   have := j.isLt
   omega
 
-/-- The round-`j` transcript carries round `j`'s own `L` point at position `t₀.length + 3j` —
-the committed cross-term is readable off the transcript prefix that squeezes its challenge. -/
+/-- Round `j`'s `L` point occurs at position `t₀.length + 3j`. -/
 theorem roundTranscriptFin_getElem?_fst {k : ℕ} (t₀ : List (TranscriptElt F G))
     (rounds : Fin k → G × G) (j : Fin k) :
     (roundTranscriptFin t₀ rounds j)[t₀.length + 3 * j.val]?
@@ -247,8 +243,7 @@ theorem roundTranscriptFin_getElem?_snd {k : ℕ} (t₀ : List (TranscriptElt F 
     show t₀.length + 3 * j.val + 1 - (t₀.length + 3 * j.val) = 1 from by omega]
   simp
 
-/-- Round transcripts grow by prefix: the round-`i` transcript is a prefix of the round-`j` one for
-`i ≤ j` — the same rounds' blocks, truncated. -/
+/-- For `i ≤ j`, the round-`i` transcript is a prefix of the round-`j` transcript. -/
 theorem roundTranscriptFin_prefix {k : ℕ} (t₀ : List (TranscriptElt F G))
     (rounds : Fin k → G × G) {i j : Fin k} (hij : i.val ≤ j.val) :
     roundTranscriptFin t₀ rounds i <+: roundTranscriptFin t₀ rounds j := by
@@ -264,8 +259,7 @@ theorem roundTranscriptFin_prefix {k : ℕ} (t₀ : List (TranscriptElt F G))
   refine ⟨q.flatten, ?_⟩
   rw [List.append_assoc, ← List.flatten_append, hq]
 
-/-- Truncating the round-`j` transcript at the round-`i` length recovers the round-`i` transcript:
-the `chainAt` of the deployed prefix decode, computable by `List.take`. -/
+/-- Truncating a later round transcript at round `i` recovers the round-`i` transcript. -/
 theorem roundTranscriptFin_take {k : ℕ} (t₀ : List (TranscriptElt F G))
     (rounds : Fin k → G × G) {i j : Fin k} (hij : i.val ≤ j.val) :
     (roundTranscriptFin t₀ rounds j).take (t₀.length + 3 * (i.val + 1))

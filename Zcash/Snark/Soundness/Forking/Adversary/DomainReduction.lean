@@ -1,30 +1,17 @@
-import Zcash.Snark.Soundness.Forking.Adaptive
+import Zcash.Snark.Soundness.Forking.Adversary.Adaptive
 
 /-!
 # The unbounded oracle domain reduces to finite subdomains
 
-The deployed capstones price adversaries over a finite, length-bounded transcript domain. A real
-adversary may hash transcripts of *arbitrary* length — an infinite query domain over which no
-uniform table measure exists. This module closes that model boundary by reduction:
+A bounded-query adversary over an infinite transcript domain reaches only finitely many points.
+This module reduces its random-oracle game to that finite support.
 
-* a `Q`-bounded machine can only ever reach finitely many query points, over all tables
-  (`OracleComp.reachSet`), and its run depends on the table only there
-  (`OracleComp.run_congr_reachSet`);
-* the game points of its attainable outputs likewise form a finite set (`gamePoints`), because
-  attainable outputs are runs over the finitely many reach-set assignments;
-* therefore every bounded-query adversary over an arbitrary — possibly infinite — domain factors,
-  table by table, through a `Q`-bounded adversary over a finite subdomain with the same wins
-  (`finite_domain_restriction`);
-* and the finite game is *canonical*: embedding it into any larger finite domain leaves the
-  uniform win probability exactly unchanged (`fsWinsFull_mapDomain_measure_eq`), because the win
-  event is a cylinder over the small domain's coordinates.
+1. `OracleComp.reachSet` and `run_congr_reachSet` prove run locality.
+2. `finite_domain_restriction` includes every reachable query and attainable game point.
+3. `fsWinsFull_mapDomain_measure_eq` shows that enlarging the finite domain preserves advantage.
+4. `fsWinsFull_unbounded_measure_le` splits deployed transcript points from finite junk queries.
 
-Composed with `fsWinsFull_restrictSum_le` (junk domains add no power at the same query budget),
-this grounds the deployed bounded-domain capstones against adversaries hashing arbitrary
-transcripts: restrict along `finite_domain_restriction`, split the finite domain into the deployed
-transcript points and the junk remainder, and price the junk by restriction. The only semantics
-this fixes for the infinite domain is the lazy one — answers at the finitely many points the
-machine can actually reach — which is exactly the random-oracle reading.
+This gives the infinite domain lazy semantics: only answers the machine can reach are sampled.
 -/
 
 namespace Zcash.Snark
@@ -104,10 +91,8 @@ theorem queryBound_restrictTo (S : Finset T) {A : OracleComp T F α} {Q : ℕ}
   | pure a Q => intro h; exact .pure a Q
   | query hk ih => intro h; exact .query fun u => ih u _
 
-/-- Split a machine's queries between a designated finite component and the junk remainder: a
-query whose point retracts along `ρ` to the designated domain `T_D` reads the `T_D` table — so
-the Fiat–Shamir self-referentiality at game points is preserved — and every other reachable point
-reads the junk table. -/
+/-- Split queries between a designated finite domain and the reachable junk points. Queries that
+retract through `ρ` use the designated table; all others use the junk table. -/
 def splitDomain {T_D : Type*} (ι : T_D → T) (ρ : T → Option T_D) (S : Finset T) :
     (A : OracleComp T F α) → A.reachSet ⊆ S → OracleComp (T_D ⊕ {t // t ∈ S}) F α
   | .pure a, _ => .pure a
@@ -190,11 +175,9 @@ section Reduction
 variable {T F P : Type*} [DecidableEq T] [Fintype F] [Nonempty F]
 
 open Classical in
-/-- **The finite-domain reduction.** A bounded-query adversary over an arbitrary — possibly
-infinite — oracle domain factors through a finite subdomain: there is an equally-bounded machine
-over a finite point set, with game points inside it, whose full-record win agrees with the
-original's on every table. The infinite-domain game therefore has lazy semantics by construction:
-only the finitely many reachable answers and attainable game points ever matter. -/
+/-- **Finite-domain reduction.** Every bounded-query adversary factors through a finite set
+containing its reachable queries and attainable game points. The restricted machine has the same
+query bound and full-record outcome on every table. -/
 theorem finite_domain_restriction {m k : ℕ} (hm : 0 < m)
     (A : OracleComp T F P) {Q : ℕ} (hQ : A.QueryBound Q)
     (accept : P → (Fin m → F) → (Fin k → F) → Prop)
@@ -243,12 +226,8 @@ theorem finite_domain_restriction {m k : ℕ} (hm : 0 < m)
   rw [h1, h2]
 
 open Classical in
-/-- **Finite games are canonical under domain enlargement.** Embedding a finite-domain adversary
-and its game points into any larger split domain leaves the uniform win probability exactly
-unchanged: the win event is a cylinder over the small domain's coordinates, and the junk
-coordinates integrate out. Together with `finite_domain_restriction` this identifies the
-infinite-domain game with the deployed bounded-domain game, independent of the chosen finite
-subdomain. -/
+/-- **Finite-domain invariance.** Embedding a finite game into a larger split domain preserves its
+uniform win probability because the junk coordinates do not affect the event. -/
 theorem fsWinsFull_mapDomain_measure_eq {T₀ J : Type*} [Fintype T₀] [DecidableEq T₀]
     [Fintype J] [DecidableEq J] {m k : ℕ}
     (A : OracleComp T₀ F P) (accept : P → (Fin m → F) → (Fin k → F) → Prop)
@@ -269,10 +248,8 @@ theorem fsWinsFull_mapDomain_measure_eq {T₀ J : Type*} [Fintype T₀] [Decidab
     uniformOfFintype_map_precomp_injective Sum.inl Sum.inl_injective]
 
 open Classical in
-/-- **The split machine plays the same game.** For a game whose challenge points factor through
-the designated component, the split machine's full-record win against the split tables is exactly
-the original's win against any full table agreeing with them — the per-table semantic tie between
-the unbounded-domain game and its finite split. -/
+/-- **Split-domain equivalence.** If game points lie in the designated component, the split and
+original machines have the same full-record outcome on agreeing tables. -/
 theorem fsWinsFull_splitDomain {T T_D : Type*} [DecidableEq T] [Fintype F]
     {m k : ℕ} (ι : T_D → T) (ρ : T → Option T_D) (S : Finset T)
     (hρ₂ : ∀ t tD, ρ t = some tD → t = ι tD)
@@ -298,18 +275,10 @@ theorem fsWinsFull_splitDomain {T T_D : Type*} [DecidableEq T] [Fintype F]
   rw [h1, h2]
 
 open Classical in
-/-- **The exported arbitrary-domain pricing.** A bounded-query adversary over an arbitrary —
-possibly infinite — oracle domain, playing a game whose challenge points factor through a
-designated finite domain along a partial retraction, is priced by any bound that holds uniformly
-for equally-bounded adversaries over the designated domain alone: split the machine
-(`OracleComp.splitDomain` — game points keep reading the designated table, junk queries read the
-finite remainder) and marginalize the junk table by table (`fsWinsFull_restrictSum_le`).
-
-`fsWinsFull_splitDomain` ties the priced finite game to the original per table, so this is the
-composed transport: instantiate `T_D` with the deployed bounded transcript domain,
-`ι := Subtype.val`, `ρ := truncateTranscript`, and `hβ` with the deployed capstone's bound —
-which depends on the adversary only through its query budget and the textbook-DL advantage of
-its relation finder. -/
+/-- **Arbitrary-domain pricing.** A bound uniform over `Q`-query machines on the designated finite
+domain also bounds a `Q`-query machine on an arbitrary domain. `splitDomain` preserves designated
+game points, and `fsWinsFull_restrictSum_le` averages over the finite junk table. For deployed
+transcripts, use `Subtype.val` and `truncateTranscript`. -/
 theorem fsWinsFull_unbounded_measure_le {T T_D : Type*} [DecidableEq T]
     [Fintype T_D] [DecidableEq T_D] {m k : ℕ}
     (ι : T_D → T) (ρ : T → Option T_D)

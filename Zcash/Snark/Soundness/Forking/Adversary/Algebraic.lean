@@ -1,31 +1,28 @@
 import Zcash.Snark.Soundness.Vesta
 import Zcash.Snark.Soundness.AGM.ProbabilityVesta
 import Zcash.Snark.Soundness.AGM.ProbabilityCoins
-import Zcash.Snark.Soundness.Forking.PreIpa
-import Zcash.Snark.Soundness.Forking.Recursive
+import Zcash.Snark.Soundness.Forking.Adversary.PreIpa
+import Zcash.Snark.Soundness.Forking.Adversary.Recursive
 
 /-!
 # Fiat–Shamir to AGM handoff
 
-This module connects the bounded-query Fiat–Shamir adversary to the representation-carrying
-interfaces consumed by the AGM reduction.
+This module connects the bounded-query Fiat–Shamir adversary to the AGM data consumed by the
+reduction.
 
-The adversary output carries the representations that are load-bearing after transcript assembly:
-the multiopen commitment, `S`, and every IPA round point. The grinding tree then assembles an
-`AlgebraicDForkCert` instead of erasing the round representations into `DForkCert`.
+## Proof route
 
-Given an oracle table and a finite extractor tape, the recursive algorithm computes an
-`AlgebraicDForkCert`, proves that it represents real accepting runs, and packages the PR #28
-`DeployedAlgebraicForkingInstance`. On a binding-attack run — acceptance while the accepted
-multiopen value disagrees with the adversary's own carried aggregate opening — every produced
-instance yields an explicit relation: the kernel's relation branch directly, or the commitment
-collision between its clean opening and the carried opening
-(`DeployedAlgebraicForkingInstance.runRelation`). The basis-indexed probability theorem then
-bounds the real binding event by the query loss, the `z = 0` slice, and the fixed-slot plain-DL
-term. No certificate is selected from propositional `Extractable2` data, and no event is stated
-as nonexistence of an opening — in a prime-order group an opening exists propositionally for
-essentially every basis, so a `¬ ∃`-opening event would be almost empty and any bound on it
-vacuous (the trap documented at `Zcash.Security.BindingSignature.Balance`).
+1. `AlgebraicWfProof` carries the multiopen, `S`, and IPA-round representations.
+2. The recursive extractor computes and validates an `AlgebraicDForkCert`.
+3. `DeployedAlgebraicForkingInstance.runRelation` computes a relation from either kernel output.
+4. The probability theorem charges query loss, the `z = 0` slice, and the fixed-slot DL loss.
+
+## Binding event
+
+A binding attack is verifier acceptance with a value mismatch against the carried aggregate
+opening. It is not nonexistence of an opening, which would be nearly vacuous in a prime-order group
+(see `Zcash.Security.BindingSignature.Balance`). A clean extracted opening on a mismatch run gives
+a commitment collision; the other kernel branch already gives a relation.
 -/
 
 namespace Zcash.Snark
@@ -212,16 +209,9 @@ def erase {shape : Shape} {basis : AugmentedIndex (2 ^ shape.k) → VestaG}
 
 end AlgebraicProofString
 
-/-- The algebraic proof output and the aggregate data needed after transcript assembly.
-
-`(aMulti, multiU, multiBlind)` and `(s, sU, sBlind)` are the complete `(g, U, W)` coordinates of
-the multiopen commitment and of `S`. An algebraic adversary reads them off its own per-point
-representations by linear algebra — the aggregates are the corresponding linear combinations of
-the emitted coordinates — so this interface is realizable by every AGM adversary, with no
-restriction on `U` components; honest proofs have `multiU = 0` and `sU = 0`. The underlying
-`AlgebraicProofString` carries full `(g,U,W)` representations for every group element. This is the
-exact producer interface consumed by `DeployedAlgebraicForkingInstance`, whose declared `U`
-coefficient is `multiU ν + ξ·sU`. -/
+/-- The algebraic proof and its aggregate `(g,U,W)` coordinates after transcript assembly.
+`AlgebraicProofString` represents each emitted point; `aMulti` and `s` aggregate those coordinates.
+Honest proofs have `multiU = sU = 0`. -/
 structure AlgebraicWfProof {shape : Shape}
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
     (vk : VerifyingKey shape Fp VestaG) where
@@ -319,18 +309,8 @@ theorem preIpaTranscript_eq_of_fullPrefix_eq {shape : Shape}
           rw [← hq, List.take_append_of_le_length (le_refl _)]
           simp
 
-/-- The deployed binding-attack event: verifier acceptance while the effective accepted multiopen
-value — the verifier's value plus the `z⁻¹·(multiU + ξ·sU)` shift contributed by the declared `U`
-coefficients, zero for honest proofs — disagrees with the value the adversary's own carried
-aggregate opening gives.
-
-The event is a computable mismatch, never nonexistence of an opening: in a prime-order group an
-opening of any commitment at any value exists propositionally for essentially every basis (the
-kernel of `commit` is a hyperplane), so a `¬ ∃`-opening event would be almost empty and any bound
-on it vacuous — the same trap `Zcash.Security.BindingSignature.Balance` documents for relations.
-The mismatch event contains that no-opening event, and on a mismatch run every clean opening the
-kernel extracts is a commitment collision against `aMulti`
-(`DeployedAlgebraicForkingInstance.runRelation`). -/
+/-- The deployed binding attack: verifier acceptance while the accepted value, including the
+declared `U` shift, differs from the value of `aMulti`. See the module's binding-event note. -/
 def fullAlgebraicBindingAttack {shape : Shape}
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
     (vk : VerifyingKey shape Fp VestaG) (p : AlgebraicWfProof basis vk)
@@ -350,12 +330,8 @@ def fullAlgebraicBindingAttackZ {shape : Shape}
     (ν : Fin 11 → Fp) (χ : Fin shape.k → Fp) : Prop :=
   fullAlgebraicBindingAttack basis vk p ν χ ∧ ν 10 ≠ 0
 
-/-- Verifier acceptance with the nonzero folding challenge required by the IPA extractor.
-
-Unlike `fullAlgebraicBindingAttackZ`, this predicate does not compare the accepted value with the
-carried aggregate opening.  The recursive extractor only needs accepting transcripts; the mismatch
-is used on the real attack run when proving that the computed relation finder returns an explicit
-relation (`DeployedAlgebraicForkingInstance.runRelation`). -/
+/-- Verifier acceptance with the nonzero folding challenge required by the IPA extractor. The
+binding mismatch is checked only when converting the extracted instance to a relation. -/
 def fullAlgebraicAcceptZ {shape : Shape}
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
     (vk : VerifyingKey shape Fp VestaG) (p : AlgebraicWfProof basis vk)
@@ -374,10 +350,8 @@ def algebraicTableAcceptZ {shape : Shape}
     (fun i => O (algebraicFullPrefixesPre init p i))
     (fun j => O (algebraicFullPrefixes init p j))
 
-/-- Run the executable recursive extractor against the deployed algebraic FS adversary.
-
-The returned certificate is computed from the supplied oracle table and extractor coins.  No
-`Extractable2` witness and no classical selection is involved. -/
+/-- Run the recursive extractor against the deployed algebraic Fiat–Shamir adversary. The oracle
+table and extractor coins determine the returned certificate. -/
 def algebraicForkCertAttempt {shape : Shape}
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
     (vk : VerifyingKey shape Fp VestaG) (init : List (TranscriptElt Fp VestaG))
@@ -432,8 +406,7 @@ theorem algebraicForkCertFailure_measure_le {shape : Shape}
   simpa only [recursiveForkFailureSet, algebraicForkCertFailureSet, algebraicForkCertAttempt,
     algebraicTableAcceptZ, fsWinsFull] using h
 
-/-- Every certificate returned by the operational deployed extractor passes the PR #28
-certificate checker. -/
+/-- Every certificate returned by the deployed extractor satisfies `DeployedForkValid`. -/
 theorem algebraicForkCertAttempt_valid {shape : Shape}
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
     (vk : VerifyingKey shape Fp VestaG) (init : List (TranscriptElt Fp VestaG))
@@ -584,7 +557,7 @@ theorem algebraicForkCertAttempt_valid {shape : Shape}
     p'.proof.1.ipaF).ipaS = p₀.proof.1.ipaS from rfl] at hacc
   exact hacc
 
-/-- Rewrite a certificate onto the canonical augmented basis reconstructed by PR #28. -/
+/-- Rewrite a certificate onto the canonical augmented basis of the deployed AGM instance. -/
 def AlgebraicDForkCert.toCanonicalBasis {shape : Shape}
     {basis : AugmentedIndex (2 ^ shape.k) → VestaG}
     (cert : AlgebraicDForkCert (F := Fp) basis shape.k) :
@@ -612,7 +585,7 @@ theorem AlgebraicDForkCert.toCanonicalBasis_toDForkCert {shape : Shape}
   exact AlgebraicDForkCert.toDForkCert_eq_mpr_basis
     (augmentedBasis_ursOfAugmentedBasis shape.k basis) cert
 
-/-- The validity theorem, transported to the canonical basis expected by PR #28's instance. -/
+/-- Transport certificate validity to the canonical basis used by the deployed AGM instance. -/
 theorem algebraicForkCertAttempt_valid_canonical {shape : Shape}
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
     (vk : VerifyingKey shape Fp VestaG) (init : List (TranscriptElt Fp VestaG))
@@ -700,11 +673,8 @@ theorem deployedAlgebraicInstanceOfCert_runRelation_isSome
   DeployedAlgebraicForkingInstance.runRelation_isSome_of_mismatch
     (deployedAlgebraicInstanceOfCert p ν cert hz hvalid) hmm
 
-/-- Compute the PR #28 deployed instance from one FS oracle table and recursive-extractor coins.
-
-The recursive extractor supplies the certificate as data, and
-`algebraicForkCertAttempt_valid_canonical` proves that every returned certificate satisfies
-`DeployedForkValid`. Failure to find a tree or `z = 0` returns `none`. -/
+/-- Compute a deployed AGM instance from one Fiat–Shamir oracle table and extractor coins.
+Failure to find a valid tree, or `z = 0`, returns `none`. -/
 def computedDeployedAlgebraicInstance {shape : Shape}
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
     (vk : VerifyingKey shape Fp VestaG) (init : List (TranscriptElt Fp VestaG))
@@ -888,11 +858,8 @@ def instanceAttempt (family : ComputedAlgebraicFSFamily shape)
   computedDeployedAlgebraicInstanceFromTape basis (family.vk basis) family.init
     (family.adversary basis) coins.1 coins.2
 
-/-- The computed relation finder supplied to the coin-aware fixed-slot DL reduction: run the
-produced instance and return its explicit relation — the kernel's relation branch, or the
-commitment collision between its clean opening and the carried aggregate opening
-(`DeployedAlgebraicForkingInstance.runRelation`). No opening is discarded on a binding run
-(`relationFinder_isSome_of_bindingWin`). -/
+/-- Run the produced instance and return its explicit relation. `runRelation` handles both the
+kernel relation branch and a clean-opening commitment collision. -/
 def relationFinder (family : ComputedAlgebraicFSFamily shape) :
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG) → family.Coins →
       Option (AlgebraicRelationWitness (F := Fp) basis) :=
@@ -1165,12 +1132,9 @@ end ComputedAlgebraicFSFamily
 
 /-! ## Randomized adversaries
 
-The family interface is deterministic given the oracle table. A real attacker also draws private
-coins; it is the uniform mixture of its deterministic members, and the binding bound holds for the
-mixture whenever the DL hypothesis holds for every member — the query-loss and `z = 0` terms are
-already member-independent. Larger oracle domains are handled one layer down:
-`fsWinsFull_restrictSum_le` (`Soundness.Forking.Adaptive`) restricts any split-domain adversary to
-the deployed bounded transcript domain, junk table by junk table, at the same query budget. -/
+Private coins form a uniform mixture of deterministic adversaries. The binding bound averages over
+that mixture when the DL hypothesis holds for every member. `fsWinsFull_restrictSum_le` handles
+finite junk oracle points without changing the query budget. -/
 
 /-- A basis-indexed family whose adversary additionally draws private coins from a finite type
 `R`, independent of the oracle table and the extractor tape. All members share one transcript
@@ -1203,11 +1167,8 @@ abbrev Coins (fam : ComputedAlgebraicFSFamilyRand shape R) :=
     RecursiveForkTape Fp shape.k
 
 open Classical in
-/-- **Randomized adversaries average out.** The real binding event of an adversary drawing
-uniform private coins `r` — alongside the sampled basis scalars and the oracle/tape coins — is
-bounded by the same three terms as each deterministic member, provided the textbook-DL bound
-holds for every member's relation finder: fixing the private coins fixes an ordinary family, and
-the query-loss and `z = 0` terms depend only on the shared query budget. -/
+/-- **Randomized-adversary bound.** Averaging deterministic members over uniform private coins
+preserves the query loss, `z = 0` loss, and DL bound. -/
 theorem binding_prob_le_of_textbookDL_rand [Fintype R] [Nonempty R]
     (B : VestaG) (fam : ComputedAlgebraicFSFamilyRand shape R) {bound : ℝ≥0∞}
     (hDL : ∀ r, TextbookDLWithCoinsAdvantageLE B (fam.determinize r).relationFinder bound) :
@@ -1225,24 +1186,13 @@ theorem binding_prob_le_of_textbookDL_rand [Fintype R] [Nonempty R]
   intro r
   exact ComputedAlgebraicFSFamily.binding_prob_le_of_textbookDL B (fam.determinize r) (hDL r)
 
-end ComputedAlgebraicFSFamilyRand/-! ## The standard-AGM adapter
+end ComputedAlgebraicFSFamilyRand
 
-`AlgebraicWfProof` asks the adversary for the aggregate `(g,U,W)` coordinates of the multiopen
-commitment and of `S`. This section shows those aggregates are *computed* from standard AGM data —
-one representation per group point — rather than assumed:
+/-! ## Standard AGM adapter
 
-* the `S` coordinates are read directly off the proof's own carried `ipaS` representation
-  (`AlgebraicWfProof.ofRepresented` discharges `ipaS_repr` with no extra input);
-* the multiopen coordinates are the linear combination of the representations of the points the
-  multiopen assembly appends (`Msm.eval_repr`), assembled by lookup from any list of represented
-  points that covers them (`RepresentedMultiopen.ofCoveredList`).
-
-The one residual hypothesis is representation-free and structural: every point the deployed
-multiopen assembly appends is drawn from the supplied list — for a standard AGM adversary, its own
-emitted proof commitments together with the represented verifying-key commitments. Discharging it
-generically is a provenance walk over `assembleQueries`/`constructIntermediateSets`/
-`assembleOpening` (each appended term originates from a proof or verifying-key field); it is
-recorded here as the named input `hcover` rather than an aggregate representation assumption. -/
+`AlgebraicWfProof.ofRepresented` computes the multiopen and `S` coordinates from per-point AGM
+representations. `Provenance.AlgebraicWfProof.ofStandard` proves that the deployed assembly uses
+only represented proof and verifying-key points, discharging the coverage premise below. -/
 
 /-- Decompose an augmented-basis representation into its generator, `U`, and `W` components. -/
 theorem representationEval_augmented_components {n : ℕ}
@@ -1420,12 +1370,8 @@ def RepresentedMultiopen.ofCoveredList
       (fun pr h => (pr.1, (L.find? (fun ap => ap.point = pr.2)).get h)) H
     covers := list_eq_map_pmap_lookup AlgebraicPoint.point L _ H }
 
-/-- **The standard-AGM adapter.** Build the packaged adversary output from per-point data alone:
-an algebraic proof string (every emitted point with its representation), the reader's shape
-checks, and a represented multiopen assembly per pre-IPA challenge vector. The `S` aggregate is
-read off the proof's own `ipaS` representation; the multiopen aggregates are the linear
-combination of the assembly's represented points. No aggregate representation equality is
-assumed. -/
+/-- **Standard AGM adapter.** Compute the packaged proof from represented emitted points and a
+represented multiopen assembly. No aggregate representation equality is assumed. -/
 def AlgebraicWfProof.ofRepresented {vk : VerifyingKey shape Fp VestaG}
     (aps : AlgebraicProofString shape basis) (hwf : PsWellFormed aps.erase)
     (rm : ∀ ν : Fin 11 → Fp, RepresentedMultiopen vk aps.erase basis ν) :

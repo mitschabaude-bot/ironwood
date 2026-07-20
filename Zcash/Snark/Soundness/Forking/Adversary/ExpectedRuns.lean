@@ -1,44 +1,21 @@
-import Zcash.Snark.Soundness.Forking.Recursive
+import Zcash.Snark.Soundness.Forking.Adversary.Recursive
 
 /-!
 # Expected run count of the recursive extractor under fork spread
 
-The worst-case run bound `(2·|F|+1)^k` (`recursiveAlgebraicForkFrom_runs_le`) is exact but not an
-efficiency statement. This module proves the sampling-without-replacement expectation bound for
-the same executable extractor: when every reachable extractor node offers at least `σ₀` nonzero
-challenges with successful, trunk-stable recursive continuations (*fork spread* — for good sets of
-density `δ` take `σ₀ = δ·|F|`), the extractor's expected number of adversary runs over the uniform
-finite tape is at most `(6·|F|/(σ₀−1))^k`, i.e. `(6/δ)^k` — polynomial in the IPA instance length
-`2^k` whenever `1/δ` is.
+The extractor is efficient when every reachable node has enough successful nonzero continuations,
+a condition called *fork spread*. With at least `σ₀` such challenges, its expected run count is at
+most `(6·|F|/(σ₀−1))^k`, or `(6/δ)^k` at density `δ`.
 
-Everything is stated as exact natural-number counting over the finite tape space, in the same
-style as the query-loss layer: `(σ₀−1)^d · Σ_tape runs ≤ (6·|F|)^d · #tapes`.
+The proof counts finite tapes exactly. `card_scanRank_lt_mul_le` bounds how many candidates precede
+the second success, `sum_eval_pi` marginalizes independent child tapes, and `paidList` matches the
+two scans in `nextForkChallenge`.
 
-The two probabilistic ingredients are:
+## Remaining floor
 
-* **Rank counting** (`card_scanRank_lt_mul_le`): under a uniformly sampled challenge order, a
-  fixed challenge precedes the second success of a good set of size `≥ σ₀ − 1` in at most a
-  `2/(σ₀−1)` fraction of orders. Proven by the swap symmetry of the order space — composing with
-  `Equiv.swap` exchanges the ranks of two good challenges — plus the injectivity of ranks.
-* **Tape marginalization** (`sum_eval_pi`): summing a function of one coordinate of a uniformly
-  sampled child-tape assignment marginalizes to the plain child-tape sum. Fresh child tapes per
-  challenge are what make each scanned candidate's expected cost the child-level expectation.
-
-The scan accounting (`paidList`) mirrors `nextForkChallenge` exactly: the scanner's run count is
-the sum of the costs of the *paid* candidates, and every paid candidate — across both chained
-scans — has at most one good challenge before it in the sampling order, hence rank `< 2` in its
-good set.
-
-## What this does and does not close
-
-This is the analytic core of the Attema–Fehr–Klooß expected-time analysis, in the form that is
-*unconditionally true for this extractor*. The remaining step to an assumption-free expected-time
-bound is inherently different: a Fiat–Shamir adversary can grind its committed challenge toward
-nodes with sparse good sets, so the unconditional statement must pay a query-dependent term for
-the sparse slice (the event `accept ∧ some reached node has < σ₀ good siblings` is priced in the
-escape-set currency), and the composition of that slice with the spread analysis requires
-lazily-sampled tables rather than the whole-table measure used here. That composition is
-deliberately out of scope for this module and is recorded as the remaining efficiency floor.
+This module does not derive fork spread from Fiat–Shamir advantage. An unconditional runtime bound
+must also price grinding runs that reach sparse nodes; composing that slice with this theorem is
+the remaining Attema–Fehr–Klooß efficiency step.
 -/
 
 namespace Zcash.Snark
@@ -620,22 +597,16 @@ variable (basis : ι → G) (k : ℕ) (A : OracleComp T F P) (prefixes : P → F
   (final : P → F × F) (win : (T → F) → P → Prop) (decideWin : ∀ O p, Decidable (win O p))
 
 open Classical in
-/-- **Fork spread.** At every reachable extractor node — any level, table, and child-coin
-assignment — at least `σ₀` nonzero challenges have trunk-stable, successful recursive
-continuations. Good sets of density `δ` give `σ₀ = δ·|F|`. This is the adversary property under
-which sampling without replacement finds its three branches quickly; the probability that an
-*accepting* run violates it at a reached node is priced separately, in the escape-set currency of
-the query-loss layer. -/
+/-- **Fork spread.** Every reachable extractor node has at least `σ₀` nonzero challenges with
+trunk-stable successful continuations. A good-set density `δ` gives `σ₀ = δ·|F|`. -/
 def ForkSpread (σ₀ : ℕ) : Prop :=
   ∀ (d m : ℕ) (hmk : m + (d + 1) = k) (O : T → F) (childC : F → RecursiveForkCoins F d),
     σ₀ ≤ (goodChallenges basis k A prefixes rounds final win decideWin m hmk O childC).card
 
 open Classical in
-/-- **The expected-run recursion.** Under fork spread `σ₀ ≥ 2`, the extractor's total run count
-over the uniform finite tape satisfies `(σ₀−1)^d · Σ_tape runs ≤ (6·|F|)^d · #tapes` at every
-level: expected runs at most `(6·|F|/(σ₀−1))^d`. The first branch telescopes directly; each of
-the two scans pays at most two low-rank candidates' worth of child extractions per the
-rank-counting bound, and fresh child tapes marginalize every candidate to the child-level sum. -/
+/-- **Expected-run recursion.** Under fork spread, the expected run count at depth `d` is at most
+`(6·|F|/(σ₀−1))^d`. Rank counting bounds both scans, and independent child tapes close the
+recursion. -/
 theorem recursiveAlgebraicForkFrom_sum_runs_le_of_forkSpread {σ₀ : ℕ} (h2 : 2 ≤ σ₀)
     (hspread : ForkSpread basis k A prefixes rounds final win decideWin σ₀) :
     ∀ (d m : ℕ) (hmk : m + d = k) (O : T → F) (p : P),
@@ -946,11 +917,8 @@ theorem recursiveAlgebraicForkFrom_sum_runs_le_of_forkSpread {σ₀ : ℕ} (h2 :
             ring
 
 open Classical in
-/-- **Expected-run bound for the deployed extractor under fork spread.** Reading the counting
-statement as a uniform expectation over the finite tape: `E[runs] ≤ (6·|F|/(σ₀−1))^k`, i.e.
-`(6/δ)^k` for good sets of density `δ` — polynomial in the IPA instance length `2^k` whenever
-`1/δ` is. Contrast with the worst-case bound `(2·|F|+1)^k`
-(`recursiveAlgebraicFork_runs_le`). -/
+/-- **Expected-run bound under fork spread.** Over the uniform tape,
+`E[runs] ≤ (6·|F|/(σ₀−1))^k`; at density `δ`, this is `(6/δ)^k`. -/
 theorem recursiveAlgebraicFork_sum_runs_le_of_forkSpread {σ₀ : ℕ} (h2 : 2 ≤ σ₀)
     (hspread : ForkSpread basis k A prefixes rounds final win decideWin σ₀)
     (O : T → F) :

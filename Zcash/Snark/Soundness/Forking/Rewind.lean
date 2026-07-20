@@ -153,14 +153,9 @@ theorem kerr_lt_verifierEq_of_deployedAccepts [DecidableEq G] [Inhabited G] {sha
 that result to an opening of the multiopen commitment at value `v − ξ·⟨s,b⟩`.
 -/
 
-/-- Compute a multiopen IPA opening or nontrivial relation from an explicit valid fork certificate
-whose whole commitment carries the declared `U` coefficient `vU`.
-
-An AGM prover's aggregate commitment decomposes as `commit aDep + vU • U + blind • W` with `vU`
-read off its own representation; halo2's `U` slot carries `z` times the claimed value, so a nonzero
-declared `vU` shifts the opened value by `z⁻¹·vU`. The opening value is `v + z⁻¹·vU − ξ·⟨s,b⟩`.
-The result is computed data; no certificate or witness is chosen from an existential
-proposition. -/
+/-- Compute an IPA opening or relation from a valid fork certificate with declared `U` coefficient
+`vU`. The opening value is shifted by `z⁻¹·vU`, giving `v + z⁻¹·vU − ξ·⟨s,b⟩`. The result is
+computed data. -/
 def deployed_forking_relation_shifted [DecidableEq G] [Inhabited G] (urs : URS G)
     (b : Fin (2 ^ urs.k) → Fp) (v ξ z vU blind : Fp) (aMulti aDep s : Fin (2 ^ urs.k) → Fp)
     (cert : DForkCert Fp G urs.k) (hz : z ≠ 0) (hb0 : b 0 = 1)
@@ -190,12 +185,8 @@ def deployed_forking_relation_shifted [DecidableEq G] [Inhabited G] (urs : URS G
           blind' t ht hclean)
   | .inr hrel => PSum.inr hrel
 
-/-- Compute a multiopen IPA opening or nontrivial relation from an explicit valid fork certificate,
-for a whole commitment with no declared `U` component (`vU = z·0`) — the
-`deployed_forking_relation_shifted` special case the legacy capstones consume.
-
-The opening value is `v − ξ·⟨s,b⟩`. The result is computed data; no certificate or witness is chosen
-from an existential proposition. -/
+/-- Compute an IPA opening or relation from a valid fork certificate when the whole commitment has
+no declared `U` component. The opening value is `v − ξ·⟨s,b⟩`. -/
 def deployed_forking_relation [DecidableEq G] [Inhabited G] (urs : URS G)
     (b : Fin (2 ^ urs.k) → Fp) (v ξ z blind : Fp) (aMulti aDep s : Fin (2 ^ urs.k) → Fp)
     (cert : DForkCert Fp G urs.k) (hz : z ≠ 0) (hb0 : b 0 = 1)
@@ -209,11 +200,11 @@ def deployed_forking_relation [DecidableEq G] [Inhabited G] (urs : URS G)
   | .inl ⟨a, ha⟩ => PSum.inl ⟨a, ha.1, ha.2.trans (by ring)⟩
   | .inr hrel => PSum.inr hrel
 
-/-! ## Closing the rewinding gap: the forked transcripts are *produced* by the probability
+/-! ## Propositional extraction
 
 If a prover strategy accepts above `kerr`, `extractable_of_prob` gives a challenge tree and
-`proverAccept_forkValid` packages it as a valid fork certificate. The real adversary-to-strategy step
-and Blake2b random-oracle model remain outside this result.
+`proverAccept_forkValid` packages it as a valid fork certificate. The executable adversary path is
+defined in `Soundness.Forking.Adversary.Algebraic`.
 -/
 
 open scoped ENNReal in
@@ -536,12 +527,11 @@ theorem deployedVerifierEq_iff_flatAccept_adaptive {shape : Shape} [DecidableEq 
     (multiopenCommitment g w u vk ps ch
       + (∑ i, ([-(multiopenValue vk ps ch)].getD i.val 0) • g i) + ch.xi • ps.ipaS) χ).symm
 
-/-! ## The deterministic content of the prover-as-oracle bridge `hbridge` is proven
+/-! ## Prover-to-verifier bridge
 
-`hbridge` identifies an accept event pointwise with `flatAccept Q`; it contains no probability.
-The constant and adaptive bridge theorems above prove its deterministic content for the deployed
-verifier. The remaining integration must show that a real rewound adversary induces such a strategy
-and transfer its acceptance probability with the correct query loss.
+`hbridge` identifies an accept event pointwise with `flatAccept Q`. The constant and adaptive bridge
+theorems above establish this identity for the deployed verifier. The executable adversary path uses
+the corresponding bridge in `Soundness.Forking.Adversary.Algebraic`.
 -/
 
 open scoped ENNReal in

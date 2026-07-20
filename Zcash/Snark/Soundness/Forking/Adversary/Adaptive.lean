@@ -1,11 +1,10 @@
-import Zcash.Snark.Soundness.Forking.Adversary
+import Zcash.Snark.Soundness.Forking.Adversary.OracleComp
 
 /-!
-# Minimal adaptive Fiat--Shamir interface
+# Minimal adaptive Fiat–Shamir interface
 
-This module contains only the deployed interfaces needed by the executable recursive extractor:
-the round-prefix decoder, the full-record attack event, the adaptive `z = 0` loss, and the bounded
-transcript oracle domain. It does not build a separate propositional extraction ladder.
+This module defines the interfaces used by the recursive extractor: transcript decoding,
+the full-record attack event, the `z = 0` loss, and the bounded transcript domain.
 -/
 
 namespace Zcash.Snark
@@ -65,15 +64,9 @@ end AdaptiveGame
 section DomainRestriction
 
 open Classical in
-/-- **Larger oracle domains add no power.** An adversary over a split domain `T ⊕ J` — free to
-query junk points outside the game's transcript domain and use their answers as grinding
-randomness — wins the full-record game with probability at most any bound that holds uniformly
-over its junk-table restrictions: on a uniform split-domain table the junk answers form an
-independent uniform table `j`, and conditioned on `j` the run is exactly the equally-bounded
-restricted machine `A.restrictSum j` against a uniform `T`-table
-(`OracleComp.run_restrictSum`, `OracleComp.queryBound_restrictSum`). Any refinement of the
-deployed bounded transcript domain splits as such a sum along `Equiv.sumCompl`, so the
-bounded-domain capstones extend to adversaries hashing arbitrary in-refinement transcripts. -/
+/-- **Finite-domain restriction.** Junk oracle points do not improve the full-record advantage.
+Conditioning on their table gives `A.restrictSum j` on `T` with the same query bound, so any
+uniform bound for the restricted machines also bounds the split-domain machine. -/
 theorem fsWinsFull_restrictSum_le {T J F P : Type*} [Fintype T] [DecidableEq T]
     [Fintype J] [DecidableEq J] [Fintype F] [Nonempty F] {m k : ℕ}
     (A : OracleComp (T ⊕ J) F P) (accept : P → (Fin m → F) → (Fin k → F) → Prop)

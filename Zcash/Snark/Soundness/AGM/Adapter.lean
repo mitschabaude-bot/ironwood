@@ -429,9 +429,8 @@ def groupRepresentationOfCollision (urs : URS G) {a a' : Fin (2 ^ urs.k) → F}
     GroupRepresentation (F := F) urs.g (0 : G) :=
   (relationWitnessOfCollision urs hneq hcollision).toGroupRepresentation
 
-/-- A relation among the URS generators alone is a relation over the augmented `(g, U, W)` basis,
-with zero coefficients at the `U` and `W` slots. Composed with `relationWitnessOfCollision`, this
-turns a commitment collision into the relation form the fixed-slot DL reduction consumes. -/
+/-- Extend a relation over `g` to `(g,U,W)` with zero `U` and `W` coefficients for the fixed-slot DL
+reduction. -/
 def AlgebraicRelationWitness.augment {n : ℕ} {g : Fin n → G} (U W : G)
     (r : AlgebraicRelationWitness (F := F) g) :
     AlgebraicRelationWitness (F := F) (augmentedBasis g U W) :=

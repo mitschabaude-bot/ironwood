@@ -1,30 +1,23 @@
-import Zcash.Snark.Soundness.Forking.Adaptive
+import Zcash.Snark.Soundness.Forking.Adversary.Adaptive
 import Zcash.Snark.Soundness.Forking.Ordering
 
 /-!
 # The pre-IPA squeeze points, sealed
 
-The deployed schedule squeezes eleven pre-IPA challenges (`θ β γ y x x₁ x₂ x₃ x₄ ξ z`), each from a
-transcript prefix that is a pure function of `(init, ps)` — squeezed values are never re-absorbed
-(`deriveChallenges`, halo2's no-self-absorption). This module names those eleven prefixes
-(`preIpaSqueezePoints`), packages a challenge record from their answers (`chRecord`), and seals the
-deployed derivation to them: `roChallenges O init ps` *is* `chRecord` of the table's answers at the
-eleven points together with the round answers at the round transcripts
-(`roChallenges_eq_chRecord`, extending the round seal `deriveChallenges_ipaRound_eq` to the whole
-record). Splicing a strategy path's IPA fields moves none of the eleven points
-(`preIpaSqueezePoints_spliceIpa`), and each point is a prefix of `preIpaTranscript`
-(`preIpaSqueezePoints_prefix`) — so all eleven are strictly shorter than every IPA round
-transcript, the disjointness the full-record grinding game's escape guard needs.
-`extendO`/`roChallenges_extendO_eq_chRecord` ground the bounded-table game oracle as the deployed
-derivation's own oracle. -/
+The deployed schedule squeezes eleven pre-IPA challenges from prefixes determined by the initial
+transcript and proof. `preIpaSqueezePoints` names them, and `roChallenges_eq_chRecord` proves that
+the deployed derivation reads exactly those answers and the IPA-round answers.
+
+Splicing IPA fields preserves all eleven prefixes. Each is a prefix of `preIpaTranscript`, hence
+strictly shorter than every IPA-round transcript. `roChallenges_extendO_eq_chRecord` then grounds
+the bounded-table game in the deployed challenge derivation. -/
 
 namespace Zcash.Snark
 
 variable {G : Type*}
 
-/-! The squeeze prefixes, one small definition per squeeze so downstream proofs (prefix chains,
-lengths) never unfold the absorb blocks. Verbatim the let-chain of `deriveChallenges` /
-`preIpaTranscript`. -/
+/-! Each squeeze has a small definition so prefix and length proofs need not unfold the absorb
+blocks in `deriveChallenges`. -/
 
 private def sqPt0 {shape : Shape} (init : List (TranscriptElt Fp G))
     (ps : ProofString shape Fp G) : List (TranscriptElt Fp G) :=
@@ -82,10 +75,8 @@ private def sqPt10 {shape : Shape} (init : List (TranscriptElt Fp G))
     (ps : ProofString shape Fp G) : List (TranscriptElt Fp G) :=
   sqPt9 init ps ++ [.challenge]
 
-/-- The eleven pre-IPA squeeze prefixes of the deployed schedule, in squeeze order
-(`θ β γ y x x₁ x₂ x₃ x₄ ξ z`) — the let-chain of `deriveChallenges`, truncated at each
-challenge marker. The `z` point (index 10) is `preIpaTranscript` itself
-(`preIpaSqueezePoints_last`). -/
+/-- The eleven deployed pre-IPA squeeze prefixes, in order
+`θ β γ y x x₁ x₂ x₃ x₄ ξ z`. Index 10 is `preIpaTranscript`. -/
 def preIpaSqueezePoints {shape : Shape} (init : List (TranscriptElt Fp G))
     (ps : ProofString shape Fp G) : Fin 11 → List (TranscriptElt Fp G) :=
   ![sqPt0 init ps, sqPt1 init ps, sqPt2 init ps, sqPt3 init ps, sqPt4 init ps, sqPt5 init ps,
@@ -109,17 +100,14 @@ private theorem chExt {k : ℕ} {F : Type*} {c₁ c₂ : Challenges k F}
     (h12 : c₁.ipaRound = c₂.ipaRound) : c₁ = c₂ := by
   cases c₁; cases c₂; simp_all
 
-/-- Replacing the round slot of the χ-free record recovers the full record: the cheap
-field-by-field identity behind routing round-slot congruences through an opaque record. -/
+/-- Replacing the round slot of the zero-round record recovers the full challenge record. -/
 theorem chRecord_update {k : ℕ} (ν : Fin 11 → Fp) (χ : Fin k → Fp) :
     ({chRecord (k := k) ν (fun _ => (0 : Fp)) with ipaRound := χ} : Challenges k Fp)
       = chRecord ν χ :=
   chExt rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl
 
-/-- **The full-record seal.** The deployed derivation *is* the record of the table's answers: each
-pre-IPA field is the table at its squeeze point, and each round challenge is the table at its round
-transcript (the round half is `deriveChallenges_ipaRound_eq`). Every challenge of
-`roChallenges O init ps` comes from `O`. -/
+/-- **Full-record seal.** `roChallenges O init ps` is exactly the table's answers at the eleven
+pre-IPA squeeze points and the IPA-round transcripts. -/
 theorem roChallenges_eq_chRecord {shape : Shape} (O : List (TranscriptElt Fp G) → Fp)
     (init : List (TranscriptElt Fp G)) (ps : ProofString shape Fp G) :
     roChallenges O init ps
@@ -230,12 +218,9 @@ theorem preIpaSqueezePoints_length_le {shape : Shape} (init : List (TranscriptEl
 
 /-! ## The squeeze lengths are shape-determined
 
-Every pre-IPA absorb block has a length fixed by the `Shape` — except the per-set permutation
-evaluations, whose `lastEval` is an `Option`. In deployment its presence is positional ("every set
-except the last", the reader's fixed parse); `PsWellFormed` states exactly that, and under it the
-eleven squeeze lengths are the explicit `preIpaLen shape init.length` — the fact that lets the
-fully adaptive game decode the pre-chain off any round point by `List.take` at *output-independent*
-positions. -/
+`Shape` fixes every absorb length except the optional final permutation evaluation.
+`PsWellFormed` fixes that position, so `preIpaLen` gives all eleven lengths independently of the
+adversary's output. -/
 
 /-- The deployed reader's parse shape: `lastEval` is present for every permutation set except the
 last. The only pre-IPA field whose absorb length is not already `Shape`-determined. -/
@@ -464,12 +449,9 @@ theorem preIpaTranscript_length_eq {shape : Shape} (init : List (TranscriptElt F
 
 /-! ## The absorb encoding is injective
 
-Two well-formed proof strings with the same pre-IPA transcript have the same pre-IPA fields: the
-chain peels block by block (`List.append_inj'`, lengths shape-determined under well-formedness),
-and each absorb combinator is injective. Packaged as one structure equality
-(`preIpaTranscript_inj`: `ps = spliceIpa ps' ps.ipaRounds ps.ipaC ps.ipaF`), so downstream
-transport is the existing splice congruences. This is what makes the fully adaptive run tree's
-shared pre-points force one shared pre-IPA proof string. -/
+Equal pre-IPA transcripts of well-formed proofs have equal pre-IPA fields. The proof peels each
+fixed-length absorb block and packages the result as `preIpaTranscript_inj`, leaving only the IPA
+suffix to splice. -/
 
 private theorem flatten_ofFn_inj {β : Type*} : ∀ {a : ℕ} (g h : Fin a → List β),
     (List.ofFn g).flatten = (List.ofFn h).flatten →
@@ -680,17 +662,14 @@ theorem preIpaTranscript_inj {shape : Shape} (init : List (TranscriptElt Fp G))
   exact psExt hAdv hLPI hLPT hPP hLP hVR hHP hIE hAE hFE hVRE hPCE hPSE hLE hQP hMU hIpaS
     rfl rfl rfl
 
-/-- Extend a bounded-transcript table to all transcripts (junk beyond the bound): the shape the
-deployed derivation `roChallenges` reads. Every transcript the schedule actually squeezes is within
-the bound, so the extension is invisible to the derivation
-(`roChallenges_extendO_eq_chRecord`). -/
+/-- Extend a bounded transcript table with zero outside the bound. The deployed schedule only reads
+in-bound transcripts. -/
 def extendO {F G : Type*} [Zero F] {L : ℕ} (O : BTranscript F G L → F) :
     List (TranscriptElt F G) → F :=
   fun l => if h : l.length ≤ L then O ⟨l, h⟩ else 0
 
-/-- **The bounded-table grounding.** Running the deployed derivation on the extension of a
-bounded-transcript table reads exactly the table's answers at the eleven pre-IPA squeeze points and
-the `k` round transcripts — the full challenge record of the grinding game's own oracle. -/
+/-- **Bounded-table grounding.** Extending a bounded table and running `roChallenges` returns its
+answers at the eleven pre-IPA points and the `k` round transcripts. -/
 theorem roChallenges_extendO_eq_chRecord {shape : Shape} {L : ℕ}
     (O : BTranscript Fp G L → Fp) (init : List (TranscriptElt Fp G))
     (ps : ProofString shape Fp G)

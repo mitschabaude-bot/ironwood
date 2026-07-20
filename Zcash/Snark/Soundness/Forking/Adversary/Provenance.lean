@@ -1,21 +1,15 @@
-import Zcash.Snark.Soundness.Forking.Algebraic
+import Zcash.Snark.Soundness.Forking.Adversary.Algebraic
 
 /-!
 # Assembly provenance: the multiopen MSM appends only proof and verifying-key points
 
-The standard-AGM adapter (`AlgebraicWfProof.ofRepresented`) reduced the packaged aggregate
-representations to one structural input: every point the deployed multiopen assembly appends is
-drawn from a supplied list of represented points. This module discharges that input.
+`AlgebraicWfProof.ofRepresented` needs representations for every point appended by the deployed
+multiopen MSM. This module proves that those points come only from the proof or verifying key.
 
-`AssemblyPoint` names the pool — the proof string's commitments (advice, lookup, permutation,
-vanishing pieces and random poly, `q'`) and the verifying key's commitments (instance, fixed,
-permutation-common), at exactly the indices the verifier's query layout touches. The provenance
-walk follows the deployed assembly code layer by layer: query builders emit only pool commitments
-(`assembleQueries_points_mem`), grouping only reorganizes them
-(`constructIntermediateSets_ref_mem`), and the compression and collapse folds append only referenced
-points plus the prover's `q'` (`multiopenMsm_points_mem`). Composing with the adapter yields
-`AlgebraicWfProof.ofStandard`: the packaged adversary output computed from an algebraic proof
-string and a represented verifying key alone, with **no** structural hypothesis remaining.
+`AssemblyPoint` names that pool. `assembleQueries_points_mem` traces query construction,
+`constructIntermediateSets_ref_mem` traces grouping, and `multiopenMsm_points_mem` traces the
+compression and collapse folds. `AlgebraicWfProof.ofStandard` then builds the packaged AGM output
+from represented proof and verifying-key points.
 -/
 
 namespace Zcash.Snark
@@ -212,8 +206,7 @@ section QueryProvenance
 
 variable {shape : Shape} {F G : Type*} [Field F] [Inhabited G]
 
-/-- The assembly's point pool: the proof and verifying-key commitments the deployed verifier can
-feed the multiopen argument, at the indices its query layout touches. -/
+/-- Proof and verifying-key commitments that the deployed verifier may feed to multiopen. -/
 def AssemblyPoint (vk : VerifyingKey shape F G) (ps : ProofString shape F G) (x : G) : Prop :=
   (∃ (p : Fin shape.numProofs) (e : ℕ × ℤ), e ∈ vk.instanceQueryLayout
       ∧ x = vk.instanceCommitment p e.1)
@@ -362,12 +355,8 @@ local instance : Inhabited VestaG := ⟨0⟩
 
 variable {shape : Shape} {basis : AugmentedIndex (2 ^ shape.k) → VestaG}
 
-/-- **Assembly provenance.** Every point the deployed multiopen assembly MSM appends is either the
-prover's `q'` or an assembly-pool point — a proof or verifying-key commitment at a queried index.
-The compression/collapse folds append only referenced points (`mem_otherPoints_multiopenCombine`,
-`mem_otherPoints_compressSet`), grouping only reorganizes queries
-(`constructIntermediateSets_ref_mem`), and the query builders emit only pool commitments
-(`assembleQueries_points_mem`). -/
+/-- **Assembly provenance.** Every point appended by the deployed multiopen MSM is `q'` or a proof
+or verifying-key commitment in `AssemblyPoint`. -/
 theorem multiopenMsm_points_mem (vk : VerifyingKey shape Fp VestaG)
     (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp) :
     ∀ x ∈ (multiopenMsm vk ps ch).otherPoints,
@@ -396,9 +385,7 @@ theorem multiopenMsm_points_mem (vk : VerifyingKey shape Fp VestaG)
     rw [← hqcomm]
     exact hxc
 
-/-- The `q'` point carries a representation in the algebraic proof: it is the multiopen commitment
-`multiopenQPrime`. Every assembly point is likewise an emitted proof point or a verifying-key
-commitment. Bundling them as the covering list discharges `RepresentedMultiopen`. -/
+/-- A list representing `q'` and every `AssemblyPoint` covers every point appended by multiopen. -/
 theorem multiopenMsm_points_covered (vk : VerifyingKey shape Fp VestaG)
     (aps : AlgebraicProofString shape basis) (ν : Fin 11 → Fp)
     (L : List (AlgebraicPoint (F := Fp) basis))
@@ -411,11 +398,9 @@ theorem multiopenMsm_points_covered (vk : VerifyingKey shape Fp VestaG)
     List.mem_map_of_mem hpr
   exact hL pr.2 (multiopenMsm_points_mem vk aps.erase (chRecord ν (fun _ => 0)) pr.2 hx)
 
-/-- **The hypothesis-free standard-AGM adapter.** Build the packaged adversary output from an
-algebraic proof string and a covering list of represented points closed under the assembly pool —
-the emitted proof commitments and the represented verifying-key commitments. No structural
-`hcover` obligation on the caller: `multiopenMsm_points_covered` discharges it from the provenance
-walk. -/
+/-- **Standard AGM adapter.** Build `AlgebraicWfProof` from an algebraic proof and representations
+covering `q'`, the emitted commitments, and the verifying-key commitments. Assembly provenance
+discharges the lower-level `hcover` premise. -/
 def AlgebraicWfProof.ofStandard {vk : VerifyingKey shape Fp VestaG}
     (aps : AlgebraicProofString shape basis) (hwf : PsWellFormed aps.erase)
     (L : List (AlgebraicPoint (F := Fp) basis))

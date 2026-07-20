@@ -14,7 +14,7 @@
     },
     "fsStack": {
       "label": "PR #56 FS-to-AGM handoff",
-      "ref": "7696aa6060be9ac8537f75bb93e643a24af2a27e",
+      "ref": "456c386e2976aefb2742318d3788e40d1a653dd2",
       "fetch": "pull/56/head"
     }
   },
@@ -65,7 +65,7 @@
       "label": "PR #56",
       "title": "Fully adaptive Fiat-Shamir adversary",
       "url": "https://github.com/zcash/ironwood/pull/56",
-      "sha": "7696aa6",
+      "sha": "456c386",
       "lane": "stack"
     },
     "27": {
@@ -293,12 +293,12 @@
       "theorems": [
         {
           "symbol": "recursiveAlgebraicFork",
-          "path": "Zcash/Snark/Soundness/Forking/Recursive.lean",
+          "path": "Zcash/Snark/Soundness/Forking/Adversary/Recursive.lean",
           "source": "fsStack"
         },
         {
           "symbol": "recursiveForkFailure_measure_le",
-          "path": "Zcash/Snark/Soundness/Forking/Recursive.lean",
+          "path": "Zcash/Snark/Soundness/Forking/Adversary/Recursive.lean",
           "source": "fsStack"
         },
         {
@@ -353,27 +353,27 @@
         },
         {
           "symbol": "AlgebraicWfProof",
-          "path": "Zcash/Snark/Soundness/Forking/Algebraic.lean",
+          "path": "Zcash/Snark/Soundness/Forking/Adversary/Algebraic.lean",
           "source": "fsStack"
         },
         {
           "symbol": "algebraicForkCertAttempt_valid",
-          "path": "Zcash/Snark/Soundness/Forking/Algebraic.lean",
+          "path": "Zcash/Snark/Soundness/Forking/Adversary/Algebraic.lean",
           "source": "fsStack"
         },
         {
           "symbol": "computedDeployedAlgebraicInstance",
-          "path": "Zcash/Snark/Soundness/Forking/Algebraic.lean",
+          "path": "Zcash/Snark/Soundness/Forking/Adversary/Algebraic.lean",
           "source": "fsStack"
         },
         {
           "symbol": "binding_prob_le_of_textbookDL",
-          "path": "Zcash/Snark/Soundness/Forking/Algebraic.lean",
+          "path": "Zcash/Snark/Soundness/Forking/Adversary/Algebraic.lean",
           "source": "fsStack"
         },
         {
           "symbol": "binding_prob_le_of_generatorRO_textbookDL",
-          "path": "Zcash/Snark/Soundness/Forking/Algebraic.lean",
+          "path": "Zcash/Snark/Soundness/Forking/Adversary/Algebraic.lean",
           "source": "fsStack"
         }
       ],

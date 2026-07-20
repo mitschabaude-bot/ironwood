@@ -42,9 +42,8 @@ def deployedAlgebraicForkingRelation [DecidableEq G] [Inhabited G] (urs : URS G)
   | PSum.inr hrel =>
       PSum.inr (AugmentedRelationWitness.toAlgebraicRelationWitness hrel)
 
-/-- As `deployedAlgebraicForkingRelation`, for a whole commitment carrying the declared `U`
-coefficient `vU` — the full-AGM-adversary form. A nonzero `vU` shifts the opened value by
-`z⁻¹·vU`, exactly as halo2's `U` slot carries `z` times the claimed value. -/
+/-- `deployedAlgebraicForkingRelation` with a declared `U` coefficient `vU`. This shifts the
+opened value by `z⁻¹·vU`. -/
 def deployedAlgebraicForkingRelation_shifted [DecidableEq G] [Inhabited G] (urs : URS G)
     (b : Fin (2 ^ urs.k) → Fp) (v ξ z vU blind : Fp) (aMulti aDep s : Fin (2 ^ urs.k) → Fp)
     (cert : AlgebraicDForkCert (F := Fp) (augmentedBasis urs.g urs.u urs.w) urs.k)
@@ -81,11 +80,8 @@ def deployedAlgebraicForkingFixedSlot [DecidableEq G] [Inhabited G] (urs : URS G
 
 /-! ## Concrete relation producer for the probability experiment -/
 
-/-- Inputs needed to run the deployed algebraic kernel on one augmented public basis.
-
-The basis determines the URS through `ursOfAugmentedBasis`, so the instance cannot use unrelated
-generators. `vU` is the declared `U` coefficient of the whole commitment — an AGM adversary reads
-it off its own aggregate representation, and an honest proof has `vU = 0`. -/
+/-- Inputs for the deployed algebraic kernel on one augmented basis. `vU` is the commitment's
+declared `U` coefficient; honest proofs have `vU = 0`. -/
 structure DeployedAlgebraicForkingInstance (k : ℕ)
     (basis : AugmentedIndex (2 ^ k) → G) where
   b : Fin (2 ^ k) → Fp
@@ -112,9 +108,8 @@ structure DeployedAlgebraicForkingInstance (k : ℕ)
 
 namespace DeployedAlgebraicForkingInstance
 
-/-- The opening branch produced by one deployed algebraic instance. The declared `U` coefficient
-shifts the opened value by `z⁻¹·vU`, exactly as halo2's `U` slot carries `z` times the claimed
-value; an honest instance has `vU = 0` and opens at `v − ξ·⟨s,b⟩`. -/
+/-- The opening returned by one deployed instance. Its value is shifted by `z⁻¹·vU`; for an
+honest instance `vU = 0`. -/
 abbrev Opening {k : ℕ} {basis : AugmentedIndex (2 ^ k) → G}
     (x : DeployedAlgebraicForkingInstance (G := G) k basis) : Type _ :=
   Σ' a, IpaRelation (ursOfAugmentedBasis k basis)
@@ -138,10 +133,8 @@ def ProducesRelation [DecidableEq G] {k : ℕ} {basis : AugmentedIndex (2 ^ k) �
     (x : DeployedAlgebraicForkingInstance (G := G) k basis) : Prop :=
   ∃ r, x.run = PSum.inr r
 
-/-- Convert one kernel outcome into an explicit relation: the relation branch is returned
-unchanged, and a clean opening that differs from the carried aggregate opening `aMulti` is a
-commitment collision, converted by `relationWitnessOfCollision` into a relation over the
-augmented basis. `none` is returned exactly when the opening *is* the carried opening. -/
+/-- Convert a kernel outcome to a relation. Keep a relation branch unchanged; turn a clean opening
+different from `aMulti` into a commitment-collision relation. Return `none` only when they agree. -/
 def relationOfRun [DecidableEq G] {k : ℕ} {basis : AugmentedIndex (2 ^ k) → G}
     (x : DeployedAlgebraicForkingInstance (G := G) k basis)
     (run : x.Opening ⊕' AlgebraicRelationWitness (F := Fp) basis) :
@@ -155,11 +148,8 @@ def relationOfRun [DecidableEq G] {k : ℕ} {basis : AugmentedIndex (2 ^ k) → 
           (relationWitnessOfCollision (ursOfAugmentedBasis k basis) hne
             hopen.2.1).augment (ursOfAugmentedBasis k basis).u (ursOfAugmentedBasis k basis).w)
 
-/-- Run one deployed instance and return an explicit relation whenever one is exhibited: the
-kernel's relation branch is returned unchanged, and a clean extracted opening that differs from
-the carried aggregate opening `aMulti` is a commitment collision. `none` is returned exactly
-when the kernel's opening *is* the carried opening — impossible on a run where the accepted value
-disagrees with it (`runRelation_isSome_of_mismatch`). -/
+/-- Run an instance and return its explicit relation. A clean opening different from `aMulti`
+becomes a commitment-collision relation; agreement returns `none`. -/
 def runRelation [DecidableEq G] {k : ℕ} {basis : AugmentedIndex (2 ^ k) → G}
     (x : DeployedAlgebraicForkingInstance (G := G) k basis) :
     Option (AlgebraicRelationWitness (F := Fp) basis) :=
@@ -179,9 +169,8 @@ theorem relationOfRun_isSome_of_mismatch [DecidableEq G] {k : ℕ}
       have hne : ¬ hopen.1 = x.aMulti := fun heq => hmm (heq ▸ hopen.2.2)
       simp only [relationOfRun, dif_neg hne, Option.isSome_some]
 
-/-- **Openings are never discarded on a mismatch run.** When the accepted multiopen value
-disagrees with the value the carried aggregate opening gives, the instance always returns an
-explicit relation. -/
+/-- **Binding mismatch produces a relation.** If the accepted value differs from the value of
+`aMulti`, `runRelation` returns an explicit relation. -/
 theorem runRelation_isSome_of_mismatch [DecidableEq G] {k : ℕ}
     {basis : AugmentedIndex (2 ^ k) → G}
     (x : DeployedAlgebraicForkingInstance (G := G) k basis)

@@ -49,8 +49,7 @@ theorem uniformOfFintype_map_eval_injective {ι T α : Type*} [Fintype ι] [Deci
       = PMF.uniformOfFintype (ι → α) :=
   map_uniformOfFintype_equiv (Equiv.arrowCongr (Equiv.ofInjective φ hφ).symm (Equiv.refl α))
 
-/-- Marginal of a uniform product: the first component of a uniform draw on `A × B` is uniform on
-`A` — each `a` is hit by exactly `card B` pairs, of total mass `(card A)⁻¹`. -/
+/-- The first component of a uniform draw on `A × B` is uniform on `A`. -/
 theorem map_fst_uniformOfFintype {A B : Type*} [Fintype A] [Fintype B] [Nonempty A] [Nonempty B] :
     (PMF.uniformOfFintype (A × B)).map Prod.fst = PMF.uniformOfFintype A := by
   classical
@@ -66,12 +65,8 @@ theorem map_fst_uniformOfFintype {A B : Type*} [Fintype A] [Fintype B] [Nonempty
     ENNReal.mul_inv_cancel (Nat.cast_ne_zero.mpr Fintype.card_ne_zero)
       (ENNReal.natCast_ne_top _), one_mul]
 
-/-- Reading a uniform random function at finitely many distinct points is uniform, full-table form:
-for injective `φ : ι → T`, drawing the whole table `O : T → F` uniformly and reading `O ∘ φ` is the
-uniform answer vector. The unread coordinates integrate out (`map_fst_uniformOfFintype`) and the read
-coordinates reindex along `φ` (`uniformOfFintype_map_eval_injective`). This is the form the
-querying-adversary layer consumes (`Soundness.Forking.Adversary`): the table covers every transcript
-the adversary may query, not only the points it reads. -/
+/-- Reading a uniform table at distinct points gives a uniform answer vector. Unread coordinates
+integrate out, and `uniformOfFintype_map_eval_injective` reindexes the read coordinates. -/
 theorem uniformOfFintype_map_precomp_injective {ι T F : Type*} [Fintype ι] [DecidableEq ι]
     [Fintype T] [DecidableEq T] [Fintype F] [Nonempty F]
     (φ : ι → T) (hφ : Function.Injective φ) :
@@ -96,10 +91,8 @@ theorem uniformOfFintype_toOuterMeasure_set {α : Type*} [Fintype α] [Nonempty 
     ← uniformOfFintype_toOuterMeasure_finset, Set.coe_toFinset]
 
 open Classical in
-/-- Fubini bound on a uniform product: if the first coordinate must land in a set *chosen by the
-second*, and every choice's set has measure at most `β`, the joint event has measure at most `β` —
-counting fiberwise, `|{(a,b) | a ∈ S b}| = Σ_b |S b| ≤ |B| · β·|A|`. The choice sees `b` but never
-`a`, so it cannot beat the worst single set; this is the product core of the fresh-read bound. -/
+/-- Uniform-product fiber bound. If every set `S b` has measure at most `β`, then choosing `b`
+before testing the independent first coordinate still gives probability at most `β`. -/
 theorem uniformOfFintype_prod_fiber_bound {A B : Type*} [Fintype A] [Fintype B] [Nonempty A]
     [Nonempty B] (S : B → Set A) {β : ℝ≥0∞}
     (hS : ∀ b, (PMF.uniformOfFintype A).toOuterMeasure (S b) ≤ β) :
@@ -161,14 +154,9 @@ theorem uniformOfFintype_prod_fiber_bound_right {A B : Type*} [Fintype A] [Finty
     _ = β * Fintype.card (A × B) := by rw [Fintype.card_prod]; push_cast; ring
 
 open Classical in
-/-- **The fresh-read bound.** A choice made from the oracle's answers *off* the read points cannot
-steer the read answers: if `choice` reads only the coordinates outside `Set.range φ`, and every
-choice's target set has uniform measure at most `β`, then the event "the answers at the distinct
-read points `φ i` land in the chosen set" has measure at most `β` over uniform tables. Splitting
-the table into read and unread coordinates (`Equiv.piEquivPiSubtypeProd`), the choice lives on one
-factor and the event on the other, and `uniformOfFintype_prod_fiber_bound` applies. This is the
-conditioning primitive of the query-loss analysis (`Soundness.Forking.Adversary`): what an
-adversary has *not* queried stays uniform against everything it computed from what it has. -/
+/-- **Fresh-read bound.** A choice based only on oracle answers outside `Set.range φ` cannot steer
+the answers at the distinct points `φ i`. If every chosen target has measure at most `β`, so does
+the joint event. -/
 theorem uniformOfFintype_fresh_read_bound {ι T F X : Type*} [Fintype ι] [DecidableEq ι]
     [Fintype T] [DecidableEq T] [Fintype F] [Nonempty F]
     (φ : ι → T) (hφ : Function.Injective φ)
@@ -218,9 +206,7 @@ theorem uniformOfFintype_toOuterMeasure_singleton {α : Type*} [Fintype α] [Non
     (PMF.uniformOfFintype α).toOuterMeasure {a} = 1 / Fintype.card α := by
   rw [uniformOfFintype_toOuterMeasure_set, Nat.card_coe_set_eq, Set.ncard_singleton, Nat.cast_one]
 
-/-- Reading a uniform table at one point is a uniform value: the one-point marginal, by splitting
-the table at the point (`Equiv.piSplitAt` shape via `piEquivPiSubtypeProd`) and integrating out
-the rest. -/
+/-- Reading one point of a uniform table gives a uniform value. -/
 theorem map_eval_uniformOfFintype {T F : Type*} [Fintype T] [DecidableEq T] [Fintype F]
     [Nonempty F] (t : T) :
     (PMF.uniformOfFintype (T → F)).map (fun O => O t) = PMF.uniformOfFintype F := by
@@ -243,13 +229,8 @@ theorem uniformOfFintype_point_measure {T F : Type*} [Fintype T] [DecidableEq T]
   have h : {O : T → F | O t ∈ s} = (fun O : T → F => O t) ⁻¹' s := rfl
   rw [h, ← PMF.toOuterMeasure_map_apply, map_eval_uniformOfFintype]
 
-/-- **One-point conditioning.** For an event blind to the table's value at `t`, additionally
-fixing that value scales the measure by `1 / |F|`: the `t`-answer is independent of the event.
-Splitting the table at `t` (`Equiv.piSplitAt`), the sliced event is the rectangle
-`{u} ×ˢ E'` and the event itself is `univ ×ˢ E'`, so the measures differ by exactly the
-singleton's `1/|F|` (`uniformOfFintype_toOuterMeasure_prod`). This is the sequential form of
-`uniformOfFintype_fresh_read_bound`, consumed one query at a time by the escape bound
-(`Soundness.Forking.Adversary.escapesDuring_measure_le`). -/
+/-- **One-point conditioning.** If an event is unchanged by updating the table at `t`, fixing
+`O t = u` multiplies its measure by `1/|F|`. -/
 theorem uniformOfFintype_cond_point {T F : Type*} [Fintype T] [DecidableEq T] [Fintype F]
     [Nonempty F] (t : T) (u : F) (E : Set (T → F))
     (hE : ∀ (O : T → F) (v : F), Function.update O t v ∈ E ↔ O ∈ E) :
@@ -329,12 +310,8 @@ theorem sum_point_mem_measure_le {T F : Type*} [Fintype T] [DecidableEq T] [Fint
             (ENNReal.natCast_ne_top _)]
 
 open Classical in
-/-- **The blind-set point bound.** The answer at `t` lands in a set chosen by the rest of the
-table with probability at most the worst choice's measure: the choice cannot see the answer
-(`hblind`), so per answer the event conditions cleanly (`uniformOfFintype_cond_point`), and the
-answers double-count to the expected set size (`sum_point_mem_measure_le`). The state-dependent
-form of `uniformOfFintype_point_measure`, consumed per query by the conditional escape bound
-(`Soundness.Forking.Adversary.escapesDuringC_measure_le`). -/
+/-- **Blind-set point bound.** If `S O` is unchanged by updating `O t`, then `O t ∈ S O` has
+probability at most the largest measure of `S O`. -/
 theorem uniformOfFintype_point_mem_blind_le {T F : Type*} [Fintype T] [DecidableEq T] [Fintype F]
     [Nonempty F] (t : T) (S : (T → F) → Set F)
     (hblind : ∀ (O : T → F) (v : F), S (Function.update O t v) = S O) {ε : ℝ≥0∞}
@@ -396,10 +373,8 @@ theorem extractable_of_prob [Fintype α] [DecidableEq α] [Zero α] [Nonempty α
     gcongr
   exact absurd h (not_lt.mpr hmono)
 
-/-- **Cauchy–Schwarz / Chebyshev over `ℝ≥0∞`** (the piece Mathlib has only over `LinearOrderedRing`,
-and VCVio ships in `ToMathlib`): for finite values, `(∑ pᵢ)² ≤ |s|·∑ pᵢ²`. Lifted to `ℝ` via
-`toReal` (the forking measures are ≤ 1, hence finite) and discharged by `sq_sum_le_card_mul_sum_sq`.
-The core inequality of the single-round local forking bound. -/
+/-- Cauchy–Schwarz for finite `ℝ≥0∞` values: `(∑ pᵢ)² ≤ |s| · ∑ pᵢ²`, the arithmetic core of local
+forking. -/
 theorem ennreal_sq_sum_le_card_mul_sum_sq {ι : Type*} (s : Finset ι) (f : ι → ℝ≥0∞)
     (hf : ∀ i ∈ s, f i ≠ ∞) :
     (∑ i ∈ s, f i) ^ 2 ≤ s.card * ∑ i ∈ s, (f i) ^ 2 := by
@@ -431,13 +406,9 @@ theorem acc_pair_card {F : Type*} [Fintype F] [DecidableEq F] (P : F → Prop) [
   rw [hoff, Finset.offDiag_card]
   exact (Nat.sub_add_cancel hle).symm
 
-/-- **The local forking lemma (counting form).** Over fork states `ψ` and challenge pairs, the
-accepting count `E = ∑_ψ |{c | acc ψ c}|` squared is dominated by `|Ψ|` times (the distinct-accepting
-ordered-pair count `D = ∑_ψ |{(c₁,c₂) | acc ψ c₁ ∧ acc ψ c₂ ∧ c₁ ≠ c₂}|` plus `E`): a fixed state has
-two distinct accepting challenges often enough that, normalized, the fork succeeds with probability
-`≥ ε² − ε/N`. `acc_pair_card` turns each `E_ψ²` into `D_ψ + E_ψ`; `ennreal_sq_sum_le_card_mul_sum_sq`
-supplies the Cauchy–Schwarz over the states. The rewinding forking bound's arithmetic core: two
-independent fresh challenges at a shared fork state are jointly accepting-and-distinct this often. -/
+/-- **Local forking, counting form.** The square of the accepting-pair count is bounded by the
+number of states times the distinct accepting-fork count plus the diagonal, yielding the count form
+of `ε² − ε/N`. -/
 theorem forking_card_bound {Ψ F : Type*} [Fintype Ψ] [Fintype F] [DecidableEq F]
     (acc : Ψ → F → Prop) [∀ ψ, DecidablePred (acc ψ)] :
     (∑ ψ : Ψ, (Finset.univ.filter (acc ψ)).card) ^ 2
@@ -492,11 +463,8 @@ theorem card_acc_distinct {Ψ F : Type*} [Fintype Ψ] [Fintype F] [DecidableEq F
   refine Finset.sum_congr rfl fun ψ _ => ?_
   rw [Finset.card_filter]
 
-/-- **The local forking lemma (measure form).** Over uniform `(state, challenge)` and
-`(state, challenge, challenge)`, the accepting probability `ε` satisfies `ε² ≤ (fork success) + ε/N`:
-two independent fresh challenges at a shared state are both accepting and distinct with probability
-at least `ε² − ε/N`. The normalized `forking_card_bound` — the AFK single-round fork success in the
-random-oracle measure the rewinding reduction runs in. -/
+/-- **Local forking, measure form.** Two independent challenges at one state are distinct and both
+accepting with probability at least `ε² − ε/N`. -/
 theorem forking_measure_bound {Ψ F : Type*} [Fintype Ψ] [Nonempty Ψ] [Fintype F] [Nonempty F]
     [DecidableEq F] (acc : Ψ → F → Prop) [∀ ψ, DecidablePred (acc ψ)] :
     ((PMF.uniformOfFintype (Ψ × F)).toOuterMeasure {x : Ψ × F | acc x.1 x.2}) ^ 2

@@ -1,19 +1,15 @@
 import Zcash.Snark.Soundness.AGM.BindingSignature
 import Zcash.Snark.Soundness.AGM.Capstone
 import Zcash.Snark.Soundness.AGM.ProbabilityVesta
-import Zcash.Snark.Soundness.Forking.Algebraic
-import Zcash.Snark.Soundness.Forking.ExpectedRuns
-import Zcash.Snark.Soundness.Forking.DomainReduction
-import Zcash.Snark.Soundness.Forking.Provenance
+import Zcash.Snark.Soundness.Forking.Adversary
 import Mathlib.Util.AssertNoSorry
 
 /-!
 # AGM trust-boundary checks
 
-The PR #28 kernels compute representations, openings, or DL relations as plain `def` values. The PR #56
-producer now computes the recursive fork certificate and checked deployed instance from explicit oracle and
-extractor coins. `assert_no_sorry` checks both layers, while the guarded reports pin the kernels' proof
-dependencies.
+The AGM kernels compute representations, openings, relations, certificates, and deployed instances
+as data. `assert_no_sorry` checks the executable producer and consumer path; the guarded reports
+record its proof dependencies.
 -/
 
 open Zcash.Snark
