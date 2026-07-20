@@ -58,11 +58,15 @@ assert_no_sorry DeployedAlgebraicForkingInstance.runRelation_isSome_of_mismatch
 assert_no_sorry ComputedAlgebraicFSFamily.relationFinder
 assert_no_sorry ComputedAlgebraicFSFamily.relationFinder_isSome_of_bindingWin
 assert_no_sorry ComputedAlgebraicFSFamily.binding_prob_le_of_textbookDL
+assert_no_sorry ComputedAlgebraicFSFamily.binding_prob_le_of_uniformURS_textbookDL
 assert_no_sorry ComputedAlgebraicFSFamily.binding_prob_le_of_generatorRO_textbookDL
+assert_no_sorry bindingWin_unbounded_measure_le
 assert_no_sorry OracleComp.restrictSum
 assert_no_sorry fsWinsFull_restrictSum_le
 assert_no_sorry ComputedAlgebraicFSFamilyRand.determinize
 assert_no_sorry ComputedAlgebraicFSFamilyRand.binding_prob_le_of_textbookDL_rand
+assert_no_sorry ComputedAlgebraicFSFamilyRand.foldedRelationFinder
+assert_no_sorry ComputedAlgebraicFSFamilyRand.binding_prob_le_of_foldedTextbookDL_rand
 assert_no_sorry recursiveAlgebraicForkFrom_node_runs_le
 assert_no_sorry recursiveAlgebraicForkFrom_sum_runs_le_of_forkSpread
 assert_no_sorry recursiveAlgebraicFork_sum_runs_le_of_forkSpread
@@ -224,3 +228,50 @@ CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
 CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
 #guard_msgs (whitespace := lax) in
 #print axioms orchard_deployed_relation_prob_le_of_generatorRO_textbookDL
+
+/-! The end-to-end Fiat–Shamir adversary bounds are the operational deliverables: the deployed
+binding event is charged to the recursive query loss, the `z = 0` slice, and the fixed-slot DL
+term. The pins below record their trusted base. The Vesta endpoints inherit CompElliptic's
+`native_decide` point-count axiom through the `Module Fp VestaG` instance; the fork-spread run-count
+bound is field-generic and does not. -/
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamily.binding_prob_le_of_textbookDL' depends on axioms:
+[propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms ComputedAlgebraicFSFamily.binding_prob_le_of_textbookDL
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamily.binding_prob_le_of_uniformURS_textbookDL' depends on
+axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms ComputedAlgebraicFSFamily.binding_prob_le_of_uniformURS_textbookDL
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamily.binding_prob_le_of_generatorRO_textbookDL' depends on
+axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms ComputedAlgebraicFSFamily.binding_prob_le_of_generatorRO_textbookDL
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamilyRand.binding_prob_le_of_textbookDL_rand' depends on
+axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms ComputedAlgebraicFSFamilyRand.binding_prob_le_of_textbookDL_rand
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamilyRand.binding_prob_le_of_foldedTextbookDL_rand' depends
+on axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms ComputedAlgebraicFSFamilyRand.binding_prob_le_of_foldedTextbookDL_rand
+
+/-- info: 'Zcash.Snark.recursiveAlgebraicFork_sum_runs_le_of_forkSpread' depends on axioms: [propext,
+Classical.choice, Quot.sound] -/
+#guard_msgs (whitespace := lax) in
+#print axioms recursiveAlgebraicFork_sum_runs_le_of_forkSpread
+
+/-- info: 'Zcash.Snark.bindingWin_unbounded_measure_le' depends on axioms: [propext,
+Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms bindingWin_unbounded_measure_le

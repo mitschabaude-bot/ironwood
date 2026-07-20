@@ -3,6 +3,7 @@ import Zcash.Snark.Soundness.AGM.ProbabilityVesta
 import Zcash.Snark.Soundness.AGM.ProbabilityCoins
 import Zcash.Snark.Soundness.Forking.Adversary.PreIpa
 import Zcash.Snark.Soundness.Forking.Adversary.Recursive
+import Zcash.Snark.Soundness.Forking.Adversary.DomainReduction
 
 /-!
 # Fiat–Shamir to AGM handoff
@@ -1130,6 +1131,52 @@ theorem binding_prob_le_of_generatorRO_textbookDL
 
 end ComputedAlgebraicFSFamily
 
+/-! ## Unbounded oracle domain
+
+`bindingWin` reads only the oracle table, so the deployed binding event composes with the domain
+reduction. A bounded-query adversary over the *unbounded* transcript domain has its attack modelled
+on the finite reachable-support split, whose measure inherits any bound holding uniformly over
+bounded-transcript machines. Blake2b itself remains a random oracle; `truncateTranscript` is the
+deployed retraction to bounded transcripts. -/
+
+/-- The deployed binding attack of a bounded-query adversary over the *unbounded* transcript domain
+is charged on the finite reachable-support split. Any bound holding uniformly for every
+bounded-transcript `Q`-query machine transfers to the split-domain binding event. This instantiates
+`fsWinsFull_unbounded_measure_le` with the deployed `Subtype.val`/`truncateTranscript` retraction
+and the binding accept predicate. -/
+theorem bindingWin_unbounded_measure_le {shape : Shape}
+    {basis : AugmentedIndex (2 ^ shape.k) → VestaG} {vk : VerifyingKey shape Fp VestaG}
+    (init : List (TranscriptElt Fp VestaG))
+    (A : OracleComp (List (TranscriptElt Fp VestaG)) Fp (AlgebraicWfProof basis vk))
+    {Q : ℕ} (hQ : A.QueryBound Q) {β : ℝ≥0∞}
+    (hβ : ∀ A₀ : OracleComp
+        (BTranscript Fp VestaG (preIpaLen shape init.length 10 + 3 * shape.k)) Fp
+        (AlgebraicWfProof basis vk), A₀.QueryBound Q →
+      (PMF.uniformOfFintype
+          (BTranscript Fp VestaG
+            (preIpaLen shape init.length 10 + 3 * shape.k) → Fp)).toOuterMeasure
+        {O | fsWinsFull A₀ (fullAlgebraicBindingAttack basis vk)
+          (algebraicFullPrefixesPre init) (algebraicFullPrefixes init) O} ≤ β) :
+    (PMF.uniformOfFintype
+        ((BTranscript Fp VestaG (preIpaLen shape init.length 10 + 3 * shape.k) ⊕
+            {t // t ∈ A.reachSet}) → Fp)).toOuterMeasure
+      {O' | fsWinsFull
+        (A.splitDomain
+          (Subtype.val : BTranscript Fp VestaG (preIpaLen shape init.length 10 + 3 * shape.k) →
+            List (TranscriptElt Fp VestaG))
+          (truncateTranscript (preIpaLen shape init.length 10 + 3 * shape.k))
+          A.reachSet (Finset.Subset.refl _))
+        (fullAlgebraicBindingAttack basis vk)
+        (fun p i => Sum.inl (algebraicFullPrefixesPre init p i))
+        (fun p j => Sum.inl (algebraicFullPrefixes init p j)) O'} ≤ β :=
+  fsWinsFull_unbounded_measure_le
+    (T := List (TranscriptElt Fp VestaG))
+    (T_D := BTranscript Fp VestaG (preIpaLen shape init.length 10 + 3 * shape.k))
+    Subtype.val
+    (truncateTranscript (preIpaLen shape init.length 10 + 3 * shape.k))
+    A hQ (fullAlgebraicBindingAttack basis vk)
+    (algebraicFullPrefixesPre init) (algebraicFullPrefixes init) hβ
+
 /-! ## Randomized adversaries
 
 Private coins form a uniform mixture of deterministic adversaries. The binding bound averages over
@@ -1185,6 +1232,91 @@ theorem binding_prob_le_of_textbookDL_rand [Fintype R] [Nonempty R]
       Set ((AugmentedIndex (2 ^ shape.k) → Fp) × fam.Coins)))
   intro r
   exact ComputedAlgebraicFSFamily.binding_prob_le_of_textbookDL B (fam.determinize r) (hDL r)
+
+/-- Fold the private coin `r` into the DL solver's coins: draw `r` alongside the extractor tape,
+then run the corresponding deterministic member's relation finder. The solver's coin type is
+`fam.Coins × R`. This is the conventional randomized-DL interface — one solver over averaged coins,
+not a separate DL bound for every fixed `r`. -/
+def foldedRelationFinder (fam : ComputedAlgebraicFSFamilyRand shape R) :
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG) → (fam.Coins × R) →
+      Option (AlgebraicRelationWitness (F := Fp) basis) :=
+  fun basis p => (fam.determinize p.2).relationFinder basis p.1
+
+open Classical in
+/-- **Randomized-adversary bound, averaged-coin form.** A single textbook-DL bound on the
+`r`-augmented solver (`foldedRelationFinder`, coins `fam.Coins × R`) bounds the averaged binding
+event. Unlike `binding_prob_le_of_textbookDL_rand`, the DL hypothesis is one statement about one
+randomized solver, matching the conventional randomized-DL game; the query and `z = 0` losses carry
+no DL and are charged per member through `failedBinding_measure_le`. -/
+theorem binding_prob_le_of_foldedTextbookDL_rand [Fintype R] [Nonempty R]
+    (B : VestaG) (fam : ComputedAlgebraicFSFamilyRand shape R) {bound : ℝ≥0∞}
+    (hDL : TextbookDLWithCoinsAdvantageLE B fam.foldedRelationFinder bound) :
+    (PMF.uniformOfFintype
+        ((AugmentedIndex (2 ^ shape.k) → Fp) × (fam.Coins × R))).toOuterMeasure
+        {p : (AugmentedIndex (2 ^ shape.k) → Fp) × (fam.Coins × R) |
+          ComputedAlgebraicFSFamily.bindingWin (fam.determinize p.2.2)
+            (scalarBasis B p.1) p.2.1}
+      ≤ (fam.Q + shape.k) * (3 / Fintype.card Fp) +
+        (fam.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
+        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+  classical
+  refine le_trans (MeasureTheory.measure_mono
+    (show {p : (AugmentedIndex (2 ^ shape.k) → Fp) × (fam.Coins × R) |
+        ComputedAlgebraicFSFamily.bindingWin (fam.determinize p.2.2)
+          (scalarBasis B p.1) p.2.1} ⊆
+      {p | ComputedAlgebraicFSFamily.bindingWin (fam.determinize p.2.2)
+          (scalarBasis B p.1) p.2.1 ∧
+        (ComputedAlgebraicFSFamily.instanceAttempt (fam.determinize p.2.2)
+          (scalarBasis B p.1) p.2.1).output.isSome} ∪
+      {p | ComputedAlgebraicFSFamily.bindingWin (fam.determinize p.2.2)
+          (scalarBasis B p.1) p.2.1 ∧
+        ¬ (ComputedAlgebraicFSFamily.instanceAttempt (fam.determinize p.2.2)
+          (scalarBasis B p.1) p.2.1).output.isSome} from ?_)) ?_
+  · intro p hp
+    by_cases hsome : (ComputedAlgebraicFSFamily.instanceAttempt (fam.determinize p.2.2)
+        (scalarBasis B p.1) p.2.1).output.isSome
+    · exact Or.inl ⟨hp, hsome⟩
+    · exact Or.inr ⟨hp, hsome⟩
+  refine le_trans (MeasureTheory.measure_union_le _ _) ?_
+  have hsucc : (PMF.uniformOfFintype
+        ((AugmentedIndex (2 ^ shape.k) → Fp) × (fam.Coins × R))).toOuterMeasure
+        {p | ComputedAlgebraicFSFamily.bindingWin (fam.determinize p.2.2)
+            (scalarBasis B p.1) p.2.1 ∧
+          (ComputedAlgebraicFSFamily.instanceAttempt (fam.determinize p.2.2)
+            (scalarBasis B p.1) p.2.1).output.isSome}
+      ≤ Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+    refine le_trans (MeasureTheory.measure_mono ?_)
+      (relationWithCoins_prob_le_of_textbookDL B fam.foldedRelationFinder hDL)
+    intro p hp
+    simp only [relSetWithCoins, Finset.coe_filter, Finset.mem_univ, true_and, Set.mem_setOf_eq,
+      foldedRelationFinder]
+    exact (fam.determinize p.2.2).relationFinder_isSome_of_bindingWin
+      (scalarBasis B p.1) p.2.1 hp.1 hp.2
+  have hfail : (PMF.uniformOfFintype
+        ((AugmentedIndex (2 ^ shape.k) → Fp) × (fam.Coins × R))).toOuterMeasure
+        {p | ComputedAlgebraicFSFamily.bindingWin (fam.determinize p.2.2)
+            (scalarBasis B p.1) p.2.1 ∧
+          ¬ (ComputedAlgebraicFSFamily.instanceAttempt (fam.determinize p.2.2)
+            (scalarBasis B p.1) p.2.1).output.isSome}
+      ≤ (fam.Q + shape.k) * (3 / Fintype.card Fp) +
+        (fam.Q + 1 : ℕ) * (1 / Fintype.card Fp) := by
+    apply uniformOfFintype_prod_fiber_bound_right
+      (fun coeffs : AugmentedIndex (2 ^ shape.k) → Fp =>
+        {cr : fam.Coins × R |
+          ComputedAlgebraicFSFamily.bindingWin (fam.determinize cr.2)
+            (scalarBasis B coeffs) cr.1 ∧
+          ¬ (ComputedAlgebraicFSFamily.instanceAttempt (fam.determinize cr.2)
+            (scalarBasis B coeffs) cr.1).output.isSome})
+    intro coeffs
+    apply uniformOfFintype_prod_fiber_bound
+      (fun r : R => {coins : fam.Coins |
+        ComputedAlgebraicFSFamily.bindingWin (fam.determinize r) (scalarBasis B coeffs) coins ∧
+        ¬ (ComputedAlgebraicFSFamily.instanceAttempt (fam.determinize r)
+          (scalarBasis B coeffs) coins).output.isSome})
+    intro r
+    exact ComputedAlgebraicFSFamily.failedBinding_measure_le (fam.determinize r)
+      (scalarBasis B coeffs)
+  exact (add_le_add hsucc hfail).trans_eq (by ac_rfl)
 
 end ComputedAlgebraicFSFamilyRand
 
