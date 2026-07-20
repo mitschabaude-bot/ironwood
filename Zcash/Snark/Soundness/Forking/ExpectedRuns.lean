@@ -793,7 +793,7 @@ theorem recursiveAlgebraicForkFrom_sum_runs_le_of_forkSpread {σ₀ : ℕ} (h2 :
                           scanRank order (insert u (M childT)) u < 2)).card * f u childT :=
                       (Finset.mul_sum _ _ _).symm
       -- close the recursion: bound each of the three summands after scaling by B^(d+1)
-      have hAcount : ∀ (childT : F → RecursiveForkTape F d) (u : F),
+      have hOrderCount : ∀ (childT : F → RecursiveForkTape F d) (u : F),
           B * (Finset.univ.filter
             (fun order : Fin N ≃ F => scanRank order (insert u (M childT)) u < 2)).card
           ≤ 2 * CP := by
@@ -920,7 +920,7 @@ theorem recursiveAlgebraicForkFrom_sum_runs_le_of_forkSpread {σ₀ : ℕ} (h2 :
                     intro childT _
                     apply Finset.sum_le_sum
                     intro u _
-                    exact Nat.mul_le_mul_right _ (hAcount childT u)
+                    exact Nat.mul_le_mul_right _ (hOrderCount childT u)
                 _ = 4 * CP * ∑ u : F, B ^ d * ∑ childT : F → RecursiveForkTape F d, f u childT := by
                     rw [Finset.sum_comm]
                     simp only [Finset.mul_sum]

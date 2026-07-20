@@ -1225,6 +1225,229 @@ theorem binding_prob_le_of_textbookDL_rand [Fintype R] [Nonempty R]
   intro r
   exact ComputedAlgebraicFSFamily.binding_prob_le_of_textbookDL B (fam.determinize r) (hDL r)
 
-end ComputedAlgebraicFSFamilyRand
+end ComputedAlgebraicFSFamilyRand/-! ## The standard-AGM adapter
+
+`AlgebraicWfProof` asks the adversary for the aggregate `(g,U,W)` coordinates of the multiopen
+commitment and of `S`. This section shows those aggregates are *computed* from standard AGM data —
+one representation per group point — rather than assumed:
+
+* the `S` coordinates are read directly off the proof's own carried `ipaS` representation
+  (`AlgebraicWfProof.ofRepresented` discharges `ipaS_repr` with no extra input);
+* the multiopen coordinates are the linear combination of the representations of the points the
+  multiopen assembly appends (`Msm.eval_repr`), assembled by lookup from any list of represented
+  points that covers them (`RepresentedMultiopen.ofCoveredList`).
+
+The one residual hypothesis is representation-free and structural: every point the deployed
+multiopen assembly appends is drawn from the supplied list — for a standard AGM adversary, its own
+emitted proof commitments together with the represented verifying-key commitments. Discharging it
+generically is a provenance walk over `assembleQueries`/`constructIntermediateSets`/
+`assembleOpening` (each appended term originates from a proof or verifying-key field); it is
+recorded here as the named input `hcover` rather than an aggregate representation assumption. -/
+
+/-- Decompose an augmented-basis representation into its generator, `U`, and `W` components. -/
+theorem representationEval_augmented_components {n : ℕ}
+    (basis : AugmentedIndex n → VestaG) (c : AugmentedIndex n → Fp) :
+    representationEval basis c
+      = (∑ i : Fin n, c (AugmentedIndex.gen i) • basis (AugmentedIndex.gen i))
+        + c AugmentedIndex.u • basis AugmentedIndex.u
+        + c AugmentedIndex.w • basis AugmentedIndex.w := by
+  rw [representationEval, Fintype.sum_sum_type, Fin.sum_univ_two, ← add_assoc]
+  rfl
+
+section Adapter
+
+variable {shape : Shape} {basis : AugmentedIndex (2 ^ shape.k) → VestaG}
+
+/-- The generator components of an augmented-basis representation. -/
+def AlgebraicPoint.gPart (P : AlgebraicPoint (F := Fp) basis) : Fin (2 ^ shape.k) → Fp :=
+  fun i => P.coeffs (AugmentedIndex.gen i)
+
+/-- An augmented-basis point is its generator commitment plus its declared `U` and `W`
+components. -/
+theorem AlgebraicPoint.point_eq_components (P : AlgebraicPoint (F := Fp) basis) :
+    P.point = commit (ursOfAugmentedBasis shape.k basis) P.gPart
+      + P.coeffs AugmentedIndex.u • (ursOfAugmentedBasis shape.k basis).u
+      + P.coeffs AugmentedIndex.w • (ursOfAugmentedBasis shape.k basis).w := by
+  rw [← P.hEq, representationEval_augmented_components]
+  rfl
+
+private theorem commitA_add (a b : Fin (2 ^ shape.k) → Fp) :
+    commit (ursOfAugmentedBasis shape.k basis) (a + b)
+      = commit (ursOfAugmentedBasis shape.k basis) a
+        + commit (ursOfAugmentedBasis shape.k basis) b :=
+  commit_add _ _ _
+
+private theorem commitA_smul (c : Fp) (a : Fin (2 ^ shape.k) → Fp) :
+    commit (ursOfAugmentedBasis shape.k basis) (c • a)
+      = c • commit (ursOfAugmentedBasis shape.k basis) a :=
+  commit_smul _ _ _
+
+/-- The aggregated generator coordinates of a represented term list. -/
+def repsGPart (reps : List (Fp × AlgebraicPoint (F := Fp) basis)) : Fin (2 ^ shape.k) → Fp :=
+  fun i => (reps.map (fun t => t.1 * t.2.coeffs (AugmentedIndex.gen i))).sum
+
+/-- The aggregated `U` coordinate of a represented term list. -/
+def repsU (reps : List (Fp × AlgebraicPoint (F := Fp) basis)) : Fp :=
+  (reps.map (fun t => t.1 * t.2.coeffs AugmentedIndex.u)).sum
+
+/-- The aggregated `W` coordinate of a represented term list. -/
+def repsW (reps : List (Fp × AlgebraicPoint (F := Fp) basis)) : Fp :=
+  (reps.map (fun t => t.1 * t.2.coeffs AugmentedIndex.w)).sum
+
+theorem repsGPart_cons (t : Fp × AlgebraicPoint (F := Fp) basis)
+    (reps : List (Fp × AlgebraicPoint (F := Fp) basis)) :
+    repsGPart (t :: reps) = t.1 • t.2.gPart + repsGPart reps := by
+  funext i
+  simp [repsGPart, AlgebraicPoint.gPart, smul_eq_mul]
+
+theorem repsU_cons (t : Fp × AlgebraicPoint (F := Fp) basis)
+    (reps : List (Fp × AlgebraicPoint (F := Fp) basis)) :
+    repsU (t :: reps) = t.1 * t.2.coeffs AugmentedIndex.u + repsU reps := by
+  simp [repsU]
+
+theorem repsW_cons (t : Fp × AlgebraicPoint (F := Fp) basis)
+    (reps : List (Fp × AlgebraicPoint (F := Fp) basis)) :
+    repsW (t :: reps) = t.1 * t.2.coeffs AugmentedIndex.w + repsW reps := by
+  simp [repsW]
+
+/-- Represented `(scalar, point)` terms sum to the commitment of their aggregated generator
+coordinates plus the aggregated `U` and `W` components: appended terms are linear, so
+representations aggregate coordinatewise. -/
+theorem sum_map_smul_point_repr (reps : List (Fp × AlgebraicPoint (F := Fp) basis)) :
+    ((reps.map (fun t => (t.1, t.2.point))).map (fun t => t.1 • t.2)).sum
+      = commit (ursOfAugmentedBasis shape.k basis) (repsGPart reps)
+        + repsU reps • (ursOfAugmentedBasis shape.k basis).u
+        + repsW reps • (ursOfAugmentedBasis shape.k basis).w := by
+  induction reps with
+  | nil =>
+      simp [repsGPart, repsU, repsW, commit]
+  | cons t reps ih =>
+      simp only [List.map_cons, List.sum_cons]
+      rw [ih, t.2.point_eq_components, repsGPart_cons, repsU_cons, repsW_cons,
+        commitA_add, commitA_smul]
+      module
+
+/-- Evaluating an MSM whose appended points carry representations: the aggregate `(g,U,W)`
+coordinates are the MSM's own scalars plus the coordinatewise linear combination of the
+representations. -/
+theorem Msm.eval_repr (m : Msm shape.k Fp VestaG)
+    (reps : List (Fp × AlgebraicPoint (F := Fp) basis))
+    (hcov : m.other = reps.map (fun t => (t.1, t.2.point))) :
+    m.eval (ursOfAugmentedBasis shape.k basis)
+      = commit (ursOfAugmentedBasis shape.k basis) (m.gScalars + repsGPart reps)
+        + (m.uScalar + repsU reps) • (ursOfAugmentedBasis shape.k basis).u
+        + (m.wScalar + repsW reps) • (ursOfAugmentedBasis shape.k basis).w := by
+  have heval : ∀ (urs : URS VestaG) (m' : Msm urs.k Fp VestaG),
+      m'.eval urs = commit urs m'.gScalars + m'.wScalar • urs.w + m'.uScalar • urs.u
+        + (m'.other.map fun t => t.1 • t.2).sum := fun _ _ => rfl
+  rw [heval, hcov, sum_map_smul_point_repr, commitA_add]
+  module
+
+/-- The multiopen assembly MSM whose evaluation is `multiopenCommitment`. -/
+def multiopenMsm (vk : VerifyingKey shape Fp VestaG)
+    (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp) :
+    Msm shape.k Fp VestaG :=
+  (assembleOpening ch.x1 ch.x2 ch.x3 ch.x4 ps.multiopenQPrime (List.ofFn ps.multiopenU)
+    (constructIntermediateSets (assembleQueries vk ps ch)) (Msm.zero shape.k Fp VestaG)).1
+
+/-- `multiopenCommitment` is the assembly MSM's evaluation. -/
+theorem multiopenCommitment_eq_eval
+    (g' : Fin (2 ^ shape.k) → VestaG) (w' u' : VestaG)
+    (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG)
+    (ch : Challenges shape.k Fp) :
+    multiopenCommitment g' w' u' vk ps ch
+      = (multiopenMsm vk ps ch).eval ⟨shape.k, g', w', u'⟩ := by
+  unfold multiopenCommitment multiopenMsm
+  rfl
+
+attribute [local irreducible] multiopenMsm
+
+/-- Evaluating against the reconstructed URS is evaluating against its literal components: the
+`URS` structure eta step, stated for an abstract MSM so nothing large is ever normalized. -/
+private theorem eval_urs_eta (m : Msm shape.k Fp VestaG) :
+    m.eval (⟨shape.k, (ursOfAugmentedBasis shape.k basis).g,
+        (ursOfAugmentedBasis shape.k basis).w,
+        (ursOfAugmentedBasis shape.k basis).u⟩ : URS VestaG)
+      = m.eval (ursOfAugmentedBasis shape.k basis) := rfl
+
+attribute [local irreducible] multiopenCommitment Msm.eval
+
+/-- A represented multiopen assembly: the assembled MSM's appended points, each carrying its
+`(g,U,W)` representation. A standard AGM adversary supplies this from the representations of the
+proof and verifying-key commitments it feeds the verifier
+(`RepresentedMultiopen.ofCoveredList`). -/
+structure RepresentedMultiopen
+    (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG)
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG) (ν : Fin 11 → Fp) where
+  reps : List (Fp × AlgebraicPoint (F := Fp) basis)
+  covers : (multiopenMsm vk ps (chRecord ν (fun _ => 0))).other
+    = reps.map (fun t => (t.1, t.2.point))
+
+/-- Rebuild a scalar–point list from lookups into a covering list of represented points. -/
+private theorem list_eq_map_pmap_lookup {β : Type*} (point : β → VestaG)
+    (L : List β) : (l : List (Fp × VestaG)) →
+    (H : ∀ pr ∈ l, (L.find? (fun ap => point ap = pr.2)).isSome) →
+    l = (l.pmap (fun pr h => (pr.1, (L.find? (fun ap => point ap = pr.2)).get h)) H).map
+        (fun t => (t.1, point t.2))
+  | [], _ => rfl
+  | pr :: l, H => by
+      simp only [List.pmap, List.map_cons]
+      refine congrArg₂ List.cons ?_ (list_eq_map_pmap_lookup point L l
+        (fun a ha => H a (List.mem_cons_of_mem _ ha)))
+      have hp := List.find?_some
+        ((Option.some_get (H pr (List.mem_cons_self ..))).symm)
+      have hpt : point ((L.find? (fun ap => point ap = pr.2)).get
+          (H pr (List.mem_cons_self ..))) = pr.2 := by
+        simpa using hp
+      exact Prod.ext rfl hpt.symm
+
+/-- Build the represented assembly by lookup: any list of represented points containing every
+point the assembly appends suffices. The hypothesis is representation-free — it speaks only about
+which group elements the deployed assembly touches. -/
+def RepresentedMultiopen.ofCoveredList
+    (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG)
+    (ν : Fin 11 → Fp) (L : List (AlgebraicPoint (F := Fp) basis))
+    (hcover : ∀ pr ∈ (multiopenMsm vk ps (chRecord ν (fun _ => 0))).other,
+      ∃ ap ∈ L, ap.point = pr.2) :
+    RepresentedMultiopen vk ps basis ν :=
+  have H : ∀ pr ∈ (multiopenMsm vk ps (chRecord ν (fun _ => 0))).other,
+      (L.find? (fun ap => ap.point = pr.2)).isSome := by
+    intro pr hpr
+    rw [List.find?_isSome]
+    obtain ⟨ap, hapL, hap⟩ := hcover pr hpr
+    exact ⟨ap, hapL, by simp [hap]⟩
+  { reps := (multiopenMsm vk ps (chRecord ν (fun _ => 0))).other.pmap
+      (fun pr h => (pr.1, (L.find? (fun ap => ap.point = pr.2)).get h)) H
+    covers := list_eq_map_pmap_lookup AlgebraicPoint.point L _ H }
+
+/-- **The standard-AGM adapter.** Build the packaged adversary output from per-point data alone:
+an algebraic proof string (every emitted point with its representation), the reader's shape
+checks, and a represented multiopen assembly per pre-IPA challenge vector. The `S` aggregate is
+read off the proof's own `ipaS` representation; the multiopen aggregates are the linear
+combination of the assembly's represented points. No aggregate representation equality is
+assumed. -/
+def AlgebraicWfProof.ofRepresented {vk : VerifyingKey shape Fp VestaG}
+    (aps : AlgebraicProofString shape basis) (hwf : PsWellFormed aps.erase)
+    (rm : ∀ ν : Fin 11 → Fp, RepresentedMultiopen vk aps.erase basis ν) :
+    AlgebraicWfProof basis vk :=
+  { algebraicProof := aps
+    wellFormed := hwf
+    aMulti := fun ν =>
+      (multiopenMsm vk aps.erase (chRecord ν (fun _ => 0))).gScalars + repsGPart (rm ν).reps
+    multiU := fun ν =>
+      (multiopenMsm vk aps.erase (chRecord ν (fun _ => 0))).uScalar + repsU (rm ν).reps
+    multiBlind := fun ν =>
+      (multiopenMsm vk aps.erase (chRecord ν (fun _ => 0))).wScalar + repsW (rm ν).reps
+    multiopen_repr := fun ν =>
+      (Msm.eval_repr (multiopenMsm vk aps.erase (chRecord ν (fun _ => 0)))
+        (rm ν).reps (rm ν).covers).symm.trans
+        ((eval_urs_eta (multiopenMsm vk aps.erase (chRecord ν (fun _ => 0)))).symm.trans
+          (multiopenCommitment_eq_eval _ _ _ vk aps.erase _).symm)
+    s := aps.ipaS.gPart
+    sU := aps.ipaS.coeffs AugmentedIndex.u
+    sBlind := aps.ipaS.coeffs AugmentedIndex.w
+    ipaS_repr := (AlgebraicPoint.point_eq_components aps.ipaS).symm }
+
+end Adapter
 
 end Zcash.Snark
