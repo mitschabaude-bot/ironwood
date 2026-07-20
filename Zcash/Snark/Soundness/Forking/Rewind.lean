@@ -283,9 +283,10 @@ theorem proverAccept_measure_eq_flatAccept {d : ℕ} {U W : G} {z : Fp} (P : Pro
   rw [hset, uniformOfFintype_measure_inv]
 
 open scoped ENNReal in
-/-- If an abstract prover strategy accepts above the knowledge error, derive an IPA opening or
-nontrivial relation. -/
-noncomputable def deployed_forking_soundness [DecidableEq G] [Inhabited G] (urs : URS G)
+/-- **Legacy propositional capstone.** If an abstract prover strategy accepts above the knowledge
+error, derive an IPA opening or nontrivial relation. The executable FS path uses
+`recursiveAlgebraicFork` instead. -/
+noncomputable def legacy_deployed_forking_soundness [DecidableEq G] [Inhabited G] (urs : URS G)
     (b : Fin (2 ^ urs.k) → Fp) (v ξ z blind : Fp) (aMulti aDep s : Fin (2 ^ urs.k) → Fp)
     (P : Prover Fp G urs.k) (hz : z ≠ 0) (hb0 : b 0 = 1)
     (hP : commit urs aDep = commit urs aMulti - v • urs.g 0 + ξ • commit urs s)
@@ -310,8 +311,9 @@ noncomputable def deployed_forking_soundness [DecidableEq G] [Inhabited G] (urs 
 
 open scoped ENNReal in
 open Classical in
-/-- State abstract forking soundness using the deployed verifier's inverse-challenge fold convention. -/
-noncomputable def deployed_forking_soundness_flat [DecidableEq G] [Inhabited G] (urs : URS G)
+/-- **Legacy propositional capstone.** State abstract forking soundness using the deployed verifier's
+inverse-challenge fold convention. -/
+noncomputable def legacy_deployed_forking_soundness_flat [DecidableEq G] [Inhabited G] (urs : URS G)
     (b : Fin (2 ^ urs.k) → Fp) (v ξ z blind : Fp) (aMulti aDep s : Fin (2 ^ urs.k) → Fp)
     (Q : Prover Fp G urs.k) (hz : z ≠ 0) (hb0 : b 0 = 1)
     (hP : commit urs aDep = commit urs aMulti - v • urs.g 0 + ξ • commit urs s)
@@ -321,7 +323,7 @@ noncomputable def deployed_forking_soundness_flat [DecidableEq G] [Inhabited G] 
               (commit urs aDep + (z * 0) • urs.u + blind • urs.w)))) :
     (∃ a, IpaRelation urs (commit urs aMulti) b (v - ξ * innerProduct s b) a)
       ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
-  refine deployed_forking_soundness urs b v ξ z blind aMulti aDep s (invProver Q) hz hb0 hP ?_
+  refine legacy_deployed_forking_soundness urs b v ξ z blind aMulti aDep s (invProver Q) hz hb0 hP ?_
   rw [proverAccept_measure_eq_flatAccept (invProver Q) urs.g b
         (commit urs aDep + (z * 0) • urs.u + blind • urs.w), invProver_invProver Q]
   exact hprob
@@ -516,9 +518,10 @@ and transfer its acceptance probability with the correct query loss.
 
 open scoped ENNReal in
 open Classical in
-/-- Derive the deployed opening from a prover strategy, a pointwise accept-event bridge, and acceptance
-above the knowledge error. -/
-noncomputable def deployed_forking_soundness_of_bridge [DecidableEq G] [Inhabited G] (urs : URS G)
+/-- **Legacy propositional capstone.** Derive the deployed opening from a prover strategy, a pointwise
+accept-event bridge, and acceptance above the knowledge error. -/
+noncomputable def legacy_deployed_forking_soundness_of_bridge [DecidableEq G] [Inhabited G]
+    (urs : URS G)
     (b : Fin (2 ^ urs.k) → Fp) (v ξ z blind : Fp) (aMulti aDep s : Fin (2 ^ urs.k) → Fp)
     (Q : Prover Fp G urs.k) (accepts : (Fin urs.k → Fp) → Prop)
     (hz : z ≠ 0) (hb0 : b 0 = 1)
@@ -529,7 +532,7 @@ noncomputable def deployed_forking_soundness_of_bridge [DecidableEq G] [Inhabite
         < (PMF.uniformOfFintype (Fin urs.k → Fp)).toOuterMeasure (Finset.univ.filter accepts)) :
     (∃ a, IpaRelation urs (commit urs aMulti) b (v - ξ * innerProduct s b) a)
       ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
-  refine deployed_forking_soundness_flat urs b v ξ z blind aMulti aDep s Q hz hb0 hP ?_
+  refine legacy_deployed_forking_soundness_flat urs b v ξ z blind aMulti aDep s Q hz hb0 hP ?_
   have hset : Finset.univ.filter accepts
       = Finset.univ.filter (flatAccept Q urs.g b urs.u urs.w z
           (commit urs aDep + (z * 0) • urs.u + blind • urs.w)) := by

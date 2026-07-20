@@ -14,7 +14,7 @@
     },
     "fsStack": {
       "label": "PR #56 FS-to-AGM handoff",
-      "ref": "a518c76d4bdb53d0e11f4098b8d0e7b3ff1ada2f",
+      "ref": "7696aa6060be9ac8537f75bb93e643a24af2a27e",
       "fetch": "pull/56/head"
     }
   },
@@ -65,7 +65,7 @@
       "label": "PR #56",
       "title": "Fully adaptive Fiat-Shamir adversary",
       "url": "https://github.com/zcash/ironwood/pull/56",
-      "sha": "a518c76",
+      "sha": "7696aa6",
       "lane": "stack"
     },
     "27": {
@@ -229,7 +229,7 @@
         "Binding failure is retained as an explicit relation on the deployed augmented basis."
       ],
       "residuals": [
-        "The capstones retain z != 0 and other rung-specific structural premises.",
+        "The legacy propositional capstones retain z != 0 and other rung-specific structural premises.",
         "The relation branch needs a computational reduction, not a propositional impossibility claim."
       ],
       "durationMs": 8500
@@ -492,9 +492,9 @@
     {
       "id": "compose",
       "chapter": "Capstones",
-      "title": "Compose opening and circuit satisfaction",
-      "claim": "The extracted opening and gate identity form SnarkRelation, which the Vesta capstone family exposes at the verifier boundary.",
-      "summary": "SnarkRelation is the conjunction of one pinned IPA opening and circuit satisfaction for the same witness. The opening and constraint capstones package this route across abstract, deployed, adaptive, rewind, xgood, and x4 variants; the explicit-certificate AGM/DL endpoint is tracked separately.",
+      "title": "Compose legacy opening and circuit satisfaction",
+      "claim": "The extracted opening and gate identity form SnarkRelation, which the legacy propositional Vesta capstone family exposes at the verifier boundary.",
+      "summary": "SnarkRelation is the conjunction of one pinned IPA opening and circuit satisfaction for the same witness. The legacy opening and constraint capstones package this route across abstract, deployed, adaptive, rewind, xgood, and x4 variants; the computed explicit-certificate AGM/DL endpoint is tracked separately.",
       "nodes": [
         "IpaRelation",
         "circuitSat",
@@ -523,11 +523,11 @@
         "31"
       ],
       "proves": [
-        "The opening and constraint branches refer to the same pinned verifier statement.",
-        "The capstone family makes each modeled adversary and residual hypothesis explicit."
+        "The legacy opening and constraint branches refer to the same pinned verifier statement.",
+        "The legacy capstone family makes each modeled adversary and residual hypothesis explicit."
       ],
       "residuals": [
-        "Different capstones retain different structural and probability premises.",
+        "Different legacy capstones retain different structural and probability premises.",
         "SnarkRelation is not yet the intended high-level Ironwood security statement."
       ],
       "durationMs": 9500

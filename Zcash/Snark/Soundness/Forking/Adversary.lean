@@ -23,13 +23,13 @@ advantage is a measure over uniformly drawn tables, no probability monad require
 * `fsAdvantage_pure` — the zero-query anchor: a query-free adversary's advantage *is* its fixed
   output's accept measure over the uniform challenge vector — `hprob`'s measure, recovered exactly.
 
-## Historical staged interfaces and the executable path
+## Legacy propositional staged interfaces and the executable path
 
 For an adversary that **is** a staged `Prover` strategy, the closure needs **no `StagedDecode` and
 no query loss**: reading its challenges off a uniform oracle table is a uniform challenge vector
 (`AdSched.map_read_uniform` for the path-dependent prefixes), which the existing forking
-(`extractable_of_prob`) turns into the tree — `deployed_forking_soundness_of_fixed_adversary`
-(constant) and `deployed_forking_soundness_of_staged_adversary` (round-adaptive). Their `hprob` *is*
+(`extractable_of_prob`) turns into the tree — `legacy_deployed_forking_soundness_of_fixed_adversary`
+(constant) and `legacy_deployed_forking_soundness_of_staged_adversary` (round-adaptive). Their `hprob` *is*
 that adversary's advantage over uniformly drawn oracle tables (the random-oracle table experiment).
 
 **These assume staging, which a malicious prover need not respect.** Transcript ordering
@@ -38,8 +38,8 @@ challenge; it does **not** stop a **grinding** forger from querying many candida
 choosing its proof afterward. The deployed arbitrary-query path is now
 `Soundness.Forking.Recursive`: it runs and rewinds `OracleComp` directly, constructs the algebraic
 fork certificate from explicit coins, and prices failure through the conditional escape bound
-below. `Soundness.Forking.Algebraic` packages that result for the AGM reduction. The older staged
-definitions later in this file remain supplementary. What the loss is paid against:
+below. `Soundness.Forking.Algebraic` packages that result for the AGM reduction. The `legacy_*`
+staged definitions later in this file remain supplementary. What the loss is paid against:
 
 * **Not the plain accept measure.** Beyond `Q = 0` (`fsAdvantage_pure`), `(Q + 1) · β` with `β`
   the worst per-output accept measure is **false**, even for committed queries: seeing one round
@@ -1125,17 +1125,20 @@ end Game
 
 open scoped ENNReal in
 open Classical in
-/-- **Deployed forking soundness for a fixed-strategy adversary — no decode, no query loss.** An
+/-- **Legacy propositional capstone for a fixed-strategy adversary.** An
 adversary committing to a fixed strategy `P` (a `.pure P` machine that reads its round-prefix
 challenges) whose Fiat–Shamir advantage *over uniformly drawn oracle tables* beats the knowledge
 error `kerr/Nᵏ` yields the deployed opening or a computed relation. `fsAdvantage_pure` rewrites the
 table advantage to the challenge-vector accept measure — that rewrite *is* challenge-vector
-uniformity (#24, `uniformOfFintype_map_precomp_injective`) — which `deployed_forking_soundness`
+uniformity (#24, `uniformOfFintype_map_precomp_injective`) — which
+`legacy_deployed_forking_soundness`
 consumes. This closes the random-oracle **table experiment** → `hprob` step for the constant rung.
 The genuinely round-adaptive rung is the staged strategy of
-`deployed_forking_soundness_of_adversary`; the computed deployed path is in `Forking.Recursive` and
+`legacy_deployed_forking_soundness_of_adversary`; the computed deployed path is in
+`Forking.Recursive` and
 `Forking.Algebraic`. -/
-noncomputable def deployed_forking_soundness_of_fixed_adversary {G : Type*} [AddCommGroup G]
+noncomputable def legacy_deployed_forking_soundness_of_fixed_adversary
+    {G : Type*} [AddCommGroup G]
     [Module Fp G] [DecidableEq G] [Inhabited G]
     (urs : URS G) (b : Fin (2 ^ urs.k) → Fp) (v ξ z blind : Fp)
     (aMulti aDep s : Fin (2 ^ urs.k) → Fp) (P : Prover Fp G urs.k)
@@ -1151,7 +1154,7 @@ noncomputable def deployed_forking_soundness_of_fixed_adversary {G : Type*} [Add
     (∃ a, IpaRelation urs (commit urs aMulti) b (v - ξ * innerProduct s b) a)
       ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
   rw [fsAdvantage_pure P _ (fun _ => prefixes) hinj] at hadv
-  refine deployed_forking_soundness urs b v ξ z blind aMulti aDep s P hz hb0 hP ?_
+  refine legacy_deployed_forking_soundness urs b v ξ z blind aMulti aDep s P hz hb0 hP ?_
   convert hadv using 2
   ext χ
   simp
@@ -1200,17 +1203,19 @@ theorem schedOfProver_fresh {d : ℕ} (P : Prover Fp G d) (t : List (TranscriptE
   exact Fin.ext (by omega)
 
 open Classical in
-/-- **Deployed forking soundness for a staged (round-adaptive) adversary — no decode, no query
-loss.** A strategy `Q` (a `Prover` tree — the object a rewound Fiat–Shamir prover realizes) whose
+/-- **Legacy propositional capstone for a staged adversary.** A strategy `Q` (a `Prover` tree — the
+object a rewound Fiat–Shamir prover realizes) whose
 accept event over uniformly drawn oracle tables, reading its challenges through the adaptive
 schedule `sched`, beats the knowledge error `kerr/Nᵏ`, yields the deployed opening or a computed
 relation. `AdSched.map_read_uniform` (needing only `sched.Fresh`, supplied for the deployed schedule
 by `schedOfProver_fresh`) rewrites the table advantage to the challenge-vector accept measure —
-challenge-vector uniformity for *path-dependent* prefixes — which `deployed_forking_soundness_flat`
+challenge-vector uniformity for *path-dependent* prefixes — which
+`legacy_deployed_forking_soundness_flat`
 consumes. This closes the random-oracle **table experiment** → `hprob` step for the round-adaptive
 rung with no `StagedDecode` and no query loss. The computed arbitrary-query path is in
 `Forking.Recursive` and `Forking.Algebraic`. -/
-noncomputable def deployed_forking_soundness_of_staged_adversary [AddCommGroup G] [Module Fp G]
+noncomputable def legacy_deployed_forking_soundness_of_staged_adversary
+    [AddCommGroup G] [Module Fp G]
     [DecidableEq G] [Inhabited G]
     (urs : URS G) (b : Fin (2 ^ urs.k) → Fp) (v ξ z blind : Fp)
     (aMulti aDep s : Fin (2 ^ urs.k) → Fp) (Q : Prover Fp G urs.k)
@@ -1223,7 +1228,7 @@ noncomputable def deployed_forking_soundness_of_staged_adversary [AddCommGroup G
                   (commit urs aDep + (z * 0) • urs.u + blind • urs.w) (sched.read O)}) :
     (∃ a, IpaRelation urs (commit urs aMulti) b (v - ξ * innerProduct s b) a)
       ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
-  refine deployed_forking_soundness_flat urs b v ξ z blind aMulti aDep s Q hz hb0 hP ?_
+  refine legacy_deployed_forking_soundness_flat urs b v ξ z blind aMulti aDep s Q hz hb0 hP ?_
   rw [show {O : T → Fp | flatAccept Q urs.g b urs.u urs.w z
         (commit urs aDep + (z * 0) • urs.u + blind • urs.w) (sched.read O)}
       = sched.read ⁻¹' {χ | flatAccept Q urs.g b urs.u urs.w z
@@ -1338,7 +1343,7 @@ end StagedDecode
 
 
 open Classical in
-/-- **Deployed forking soundness from an oracle-querying adversary.** A `Q`-query machine
+/-- **Legacy propositional capstone for an oracle-querying adversary.** A `Q`-query machine
 outputting staged strategies, equipped with a staged decode, whose Fiat–Shamir advantage beats the
 query loss `(Q + k) · 3/p`, yields the deployed opening or a computed relation:
 `StagedDecode.extractable_of_lt_fsAdvantage` produces a table whose output strategy carries the
@@ -1346,7 +1351,8 @@ full `(3,…,3)` tree, `proverAccept_forkValid` reads off the forking certificat
 computable `deployed_forking_relation` extracts. This staged, existence-form definition is retained
 as supplementary material; the deployed arbitrary-query producer is the computable path in
 `Forking.Recursive` and `Forking.Algebraic`. -/
-noncomputable def deployed_forking_soundness_of_adversary {G : Type*} [AddCommGroup G]
+noncomputable def legacy_deployed_forking_soundness_of_adversary
+    {G : Type*} [AddCommGroup G]
     [Module Fp G] [DecidableEq G] [Inhabited G]
     (urs : URS G) (b : Fin (2 ^ urs.k) → Fp) (v ξ z blind : Fp)
     (aMulti aDep s : Fin (2 ^ urs.k) → Fp)
