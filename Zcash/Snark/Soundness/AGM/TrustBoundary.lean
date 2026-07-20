@@ -4,6 +4,7 @@ import Zcash.Snark.Soundness.AGM.ProbabilityVesta
 import Zcash.Snark.Soundness.Forking.Algebraic
 import Zcash.Snark.Soundness.Forking.ExpectedRuns
 import Zcash.Snark.Soundness.Forking.DomainReduction
+import Zcash.Snark.Soundness.Forking.Provenance
 import Mathlib.Util.AssertNoSorry
 
 /-!
@@ -73,11 +74,19 @@ assert_no_sorry AlgebraicPoint.point_eq_components
 assert_no_sorry Msm.eval_repr
 assert_no_sorry RepresentedMultiopen.ofCoveredList
 assert_no_sorry AlgebraicWfProof.ofRepresented
+assert_no_sorry assembleQueries_points_mem
+assert_no_sorry constructIntermediateSets_ref_mem
+assert_no_sorry multiopenMsm_points_mem
+assert_no_sorry AlgebraicWfProof.ofStandard
 assert_no_sorry OracleComp.reachSet
 assert_no_sorry OracleComp.run_congr_reachSet
 assert_no_sorry OracleComp.restrictTo
+assert_no_sorry OracleComp.splitDomain
 assert_no_sorry finite_domain_restriction
 assert_no_sorry fsWinsFull_mapDomain_measure_eq
+assert_no_sorry fsWinsFull_splitDomain
+assert_no_sorry fsWinsFull_unbounded_measure_le
+assert_no_sorry truncateTranscript
 assert_no_sorry Zcash.Security.BindingSignature.NontrivialRelation.toAlgebraicRelationWitness
 assert_no_sorry Zcash.Security.BindingSignature.NontrivialRelation.toDiscreteLog
 assert_no_sorry Zcash.Security.BindingSignature.orchardImbalanceToDiscreteLog

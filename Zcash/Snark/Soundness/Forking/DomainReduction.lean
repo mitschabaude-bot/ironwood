@@ -29,6 +29,8 @@ machine can actually reach — which is exactly the random-oracle reading.
 
 namespace Zcash.Snark
 
+open scoped ENNReal
+
 namespace OracleComp
 
 variable {T T' F α : Type*}
@@ -98,6 +100,53 @@ theorem run_restrictTo (S : Finset T) :
 /-- Restriction never adds queries. -/
 theorem queryBound_restrictTo (S : Finset T) {A : OracleComp T F α} {Q : ℕ}
     (hQ : A.QueryBound Q) : ∀ h : A.reachSet ⊆ S, (A.restrictTo S h).QueryBound Q := by
+  induction hQ with
+  | pure a Q => intro h; exact .pure a Q
+  | query hk ih => intro h; exact .query fun u => ih u _
+
+/-- Split a machine's queries between a designated finite component and the junk remainder: a
+query whose point retracts along `ρ` to the designated domain `T_D` reads the `T_D` table — so
+the Fiat–Shamir self-referentiality at game points is preserved — and every other reachable point
+reads the junk table. -/
+def splitDomain {T_D : Type*} (ι : T_D → T) (ρ : T → Option T_D) (S : Finset T) :
+    (A : OracleComp T F α) → A.reachSet ⊆ S → OracleComp (T_D ⊕ {t // t ∈ S}) F α
+  | .pure a, _ => .pure a
+  | .query t k, h =>
+      .query (match ρ t with
+        | some tD => Sum.inl tD
+        | none => Sum.inr ⟨t, h (mem_reachSet_query_self t k)⟩)
+        fun u => (k u).splitDomain ι ρ S (fun x hx => h (reachSet_query_subset t k u hx))
+
+/-- The split machine reproduces the run against any full table agreeing with the designated
+table along `ι` and with the junk table elsewhere. -/
+theorem run_splitDomain {T_D : Type*} (ι : T_D → T) (ρ : T → Option T_D) (S : Finset T)
+    (hρ₂ : ∀ t tD, ρ t = some tD → t = ι tD) :
+    (A : OracleComp T F α) → (h : A.reachSet ⊆ S) →
+    (O' : (T_D ⊕ {t // t ∈ S}) → F) → (Ofull : T → F) →
+    (∀ tD, Ofull (ι tD) = O' (Sum.inl tD)) →
+    (∀ (t : T) (ht : t ∈ S), ρ t = none → Ofull t = O' (Sum.inr ⟨t, ht⟩)) →
+    (A.splitDomain ι ρ S h).run O' = A.run Ofull
+  | .pure _, _, _, _, _, _ => rfl
+  | .query t k, h, O', Ofull, hD, hJ => by
+      simp only [splitDomain, run_query]
+      have hans : O' (match ρ t with
+          | some tD => Sum.inl tD
+          | none => Sum.inr ⟨t, h (mem_reachSet_query_self t k)⟩) = Ofull t := by
+        cases hρ : ρ t with
+        | some tD =>
+            simp only [hρ]
+            rw [hρ₂ t tD hρ]
+            exact (hD tD).symm
+        | none =>
+            simp only [hρ]
+            exact (hJ t (h (mem_reachSet_query_self t k)) hρ).symm
+      rw [hans]
+      exact run_splitDomain ι ρ S hρ₂ (k (Ofull t)) _ O' Ofull hD hJ
+
+/-- Splitting never adds queries. -/
+theorem queryBound_splitDomain {T_D : Type*} (ι : T_D → T) (ρ : T → Option T_D)
+    (S : Finset T) {A : OracleComp T F α} {Q : ℕ} (hQ : A.QueryBound Q) :
+    ∀ h : A.reachSet ⊆ S, (A.splitDomain ι ρ S h).QueryBound Q := by
   induction hQ with
   | pure a Q => intro h; exact .pure a Q
   | query hk ih => intro h; exact .query fun u => ih u _
@@ -219,6 +268,89 @@ theorem fsWinsFull_mapDomain_measure_eq {T₀ J : Type*} [Fintype T₀] [Decidab
   rw [hset, ← PMF.toOuterMeasure_map_apply,
     uniformOfFintype_map_precomp_injective Sum.inl Sum.inl_injective]
 
+open Classical in
+/-- **The split machine plays the same game.** For a game whose challenge points factor through
+the designated component, the split machine's full-record win against the split tables is exactly
+the original's win against any full table agreeing with them — the per-table semantic tie between
+the unbounded-domain game and its finite split. -/
+theorem fsWinsFull_splitDomain {T T_D : Type*} [DecidableEq T] [Fintype F]
+    {m k : ℕ} (ι : T_D → T) (ρ : T → Option T_D) (S : Finset T)
+    (hρ₂ : ∀ t tD, ρ t = some tD → t = ι tD)
+    (A : OracleComp T F P) (h : A.reachSet ⊆ S)
+    (accept : P → (Fin m → F) → (Fin k → F) → Prop)
+    (preD : P → Fin m → T_D) (ptsD : P → Fin k → T_D)
+    (O' : (T_D ⊕ {t // t ∈ S}) → F) (Ofull : T → F)
+    (hD : ∀ tD, Ofull (ι tD) = O' (Sum.inl tD))
+    (hJ : ∀ (t : T) (ht : t ∈ S), ρ t = none → Ofull t = O' (Sum.inr ⟨t, ht⟩)) :
+    fsWinsFull A accept (fun p i => ι (preD p i)) (fun p j => ι (ptsD p j)) Ofull
+      ↔ fsWinsFull (A.splitDomain ι ρ S h) accept
+          (fun p i => Sum.inl (preD p i)) (fun p j => Sum.inl (ptsD p j)) O' := by
+  rw [fsWinsFull, fsWinsFull,
+    OracleComp.run_splitDomain ι ρ S hρ₂ A h O' Ofull hD hJ]
+  have h1 : (fun i => O' (Sum.inl (preD (A.run Ofull) i)))
+      = fun i => Ofull (ι (preD (A.run Ofull) i)) := by
+    funext i
+    exact (hD (preD (A.run Ofull) i)).symm
+  have h2 : (fun j => O' (Sum.inl (ptsD (A.run Ofull) j)))
+      = fun j => Ofull (ι (ptsD (A.run Ofull) j)) := by
+    funext j
+    exact (hD (ptsD (A.run Ofull) j)).symm
+  rw [h1, h2]
+
+open Classical in
+/-- **The exported arbitrary-domain pricing.** A bounded-query adversary over an arbitrary —
+possibly infinite — oracle domain, playing a game whose challenge points factor through a
+designated finite domain along a partial retraction, is priced by any bound that holds uniformly
+for equally-bounded adversaries over the designated domain alone: split the machine
+(`OracleComp.splitDomain` — game points keep reading the designated table, junk queries read the
+finite remainder) and marginalize the junk table by table (`fsWinsFull_restrictSum_le`).
+
+`fsWinsFull_splitDomain` ties the priced finite game to the original per table, so this is the
+composed transport: instantiate `T_D` with the deployed bounded transcript domain,
+`ι := Subtype.val`, `ρ := truncateTranscript`, and `hβ` with the deployed capstone's bound —
+which depends on the adversary only through its query budget and the textbook-DL advantage of
+its relation finder. -/
+theorem fsWinsFull_unbounded_measure_le {T T_D : Type*} [DecidableEq T]
+    [Fintype T_D] [DecidableEq T_D] {m k : ℕ}
+    (ι : T_D → T) (ρ : T → Option T_D)
+    (A : OracleComp T F P) {Q : ℕ} (hQ : A.QueryBound Q)
+    (accept : P → (Fin m → F) → (Fin k → F) → Prop)
+    (preD : P → Fin m → T_D) (ptsD : P → Fin k → T_D) {β : ℝ≥0∞}
+    (hβ : ∀ A₀ : OracleComp T_D F P, A₀.QueryBound Q →
+      (PMF.uniformOfFintype (T_D → F)).toOuterMeasure
+        {O : T_D → F | fsWinsFull A₀ accept preD ptsD O} ≤ β) :
+    (PMF.uniformOfFintype ((T_D ⊕ {t // t ∈ A.reachSet}) → F)).toOuterMeasure
+      {O' : (T_D ⊕ {t // t ∈ A.reachSet}) → F |
+        fsWinsFull (A.splitDomain ι ρ A.reachSet (Finset.Subset.refl _)) accept
+          (fun p i => Sum.inl (preD p i)) (fun p j => Sum.inl (ptsD p j)) O'} ≤ β :=
+  fsWinsFull_restrictSum_le _ accept preD ptsD (fun j =>
+    hβ _ (OracleComp.queryBound_restrictSum
+      (OracleComp.queryBound_splitDomain ι ρ A.reachSet hQ (Finset.Subset.refl _)) j))
+
 end Reduction
+
+section DeployedRetraction
+
+variable {F G : Type*}
+
+/-- The deployed partial retraction: an arbitrary transcript retracts to the bounded domain
+exactly when its length is within the bound. -/
+def truncateTranscript (L : ℕ) (t : List (TranscriptElt F G)) :
+    Option (BTranscript F G L) :=
+  if h : t.length ≤ L then some ⟨t, h⟩ else none
+
+theorem truncateTranscript_val (L : ℕ) (t : BTranscript F G L) :
+    truncateTranscript L t.val = some t := by
+  rw [truncateTranscript, dif_pos t.prop]
+  rfl
+
+theorem truncateTranscript_eq_some (L : ℕ) {t : List (TranscriptElt F G)}
+    {tD : BTranscript F G L} (h : truncateTranscript L t = some tD) : t = tD.val := by
+  rw [truncateTranscript] at h
+  split at h
+  · exact congrArg Subtype.val (Option.some.inj h)
+  · exact absurd h (by simp)
+
+end DeployedRetraction
 
 end Zcash.Snark
