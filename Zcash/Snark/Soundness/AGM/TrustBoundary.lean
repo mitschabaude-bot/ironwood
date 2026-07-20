@@ -70,7 +70,38 @@ assert_no_sorry ComputedAlgebraicFSFamily.snarkFailure_prob_le_of_generatorRO_te
 assert_no_sorry ComputedAlgebraicFSFamily.binding_prob_le_of_textbookDL
 assert_no_sorry ComputedAlgebraicFSFamily.binding_prob_le_of_uniformURS_textbookDL
 assert_no_sorry ComputedAlgebraicFSFamily.binding_prob_le_of_generatorRO_textbookDL
+assert_no_sorry ComputedAlgebraicFSFamily.ReductionEfficient
+assert_no_sorry ComputedAlgebraicFSFamily.reductionEfficient_exists
+assert_no_sorry ComputedAlgebraicFSFamily.instanceAttempt_runs_eq
+assert_no_sorry ComputedAlgebraicFSFamily.reductionEfficient_exponential
+assert_no_sorry ComputedAlgebraicFSFamily.DiscreteLogRelationHardFor
+assert_no_sorry ComputedAlgebraicFSFamily.knowledgeSoundness_under_DL
+assert_no_sorry ComputedAlgebraicFSFamily.binding_under_DL
 assert_no_sorry bindingWin_unbounded_measure_le
+assert_no_sorry queryCharge
+assert_no_sorry queryCharge_sum_mul_le
+assert_no_sorry le_queryCharge_of_mem_queries
+assert_no_sorry mem_queries_dedup
+assert_no_sorry applyUpdates_apply_mem_nodup
+assert_no_sorry queryCharge_sum_mul_le_table_budget
+assert_no_sorry steeredCharge_context_sum_mul_le
+assert_no_sorry steeredCharge_context_sum_mul_le_table_budget
+assert_no_sorry steeredCharge_sum_mul_le
+assert_no_sorry scanCandidate_self
+assert_no_sorry self_mem_goodChallenges_iff
+assert_no_sorry scanRank_insert_erase
+assert_no_sorry scanRank_insert_eq_filter
+assert_no_sorry goodChallengesAt
+assert_no_sorry OracleComp.queries_queryList
+assert_no_sorry recursiveAlgebraicForkFrom_node_runs_le_gated
+assert_no_sorry OracleComp.queries_bind
+assert_no_sorry OracleComp.mem_queries_completing
+assert_no_sorry scanCandidateAt
+assert_no_sorry scanCandidateAt_fork
+assert_no_sorry scanCandidateAt_update
+assert_no_sorry goodChallengesAt_fork
+assert_no_sorry goodChallengesAt_update
+assert_no_sorry sum_card_scanRank_erase_lt_le
 assert_no_sorry OracleComp.restrictSum
 assert_no_sorry fsWinsFull_restrictSum_le
 assert_no_sorry ComputedAlgebraicFSFamilyRand.determinize
@@ -271,11 +302,8 @@ CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
 #guard_msgs (whitespace := lax) in
 #print axioms orchard_deployed_relation_prob_le_of_generatorRO_textbookDL
 
-/-! The end-to-end Fiat–Shamir adversary bounds are the operational deliverables: the deployed
-binding event is charged to the recursive query loss, the `z = 0` slice, and the fixed-slot DL
-term. The pins below record their trusted base. The Vesta endpoints inherit CompElliptic's
-`native_decide` point-count axiom through the `Module Fp VestaG` instance; the fork-spread run-count
-bound is field-generic and does not. -/
+/-! The adversary bounds charge query loss, `z = 0`, and fixed-slot DL. Vesta inherits
+CompElliptic's point-count axiom. A polynomial AFK call bound is unproved; PPT time is external. -/
 
 /-- info: 'Zcash.Snark.ComputedAlgebraicFSFamily.binding_prob_le_of_textbookDL' depends on axioms:
 [propext, Classical.choice, Quot.sound,
@@ -340,6 +368,7 @@ CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
 #guard_msgs (whitespace := lax) in
 #print axioms
   ComputedAlgebraicFSFamilyUnbounded.binding_prob_le_of_unbounded_generatorRO_textbookDL
+
 /-- info: 'Zcash.Snark.ComputedAlgebraicFSFamilyUnboundedRand.snarkFailure_prob_le_of_unboundedRand_generatorRO_textbookDL'
 depends on axioms: [propext, Classical.choice, Quot.sound,
 CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
@@ -368,7 +397,6 @@ CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
 #print axioms
   ComputedAlgebraicFSFamilyUnboundedRand.binding_prob_le_of_unboundedRand_uniformURS_textbookDL
 
-
 /-- info: 'Zcash.Snark.recursiveAlgebraicFork_oracle_tape_sum_runs_le_unconditional' depends on
 axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs (whitespace := lax) in
@@ -385,9 +413,7 @@ CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
 #guard_msgs (whitespace := lax) in
 #print axioms bindingWin_unbounded_measure_le
 
-/-! The executable knowledge-soundness producer drives the computed instance to the deployed SNARK
-dichotomy `S ⊕' relation` from the `AlgebraicDForkCert`, retiring the legacy `hprob` path for the
-constraint conclusion. -/
+/-! The executable producer returns the deployed `S ⊕' relation` dichotomy. -/
 
 /-- info: 'Zcash.Snark.DeployedAlgebraicForkingInstance.runToSnark' depends on axioms: [propext,
 Classical.choice, Quot.sound,
@@ -424,3 +450,89 @@ axioms: [propext, Classical.choice, Quot.sound,
 CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
 #guard_msgs (whitespace := lax) in
 #print axioms ComputedAlgebraicFSFamily.snarkNonRelationFailure_measure_le
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamily.reductionEfficient_exists' depends on axioms:
+[propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms ComputedAlgebraicFSFamily.reductionEfficient_exists
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamily.reductionEfficient_exponential' depends on axioms:
+[propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms ComputedAlgebraicFSFamily.reductionEfficient_exponential
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamily.knowledgeSoundness_under_DL' depends on axioms:
+[propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms ComputedAlgebraicFSFamily.knowledgeSoundness_under_DL
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamily.binding_under_DL' depends on axioms: [propext,
+Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms ComputedAlgebraicFSFamily.binding_under_DL
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamily.snarkFailure_prob_le_of_uniformURS_textbookDL'
+depends on axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms ComputedAlgebraicFSFamily.snarkFailure_prob_le_of_uniformURS_textbookDL
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamilyRand.snarkFailure_prob_le_of_textbookDL_rand'
+depends on axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms ComputedAlgebraicFSFamilyRand.snarkFailure_prob_le_of_textbookDL_rand
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamilyUnbounded.snarkFailure_prob_le_of_unbounded_uniformURS_textbookDL'
+depends on axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms
+  ComputedAlgebraicFSFamilyUnbounded.snarkFailure_prob_le_of_unbounded_uniformURS_textbookDL
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamilyUnbounded.binding_prob_le_of_unbounded_uniformURS_textbookDL'
+depends on axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms
+  ComputedAlgebraicFSFamilyUnbounded.binding_prob_le_of_unbounded_uniformURS_textbookDL
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamily.instanceAttempt_runs_eq' depends on axioms:
+[propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms ComputedAlgebraicFSFamily.instanceAttempt_runs_eq
+
+/-- info: 'Zcash.Snark.uniformURS_basis_transfer' depends on axioms: [propext, Classical.choice,
+Quot.sound, CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms uniformURS_basis_transfer
+
+/-- info: 'Zcash.Snark.recursiveAlgebraicFork_sum_runs_le_unconditional' depends on axioms:
+[propext, Classical.choice, Quot.sound] -/
+#guard_msgs (whitespace := lax) in
+#print axioms recursiveAlgebraicFork_sum_runs_le_unconditional
+
+/-- info: 'Zcash.Snark.queryCharge_sum_mul_le_table_budget' depends on axioms: [propext,
+Classical.choice, Quot.sound] -/
+#guard_msgs (whitespace := lax) in
+#print axioms queryCharge_sum_mul_le_table_budget
+
+/-- info: 'Zcash.Snark.steeredCharge_context_sum_mul_le_table_budget' depends on axioms: [propext,
+Classical.choice, Quot.sound] -/
+#guard_msgs (whitespace := lax) in
+#print axioms steeredCharge_context_sum_mul_le_table_budget
+
+/-- info: 'Zcash.Snark.sum_card_scanRank_erase_lt_le' depends on axioms: [propext,
+Classical.choice, Quot.sound] -/
+#guard_msgs (whitespace := lax) in
+#print axioms sum_card_scanRank_erase_lt_le
+
+/-- info: 'Zcash.Snark.recursiveAlgebraicForkFrom_node_runs_le_gated' depends on axioms: [propext,
+Classical.choice, Quot.sound] -/
+#guard_msgs (whitespace := lax) in
+#print axioms recursiveAlgebraicForkFrom_node_runs_le_gated

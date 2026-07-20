@@ -4,6 +4,7 @@ import Zcash.Snark.Soundness.Forking.Adversary.PreIpa
 import Zcash.Snark.Soundness.Forking.Adversary.DomainReduction
 import Zcash.Snark.Soundness.Forking.Adversary.Recursive
 import Zcash.Snark.Soundness.Forking.Adversary.ExpectedRuns
+import Zcash.Snark.Soundness.Forking.Adversary.ExpectedRunsPoly
 import Zcash.Snark.Soundness.Forking.Adversary.Algebraic
 import Zcash.Snark.Soundness.Forking.Adversary.Provenance
 

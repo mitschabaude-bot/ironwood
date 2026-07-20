@@ -8,22 +8,8 @@ import Zcash.Snark.Soundness.Forking.Adversary.DomainReduction
 /-!
 # Fiat–Shamir to AGM handoff
 
-This module connects the bounded-query Fiat–Shamir adversary to the AGM data consumed by the
-reduction.
-
-## Proof route
-
-1. `AlgebraicWfProof` carries the multiopen, `S`, and IPA-round representations.
-2. The recursive extractor computes and validates an `AlgebraicDForkCert`.
-3. `DeployedAlgebraicForkingInstance.runRelation` computes a relation from either kernel output.
-4. The probability theorem charges query loss, the `z = 0` slice, and the fixed-slot DL loss.
-
-## Binding event
-
-A binding attack is verifier acceptance with a value mismatch against the carried aggregate
-opening. It is not nonexistence of an opening, which would be nearly vacuous in a prime-order group
-(see `Zcash.Security.BindingSignature.Balance`). A clean extracted opening on a mismatch run gives
-a commitment collision; the other kernel branch already gives a relation.
+Run the recursive extractor on a bounded-query adversary and package its certificate for the AGM
+reduction. Acceptance with an opening mismatch yields a relation.
 -/
 
 namespace Zcash.Snark
@@ -210,9 +196,7 @@ def erase {shape : Shape} {basis : AugmentedIndex (2 ^ shape.k) → VestaG}
 
 end AlgebraicProofString
 
-/-- The algebraic proof and its aggregate `(g,U,W)` coordinates after transcript assembly.
-`AlgebraicProofString` represents each emitted point; `aMulti` and `s` aggregate those coordinates.
-Honest proofs have `multiU = sU = 0`. -/
+/-- An algebraic proof and its aggregate `(g,U,W)` coordinates after transcript assembly. -/
 structure AlgebraicWfProof {shape : Shape}
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
     (vk : VerifyingKey shape Fp VestaG) where
@@ -310,8 +294,7 @@ theorem preIpaTranscript_eq_of_fullPrefix_eq {shape : Shape}
           rw [← hq, List.take_append_of_le_length (le_refl _)]
           simp
 
-/-- The deployed binding attack: verifier acceptance while the accepted value, including the
-declared `U` shift, differs from the value of `aMulti`. See the module's binding-event note. -/
+/-- Acceptance with a carried aggregate opening that mismatches the accepted value. -/
 def fullAlgebraicBindingAttack {shape : Shape}
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
     (vk : VerifyingKey shape Fp VestaG) (p : AlgebraicWfProof basis vk)
@@ -341,8 +324,7 @@ def fullAlgebraicAccept {shape : Shape}
       (ursOfAugmentedBasis shape.k basis).w (ursOfAugmentedBasis shape.k basis).u
       vk p.proof.1 (chRecord ν χ)
 
-/-- Verifier acceptance with the nonzero folding challenge required by the IPA extractor. The
-binding mismatch is checked only when converting the extracted instance to a relation. -/
+/-- Verifier acceptance with the nonzero folding challenge required by extraction. -/
 def fullAlgebraicAcceptZ {shape : Shape}
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
     (vk : VerifyingKey shape Fp VestaG) (p : AlgebraicWfProof basis vk)
@@ -656,9 +638,7 @@ def deployedAlgebraicInstanceOfCert {shape : Shape}
       (multiopenValue vk p.proof.1 (chRecord ν (fun _ => 0))) (ν 9)
     hvalid := hvalid }
 
-/-- On a mismatch run, a checked instance always yields an explicit relation: the kernel's
-relation branch directly, or the commitment collision between its clean opening and the carried
-aggregate opening `aMulti`. -/
+/-- Every checked mismatch instance yields an explicit relation. -/
 theorem deployedAlgebraicInstanceOfCert_runRelation_isSome
     {shape : Shape} {basis : AugmentedIndex (2 ^ shape.k) → VestaG}
     {vk : VerifyingKey shape Fp VestaG}
@@ -791,9 +771,7 @@ theorem computedAlgebraicInstanceFailure_measure_le {shape : Shape}
     (computedAlgebraicInstanceFailureSet_subset_certFailure basis vk init A tape)) ?_
   exact algebraicForkCertFailure_measure_le basis vk init A tape hQ
 
-/-- A computed instance obtained on a real binding-attack run always returns an explicit
-relation: the kernel's relation branch, or the collision of its clean opening with the carried
-aggregate opening. -/
+/-- A computed binding-attack instance always returns an explicit relation. -/
 theorem computedDeployedAlgebraicInstance_runRelation_isSome
     {shape : Shape}
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
@@ -841,19 +819,9 @@ theorem computedDeployedAlgebraicInstanceFromTape_runRelation_isSome
 
 /-! ## Executable knowledge soundness
 
-The computed AGM instance runs to an IPA opening or an explicit relation. The opening branch feeds
-the extracted witness to the deployed circuit encoder — the same conditional constraint interface
-(`hcirc`/`hencodes`) the deployed `_of_forked` capstones take, `hcirc` constraining the single
-extracted witness the run yields, not every opening. The relation branch passes the discrete-log
-break through. This drives the deployed knowledge-soundness dichotomy `S ⊕' relation` from the
-executable `AlgebraicDForkCert`, rather than the legacy existential fork above the knowledge error
-(`hprob`). Making `circuitSat` faithful (the multiopen decode binding) is the remaining
-constraint-decode gap. -/
+`runToSnark` returns `S ⊕' relation` under explicit circuit and encoding hypotheses. -/
 
-/-- **Executable SNARK dichotomy from one computed instance.** Either the deployed circuit statement
-`S` holds (via the run's clean opening and `hcirc` at that single extracted witness) or an explicit
-augmented-basis relation is produced (a discrete-log break). No `hprob`/`ForkedTranscript`: the
-opening is the computed `DeployedAlgebraicForkingInstance.run` output. -/
+/-- Turn one computed instance into the circuit statement `S` or an explicit relation. -/
 def DeployedAlgebraicForkingInstance.runToSnark {k : ℕ}
     {basis : AugmentedIndex (2 ^ k) → VestaG}
     (x : DeployedAlgebraicForkingInstance (G := VestaG) k basis)
@@ -908,9 +876,7 @@ def relationFinder (family : ComputedAlgebraicFSFamily shape) :
     | none => none
     | some x => x.runRelation
 
-/-- The finder that returns only the *direct relation* branch of the computed run. On a produced
-instance, `runToSnark` falls into its relation (discrete-log break) branch exactly when this finder
-succeeds; otherwise it yields the circuit statement `S`. -/
+/-- Return only the direct relation branch of the computed run. -/
 def snarkRelationFinder (family : ComputedAlgebraicFSFamily shape) :
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG) → family.Coins →
       Option (AlgebraicRelationWitness (F := Fp) basis) :=
@@ -922,12 +888,7 @@ def snarkRelationFinder (family : ComputedAlgebraicFSFamily shape) :
       | PSum.inr rel => some rel
       | PSum.inl _ => none
 
-/-- **Direct-relation branch bounded by discrete log.** Under textbook DL hardness for the
-run-relation finder, the probability that the computed producer returns its *direct relation* branch
-(`run = inr`) is at most `|basis|` times the DL advantage — a fixed-slot reduction instance. This is
-one term only: it carries no acceptance event, no circuit statement `S`, and no extractor-failure
-slice. `snarkFailure_prob_le_of_textbookDL` combines it with those into the full
-`accept ∧ no clean opening` knowledge-soundness bound. -/
+/-- Bound the direct relation branch by `|basis|` times the textbook-DL advantage. -/
 theorem snarkRelation_prob_le_of_textbookDL
     (B : VestaG) (family : ComputedAlgebraicFSFamily shape) {bound : ℝ≥0∞}
     (hDL : TextbookDLWithCoinsAdvantageLE B family.snarkRelationFinder bound) :
@@ -937,7 +898,7 @@ theorem snarkRelation_prob_le_of_textbookDL
       ≤ Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound :=
   relationWithCoins_prob_le_of_textbookDL B family.snarkRelationFinder hDL
 
-/-- The real binding-attack event for one oracle table. -/
+/-- The modeled deployed binding-attack event for one oracle table. -/
 def bindingWin (family : ComputedAlgebraicFSFamily shape)
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG) (O : family.Coins) : Prop :=
   fsWinsFull (family.adversary basis) (fullAlgebraicBindingAttack basis (family.vk basis))
@@ -996,9 +957,7 @@ theorem failedBinding_measure_le (family : ComputedAlgebraicFSFamily shape)
     (le_trans (MeasureTheory.measure_union_le _ _) ?_)
   exact add_le_add haccept hzero
 
-/-- On a binding-attack run, every returned instance is retained by the relation finder: the
-mismatch with the carried aggregate opening turns even a clean extracted opening into a
-commitment-collision relation. -/
+/-- The relation finder retains every instance returned on a binding-attack run. -/
 theorem relationFinder_isSome_of_bindingWin
     (family : ComputedAlgebraicFSFamily shape)
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG) (coins : family.Coins)
@@ -1012,7 +971,7 @@ theorem relationFinder_isSome_of_bindingWin
   rw [hx]
   exact hrel
 
-/-- Basis/coin pairs on which the real binding attack occurs and the recursive extractor returns an
+/-- Basis/coin pairs on which the modeled binding attack occurs and the recursive extractor returns an
 instance. -/
 noncomputable def successfulBindingSet
     (B : VestaG) (family : ComputedAlgebraicFSFamily shape) :
@@ -1022,7 +981,7 @@ noncomputable def successfulBindingSet
     family.bindingWin (scalarBasis B p.1) p.2 ∧
       (family.instanceAttempt (scalarBasis B p.1) p.2).output.isSome
 
-/-- All real binding runs, before extraction success is required. -/
+/-- All modeled binding runs, before extraction success is required. -/
 noncomputable def bindingSet
     (B : VestaG) (family : ComputedAlgebraicFSFamily shape) :
     Finset ((AugmentedIndex (2 ^ shape.k) → Fp) × family.Coins) := by
@@ -1034,7 +993,7 @@ def bindingEvent (family : ComputedAlgebraicFSFamily shape) :
     Set ((AugmentedIndex (2 ^ shape.k) → VestaG) × family.Coins) :=
   {p | family.bindingWin p.1 p.2}
 
-/-- Real binding runs lost by the executable producer. -/
+/-- Modeled binding runs lost by the executable producer. -/
 noncomputable def failedBindingSet
     (B : VestaG) (family : ComputedAlgebraicFSFamily shape) :
     Finset ((AugmentedIndex (2 ^ shape.k) → Fp) × family.Coins) := by
@@ -1089,7 +1048,7 @@ theorem successfulBindingSet_subset_relSet
   simp only [relSetWithCoins, Finset.mem_filter, Finset.mem_univ, true_and]
   exact family.relationFinder_isSome_of_bindingWin (scalarBasis B p.1) p.2 hp.1 hp.2
 
-/-- Plain-DL hardness bounds the probability of real binding runs on which the executable extractor
+/-- Plain-DL hardness bounds the probability of modeled binding runs on which the executable extractor
 returns an AGM instance. -/
 theorem successfulBinding_prob_le_of_textbookDL
     (B : VestaG) (family : ComputedAlgebraicFSFamily shape) {bound : ℝ≥0∞}
@@ -1101,7 +1060,7 @@ theorem successfulBinding_prob_le_of_textbookDL
   refine le_trans (MeasureTheory.measure_mono (successfulBindingSet_subset_relSet B family)) ?_
   exact relationWithCoins_prob_le_of_textbookDL B family.relationFinder hDL
 
-/-- End-to-end computed probability bound: the real deployed binding event is at most the
+/-- Composed probability bound: the modeled deployed binding event is at most the
 recursive query loss, the adaptive `z = 0` loss, and the fixed-slot plain-DL term. -/
 theorem binding_prob_le_of_textbookDL
     (B : VestaG) (family : ComputedAlgebraicFSFamily shape) {bound : ℝ≥0∞}
@@ -1119,8 +1078,7 @@ theorem binding_prob_le_of_textbookDL
   have hfailure := failedBindingSet_prob_le B family
   exact add_le_add hsuccess hfailure |>.trans_eq (by ac_rfl)
 
-/-- Transfer the computed binding experiment from an explicit uniform-URS setup to the sampled
-scalar basis used by the fixed-slot reduction. Extractor coins remain independent on both sides. -/
+/-- Transfer the binding experiment across a uniform-URS basis identification. -/
 theorem binding_prob_eq_of_uniformURS {Ω : Type*} (setup : PMF Ω)
     (B : VestaG) (family : ComputedAlgebraicFSFamily shape)
     (basisOf : Ω → AugmentedIndex (2 ^ shape.k) → VestaG)
@@ -1167,7 +1125,7 @@ theorem binding_prob_eq_of_uniformURS {Ω : Type*} (setup : PMF Ω)
       simp only [Set.mem_preimage, bindingEvent, Set.mem_setOf_eq, bindingSet,
         Finset.mem_coe, Finset.mem_filter, Finset.mem_univ, true_and]
 
-/-- End-to-end computed bound under an explicit uniform-URS setup distribution. -/
+/-- The composed binding bound under an explicit uniform-URS setup distribution. -/
 theorem binding_prob_le_of_uniformURS_textbookDL {Ω : Type*} (setup : PMF Ω)
     (B : VestaG) (family : ComputedAlgebraicFSFamily shape)
     (basisOf : Ω → AugmentedIndex (2 ^ shape.k) → VestaG)
@@ -1181,7 +1139,7 @@ theorem binding_prob_le_of_uniformURS_textbookDL {Ω : Type*} (setup : PMF Ω)
   rw [binding_prob_eq_of_uniformURS setup B family basisOf hURS]
   exact binding_prob_le_of_textbookDL B family hDL
 
-/-- End-to-end computed bound in the uniform generator-random-oracle setup model. -/
+/-- The composed binding bound in the uniform generator-random-oracle setup model. -/
 theorem binding_prob_le_of_generatorRO_textbookDL
     {T : Type*} [DecidableEq T] (B : VestaG) (hB : B ≠ 0)
     (query : AugmentedIndex (2 ^ shape.k) → T) (hquery : Function.Injective query)
@@ -1197,13 +1155,9 @@ theorem binding_prob_le_of_generatorRO_textbookDL
     (orchardGeneratorROBasis query)
     (orchard_uniformURSIdentification_of_generatorRO shape.k B hB query hquery) hDL
 
-/-! ## Knowledge-soundness probability composition
+/-! ## Clean-opening probability
 
-`runToSnark` yields the circuit statement `S` exactly on the clean-opening branch (`run = inl`).
-The theorem below bounds the complementary event — an accepting run on which the producer returns
-no clean opening — by the recursive query loss plus `|basis|` times the discrete-log advantage. The
-two failure modes are a missing instance and the direct-relation branch. This is the composition
-`snarkRelation_prob_le_of_textbookDL` alone does not carry. -/
+Charge missing clean openings to extraction failure or a direct relation. -/
 
 /-- A produced instance whose run is a clean IPA opening — the branch on which `runToSnark` returns
 `S`. Its negation is a missing instance or the direct-relation branch. -/
@@ -1211,8 +1165,7 @@ def hasCleanOpening (family : ComputedAlgebraicFSFamily shape)
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG) (coins : family.Coins) : Prop :=
   ∃ x, (family.instanceAttempt basis coins).output = some x ∧ ∃ o, x.run = PSum.inl o
 
-/-- Accepting runs (`z ≠ 0`) on which the operational producer returns no instance. The acceptance
-event is the plain deployed accept, not a binding mismatch (contrast `failedBinding`). -/
+/-- Nonzero-challenge accepting runs on which the producer returns no instance. -/
 def acceptExtractionFailure (family : ComputedAlgebraicFSFamily shape)
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG) : Set family.Coins :=
   {coins | fsWinsFull (family.adversary basis) (fullAlgebraicAcceptZ basis (family.vk basis))
@@ -1231,9 +1184,7 @@ theorem acceptExtractionFailure_measure_le (family : ComputedAlgebraicFSFamily s
   exact computedAlgebraicInstanceFailure_measure_le basis (family.vk basis) family.init
     (family.adversary basis) tape (family.queryBound basis)
 
-/-- The non-relation failure modes on one basis: an accepting run (`z ≠ 0`) with no instance, or a
-plain accepting run with `z = 0`. Together these are the SNARK failure minus the direct-relation
-(discrete-log) branch. -/
+/-- Non-relation failures: no instance on a `z ≠ 0` accepting run, or an accepting `z = 0` run. -/
 def snarkNonRelationFailure (family : ComputedAlgebraicFSFamily shape)
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG) : Set family.Coins :=
   family.acceptExtractionFailure basis ∪
@@ -1262,12 +1213,8 @@ theorem snarkNonRelationFailure_measure_le (family : ComputedAlgebraicFSFamily s
     (algebraicFullPrefixesPre family.init) (algebraicFullPrefixes family.init) 10
     (family.queryBound basis)
 
-/-- **Knowledge-soundness probability composition.** On an accepting run (`z ≠ 0`), the executable
-producer returns a clean opening — from which `runToSnark` yields the circuit statement `S` — except
-with probability at most the recursive query loss `(Q+k)·3/|Fp|` plus `|basis|` times the
-discrete-log advantage. The failure modes are a missing instance (`acceptExtractionFailure`) and the
-direct-relation branch (a discrete-log break, `snarkRelation_prob_le_of_textbookDL`). The residual
-`z = 0` slice (a further `(Q+1)/|Fp|`) is excluded by the `z ≠ 0` guard. -/
+/-- On `z ≠ 0` accepting runs, bound failure to return a clean opening by
+`(Q+k)·3/|Fp| + |basis|·DLadv`. -/
 theorem snarkFailure_prob_le_of_textbookDL
     (B : VestaG) (family : ComputedAlgebraicFSFamily shape) {bound : ℝ≥0∞}
     (hDL : TextbookDLWithCoinsAdvantageLE B family.snarkRelationFinder bound) :
@@ -1309,11 +1256,7 @@ theorem snarkFailure_prob_le_of_textbookDL
     intro coeffs
     exact family.acceptExtractionFailure_measure_le (scalarBasis B coeffs)
 
-/-- **Full-acceptance knowledge-soundness bound.** As `snarkFailure_prob_le_of_textbookDL`, but the
-acceptance event is plain deployed acceptance (`fullAlgebraicAccept`) with no `z ≠ 0` guard: the
-`z = 0` slice is added back as a further `(Q+1)/|Fp|` (`fsAdvantageFull_zero_slice_le`). So on *any*
-accepting run the producer returns a clean opening — from which `runToSnark` yields `S` — except with
-probability the recursive query loss, the `z = 0` slice, and `|basis|` times the DL advantage. -/
+/-- Full-acceptance clean-opening bound, adding the `(Q+1)/|Fp|` zero-challenge slice. -/
 theorem snarkFailure_prob_le_of_textbookDL_full
     (B : VestaG) (family : ComputedAlgebraicFSFamily shape) {bound : ℝ≥0∞}
     (hDL : TextbookDLWithCoinsAdvantageLE B family.snarkRelationFinder bound) :
@@ -1381,16 +1324,15 @@ theorem snarkFailure_prob_le_of_textbookDL_full
     exact (add_le_add (snarkFailure_prob_le_of_textbookDL B family hDL) hzero).trans_eq
       (by ac_rfl)
 
-/-- The full-acceptance knowledge-soundness failure event on an explicit augmented basis and
-extractor coins: plain deployed acceptance with no clean opening. -/
+/-- The full-acceptance clean-opening failure event on an explicit augmented basis and extractor
+coins: plain deployed acceptance with no clean opening. -/
 def snarkFailureEvent (family : ComputedAlgebraicFSFamily shape) :
     Set ((AugmentedIndex (2 ^ shape.k) → VestaG) × family.Coins) :=
   {q | fsWinsFull (family.adversary q.1) (fullAlgebraicAccept q.1 (family.vk q.1))
       (algebraicFullPrefixesPre family.init) (algebraicFullPrefixes family.init) q.2.1 ∧
     ¬ family.hasCleanOpening q.1 q.2}
 
-/-- Transfer the SNARK-failure experiment from an explicit uniform-URS setup to the sampled scalar
-basis (`snarkFailure_prob_eq`-style, for `snarkFailureEvent`). Extractor coins stay independent. -/
+/-- Transfer the SNARK-failure experiment across a uniform-URS basis identification. -/
 theorem snarkFailure_prob_eq_of_uniformURS {Ω : Type*} (setup : PMF Ω)
     (B : VestaG) (family : ComputedAlgebraicFSFamily shape)
     (basisOf : Ω → AugmentedIndex (2 ^ shape.k) → VestaG)
@@ -1426,7 +1368,7 @@ theorem snarkFailure_prob_eq_of_uniformURS {Ω : Type*} (setup : PMF Ω)
   rw [PMF.toOuterMeasure_map_apply, PMF.toOuterMeasure_map_apply] at hmeasure
   rw [hmeasure, independentProductPMF_uniform]
 
-/-- End-to-end full-acceptance knowledge-soundness bound under an explicit uniform-URS setup. -/
+/-- The full-acceptance clean-opening bound under an explicit uniform-URS setup. -/
 theorem snarkFailure_prob_le_of_uniformURS_textbookDL {Ω : Type*} (setup : PMF Ω)
     (B : VestaG) (family : ComputedAlgebraicFSFamily shape)
     (basisOf : Ω → AugmentedIndex (2 ^ shape.k) → VestaG)
@@ -1440,10 +1382,7 @@ theorem snarkFailure_prob_le_of_uniformURS_textbookDL {Ω : Type*} (setup : PMF 
   rw [snarkFailure_prob_eq_of_uniformURS setup B family basisOf hURS]
   exact snarkFailure_prob_le_of_textbookDL_full B family hDL
 
-/-- **Full-acceptance knowledge soundness in the generator-random-oracle setup model.** On any
-accepting run over the generator-RO URS, the executable producer returns a clean opening — from which
-`runToSnark` yields `S` — except with probability the recursive query loss, the `z = 0` slice, and
-`|basis|` times the textbook-DL advantage. -/
+/-- Generator-RO form of the full-acceptance clean-opening bound. -/
 theorem snarkFailure_prob_le_of_generatorRO_textbookDL
     {T : Type*} [DecidableEq T] (B : VestaG) (hB : B ≠ 0)
     (query : AugmentedIndex (2 ^ shape.k) → T) (hquery : Function.Injective query)
@@ -1459,21 +1398,106 @@ theorem snarkFailure_prob_le_of_generatorRO_textbookDL
     (orchardGeneratorROBasis query)
     (orchard_uniformURSIdentification_of_generatorRO shape.k B hB query hquery) hDL
 
+/-! ### Discrete-log hardness and runtime
+
+Probability bounds need no runtime premise. The DL-hardness endpoint still needs a polynomial AFK
+black-box call bound; adversary PPT time remains external. -/
+
+/-- The extractor makes at most `R` expected black-box adversary calls for every basis. -/
+def ReductionEfficient (family : ComputedAlgebraicFSFamily shape) (R : ℕ) : Prop :=
+  ∀ basis : AugmentedIndex (2 ^ shape.k) → VestaG,
+    ∑ coins : family.Coins, (family.instanceAttempt basis coins).runs
+      ≤ R * Fintype.card family.Coins
+
+/-- Every fixed family has a finite call bound; this is not a uniform asymptotic bound. -/
+theorem reductionEfficient_exists (family : ComputedAlgebraicFSFamily shape) :
+    ∃ R, family.ReductionEfficient R := by
+  classical
+  letI : Fintype VestaG := Fintype.ofFinite VestaG
+  refine ⟨Finset.univ.sup fun basis => ∑ coins : family.Coins,
+      (family.instanceAttempt basis coins).runs, fun basis => ?_⟩
+  calc ∑ coins : family.Coins, (family.instanceAttempt basis coins).runs
+      ≤ Finset.univ.sup fun b => ∑ coins : family.Coins,
+          (family.instanceAttempt b coins).runs :=
+        Finset.le_sup (f := fun b => ∑ coins : family.Coins,
+          (family.instanceAttempt b coins).runs) (Finset.mem_univ basis)
+    _ ≤ (Finset.univ.sup fun b => ∑ coins : family.Coins,
+          (family.instanceAttempt b coins).runs) * Fintype.card family.Coins :=
+        Nat.le_mul_of_pos_right _ Fintype.card_pos
+
+/-- `instanceAttempt.runs` is the recursive extractor's adversary-call count. -/
+theorem instanceAttempt_runs_eq (family : ComputedAlgebraicFSFamily shape)
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG) (coins : family.Coins) :
+    (family.instanceAttempt basis coins).runs
+      = (algebraicForkCertAttempt basis (family.vk basis) family.init
+          (family.adversary basis) coins.1 coins.2.toCoins).runs := by
+  unfold instanceAttempt computedDeployedAlgebraicInstanceFromTape
+  simp only [computedDeployedAlgebraicInstance]
+  split
+  · rfl
+  · split <;> rfl
+
+/-- The unconditional call bound `(2·|F|+1)^k` is not field-independent polynomial AFK. -/
+theorem reductionEfficient_exponential (family : ComputedAlgebraicFSFamily shape) :
+    family.ReductionEfficient ((2 * Fintype.card Fp + 1) ^ shape.k) := by
+  intro basis
+  rw [Finset.sum_congr rfl (fun coins _ => family.instanceAttempt_runs_eq basis coins)]
+  exact recursiveAlgebraicFork_oracle_tape_sum_runs_le_unconditional basis shape.k
+    (family.adversary basis) (algebraicFullPrefixes family.init) (fun p => p.rounds)
+    (fun p => (p.proof.1.ipaC, p.proof.1.ipaF))
+    (algebraicTableAcceptZ basis (family.vk basis) family.init) _
+
+/-- Fixed-slot DL hardness at advantage `ε`, as it applies to *one* reduction family with expected
+call bound `R`: if the family's extractor meets the call bound, its two derived solvers have
+advantage at most `ε`.  Stated per family, not `∀`-quantified over families: a family's adversary
+is an arbitrary Lean function whose own running time is not encoded, so a family-universal form
+would range over computationally unbounded solvers and could not be soundly assumed at
+cryptographic `ε`.  For a PPT family this predicate is what standard DL hardness supplies;
+PPT-ness of the family remains the external premise. -/
+def DiscreteLogRelationHardFor (B : VestaG) (family : ComputedAlgebraicFSFamily shape)
+    (R : ℕ) (ε : ℝ≥0∞) : Prop :=
+  family.ReductionEfficient R →
+    TextbookDLWithCoinsAdvantageLE B family.relationFinder ε ∧
+    TextbookDLWithCoinsAdvantageLE B family.snarkRelationFinder ε
+
+/-- Under DL hardness for this family and call bound `R`, bound clean-opening failure by the
+recursive losses and `|basis|·ε`; a polynomial AFK instantiation of `R` remains open. -/
+theorem knowledgeSoundness_under_DL
+    (B : VestaG) (family : ComputedAlgebraicFSFamily shape) {R : ℕ} {ε : ℝ≥0∞}
+    (hHard : DiscreteLogRelationHardFor B family R ε)
+    (hEff : family.ReductionEfficient R) :
+    (PMF.uniformOfFintype
+        ((AugmentedIndex (2 ^ shape.k) → Fp) × family.Coins)).toOuterMeasure
+        {p | fsWinsFull (family.adversary (scalarBasis B p.1))
+              (fullAlgebraicAccept (scalarBasis B p.1) (family.vk (scalarBasis B p.1)))
+              (algebraicFullPrefixesPre family.init) (algebraicFullPrefixes family.init) p.2.1 ∧
+            ¬ family.hasCleanOpening (scalarBasis B p.1) p.2}
+      ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
+        (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
+        Fintype.card (AugmentedIndex (2 ^ shape.k)) * ε :=
+  snarkFailure_prob_le_of_textbookDL_full B family (hHard hEff).2
+
+/-- Binding dual of `knowledgeSoundness_under_DL`. -/
+theorem binding_under_DL
+    (B : VestaG) (family : ComputedAlgebraicFSFamily shape) {R : ℕ} {ε : ℝ≥0∞}
+    (hHard : DiscreteLogRelationHardFor B family R ε)
+    (hEff : family.ReductionEfficient R) :
+    (PMF.uniformOfFintype
+        ((AugmentedIndex (2 ^ shape.k) → Fp) × family.Coins)).toOuterMeasure
+        (bindingSet B family)
+      ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
+        (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
+        Fintype.card (AugmentedIndex (2 ^ shape.k)) * ε :=
+  binding_prob_le_of_textbookDL B family (hHard hEff).1
+
 end ComputedAlgebraicFSFamily
 
 /-! ## Unbounded oracle domain
 
-`bindingWin` reads only the oracle table, so the deployed binding event composes with the domain
-reduction. A bounded-query adversary over the *unbounded* transcript domain has its attack modelled
-on the finite reachable-support split, whose measure inherits any bound holding uniformly over
-bounded-transcript machines. Blake2b itself remains a random oracle; `truncateTranscript` is the
-deployed retraction to bounded transcripts. -/
+Bounded-query adversaries over transcript lists reduce to their finite reachable-support split.
+Blake2b remains idealized; `truncateTranscript` is only the deployed bounded-transcript retraction. -/
 
-/-- The deployed binding attack of a bounded-query adversary over the *unbounded* transcript domain
-is charged on the finite reachable-support split. Any bound holding uniformly for every
-bounded-transcript `Q`-query machine transfers to the split-domain binding event. This instantiates
-`fsWinsFull_unbounded_measure_le` with the deployed `Subtype.val`/`truncateTranscript` retraction
-and the binding accept predicate. -/
+/-- Transfer a uniform bounded-transcript binding bound to the reachable-support split. -/
 theorem bindingWin_unbounded_measure_le {shape : Shape}
     {basis : AugmentedIndex (2 ^ shape.k) → VestaG} {vk : VerifyingKey shape Fp VestaG}
     (init : List (TranscriptElt Fp VestaG))
@@ -1509,13 +1533,9 @@ theorem bindingWin_unbounded_measure_le {shape : Shape}
 
 /-! ## Randomized adversaries
 
-Private coins form a uniform mixture of deterministic adversaries. The binding bound averages over
-that mixture when the DL hypothesis holds for every member. `fsWinsFull_restrictSum_le` handles
-finite junk oracle points without changing the query budget. -/
+Private coins form a uniform mixture of deterministic adversaries. -/
 
-/-- A basis-indexed family whose adversary additionally draws private coins from a finite type
-`R`, independent of the oracle table and the extractor tape. All members share one transcript
-prefix, so they share one oracle-and-tape coin type. -/
+/-- A basis-indexed adversary family with independent finite private coins. -/
 structure ComputedAlgebraicFSFamilyRand (shape : Shape) (R : Type*) where
   init : List (TranscriptElt Fp VestaG)
   vk : (basis : AugmentedIndex (2 ^ shape.k) → VestaG) → VerifyingKey shape Fp VestaG
@@ -1544,8 +1564,7 @@ abbrev Coins (fam : ComputedAlgebraicFSFamilyRand shape R) :=
     RecursiveForkTape Fp shape.k
 
 open Classical in
-/-- **Randomized-adversary bound.** Averaging deterministic members over uniform private coins
-preserves the query loss, `z = 0` loss, and DL bound. -/
+/-- Average the binding bound over private coins. -/
 theorem binding_prob_le_of_textbookDL_rand [Fintype R] [Nonempty R]
     (B : VestaG) (fam : ComputedAlgebraicFSFamilyRand shape R) {bound : ℝ≥0∞}
     (hDL : ∀ r, TextbookDLWithCoinsAdvantageLE B (fam.determinize r).relationFinder bound) :
@@ -1563,21 +1582,14 @@ theorem binding_prob_le_of_textbookDL_rand [Fintype R] [Nonempty R]
   intro r
   exact ComputedAlgebraicFSFamily.binding_prob_le_of_textbookDL B (fam.determinize r) (hDL r)
 
-/-- Fold the private coin `r` into the DL solver's coins: draw `r` alongside the extractor tape,
-then run the corresponding deterministic member's relation finder. The solver's coin type is
-`fam.Coins × R`. This is the conventional randomized-DL interface — one solver over averaged coins,
-not a separate DL bound for every fixed `r`. -/
+/-- Fold the adversary's private coin into one randomized DL solver. -/
 def foldedRelationFinder (fam : ComputedAlgebraicFSFamilyRand shape R) :
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG) → (fam.Coins × R) →
       Option (AlgebraicRelationWitness (F := Fp) basis) :=
   fun basis p => (fam.determinize p.2).relationFinder basis p.1
 
 open Classical in
-/-- **Randomized-adversary bound, averaged-coin form.** A single textbook-DL bound on the
-`r`-augmented solver (`foldedRelationFinder`, coins `fam.Coins × R`) bounds the averaged binding
-event. Unlike `binding_prob_le_of_textbookDL_rand`, the DL hypothesis is one statement about one
-randomized solver, matching the conventional randomized-DL game; the query and `z = 0` losses carry
-no DL and are charged per member through `failedBinding_measure_le`. -/
+/-- Bound averaged binding from one DL bound on the private-coin-folded solver. -/
 theorem binding_prob_le_of_foldedTextbookDL_rand [Fintype R] [Nonempty R]
     (B : VestaG) (fam : ComputedAlgebraicFSFamilyRand shape R) {bound : ℝ≥0∞}
     (hDL : TextbookDLWithCoinsAdvantageLE B fam.foldedRelationFinder bound) :
@@ -1649,10 +1661,7 @@ theorem binding_prob_le_of_foldedTextbookDL_rand [Fintype R] [Nonempty R]
   exact (add_le_add hsucc hfail).trans_eq (by ac_rfl)
 
 open Classical in
-/-- **Randomized-adversary knowledge-soundness bound.** Averaging deterministic members over uniform
-private coins preserves the full-acceptance SNARK bound: on any accepting run of any member the
-producer returns a clean opening (`runToSnark` yields `S`) except with the query loss, the `z = 0`
-slice, and `|basis|` times the per-member DL advantage. -/
+/-- Average the full-acceptance clean-opening bound over private coins. -/
 theorem snarkFailure_prob_le_of_textbookDL_rand [Fintype R] [Nonempty R]
     (B : VestaG) (fam : ComputedAlgebraicFSFamilyRand shape R) {bound : ℝ≥0∞}
     (hDL : ∀ r, TextbookDLWithCoinsAdvantageLE B (fam.determinize r).snarkRelationFinder bound) :
@@ -1679,19 +1688,14 @@ theorem snarkFailure_prob_le_of_textbookDL_rand [Fintype R] [Nonempty R]
   exact ComputedAlgebraicFSFamily.snarkFailure_prob_le_of_textbookDL_full B
     (fam.determinize r) (hDL r)
 
-/-- Fold the private coin `r` into the run-relation solver's coins: draw `r` alongside the extractor
-tape, then run the corresponding member's `snarkRelationFinder`. -/
+/-- Fold the adversary's private coin into one randomized run-relation solver. -/
 def foldedSnarkRelationFinder (fam : ComputedAlgebraicFSFamilyRand shape R) :
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG) → (fam.Coins × R) →
       Option (AlgebraicRelationWitness (F := Fp) basis) :=
   fun basis p => (fam.determinize p.2).snarkRelationFinder basis p.1
 
 open Classical in
-/-- **Randomized-adversary knowledge soundness, averaged-coin form.** A single textbook-DL bound on
-the `r`-augmented run-relation solver (`foldedSnarkRelationFinder`, coins `fam.Coins × R`) bounds the
-averaged full-acceptance SNARK failure: the direct-relation branch is charged to the folded DL, and
-the query/`z = 0` losses are charged per member with no DL. This is the folded form the unbounded
-endpoint routes through. -/
+/-- Bound averaged clean-opening failure from one DL bound on the private-coin-folded solver. -/
 theorem snarkFailure_prob_le_of_foldedTextbookDL_rand [Fintype R] [Nonempty R]
     (B : VestaG) (fam : ComputedAlgebraicFSFamilyRand shape R) {bound : ℝ≥0∞}
     (hDL : TextbookDLWithCoinsAdvantageLE B fam.foldedSnarkRelationFinder bound) :
@@ -1758,13 +1762,8 @@ end ComputedAlgebraicFSFamilyRand
 
 /-! ## Unbounded-domain fixed-slot endpoint
 
-The arbitrary transcript domain is reduced once, uniformly over the sampled AGM basis.  The union
-of the finitely many reachable supports supplies a common finite junk-oracle type.  Fixing that
-junk table turns every split-domain adversary into a bounded-transcript adversary, so the junk table
-is exactly the private randomness handled by `ComputedAlgebraicFSFamilyRand`.  Consequently the
-endpoint below has one averaged fixed-slot DL solver; it does not assume a DL bound separately for
-each junk table.
--/
+A common reachable-support split makes the finite junk table private randomness. The endpoint uses
+one private-coin-folded DL solver, not a separate assumption for each junk table. -/
 
 /-- A basis-indexed computed adversary over arbitrary transcript lists. -/
 structure ComputedAlgebraicFSFamilyUnbounded (shape : Shape) where
@@ -1776,12 +1775,7 @@ structure ComputedAlgebraicFSFamilyUnbounded (shape : Shape) where
   queryBound : ∀ basis, (adversary basis).QueryBound Q
 
 open Classical in
-/-- **Generic uniform-URS basis transfer.** For any finite extractor-coin type `C` and any event `E`
-depending on an explicit augmented basis and the coins, the setup-sampled experiment pulled back
-through `basisOf` equals the scalar-basis experiment, provided the setup's basis pushforward matches
-the sampled-scalar distribution.  Coin- and event-generic: the randomized/unbounded endpoints reuse
-it with the enlarged coins `C = Coins × R`, where the existing family transfer lemmas fix
-`C = Coins`. -/
+/-- Transfer any finite-coin event across a uniform-URS basis identification. -/
 theorem uniformURS_basis_transfer {k : ℕ} {C : Type*} [Fintype C] [Nonempty C]
     {Ω : Type*} (setup : PMF Ω) (B : VestaG)
     (basisOf : Ω → AugmentedIndex (2 ^ k) → VestaG)
@@ -1885,13 +1879,7 @@ theorem run_splitFamilyRand_adversary (family : ComputedAlgebraicFSFamilyUnbound
       family.globalReachSet (family.reachSet_subset_globalReachSet basis))).run O = _
   exact OracleComp.run_restrictSum junk _ O
 
-/-- **Arbitrary-domain, basis-indexed fixed-slot endpoint.** Uniformly sample the basis
-coefficients, bounded random-oracle table, extractor tape, and the finite junk table.  The deployed
-binding event for the arbitrary-domain adversary, represented by its common-support split, is
-bounded by the recursive losses and one averaged fixed-slot textbook-DL advantage.
-
-The junk table is part of the DL solver's coins through `splitFamilyRand.foldedRelationFinder`;
-there is no per-table DL premise. -/
+/-- Bound arbitrary-domain binding using one DL solver with the junk table folded into its coins. -/
 theorem binding_prob_le_of_unbounded_foldedTextbookDL
     (B : VestaG) (family : ComputedAlgebraicFSFamilyUnbounded shape) {bound : ℝ≥0∞}
     (hDL : TextbookDLWithCoinsAdvantageLE B family.splitFamilyRand.foldedRelationFinder bound) :
@@ -1907,14 +1895,7 @@ theorem binding_prob_le_of_unbounded_foldedTextbookDL
   exact ComputedAlgebraicFSFamilyRand.binding_prob_le_of_foldedTextbookDL_rand
     B family.splitFamilyRand hDL
 
-/-- **Arbitrary-domain SNARK knowledge soundness, fixed-slot endpoint.** Uniformly sample the basis
-coefficients, bounded random-oracle table, extractor tape, and the finite junk table.  The full
-SNARK-acceptance-without-clean-opening event for the arbitrary-domain adversary, represented by its
-common-support split, is bounded by the recursive query/`z = 0` losses and one averaged fixed-slot
-textbook-DL advantage on the run-relation solver.
-
-Like the binding endpoint, the junk table is part of the DL solver's coins through
-`splitFamilyRand.foldedSnarkRelationFinder`; there is no per-table DL premise. -/
+/-- Bound arbitrary-domain clean-opening failure with the junk table folded into the DL coins. -/
 theorem snarkFailure_prob_le_of_unbounded_foldedTextbookDL
     (B : VestaG) (family : ComputedAlgebraicFSFamilyUnbounded shape) {bound : ℝ≥0∞}
     (hDL : TextbookDLWithCoinsAdvantageLE B
@@ -1937,10 +1918,11 @@ theorem snarkFailure_prob_le_of_unbounded_foldedTextbookDL
   exact ComputedAlgebraicFSFamilyRand.snarkFailure_prob_le_of_foldedTextbookDL_rand
     B family.splitFamilyRand hDL
 
-/-- General-basis full-acceptance SNARK-failure event for the arbitrary-domain family, with the junk
-table (private randomness) folded into the coins.  The scalar-basis pullback recovers the event of
-`snarkFailure_prob_le_of_unbounded_foldedTextbookDL`; a general `basisOf` pullback gives the setup /
-generator-RO experiment. -/
+/-- Arbitrary-domain clean-opening failure with the junk table folded into the coins.  The event
+is the win event of the common-support *split* machine (`splitFamilyRand.determinize`) over the
+finite `BTranscript ⊕ reachSet` domain; `run_splitFamilyRand_adversary` and `run_splitDomain` give
+its pointwise faithfulness to the original list-domain adversary, but that composition is not part
+of the endpoint statements. -/
 def snarkFailureEventUnbounded (family : ComputedAlgebraicFSFamilyUnbounded shape) :
     Set ((AugmentedIndex (2 ^ shape.k) → VestaG) ×
       (family.splitFamilyRand.Coins × ({t // t ∈ family.globalReachSet} → Fp))) :=
@@ -1950,9 +1932,7 @@ def snarkFailureEventUnbounded (family : ComputedAlgebraicFSFamilyUnbounded shap
       (algebraicFullPrefixes (family.splitFamilyRand.determinize q.2.2).init) q.2.1.1 ∧
     ¬ (family.splitFamilyRand.determinize q.2.2).hasCleanOpening q.1 q.2.1}
 
-/-- **Arbitrary-domain SNARK knowledge soundness under an explicit uniform-URS setup.** Combines all
-three adversary axes: privately randomized (junk table), arbitrary oracle domain (via
-`splitFamilyRand`), and a general setup distribution identified with the sampled scalar basis. -/
+/-- Uniform-URS form of the arbitrary-domain clean-opening bound. -/
 theorem snarkFailure_prob_le_of_unbounded_uniformURS_textbookDL {Ω : Type*} (setup : PMF Ω)
     (B : VestaG) (family : ComputedAlgebraicFSFamilyUnbounded shape)
     (basisOf : Ω → AugmentedIndex (2 ^ shape.k) → VestaG)
@@ -1969,10 +1949,7 @@ theorem snarkFailure_prob_le_of_unbounded_uniformURS_textbookDL {Ω : Type*} (se
   rw [uniformURS_basis_transfer setup B basisOf family.snarkFailureEventUnbounded hURS]
   exact snarkFailure_prob_le_of_unbounded_foldedTextbookDL B family hDL
 
-/-- **Arbitrary-domain SNARK knowledge soundness in the generator-random-oracle setup model** — the
-single privately-randomized + arbitrary-domain + generator-RO endpoint.  The URS is a uniform
-group-valued random oracle at the distinct parameter queries; the extractor's junk table supplies the
-private randomness and the arbitrary transcript domain is reduced through `splitFamilyRand`. -/
+/-- Generator-RO form of the arbitrary-domain clean-opening bound. -/
 theorem snarkFailure_prob_le_of_unbounded_generatorRO_textbookDL
     {T : Type*} [DecidableEq T] (B : VestaG) (hB : B ≠ 0)
     (query : AugmentedIndex (2 ^ shape.k) → T) (hquery : Function.Injective query)
@@ -1991,16 +1968,13 @@ theorem snarkFailure_prob_le_of_unbounded_generatorRO_textbookDL
     (orchardGeneratorROBasis query)
     (orchard_uniformURSIdentification_of_generatorRO shape.k B hB query hquery) hDL
 
-/-- General-basis binding event for the arbitrary-domain family, with the junk table folded into the
-coins.  The scalar-basis pullback recovers the event of `binding_prob_le_of_unbounded_foldedTextbookDL`. -/
+/-- Arbitrary-domain binding with the junk table folded into the coins. -/
 def bindingEventUnbounded (family : ComputedAlgebraicFSFamilyUnbounded shape) :
     Set ((AugmentedIndex (2 ^ shape.k) → VestaG) ×
       (family.splitFamilyRand.Coins × ({t // t ∈ family.globalReachSet} → Fp))) :=
   {q | ComputedAlgebraicFSFamily.bindingWin (family.splitFamilyRand.determinize q.2.2) q.1 q.2.1}
 
-/-- **Arbitrary-domain binding under an explicit uniform-URS setup** — privately randomized (junk
-table) + arbitrary oracle domain + a general setup distribution identified with the sampled scalar
-basis. -/
+/-- Uniform-URS form of the arbitrary-domain binding bound. -/
 theorem binding_prob_le_of_unbounded_uniformURS_textbookDL {Ω : Type*} (setup : PMF Ω)
     (B : VestaG) (family : ComputedAlgebraicFSFamilyUnbounded shape)
     (basisOf : Ω → AugmentedIndex (2 ^ shape.k) → VestaG)
@@ -2017,9 +1991,7 @@ theorem binding_prob_le_of_unbounded_uniformURS_textbookDL {Ω : Type*} (setup :
   rw [uniformURS_basis_transfer setup B basisOf family.bindingEventUnbounded hURS]
   exact binding_prob_le_of_unbounded_foldedTextbookDL B family hDL
 
-/-- **Arbitrary-domain binding in the generator-random-oracle setup model** — the privately-randomized
-+ arbitrary-domain + generator-RO binding endpoint, dual to
-`snarkFailure_prob_le_of_unbounded_generatorRO_textbookDL`. -/
+/-- Generator-RO form of the arbitrary-domain binding bound. -/
 theorem binding_prob_le_of_unbounded_generatorRO_textbookDL
     {T : Type*} [DecidableEq T] (B : VestaG) (hB : B ≠ 0)
     (query : AugmentedIndex (2 ^ shape.k) → T) (hquery : Function.Injective query)
@@ -2039,6 +2011,7 @@ theorem binding_prob_le_of_unbounded_generatorRO_textbookDL
     (orchard_uniformURSIdentification_of_generatorRO shape.k B hB query hquery) hDL
 
 end ComputedAlgebraicFSFamilyUnbounded
+
 /-- Arbitrary-domain adversary with genuine independent private coins `R`, on top of the
 transcript-list oracle domain. -/
 structure ComputedAlgebraicFSFamilyUnboundedRand (shape : Shape) (R : Type*) where
@@ -2272,12 +2245,9 @@ theorem binding_prob_le_of_unboundedRand_generatorRO_textbookDL [Fintype R] [Non
 
 end ComputedAlgebraicFSFamilyUnboundedRand
 
-
 /-! ## Standard AGM adapter
 
-`AlgebraicWfProof.ofRepresented` computes the multiopen and `S` coordinates from per-point AGM
-representations. `Provenance.AlgebraicWfProof.ofStandard` proves that the deployed assembly uses
-only represented proof and verifying-key points, discharging the coverage premise below. -/
+Compute multiopen and `S` coordinates from representations of the points used by the assembly. -/
 
 /-- Decompose an augmented-basis representation into its generator, `U`, and `W` components. -/
 theorem representationEval_augmented_components {n : ℕ}
@@ -2345,9 +2315,7 @@ theorem repsW_cons (t : Fp × AlgebraicPoint (F := Fp) basis)
     repsW (t :: reps) = t.1 * t.2.coeffs AugmentedIndex.w + repsW reps := by
   simp [repsW]
 
-/-- Represented `(scalar, point)` terms sum to the commitment of their aggregated generator
-coordinates plus the aggregated `U` and `W` components: appended terms are linear, so
-representations aggregate coordinatewise. -/
+/-- Sum represented terms by aggregating their generator, `U`, and `W` coordinates. -/
 theorem sum_map_smul_point_repr (reps : List (Fp × AlgebraicPoint (F := Fp) basis)) :
     ((reps.map (fun t => (t.1, t.2.point))).map (fun t => t.1 • t.2)).sum
       = commit (ursOfAugmentedBasis shape.k basis) (repsGPart reps)
@@ -2362,9 +2330,7 @@ theorem sum_map_smul_point_repr (reps : List (Fp × AlgebraicPoint (F := Fp) bas
         commitA_add, commitA_smul]
       module
 
-/-- Evaluating an MSM whose appended points carry representations: the aggregate `(g,U,W)`
-coordinates are the MSM's own scalars plus the coordinatewise linear combination of the
-representations. -/
+/-- Evaluate an MSM from its native scalars and representations of appended points. -/
 theorem Msm.eval_repr (m : Msm shape.k Fp VestaG)
     (reps : List (Fp × AlgebraicPoint (F := Fp) basis))
     (hcov : m.other = reps.map (fun t => (t.1, t.2.point))) :
@@ -2397,8 +2363,7 @@ theorem multiopenCommitment_eq_eval
 
 attribute [local irreducible] multiopenMsm
 
-/-- Evaluating against the reconstructed URS is evaluating against its literal components: the
-`URS` structure eta step, stated for an abstract MSM so nothing large is ever normalized. -/
+/-- Evaluating against the reconstructed URS is invariant under structure eta. -/
 private theorem eval_urs_eta (m : Msm shape.k Fp VestaG) :
     m.eval (⟨shape.k, (ursOfAugmentedBasis shape.k basis).g,
         (ursOfAugmentedBasis shape.k basis).w,
@@ -2407,10 +2372,7 @@ private theorem eval_urs_eta (m : Msm shape.k Fp VestaG) :
 
 attribute [local irreducible] multiopenCommitment Msm.eval
 
-/-- A represented multiopen assembly: the assembled MSM's appended points, each carrying its
-`(g,U,W)` representation. A standard AGM adversary supplies this from the representations of the
-proof and verifying-key commitments it feeds the verifier
-(`RepresentedMultiopen.ofCoveredList`). -/
+/-- Representations for every point appended by the multiopen assembly. -/
 structure RepresentedMultiopen
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG)
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG) (ν : Fin 11 → Fp) where
@@ -2436,9 +2398,7 @@ private theorem list_eq_map_pmap_lookup {β : Type*} (point : β → VestaG)
         simpa using hp
       exact Prod.ext rfl hpt.symm
 
-/-- Build the represented assembly by lookup: any list of represented points containing every
-point the assembly appends suffices. The hypothesis is representation-free — it speaks only about
-which group elements the deployed assembly touches. -/
+/-- Build the represented assembly from a list covering every appended point. -/
 def RepresentedMultiopen.ofCoveredList
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG)
     (ν : Fin 11 → Fp) (L : List (AlgebraicPoint (F := Fp) basis))
@@ -2455,8 +2415,7 @@ def RepresentedMultiopen.ofCoveredList
       (fun pr h => (pr.1, (L.find? (fun ap => ap.point = pr.2)).get h)) H
     covers := list_eq_map_pmap_lookup AlgebraicPoint.point L _ H }
 
-/-- **Standard AGM adapter.** Compute the packaged proof from represented emitted points and a
-represented multiopen assembly. No aggregate representation equality is assumed. -/
+/-- Package represented emitted points and their represented multiopen assembly. -/
 def AlgebraicWfProof.ofRepresented {vk : VerifyingKey shape Fp VestaG}
     (aps : AlgebraicProofString shape basis) (hwf : PsWellFormed aps.erase)
     (rm : ∀ ν : Fin 11 → Fp, RepresentedMultiopen vk aps.erase basis ν) :

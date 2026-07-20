@@ -3,29 +3,8 @@ import Zcash.Snark.Soundness.Forking.Rewind
 /-!
 # The oracle-querying Fiat–Shamir adversary
 
-This module models a `Q`-query adversary as an adaptive query tree, following VCVio's eager
-`OracleComp` semantics (https://eprint.iacr.org/2024/1819). `fsAdvantage` measures acceptance when
-the adversary and verifier read the same uniformly sampled oracle table.
-
-## Proof route
-
-1. Query histories support replay, deduplication, and one-point reprogramming.
-2. `escapesDuringC_measure_le'` bounds adaptive queries into blind escape sets.
-3. `AdSched.map_read_uniform` and `schedule_fork_bound` prove the staged and single-fork cases.
-4. `Forking.Adversary.Recursive` constructs the deployed fork certificate;
-   `Forking.Adversary.Algebraic` packages it for the AGM reduction.
-
-## Why the loss uses escape sets
-
-A grinding adversary may choose its proof after seeing oracle answers, so its advantage is not
-bounded by `(Q + 1)` times the worst fixed-output acceptance probability. The proof instead charges
-each query for entering a blind escape set. A prefix does not determine the later proof points, so
-`StagedDecode` applies only to staged strategies. The recursive extractor instead preserves the
-operational state of arbitrary querying adversaries, matching the state-restoration boundary of
-Attema–Fehr–Klooß (https://eprint.iacr.org/2021/1377).
-
-The `legacy_*` definitions below retain the propositional staged path. The deployed path computes
-certificate data in `Forking.Adversary.Recursive`.
+Model a `Q`-query adversary as an adaptive query tree with eager whole-table semantics. Query
+histories support replay and reprogramming; blind escape sets give the adaptive query loss.
 -/
 
 namespace Zcash.Snark
@@ -81,9 +60,7 @@ theorem queries_length_le {A : OracleComp T F α} {Q : ℕ} (h : QueryBound A Q)
   | pure => exact Nat.zero_le _
   | query h ih => simpa [queries] using Nat.succ_le_succ (ih _)
 
-/-- The query–answer history of a run: the points asked with the answers received, in order. The
-rewinding layer's central object — a fork is two tables sharing a history prefix and diverging at
-its end. -/
+/-- The ordered query–answer history of a run. -/
 def history : OracleComp T F α → (T → F) → List (T × F)
   | .pure _, _ => []
   | .query t k, O => (t, O t) :: (k (O t)).history O
@@ -112,9 +89,7 @@ theorem history_mem_answer (A : OracleComp T F α) (O : T → F) :
       · subst hp; rfl
       · exact ih (O t) p hp
 
-/-- **The replay lemma.** A table agreeing with the recorded answers of a run's first `i` steps
-reproduces those steps: the machine is deterministic given its answers, so the fork of two tables
-happens exactly where their answers first differ. -/
+/-- A table agreeing with the first `i` recorded answers reproduces those steps. -/
 theorem history_take_replay (A : OracleComp T F α) (O O' : T → F) (i : ℕ)
     (h : ∀ p ∈ (A.history O).take i, O' p.1 = p.2) :
     (A.history O').take i = (A.history O).take i := by
@@ -129,9 +104,8 @@ theorem history_take_replay (A : OracleComp T F α) (O O' : T → F) (i : ℕ)
           congr 1
           exact ih (O t) j fun p hp => h p (by simp [hp])
 
-/-- **The history cylinder.** Realizing a run's first `i` steps is exactly agreeing with their
-recorded answers — the event the conditioning layer prices, in the same override shape as
-`applyUpdates`. -/
+/-- Two runs share their first `i` steps exactly when the second table agrees with those recorded
+answers. -/
 theorem history_take_eq_iff (A : OracleComp T F α) (O O' : T → F) (i : ℕ) :
     (A.history O').take i = (A.history O).take i
       ↔ ∀ p ∈ (A.history O).take i, O' p.1 = p.2 := by
@@ -157,32 +131,24 @@ theorem history_getElem_fst_congr (A : OracleComp T F α) (O O' : T → F) (i : 
           simp only [history_query, List.getElem?_cons_succ, ht]
           exact ih (O t) j (ht ▸ h.2)
 
-/-- The run of the machine on table `O` makes an *escaping* query: some query's answer lands in
-that point's escape set. The event the escape bound (`escapesDuring_measure_le`) prices at `ε`
-per query. -/
+/-- Some query answer lands in that point's escape set. -/
 def escapesDuring (esc : T → Set F) : OracleComp T F α → (T → F) → Prop
   | .pure _, _ => False
   | .query t k, O => O t ∈ esc t ∨ (k (O t)).escapesDuring esc O
 
-/-- Conditional escape: some query's answer lands in that point's escape set, the set now chosen
-by the whole table — the state-function shape, where a round's bad challenges depend on the
-earlier ones (the oracle's answers at the sub-prefixes). Priced by
-`escapesDuringC_measure_le'`. -/
+/-- Some query answer lies in a table-dependent escape set that is blind at that query point. -/
 def escapesDuringC (esc : T → (T → F) → Set F) : OracleComp T F α → (T → F) → Prop
   | .pure _, _ => False
   | .query t k, O => O t ∈ esc t O ∨ (k (O t)).escapesDuringC esc O
 
-/-- The machine's queries avoid the cache and stay pairwise fresh below it: no point is queried
-twice on any path. The shape `dedup` produces; the conditional escape bound inducts on it. -/
+/-- The machine avoids cached points and makes no repeated query on a path. -/
 inductive AvoidsCache [DecidableEq T] : List (T × F) → OracleComp T F α → Prop
   | pure (c : List (T × F)) (a : α) : AvoidsCache c (.pure a)
   | query {c : List (T × F)} {t : T} {k : F → OracleComp T F α}
       (ht : t ∉ c.map Prod.fst) (h : ∀ u, AvoidsCache ((t, u) :: c) (k u)) :
       AvoidsCache c (.query t k)
 
-/-- Deduplicate a machine's queries against a cache: cached points are answered from the cache,
-fresh points are queried once and recorded. Never more queries, never a repeated one — the wlog
-behind lifting the conditional escape bound to arbitrary machines. -/
+/-- Answer cached queries locally and issue each fresh query once. -/
 def dedup [DecidableEq T] (c : List (T × F)) : OracleComp T F α → OracleComp T F α
   | .pure a => .pure a
   | .query t k =>
@@ -215,9 +181,8 @@ theorem dedup_queryBound [DecidableEq T] {A : OracleComp T F α} {Q : ℕ}
       | some p => exact (ih p.2 c).mono (Nat.le_succ Q)
       | none => exact .query (fun u => ih u ((t, u) :: c))
 
-/-- An escape of the original machine is an escape of the deduplicated machine, provided the
-cache is table-consistent and its recorded answers do not escape: the first query of the escaping
-point survives deduplication with the same answer and the same (table-determined) escape set. -/
+/-- Deduplication preserves escapes when the cache is table-consistent and contains no escaping
+answer. -/
 theorem escapesDuringC_dedup [DecidableEq T] (esc : T → (T → F) → Set F) {A : OracleComp T F α}
     {O : T → F} {c : List (T × F)}
     (hcon : ∀ p ∈ c, O p.1 = p.2) (hesc : ∀ p ∈ c, O p.1 ∉ esc p.1 O)
@@ -311,9 +276,7 @@ theorem escapesDuringC_queryList (esc : T → (T → F) → Set F) (p : α) {ts 
       · exact Or.inl h
       · exact Or.inr (ih hmem)
 
-/-- Complete a machine against its own output: after computing it, query its `k` round prefixes
-(ignoring the answers) and return it unchanged. The wlog step that makes every winning chain point
-a queried point, so a ladder escape is an escaping query. -/
+/-- Run a machine, query every round prefix of its output, and return that output unchanged. -/
 def completing {P : Type*} {k : ℕ} (prefixes : P → Fin k → T) (A : OracleComp T F P) :
     OracleComp T F P :=
   A.bind fun p => queryList p (List.ofFn (prefixes p))
@@ -337,10 +300,36 @@ theorem escapesDuringC_completing (esc : T → (T → F) → Set F) {P : Type*} 
   escapesDuringC_bind_right esc
     (escapesDuringC_queryList esc _ (by exact List.mem_ofFn.mpr ⟨j, rfl⟩) h)
 
+/-- Sequencing concatenates the query logs. -/
+theorem queries_bind (A : OracleComp T F α) (f : α → OracleComp T F β) (O : T → F) :
+    (A.bind f).queries O = A.queries O ++ (f (A.run O)).queries O := by
+  induction A with
+  | pure a => rfl
+  | query t k ih =>
+      show t :: ((k (O t)).bind f).queries O
+          = (t :: (k (O t)).queries O) ++ (f ((OracleComp.query t k).run O)).queries O
+      rw [run_query, List.cons_append, ih (O t)]
 
-/-- Fix the junk half of a split-domain oracle and retain only queries to the game domain. The query
-budget is unchanged, and `fsWinsFull_restrictSum_le` recovers the original advantage by averaging
-over independent uniform junk tables. -/
+/-- A list-query pass queries exactly its list. -/
+theorem queries_queryList (p : α) (ts : List T) (O : T → F) :
+    (queryList (F := F) p ts).queries O = ts := by
+  induction ts with
+  | nil => rfl
+  | cons t ts ih =>
+      show t :: _ = _
+      rw [ih]
+
+/-- The completed run queries every one of the output's own round prefixes. -/
+theorem mem_queries_completing {P : Type*} {k : ℕ} (prefixes : P → Fin k → T)
+    (A : OracleComp T F P) (O : T → F) (j : Fin k) :
+    prefixes (A.run O) j ∈ (A.completing prefixes).queries O := by
+  rw [completing, queries_bind, List.mem_append]
+  right
+  rw [queries_queryList]
+  exact List.mem_ofFn.mpr ⟨j, rfl⟩
+
+
+/-- Fix the junk table and retain only queries to the game domain. -/
 def restrictSum {J : Type*} (j : J → F) : OracleComp (T ⊕ J) F α → OracleComp T F α
   | .pure a => .pure a
   | .query (Sum.inl t) k => .query t (fun u => restrictSum j (k u))
@@ -365,9 +354,7 @@ theorem queryBound_restrictSum {J : Type*} {A : OracleComp (T ⊕ J) F α} {Q : 
       | inl t => exact .query fun u => ih u
       | inr x => exact (ih (j x)).mono (Nat.le_succ Q)
 
-/-- A cache-avoiding machine queries pairwise-distinct points along every run, and none of them is a
-cached point: the structural distinctness (`Nodup`) that lets a reprogram at one query be replayed
-without disturbing the others — the foundation of the rewinding fork. -/
+/-- A cache-avoiding run queries distinct points, none already cached. -/
 theorem AvoidsCache.run_queries_nodup [DecidableEq T] :
     {c : List (T × F)} → {A : OracleComp T F α} → AvoidsCache c A → (O : T → F) →
     (A.queries O).Nodup ∧ ∀ p ∈ c, p.1 ∉ A.queries O
@@ -385,11 +372,8 @@ theorem AvoidsCache.run_queries_nodup [DecidableEq T] :
         · exact absurd (hpt ▸ List.mem_map_of_mem (f := Prod.fst) hp) ht
         · exact hdis p (List.mem_cons_of_mem _ hp)
 
-/-- **The reprogram-and-replay fork.** For a cache-avoiding machine, reprogramming the oracle at the
-`i`-th query point of a run (via `Function.update`) replays the run identically through the first `i`
-queries — their points are distinct from the forked one (`run_queries_nodup`), so `history_take_replay`
-applies — and delivers the fresh answer `u` at query `i`. The rewinding primitive the forking lemma
-iterates: fork a run at a chosen query, keeping the prefix fixed and resampling that one challenge. -/
+/-- Reprogramming a cache-avoiding run at query `i` preserves its earlier history and supplies the
+new answer at `i`. -/
 theorem reprogram_replay_fork [DecidableEq T] {A : OracleComp T F α}
     (hac : A.AvoidsCache []) (O : T → F) {i : ℕ} (hi : i < (A.history O).length) (u : F) :
     ((A.history (Function.update O ((A.history O)[i].1) u)).take i = (A.history O).take i)
@@ -438,9 +422,7 @@ theorem reprogram_replay_fork [DecidableEq T] {A : OracleComp T F α}
   exact ⟨hq1, hans.symm⟩
 
 
-/-- The fork index of a run: the position in the query log where the output's fork point `fp` (its
-round prefix) is first read. On a winning run the adversary must have queried that point to obtain
-the challenge, so the index is `< Q` (`forkIdx_lt`). The index the local forking bound sums over. -/
+/-- The first query index of the output's fork point. -/
 def forkIdx [DecidableEq T] (A : OracleComp T F α) (fp : α → T) (O : T → F) : ℕ :=
   (A.queries O).idxOf (fp (A.run O))
 
@@ -449,9 +431,7 @@ theorem forkIdx_lt [DecidableEq T] {A : OracleComp T F α} {Q : ℕ} (hQ : A.Que
     forkIdx A fp O < Q :=
   lt_of_lt_of_le (List.idxOf_lt_length_iff.mpr hmem) (A.queries_length_le hQ O)
 
-/-- **Fork-index decomposition of the win set.** The winning tables partition by fork index into the
-`Q` slices `{win ∧ forkIdx = i}` — every winning run queries its fork point, so its index is `< Q`.
-The first step of the local forking bound: bound each slice, then sum. -/
+/-- Partition winning tables by their fork index among the first `Q` queries. -/
 theorem card_win_eq_sum_forkIdx [Fintype T] [DecidableEq T] [Fintype F] [DecidableEq F]
     {A : OracleComp T F α} {Q : ℕ} (hQ : A.QueryBound Q) (fp : α → T)
     (win : (T → F) → Prop) [DecidablePred win]
@@ -469,12 +449,9 @@ theorem card_win_eq_sum_forkIdx [Fintype T] [DecidableEq T] [Fintype F] [Decidab
 
 end OracleComp
 
-/-! ## Overridden tables: the escape bound's conditioning record
+/-! ## Overridden tables
 
-The escape bound's induction conditions on each fresh answer in turn. The record of conditioned
-answers is a list of point-value overrides applied over the free table — so the measure always
-ranges over full uniform tables, and the induction hypothesis carries the overrides instead of a
-shrinking table type. -/
+Conditioned answers are represented as point-value overrides on an otherwise uniform table. -/
 
 variable {T F : Type*} [DecidableEq T]
 
@@ -560,9 +537,7 @@ theorem applyUpdates_update_of_mem {σ : List (T × F)} {t : T}
           exact ih h _
 
 open Classical in
-/-- **Adaptive escape bound.** A `Q`-query machine enters pointwise escape sets of measure at most
-`ε` with probability at most `Q · ε`. Fresh queries pay `ε`; cached queries pay nothing. The
-override record `σ` carries the conditioning history. -/
+/-- A `Q`-query machine enters pointwise `ε`-escape sets with probability at most `Q·ε`. -/
 theorem escapesDuring_measure_le {T F : Type*} [Fintype T] [DecidableEq T] [Fintype F]
     [Nonempty F] {α : Type*} (esc : T → Set F) {ε : ℝ≥0∞}
     (hesc : ∀ t, (PMF.uniformOfFintype F).toOuterMeasure (esc t) ≤ ε)
@@ -671,13 +646,8 @@ theorem escapesDuring_measure_le {T F : Type*} [Fintype T] [DecidableEq T] [Fint
           _ = ((Q + 1 : ℕ) : ℝ≥0∞) * ε := by push_cast; ring
 
 open Classical in
-/-- **The conditional escape bound.** As `escapesDuring_measure_le`, with each point's escape set
-chosen by the rest of the table (`hblind`: never by its own answer) — the state-function shape,
-where a round's bad challenges depend on the earlier ones. Stated for machines that never repeat
-a query (`OracleComp.AvoidsCache`); `escapesDuringC_measure_le'` lifts to arbitrary machines by
-deduplication. Every query here is fresh, so each pays `ε` by the blind-set point bound
-(`uniformOfFintype_point_mem_blind_le`) and recurses conditionally; no invariant on the record is
-needed. -/
+/-- A `Q`-query cache-avoiding machine enters table-dependent blind escape sets of measure `ε` with
+probability at most `Q · ε`. -/
 theorem escapesDuringC_measure_le {T F : Type*} [Fintype T] [DecidableEq T] [Fintype F]
     [Nonempty F] {α : Type*} (esc : T → (T → F) → Set F)
     (hblind : ∀ (t : T) (O : T → F) (v : F), esc t (Function.update O t v) = esc t O)
@@ -772,24 +742,380 @@ theorem escapesDuringC_measure_le' {T F : Type*} [Fintype T] [DecidableEq T] [Fi
   exact escapesDuringC_measure_le esc hblind hesc (OracleComp.dedup_queryBound hQ [])
     (OracleComp.dedup_avoidsCache [] A)
 
+/-! ## Weighted query charges
 
-/-! ## The Fiat–Shamir attack game
+Bound natural-number query charges by the query budget for AFK accounting. -/
 
-The abstract game: the adversary outputs a proof `p : P`; `prefixes p` are the `k` round transcript
-prefixes that proof induces (deployed: `roundTranscriptFin`, pairwise distinct by
-`roundTranscriptFin_injective`); `accept p χ` is the verifier's accept at round challenges `χ`
-(deployed: `DeployedIpaVerifierEq` with the round vector replaced). The attack event reads the round
-challenges off the *same* table the adversary queried — the defining self-referentiality of
-Fiat–Shamir. The full deployed event (every challenge, pre-IPA included, derived from the table via
-`roChallenges`) instantiates this once the table domain is restricted to a finite transcript space;
-that instantiation belongs with the query-loss reduction. -/
+/-- Accumulate a per-query charge along the run: each query `t` contributes `v t O (O t)`. -/
+def queryCharge {T F α : Type*} (v : T → (T → F) → F → ℕ) :
+    OracleComp T F α → (T → F) → ℕ
+  | .pure _, _ => 0
+  | .query t k, O => v t O (O t) + queryCharge v (k (O t)) O
+
+/-- Fibering a table sum over one coordinate's value. -/
+theorem sum_table_fiberwise {T F : Type*} [Fintype T] [DecidableEq T] [Fintype F]
+    [DecidableEq F] (t : T) (g : (T → F) → ℕ) :
+    ∑ O : T → F, g O
+      = ∑ u : F, ∑ O ∈ Finset.univ.filter (fun O : T → F => O t = u), g O := by
+  classical
+  calc ∑ O : T → F, g O = ∑ O : T → F, ∑ u : F, if O t = u then g O else 0 := by
+        refine Finset.sum_congr rfl fun O _ => ?_
+        simp
+    _ = ∑ u : F, ∑ O : T → F, if O t = u then g O else 0 := Finset.sum_comm
+    _ = _ := Finset.sum_congr rfl fun u _ => (Finset.sum_filter _ _).symm
+
+/-- A coordinate-blind summand makes every fiber of that coordinate the same size. -/
+theorem sum_table_fiber_blind {T F : Type*} [Fintype T] [DecidableEq T] [Fintype F]
+    [DecidableEq F] (t : T) (g : (T → F) → ℕ)
+    (hblind : ∀ (O : T → F) (v : F), g (Function.update O t v) = g O) (u u' : F) :
+    ∑ O ∈ Finset.univ.filter (fun O : T → F => O t = u), g O
+      = ∑ O ∈ Finset.univ.filter (fun O : T → F => O t = u'), g O := by
+  classical
+  refine Finset.sum_nbij' (fun O => Function.update O t u') (fun O => Function.update O t u)
+    (fun O hO => ?_) (fun O hO => ?_) (fun O hO => ?_) (fun O hO => ?_) (fun O hO => ?_)
+  · simp
+  · simp
+  · dsimp only
+    rw [Function.update_idem, ← (Finset.mem_filter.mp hO).2, Function.update_eq_self]
+  · dsimp only
+    rw [Function.update_idem, ← (Finset.mem_filter.mp hO).2, Function.update_eq_self]
+  · exact (hblind O u').symm
+
+/-- Summing a coordinate-blind summand over one fiber recovers the full sum after scaling by the
+field size. -/
+theorem sum_table_fiber_mul_card {T F : Type*} [Fintype T] [DecidableEq T] [Fintype F]
+    [DecidableEq F] (t : T) (g : (T → F) → ℕ)
+    (hblind : ∀ (O : T → F) (v : F), g (Function.update O t v) = g O) (u : F) :
+    (∑ O ∈ Finset.univ.filter (fun O : T → F => O t = u), g O) * Fintype.card F
+      = ∑ O : T → F, g O := by
+  rw [sum_table_fiberwise t g,
+    Finset.sum_congr rfl fun u' _ => sum_table_fiber_blind t g hblind u' u,
+    Finset.sum_const, Finset.card_univ, smul_eq_mul, mul_comm]
+
+open Classical in
+/-- A `Q`-query machine's total blind charge is at most `Q` times its average per-point budget,
+stated after clearing the factor `|F|`.  The budget must hold uniformly over every override
+context `σ'`, not just the ambient one; `queryCharge_sum_mul_le_table_budget` trades this for a
+pointwise table-indexed budget. -/
+theorem queryCharge_sum_mul_le {T F α : Type*} [Fintype T] [DecidableEq T] [Fintype F]
+    [DecidableEq F] [Nonempty F] (v : T → (T → F) → F → ℕ)
+    (hblind : ∀ (t : T) (O : T → F) (x y : F), v t (Function.update O t y) x = v t O x)
+    {M : ℕ} (hbudget : ∀ (t : T) (σ' : List (T × F)),
+      ∑ O : T → F, ∑ x : F, v t (applyUpdates σ' O) x ≤ M * Fintype.card (T → F))
+    {A : OracleComp T F α} {Q : ℕ} (hQ : A.QueryBound Q)
+    {σ : List (T × F)} (hσ : OracleComp.AvoidsCache σ A) :
+    (∑ O : T → F, queryCharge v A (applyUpdates σ O)) * Fintype.card F
+      ≤ Q * M * Fintype.card (T → F) := by
+  induction hQ generalizing σ with
+  | pure a Q' => simp [queryCharge]
+  | @query t k Q h ih =>
+      cases hσ with
+      | query ht hk =>
+      have happ : ∀ O : T → F, applyUpdates σ O t = O t :=
+        fun O => applyUpdates_apply_not_mem ht O
+      have hsplit : ∀ O : T → F,
+          queryCharge v (OracleComp.query t k) (applyUpdates σ O)
+            = v t (applyUpdates σ O) (O t)
+              + queryCharge v (k (O t)) (applyUpdates ((t, O t) :: σ) O) := by
+        intro O
+        have hcons : applyUpdates ((t, O t) :: σ) O = applyUpdates σ O := by
+          rw [applyUpdates_cons, Function.update_eq_self]
+        rw [queryCharge, happ O, hcons]
+      rw [Finset.sum_congr rfl fun O _ => hsplit O, Finset.sum_add_distrib, Nat.add_mul,
+        show (Q + 1) * M * Fintype.card (T → F)
+          = M * Fintype.card (T → F) + Q * M * Fintype.card (T → F) by ring]
+      refine Nat.add_le_add ?_ ?_
+      · -- one query pays its answer-averaged budget
+        have hb : ∀ (x : F) (O : T → F) (y : F),
+            v t (applyUpdates σ (Function.update O t y)) x = v t (applyUpdates σ O) x := by
+          intro x O y
+          rw [applyUpdates_update_not_mem ht, hblind]
+        calc (∑ O : T → F, v t (applyUpdates σ O) (O t)) * Fintype.card F
+            = ∑ u : F, (∑ O ∈ Finset.univ.filter (fun O : T → F => O t = u),
+                v t (applyUpdates σ O) (O t)) * Fintype.card F := by
+              rw [sum_table_fiberwise t, Finset.sum_mul]
+          _ = ∑ u : F, (∑ O ∈ Finset.univ.filter (fun O : T → F => O t = u),
+                v t (applyUpdates σ O) u) * Fintype.card F := by
+              refine Finset.sum_congr rfl fun u _ => ?_
+              congr 1
+              exact Finset.sum_congr rfl fun O hO => by rw [(Finset.mem_filter.mp hO).2]
+          _ = ∑ u : F, ∑ O : T → F, v t (applyUpdates σ O) u :=
+              Finset.sum_congr rfl fun u _ => sum_table_fiber_mul_card t _ (hb u) u
+          _ = ∑ O : T → F, ∑ u : F, v t (applyUpdates σ O) u := Finset.sum_comm
+          _ ≤ M * Fintype.card (T → F) := hbudget t σ
+      · -- the continuation recurses conditionally on the answer
+        have hbk : ∀ (u : F) (O : T → F) (y : F),
+            queryCharge v (k u) (applyUpdates ((t, u) :: σ) (Function.update O t y))
+              = queryCharge v (k u) (applyUpdates ((t, u) :: σ) O) := by
+          intro u O y
+          rw [applyUpdates_cons, applyUpdates_cons, Function.update_idem]
+        have hfiber : (∑ O : T → F,
+            queryCharge v (k (O t)) (applyUpdates ((t, O t) :: σ) O)) * Fintype.card F
+            = ∑ u : F, ∑ O : T → F, queryCharge v (k u) (applyUpdates ((t, u) :: σ) O) := by
+          rw [sum_table_fiberwise t, Finset.sum_mul]
+          refine Finset.sum_congr rfl fun u _ => ?_
+          rw [show (∑ O ∈ Finset.univ.filter (fun O : T → F => O t = u),
+                queryCharge v (k (O t)) (applyUpdates ((t, O t) :: σ) O))
+              = ∑ O ∈ Finset.univ.filter (fun O : T → F => O t = u),
+                queryCharge v (k u) (applyUpdates ((t, u) :: σ) O) from
+            Finset.sum_congr rfl fun O hO => by rw [(Finset.mem_filter.mp hO).2]]
+          exact sum_table_fiber_mul_card t _ (hbk u) u
+        rw [hfiber]
+        refine Nat.le_of_mul_le_mul_right ?_ (Fintype.card_pos (α := F))
+        calc (∑ u : F, ∑ O : T → F, queryCharge v (k u) (applyUpdates ((t, u) :: σ) O))
+              * Fintype.card F
+            = ∑ u : F, (∑ O : T → F,
+                queryCharge v (k u) (applyUpdates ((t, u) :: σ) O)) * Fintype.card F :=
+              Finset.sum_mul _ _ _
+          _ ≤ ∑ _u : F, Q * M * Fintype.card (T → F) :=
+              Finset.sum_le_sum fun u _ => ih u (hk u)
+          _ = Q * M * Fintype.card (T → F) * Fintype.card F := by
+              rw [Finset.sum_const, Finset.card_univ, smul_eq_mul, mul_comm]
+
+open Classical in
+/-- Table-indexed query-charge bound, charging the budget sum at the original override context. -/
+theorem queryCharge_sum_mul_le_table_budget {T F α : Type*} [Fintype T] [DecidableEq T]
+    [Fintype F] [DecidableEq F] [Nonempty F] (v : T → (T → F) → F → ℕ)
+    (hblind : ∀ (t : T) (O : T → F) (x y : F), v t (Function.update O t y) x = v t O x)
+    (B : (T → F) → ℕ) (hB : ∀ (t : T) (O : T → F), ∑ x : F, v t O x ≤ B O)
+    {A : OracleComp T F α} {Q : ℕ} (hQ : A.QueryBound Q)
+    {σ : List (T × F)} (hσ : OracleComp.AvoidsCache σ A) :
+    (∑ O : T → F, queryCharge v A (applyUpdates σ O)) * Fintype.card F
+      ≤ Q * ∑ O : T → F, B (applyUpdates σ O) := by
+  induction hQ generalizing σ with
+  | pure a Q' => simp [queryCharge]
+  | @query t k Q h ih =>
+      cases hσ with
+      | query ht hk =>
+      have happ : ∀ O : T → F, applyUpdates σ O t = O t :=
+        fun O => applyUpdates_apply_not_mem ht O
+      have hsplit : ∀ O : T → F,
+          queryCharge v (OracleComp.query t k) (applyUpdates σ O)
+            = v t (applyUpdates σ O) (O t)
+              + queryCharge v (k (O t)) (applyUpdates ((t, O t) :: σ) O) := by
+        intro O
+        have hcons : applyUpdates ((t, O t) :: σ) O = applyUpdates σ O := by
+          rw [applyUpdates_cons, Function.update_eq_self]
+        rw [queryCharge, happ O, hcons]
+      rw [Finset.sum_congr rfl fun O _ => hsplit O, Finset.sum_add_distrib, Nat.add_mul,
+        show (Q + 1) * ∑ O : T → F, B (applyUpdates σ O)
+          = (∑ O : T → F, B (applyUpdates σ O)) + Q * ∑ O : T → F, B (applyUpdates σ O)
+          by ring]
+      refine Nat.add_le_add ?_ ?_
+      · -- one query pays the budget at the current context
+        have hb : ∀ (x : F) (O : T → F) (y : F),
+            v t (applyUpdates σ (Function.update O t y)) x = v t (applyUpdates σ O) x := by
+          intro x O y
+          rw [applyUpdates_update_not_mem ht, hblind]
+        calc (∑ O : T → F, v t (applyUpdates σ O) (O t)) * Fintype.card F
+            = ∑ u : F, (∑ O ∈ Finset.univ.filter (fun O : T → F => O t = u),
+                v t (applyUpdates σ O) (O t)) * Fintype.card F := by
+              rw [sum_table_fiberwise t, Finset.sum_mul]
+          _ = ∑ u : F, (∑ O ∈ Finset.univ.filter (fun O : T → F => O t = u),
+                v t (applyUpdates σ O) u) * Fintype.card F := by
+              refine Finset.sum_congr rfl fun u _ => ?_
+              congr 1
+              exact Finset.sum_congr rfl fun O hO => by rw [(Finset.mem_filter.mp hO).2]
+          _ = ∑ u : F, ∑ O : T → F, v t (applyUpdates σ O) u :=
+              Finset.sum_congr rfl fun u _ => sum_table_fiber_mul_card t _ (hb u) u
+          _ = ∑ O : T → F, ∑ u : F, v t (applyUpdates σ O) u := Finset.sum_comm
+          _ ≤ ∑ O : T → F, B (applyUpdates σ O) :=
+              Finset.sum_le_sum fun O _ => hB t _
+      · -- the continuation recurses conditionally; the budget fibers recombine exactly
+        have hbk : ∀ (u : F) (O : T → F) (y : F),
+            queryCharge v (k u) (applyUpdates ((t, u) :: σ) (Function.update O t y))
+              = queryCharge v (k u) (applyUpdates ((t, u) :: σ) O) := by
+          intro u O y
+          rw [applyUpdates_cons, applyUpdates_cons, Function.update_idem]
+        have hBk : ∀ (u : F) (O : T → F) (y : F),
+            B (applyUpdates ((t, u) :: σ) (Function.update O t y))
+              = B (applyUpdates ((t, u) :: σ) O) := by
+          intro u O y
+          rw [applyUpdates_cons, applyUpdates_cons, Function.update_idem]
+        have hfiber : (∑ O : T → F,
+            queryCharge v (k (O t)) (applyUpdates ((t, O t) :: σ) O)) * Fintype.card F
+            = ∑ u : F, ∑ O : T → F, queryCharge v (k u) (applyUpdates ((t, u) :: σ) O) := by
+          rw [sum_table_fiberwise t, Finset.sum_mul]
+          refine Finset.sum_congr rfl fun u _ => ?_
+          rw [show (∑ O ∈ Finset.univ.filter (fun O : T → F => O t = u),
+                queryCharge v (k (O t)) (applyUpdates ((t, O t) :: σ) O))
+              = ∑ O ∈ Finset.univ.filter (fun O : T → F => O t = u),
+                queryCharge v (k u) (applyUpdates ((t, u) :: σ) O) from
+            Finset.sum_congr rfl fun O hO => by rw [(Finset.mem_filter.mp hO).2]]
+          exact sum_table_fiber_mul_card t _ (hbk u) u
+        have hBfiber : ∑ u : F, ∑ O : T → F, B (applyUpdates ((t, u) :: σ) O)
+            = (∑ O : T → F, B (applyUpdates σ O)) * Fintype.card F := by
+          calc ∑ u : F, ∑ O : T → F, B (applyUpdates ((t, u) :: σ) O)
+              = ∑ u : F, (∑ O ∈ Finset.univ.filter (fun O : T → F => O t = u),
+                  B (applyUpdates ((t, u) :: σ) O)) * Fintype.card F :=
+                Finset.sum_congr rfl fun u _ => (sum_table_fiber_mul_card t _ (hBk u) u).symm
+            _ = ∑ u : F, (∑ O ∈ Finset.univ.filter (fun O : T → F => O t = u),
+                  B (applyUpdates ((t, O t) :: σ) O)) * Fintype.card F := by
+                refine Finset.sum_congr rfl fun u _ => ?_
+                congr 1
+                exact Finset.sum_congr rfl fun O hO => by
+                  rw [(Finset.mem_filter.mp hO).2]
+            _ = (∑ O : T → F, B (applyUpdates ((t, O t) :: σ) O)) * Fintype.card F := by
+                rw [sum_table_fiberwise t, Finset.sum_mul]
+            _ = (∑ O : T → F, B (applyUpdates σ O)) * Fintype.card F := by
+                congr 1
+                refine Finset.sum_congr rfl fun O _ => ?_
+                congr 1
+                rw [applyUpdates_cons, Function.update_eq_self]
+        rw [hfiber]
+        refine Nat.le_of_mul_le_mul_right ?_ (Fintype.card_pos (α := F))
+        calc (∑ u : F, ∑ O : T → F, queryCharge v (k u) (applyUpdates ((t, u) :: σ) O))
+              * Fintype.card F
+            = ∑ u : F, (∑ O : T → F,
+                queryCharge v (k u) (applyUpdates ((t, u) :: σ) O)) * Fintype.card F :=
+              Finset.sum_mul _ _ _
+          _ ≤ ∑ u : F, Q * ∑ O : T → F, B (applyUpdates ((t, u) :: σ) O) :=
+              Finset.sum_le_sum fun u _ => ih u (hk u)
+          _ = Q * ∑ u : F, ∑ O : T → F, B (applyUpdates ((t, u) :: σ) O) := by
+              rw [Finset.mul_sum]
+          _ = Q * ((∑ O : T → F, B (applyUpdates σ O)) * Fintype.card F) := by
+              rw [hBfiber]
+          _ = Q * (∑ O : T → F, B (applyUpdates σ O)) * Fintype.card F := by ring
+
+/-- A single query's charge is dominated by the accumulated charge of any run that makes it. -/
+theorem le_queryCharge_of_mem_queries {T F α : Type*} (v : T → (T → F) → F → ℕ)
+    {B : OracleComp T F α} {O : T → F} {t : T} (h : t ∈ B.queries O) :
+    v t O (O t) ≤ queryCharge v B O := by
+  induction B with
+  | pure a => simp [OracleComp.queries] at h
+  | query t' k ih =>
+      simp only [OracleComp.queries, List.mem_cons] at h
+      rw [queryCharge]
+      rcases h with rfl | h
+      · exact Nat.le_add_right _ _
+      · exact le_trans (ih (O t') h) (Nat.le_add_left _ _)
+
+/-- Deduplication preserves occurrence of a queried point not already cached. -/
+theorem mem_queries_dedup {T F α : Type*} [DecidableEq T] {B : OracleComp T F α}
+    {O : T → F} {t : T} {c : List (T × F)} (hc : ∀ p ∈ c, O p.1 = p.2)
+    (ht : t ∉ c.map Prod.fst) (h : t ∈ B.queries O) :
+    t ∈ (OracleComp.dedup c B).queries O := by
+  induction B generalizing c with
+  | pure a => simp [OracleComp.queries] at h
+  | query t' k ih =>
+      simp only [OracleComp.queries, List.mem_cons] at h
+      rw [OracleComp.dedup]
+      cases hfind : c.find? (fun p => p.1 = t') with
+      | some p =>
+          have hpc := List.mem_of_find?_eq_some hfind
+          have hpt : p.1 = t' := by simpa using List.find?_some hfind
+          have hval : O t' = p.2 := by rw [← hpt]; exact hc p hpc
+          rcases h with rfl | h
+          · exact absurd (hpt ▸ List.mem_map_of_mem hpc) ht
+          · show t ∈ (OracleComp.dedup c (k p.2)).queries O
+            rw [← hval]
+            exact ih (O t') hc ht h
+      | none =>
+          simp only [OracleComp.queries, List.mem_cons]
+          rcases h with rfl | h
+          · exact Or.inl rfl
+          · by_cases htt' : t = t'
+            · exact Or.inl htt'
+            · refine Or.inr (ih (O t') ?_ ?_ h)
+              · intro p hp
+                rcases List.mem_cons.mp hp with rfl | hp
+                · rfl
+                · exact hc p hp
+              · simp only [List.map_cons, List.mem_cons, not_or]
+                exact ⟨htt', ht⟩
+
+/-- With pairwise-distinct override keys, the reprogrammed table shows each recorded override. -/
+theorem applyUpdates_apply_mem_nodup {T F : Type*} [DecidableEq T] {σ : List (T × F)}
+    (hnodup : (σ.map Prod.fst).Nodup) {p : T × F} (hp : p ∈ σ) (O : T → F) :
+    applyUpdates σ O p.1 = p.2 := by
+  induction σ generalizing O with
+  | nil => simp at hp
+  | cons q σ ih =>
+      simp only [List.map_cons, List.nodup_cons] at hnodup
+      rcases List.mem_cons.mp hp with rfl | hp
+      · rw [applyUpdates_cons, applyUpdates_apply_not_mem hnodup.1, Function.update_self]
+      · rw [applyUpdates_cons]
+        exact ih hnodup.2 hp _
+
+open Classical in
+/-- Bound the charge at an adaptively selected queried point under a reprogrammed table by the
+query budget times the average per-point budget. -/
+theorem steeredCharge_context_sum_mul_le {T F α : Type*} [Fintype T] [DecidableEq T] [Fintype F]
+    [DecidableEq F] [Nonempty F] (v : T → (T → F) → F → ℕ)
+    (hblind : ∀ (t : T) (O : T → F) (x y : F), v t (Function.update O t y) x = v t O x)
+    {M : ℕ} (hbudget : ∀ (t : T) (σ' : List (T × F)),
+      ∑ O : T → F, ∑ x : F, v t (applyUpdates σ' O) x ≤ M * Fintype.card (T → F))
+    {A : OracleComp T F α} {Q : ℕ} (hQ : A.QueryBound Q)
+    {σ : List (T × F)} (hnodup : (σ.map Prod.fst).Nodup)
+    (fp : (T → F) → T)
+    (hfp : ∀ O : T → F, fp O ∈ A.queries (applyUpdates σ O))
+    (hfresh : ∀ O : T → F, fp O ∉ σ.map Prod.fst) :
+    (∑ O : T → F, v (fp O) (applyUpdates σ O) (applyUpdates σ O (fp O))) * Fintype.card F
+      ≤ Q * M * Fintype.card (T → F) := by
+  have hle : ∀ O : T → F,
+      v (fp O) (applyUpdates σ O) (applyUpdates σ O (fp O))
+        ≤ queryCharge v (OracleComp.dedup σ A) (applyUpdates σ O) := fun O =>
+    le_queryCharge_of_mem_queries v
+      (mem_queries_dedup (fun p hp => applyUpdates_apply_mem_nodup hnodup hp O)
+        (hfresh O) (hfp O))
+  calc (∑ O : T → F, v (fp O) (applyUpdates σ O) (applyUpdates σ O (fp O))) * Fintype.card F
+      ≤ (∑ O : T → F, queryCharge v (OracleComp.dedup σ A) (applyUpdates σ O))
+        * Fintype.card F :=
+        Nat.mul_le_mul_right _ (Finset.sum_le_sum fun O _ => hle O)
+    _ ≤ Q * M * Fintype.card (T → F) :=
+        queryCharge_sum_mul_le v hblind hbudget (OracleComp.dedup_queryBound hQ σ)
+          (OracleComp.dedup_avoidsCache σ A)
+
+open Classical in
+/-- Table-indexed form of `steeredCharge_context_sum_mul_le`. -/
+theorem steeredCharge_context_sum_mul_le_table_budget {T F α : Type*} [Fintype T]
+    [DecidableEq T] [Fintype F] [DecidableEq F] [Nonempty F] (v : T → (T → F) → F → ℕ)
+    (hblind : ∀ (t : T) (O : T → F) (x y : F), v t (Function.update O t y) x = v t O x)
+    (B : (T → F) → ℕ) (hB : ∀ (t : T) (O : T → F), ∑ x : F, v t O x ≤ B O)
+    {A : OracleComp T F α} {Q : ℕ} (hQ : A.QueryBound Q)
+    {σ : List (T × F)} (hnodup : (σ.map Prod.fst).Nodup)
+    (fp : (T → F) → T)
+    (hfp : ∀ O : T → F, fp O ∈ A.queries (applyUpdates σ O))
+    (hfresh : ∀ O : T → F, fp O ∉ σ.map Prod.fst) :
+    (∑ O : T → F, v (fp O) (applyUpdates σ O) (applyUpdates σ O (fp O))) * Fintype.card F
+      ≤ Q * ∑ O : T → F, B (applyUpdates σ O) := by
+  have hle : ∀ O : T → F,
+      v (fp O) (applyUpdates σ O) (applyUpdates σ O (fp O))
+        ≤ queryCharge v (OracleComp.dedup σ A) (applyUpdates σ O) := fun O =>
+    le_queryCharge_of_mem_queries v
+      (mem_queries_dedup (fun p hp => applyUpdates_apply_mem_nodup hnodup hp O)
+        (hfresh O) (hfp O))
+  calc (∑ O : T → F, v (fp O) (applyUpdates σ O) (applyUpdates σ O (fp O))) * Fintype.card F
+      ≤ (∑ O : T → F, queryCharge v (OracleComp.dedup σ A) (applyUpdates σ O))
+        * Fintype.card F :=
+        Nat.mul_le_mul_right _ (Finset.sum_le_sum fun O _ => hle O)
+    _ ≤ Q * ∑ O : T → F, B (applyUpdates σ O) :=
+        queryCharge_sum_mul_le_table_budget v hblind B hB (OracleComp.dedup_queryBound hQ σ)
+          (OracleComp.dedup_avoidsCache σ A)
+
+open Classical in
+/-- Context-free form of `steeredCharge_context_sum_mul_le`. -/
+theorem steeredCharge_sum_mul_le {T F α : Type*} [Fintype T] [DecidableEq T] [Fintype F]
+    [DecidableEq F] [Nonempty F] (v : T → (T → F) → F → ℕ)
+    (hblind : ∀ (t : T) (O : T → F) (x y : F), v t (Function.update O t y) x = v t O x)
+    {M : ℕ} (hbudget : ∀ (t : T) (σ' : List (T × F)),
+      ∑ O : T → F, ∑ x : F, v t (applyUpdates σ' O) x ≤ M * Fintype.card (T → F))
+    {A : OracleComp T F α} {Q : ℕ} (hQ : A.QueryBound Q)
+    (fp : (T → F) → T) (hfp : ∀ O : T → F, fp O ∈ A.queries O) :
+    (∑ O : T → F, v (fp O) O (O (fp O))) * Fintype.card F
+      ≤ Q * M * Fintype.card (T → F) := by
+  have h := steeredCharge_context_sum_mul_le v hblind hbudget hQ
+    (σ := []) (by simp) fp (fun O => by simpa using hfp O) (fun O => by simp)
+  simpa using h
+
+
+/-! ## Fiat–Shamir attack game
+
+The adversary and verifier read one table at output-dependent round prefixes. -/
 
 /-! ## Adaptive reads of a uniform random function
 
-The round-adaptive rung's uniformity: a Fiat–Shamir prover's oracle queries form an *adaptive*
-schedule — round `j`'s point is fixed by the answers to rounds `< j` — so the challenge vector's
-prefixes are path-dependent and the fixed-`φ` uniformity (`roChallenges_ipaRound_uniform`) does not
-apply directly. `AdSched.map_read_uniform` supplies the adaptive form. -/
+`AdSched.map_read_uniform` proves uniformity when each query point depends on earlier answers. -/
 
 universe u v
 
@@ -813,7 +1139,7 @@ def read : {k : ℕ} → AdSched T F k → (T → F) → (Fin k → F)
   | 0, _, _ => Fin.elim0
   | k + 1, s, O => Fin.cons (O s.1) (read (s.2 (O s.1)) O)
 
-/-- **Reads meet the target iff the table agrees at the target's own points.** -/
+/-- Reads match a target exactly when the table agrees at its visited points. -/
 theorem read_eq_iff : {k : ℕ} → (s : AdSched T F k) → (O : T → F) → (χ : Fin k → F) →
     (s.read O = χ ↔ ∀ j, O (s.points χ j) = χ j)
   | 0, _, _, χ => ⟨fun _ j => j.elim0, fun _ => funext fun j => j.elim0⟩
@@ -841,11 +1167,7 @@ theorem read_eq_iff : {k : ℕ} → (s : AdSched T F k) → (O : T → F) → (�
 def Fresh {k : ℕ} (s : AdSched T F k) : Prop := ∀ χ : Fin k → F, Function.Injective (s.points χ)
 
 open Classical in
-/-- **Adaptive reads of a uniform random function are uniform.** A fresh depth-`k` adaptive schedule
-reads a uniform table to a uniform answer vector: for each target `χ`, the read-equals-`χ` event is
-the fixed cylinder over `χ`'s distinct points (`read_eq_iff`), of uniform measure `1/|F|ᵏ`
-(`uniformOfFintype_map_precomp_injective`) — the same for every `χ`. The adaptivity is absorbed by
-computing the pushforward pointwise; no probability monad. -/
+/-- A fresh adaptive schedule reads a uniform table to a uniform answer vector. -/
 theorem map_read_uniform [Fintype T] [DecidableEq T] [Fintype F] [Nonempty F] {k : ℕ}
     (s : AdSched T F k) (hs : s.Fresh) :
     (PMF.uniformOfFintype (T → F)).map s.read = PMF.uniformOfFintype (Fin k → F) := by
@@ -860,11 +1182,7 @@ theorem map_read_uniform [Fintype T] [DecidableEq T] [Fintype F] [Nonempty F] {k
     ← PMF.toOuterMeasure_map_apply, uniformOfFintype_map_precomp_injective _ (hs χ),
     PMF.toOuterMeasure_apply_singleton]
 
-/-- Append a final adaptive read to a schedule: after the schedule's `k` reads, query the point
-`pt` chosen from all `k` answers. This is how the rewinding forking bound turns "the fork state's
-`i` reads, then the challenge read at the fork point" into one depth-`(i+1)` schedule, so the joint
-distribution of `(fork state, fork challenge)` is `map_read_uniform` at `i+1` — the joint uniformity
-the per-fork-index bound needs. -/
+/-- Append a read whose point depends on all preceding answers. -/
 def snoc : {k : ℕ} → AdSched T F k → ((Fin k → F) → T) → AdSched T F (k + 1)
   | 0, _, pt => (pt Fin.elim0, fun _ => PUnit.unit)
   | _ + 1, s, pt => (s.1, fun u => (s.2 u).snoc (fun χ => pt (Fin.cons u χ)))
@@ -897,8 +1215,7 @@ theorem points_snoc : {k : ℕ} → (s : AdSched T F k) → (pt : (Fin k → F) 
             rw [← h0, Fin.cons_self_tail], h0]
       exact Fin.cons_snoc_eq_snoc_cons _ _ _
 
-/-- Appending a point that is fresh along every path preserves schedule freshness: the extended
-`(fork state, fork challenge)` schedule is fresh, so `map_read_uniform` applies at depth `k+1`. -/
+/-- Appending a pathwise-fresh point preserves schedule freshness. -/
 theorem Fresh.snoc {k : ℕ} {s : AdSched T F k} (hs : s.Fresh) {pt : (Fin k → F) → T}
     (hpt : ∀ ψ : Fin k → F, pt ψ ∉ Set.range (s.points ψ)) : (s.snoc pt).Fresh := by
   intro χ
@@ -915,9 +1232,8 @@ theorem Fresh.of_snoc [Nonempty F] {k : ℕ} {s : AdSched T F k} {pt : (Fin k �
 
 end AdSched
 
-/-- **Adaptive-fork blind-set bound.** Under a fresh schedule, the challenge read at the fork point
-remains uniform after conditioning on the preceding fork state. Its chance of landing in the
-state-dependent set `S` is therefore at most the worst measure of `S`. -/
+/-- Under a fresh schedule, an adaptive final read hits a state-dependent set with probability at
+most that set's worst-case measure. -/
 theorem adaptive_fork_mem_le {T F : Type*} [Fintype T] [DecidableEq T] [Fintype F] [Nonempty F]
     {k : ℕ} (s : AdSched T F k) (pt : (Fin k → F) → T) (hf : (s.snoc pt).Fresh)
     (S : (Fin k → F) → Set F) {ε : ℝ≥0∞}
@@ -966,9 +1282,8 @@ def reindex1 (F : Type*) (k : ℕ) : (Fin (k + 1) → F) ≃ (Fin k → F) × F 
   simp only [reindex1, Equiv.trans_apply, Fin.snocEquiv_symm_apply, Equiv.prodComm_apply,
     Prod.swap_prod_mk]
 
-/-- **Single-round forking bound.** Two fresh fork points both accept with distinct challenges with
-probability at least `ε² − ε/N`. `AdSched.map_read_uniform` reduces the oracle experiment to the
-uniform Bellare–Neven fork counted by `forking_measure_bound`. -/
+/-- Two fresh fork points both accept with distinct challenges with probability at least
+`ε² − ε/N`. -/
 theorem schedule_fork_bound {T F : Type*} [Fintype T] [DecidableEq T] [Fintype F] [Nonempty F]
     [DecidableEq F] {k : ℕ} (s : AdSched T F k) (pt₁ pt₂ : (Fin k → F) → T)
     (hd : ((s.snoc pt₁).snoc (fun χ : Fin (k + 1) → F => pt₂ (Fin.init χ))).Fresh)
@@ -1022,8 +1337,7 @@ section Game
 
 variable {T P F : Type*} [Fintype T] [DecidableEq T] [Fintype F] [Nonempty F] {k : ℕ}
 
-/-- The Fiat–Shamir attack event on table `O`: the adversary's output, taken with the round-challenge
-vector the same oracle induces at the output's own round prefixes, is accepted. -/
+/-- Acceptance of the adversary's output under its table-induced round challenges. -/
 def fsWins (A : OracleComp T F P) (accept : P → (Fin k → F) → Prop)
     (prefixes : P → Fin k → T) (O : T → F) : Prop :=
   accept (A.run O) (fun j => O (prefixes (A.run O) j))
@@ -1034,10 +1348,8 @@ noncomputable def fsAdvantage (A : OracleComp T F P) (accept : P → (Fin k → 
     (prefixes : P → Fin k → T) : ℝ≥0∞ :=
   (PMF.uniformOfFintype (T → F)).toOuterMeasure {O | fsWins A accept prefixes O}
 
-/-- **The zero-query anchor.** A query-free adversary's advantage is exactly its fixed output's accept
-measure over the uniform challenge vector — the measure `hprob` is stated over
-(`uniformOfFintype_map_precomp_injective` at the output's distinct round prefixes). The general
-query-loss reduction is this identity's `Q`-query generalization (module docstring). -/
+/-- A query-free adversary's advantage equals its fixed output's accept measure over uniform
+challenges. -/
 theorem fsAdvantage_pure (p : P) (accept : P → (Fin k → F) → Prop)
     (prefixes : P → Fin k → T) (hinj : Function.Injective (prefixes p)) :
     fsAdvantage (.pure p) accept prefixes
@@ -1046,9 +1358,7 @@ theorem fsAdvantage_pure (p : P) (accept : P → (Fin k → F) → Prop)
     PMF.toOuterMeasure_map_apply]
   rfl
 
-/-- **Query-loss composition.** If every winning run either makes an escaping query or reaches a
-residual event `R`, its advantage is at most `Q · ε + δ`: `ε` for each query and `δ` for the
-residual event. -/
+/-- Bound advantage by `Q·ε + δ` when wins escape or enter a residual `δ`-event. -/
 theorem fsAdvantage_le_of_forcing (A : OracleComp T F P) (accept : P → (Fin k → F) → Prop)
     (prefixes : P → Fin k → T) (esc : T → Set F) {ε : ℝ≥0∞}
     (hesc : ∀ t, (PMF.uniformOfFintype F).toOuterMeasure (esc t) ≤ ε)
@@ -1077,9 +1387,7 @@ end Game
 
 open scoped ENNReal in
 open Classical in
-/-- **Legacy fixed-strategy soundness.** If a fixed strategy's oracle-table advantage exceeds
-`kerr/Nᵏ`, compute an IPA opening or relation. `fsAdvantage_pure` supplies the uniform challenge
-vector; the deployed arbitrary-query path is in `Forking.Adversary.Recursive`. -/
+/-- Legacy fixed-strategy wrapper: advantage above `kerr/Nᵏ` yields an IPA opening or relation. -/
 noncomputable def legacy_deployed_forking_soundness_of_fixed_adversary
     {G : Type*} [AddCommGroup G]
     [Module Fp G] [DecidableEq G] [Inhabited G]
@@ -1132,8 +1440,7 @@ theorem schedOfProver_points_length : {d : ℕ} → (P : Prover Fp G d) →
         simp only [List.length_append, List.length_cons, List.length_nil, Fin.val_succ]
         omega
 
-/-- **Staged schedule freshness.** Distinct rounds have distinct transcript lengths, so their
-squeeze points are pairwise distinct along every path. -/
+/-- Distinct round lengths make staged squeeze points pathwise distinct. -/
 theorem schedOfProver_fresh {d : ℕ} (P : Prover Fp G d) (t : List (TranscriptElt Fp G)) :
     (schedOfProver P t).Fresh := by
   intro χ a c hac
@@ -1143,9 +1450,7 @@ theorem schedOfProver_fresh {d : ℕ} (P : Prover Fp G d) (t : List (TranscriptE
   exact Fin.ext (by omega)
 
 open Classical in
-/-- **Legacy staged-strategy soundness.** If a fresh staged schedule's oracle-table advantage
-exceeds `kerr/Nᵏ`, compute an IPA opening or relation. `AdSched.map_read_uniform` supplies the
-path-dependent uniform challenge vector. -/
+/-- Legacy staged-strategy wrapper: advantage above `kerr/Nᵏ` yields an IPA opening or relation. -/
 noncomputable def legacy_deployed_forking_soundness_of_staged_adversary
     [AddCommGroup G] [Module Fp G]
     [DecidableEq G] [Inhabited G]
@@ -1172,8 +1477,7 @@ noncomputable def legacy_deployed_forking_soundness_of_staged_adversary
 
 end StagedAdversary
 
-/-- A staged decode assigns each transcript point its round, earlier prefix chain, and continuation
-accept predicate. The consistency fields make its escape sets depend only on earlier answers. -/
+/-- Decode a staged transcript point into its round, prefix chain, and continuation predicate. -/
 structure StagedDecode (T F P : Type*) (k : ℕ) (accept : P → (Fin k → F) → Prop)
     (prefixes : P → Fin k → T) : Type _ where
   /-- The full-vector accept predicate of the transcript's staged continuation. -/
@@ -1217,9 +1521,7 @@ theorem esc_measure_le [DecidableEq T] [Fintype F] [Nonempty F]
     (fun i => O (D.chainAt t i)) (D.roundOf t)
   exact uniformOfFintype_toOuterMeasure_triple_le hab
 
-/-- **Winning forces an escape or an extractable output.** The attack's accepted vector walks the
-ladder (`extractable_or_ladderEscape`): extraction at the root, or an escaping round whose prefix
-the completed machine queried. -/
+/-- A winning completed run either escapes or returns an extractable output. -/
 theorem win_forces [DecidableEq T] (D : StagedDecode T F P k accept prefixes)
     {A : OracleComp T F P} {O : T → F} (hwin : fsWins A accept prefixes O) :
     (A.completing prefixes).escapesDuringC D.esc O ∨ Extractable (accept (A.run O)) := by
@@ -1234,9 +1536,8 @@ theorem win_forces [DecidableEq T] (D : StagedDecode T F P k accept prefixes)
     exact hj
 
 open Classical in
-/-- **The staged query loss.** Under a staged decode, an adversary with no extractable output has
-advantage at most `(Q + k) · 3/|F|`: winning forces an escaping query of the completed machine
-(`win_forces`), and the conditional escape bound prices its `Q + k` queries at `3/|F|` each. -/
+/-- A staged `Q`-query adversary with no extractable output has advantage at most
+`(Q + k) · 3/|F|`. -/
 theorem fsAdvantage_le [Fintype T] [DecidableEq T] [Fintype F] [Nonempty F]
     (D : StagedDecode T F P k accept prefixes) {A : OracleComp T F P} {Q : ℕ}
     (hQ : A.QueryBound Q)
@@ -1254,8 +1555,7 @@ theorem fsAdvantage_le [Fintype T] [DecidableEq T] [Fintype F] [Nonempty F]
   exact_mod_cast h
 
 open Classical in
-/-- **Staged extraction dichotomy.** Advantage above `(Q + k) · 3/|F|` yields a table whose output
-is `Extractable`, hence carries the full ternary fork tree. -/
+/-- Advantage above `(Q+k)·3/|F|` yields an extractable output. -/
 theorem extractable_of_lt_fsAdvantage [Fintype T] [DecidableEq T] [Fintype F] [Nonempty F]
     (D : StagedDecode T F P k accept prefixes) {A : OracleComp T F P} {Q : ℕ}
     (hQ : A.QueryBound Q)
@@ -1269,9 +1569,8 @@ end StagedDecode
 
 
 open Classical in
-/-- **Legacy querying-adversary soundness.** A staged `Q`-query adversary above the
-`(Q + k) · 3/p` loss yields an IPA opening or relation. This existence-form wrapper is
-supplementary; `Forking.Adversary.Recursive` computes the deployed certificate. -/
+/-- Legacy staged-adversary wrapper: advantage above `(Q + k) · 3/p` yields an IPA opening or
+relation. -/
 noncomputable def legacy_deployed_forking_soundness_of_adversary
     {G : Type*} [AddCommGroup G]
     [Module Fp G] [DecidableEq G] [Inhabited G]
