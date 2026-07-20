@@ -5,9 +5,8 @@ import Zcash.Snark.Soundness.Forking.Rewind
 /-!
 # Deployed AGM opening or relation
 
-`Soundness.AGM.Peel` computes a relation from algebraic prover data. This module connects that result
-to the deployed opening. The result is either a multiopen IPA opening or an explicit relation, with
-no `Classical.choice`.
+`Soundness.AGM.Peel` computes a relation from algebraic prover data. This module returns either a
+multiopen IPA opening or an explicit relation; no coefficients are chosen from an existential.
 
 ## The boundary with the Fiat–Shamir/forking layer
 
@@ -133,8 +132,7 @@ def ProducesRelation [DecidableEq G] {k : ℕ} {basis : AugmentedIndex (2 ^ k) �
     (x : DeployedAlgebraicForkingInstance (G := G) k basis) : Prop :=
   ∃ r, x.run = PSum.inr r
 
-/-- Convert a kernel outcome to a relation. Keep a relation branch unchanged; turn a clean opening
-different from `aMulti` into a commitment-collision relation. Return `none` only when they agree. -/
+/-- Preserve a relation or turn a distinct opening into a commitment-collision relation. -/
 def relationOfRun [DecidableEq G] {k : ℕ} {basis : AugmentedIndex (2 ^ k) → G}
     (x : DeployedAlgebraicForkingInstance (G := G) k basis)
     (run : x.Opening ⊕' AlgebraicRelationWitness (F := Fp) basis) :
@@ -148,15 +146,13 @@ def relationOfRun [DecidableEq G] {k : ℕ} {basis : AugmentedIndex (2 ^ k) → 
           (relationWitnessOfCollision (ursOfAugmentedBasis k basis) hne
             hopen.2.1).augment (ursOfAugmentedBasis k basis).u (ursOfAugmentedBasis k basis).w)
 
-/-- Run an instance and return its explicit relation. A clean opening different from `aMulti`
-becomes a commitment-collision relation; agreement returns `none`. -/
+/-- Return the explicit relation from a relation or distinct-opening branch. -/
 def runRelation [DecidableEq G] {k : ℕ} {basis : AugmentedIndex (2 ^ k) → G}
     (x : DeployedAlgebraicForkingInstance (G := G) k basis) :
     Option (AlgebraicRelationWitness (F := Fp) basis) :=
   x.relationOfRun x.run
 
-/-- Openings are never discarded on a mismatch run: a kernel opening equal to `aMulti` would
-contradict the mismatch, and any other opening collides with it. -/
+/-- A value mismatch makes every kernel outcome yield a relation. -/
 theorem relationOfRun_isSome_of_mismatch [DecidableEq G] {k : ℕ}
     {basis : AugmentedIndex (2 ^ k) → G}
     (x : DeployedAlgebraicForkingInstance (G := G) k basis)
@@ -169,8 +165,7 @@ theorem relationOfRun_isSome_of_mismatch [DecidableEq G] {k : ℕ}
       have hne : ¬ hopen.1 = x.aMulti := fun heq => hmm (heq ▸ hopen.2.2)
       simp only [relationOfRun, dif_neg hne, Option.isSome_some]
 
-/-- **Binding mismatch produces a relation.** If the accepted value differs from the value of
-`aMulti`, `runRelation` returns an explicit relation. -/
+/-- A binding mismatch makes `runRelation` return an explicit relation. -/
 theorem runRelation_isSome_of_mismatch [DecidableEq G] {k : ℕ}
     {basis : AugmentedIndex (2 ^ k) → G}
     (x : DeployedAlgebraicForkingInstance (G := G) k basis)

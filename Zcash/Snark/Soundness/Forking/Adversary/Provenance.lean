@@ -1,15 +1,9 @@
 import Zcash.Snark.Soundness.Forking.Adversary.Algebraic
 
 /-!
-# Assembly provenance: the multiopen MSM appends only proof and verifying-key points
+# Multiopen assembly provenance
 
-`AlgebraicWfProof.ofRepresented` needs representations for every point appended by the deployed
-multiopen MSM. This module proves that those points come only from the proof or verifying key.
-
-`AssemblyPoint` names that pool. `assembleQueries_points_mem` traces query construction,
-`constructIntermediateSets_ref_mem` traces grouping, and `multiopenMsm_points_mem` traces the
-compression and collapse folds. `AlgebraicWfProof.ofStandard` then builds the packaged AGM output
-from represented proof and verifying-key points.
+Every point appended by the deployed multiopen MSM comes from the proof or verifying key.
 -/
 
 namespace Zcash.Snark
@@ -355,8 +349,7 @@ local instance : Inhabited VestaG := ⟨0⟩
 
 variable {shape : Shape} {basis : AugmentedIndex (2 ^ shape.k) → VestaG}
 
-/-- **Assembly provenance.** Every point appended by the deployed multiopen MSM is `q'` or a proof
-or verifying-key commitment in `AssemblyPoint`. -/
+/-- Every point appended by the deployed multiopen MSM is `q'` or an `AssemblyPoint`. -/
 theorem multiopenMsm_points_mem (vk : VerifyingKey shape Fp VestaG)
     (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp) :
     ∀ x ∈ (multiopenMsm vk ps ch).otherPoints,
@@ -398,9 +391,8 @@ theorem multiopenMsm_points_covered (vk : VerifyingKey shape Fp VestaG)
     List.mem_map_of_mem hpr
   exact hL pr.2 (multiopenMsm_points_mem vk aps.erase (chRecord ν (fun _ => 0)) pr.2 hx)
 
-/-- **Standard AGM adapter.** Build `AlgebraicWfProof` from an algebraic proof and representations
-covering `q'`, the emitted commitments, and the verifying-key commitments. Assembly provenance
-discharges the lower-level `hcover` premise. -/
+/-- Build `AlgebraicWfProof` from representations of `q'`, the proof commitments, and the
+verifying-key commitments. -/
 def AlgebraicWfProof.ofStandard {vk : VerifyingKey shape Fp VestaG}
     (aps : AlgebraicProofString shape basis) (hwf : PsWellFormed aps.erase)
     (L : List (AlgebraicPoint (F := Fp) basis))

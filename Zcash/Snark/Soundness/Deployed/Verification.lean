@@ -15,7 +15,7 @@ and ties that equation to the deployed accept condition:
 * the `…?_eq_some` lemmas — deployed acceptance uses the rejecting `assemble?`; when it
   returns `some m`, `m` is the non-rejecting `assembleFinalMsm`, so the equation transfers.
 
-The remaining bridge obligations are listed at `FiatShamirTree` in `Soundness.Main`.
+`Soundness.Main` records the legacy bridge; `Forking.Adversary.Algebraic` gives the computed one.
 -/
 
 namespace Zcash.Snark

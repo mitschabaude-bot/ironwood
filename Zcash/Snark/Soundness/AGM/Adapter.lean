@@ -32,9 +32,8 @@ proves the operational prover, certificate, and reductions used here.
 `Soundness.AGM.Peel` and `.Capstone` compute an IPA opening or relation.
 `Soundness.AGM.Probability` proves the slot-loss bound, and `.ProbabilityVesta` applies it to Vesta.
 
-The explicit-certificate path is computable. Its assumptions are the AGM, plain-DL hardness, the
-generator random-oracle model for the URS, and the random-oracle execution that produces a fork
-certificate.
+The explicit-certificate path is computable. Its boundary is AGM, plain-DL hardness, ideal random
+oracles, an unproved polynomial AFK call bound, and an external PPT-adversary restriction.
 -/
 
 namespace Zcash.Snark

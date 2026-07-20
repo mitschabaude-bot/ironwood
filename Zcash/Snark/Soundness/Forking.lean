@@ -10,10 +10,6 @@ import Zcash.Snark.Soundness.Forking.Adversary
 /-!
 # Fiat–Shamir forking soundness
 
-`Soundness/Forking/` is the reusable forking kernel: random-oracle primitives, fork trees and
-certificates, probability lemmas, transcript ordering and assembly, and the
-certificate-to-opening-or-relation reduction.
-
-`Soundness/Forking/Adversary/` is the concrete producer layered on that kernel. It models the
-querying Fiat–Shamir adversary, computes the fork certificate, and packages the AGM inputs.
+Reusable random-oracle lemmas, fork certificates, transcript assembly, and the querying-adversary
+reduction.
 -/

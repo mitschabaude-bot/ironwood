@@ -13,8 +13,8 @@ The flat verifier equation folds one IPA round at a time. `roundSum_cons`, `comp
 `CF_leaf_to_acceptV` identifies the final closed-form equation with the deployed leaf check, and
 `forkAccept_to_acceptV` assembles the full tree.
 
-`Soundness.Forking.Extractor` separately recovers each round point's `(g, U, W)` coefficients from
-three forks. Random-oracle rewinding and its query loss remain outside this structural step.
+`Soundness.Forking.Extractor` recovers the parent data, while the algebraic prover supplies AGM
+coefficients. Rewinding and query loss remain outside this structural step.
 -/
 
 namespace Zcash.Snark

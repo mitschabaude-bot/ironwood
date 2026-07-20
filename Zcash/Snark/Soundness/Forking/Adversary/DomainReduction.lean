@@ -1,17 +1,10 @@
 import Zcash.Snark.Soundness.Forking.Adversary.Adaptive
 
 /-!
-# The unbounded oracle domain reduces to finite subdomains
+# Reduce an unbounded oracle domain to finite support
 
-A bounded-query adversary over an infinite transcript domain reaches only finitely many points.
-This module reduces its random-oracle game to that finite support.
-
-1. `OracleComp.reachSet` and `run_congr_reachSet` prove run locality.
-2. `finite_domain_restriction` includes every reachable query and attainable game point.
-3. `fsWinsFull_mapDomain_measure_eq` shows that enlarging the finite domain preserves advantage.
-4. `fsWinsFull_unbounded_measure_le` splits deployed transcript points from finite junk queries.
-
-This gives the infinite domain lazy semantics: only answers the machine can reach are sampled.
+A bounded-query adversary reaches finitely many oracle points; split them into deployed transcripts
+and finite junk support.
 -/
 
 namespace Zcash.Snark
@@ -54,7 +47,7 @@ theorem reachSet_query_subset (t : T) (k : F → OracleComp T F α) (u : F) :
   Finset.subset_insert t _
     (Finset.subset_biUnion_of_mem (fun v : F => (k v).reachSet) (Finset.mem_univ u) hx)
 
-/-- **Run locality.** The run depends on the table only at the reachable points. -/
+/-- A run depends only on reachable table points. -/
 theorem run_congr_reachSet : (A : OracleComp T F α) → {O O' : T → F} →
     (∀ t ∈ A.reachSet, O t = O' t) → A.run O = A.run O'
   | .pure _, _, _, _ => rfl
@@ -175,9 +168,8 @@ section Reduction
 variable {T F P : Type*} [DecidableEq T] [Fintype F] [Nonempty F]
 
 open Classical in
-/-- **Finite-domain reduction.** Every bounded-query adversary factors through a finite set
-containing its reachable queries and attainable game points. The restricted machine has the same
-query bound and full-record outcome on every table. -/
+/-- Restrict an adversary to a finite set containing every reachable query and attainable game
+point, preserving its query bound and outcome. -/
 theorem finite_domain_restriction {m k : ℕ} (hm : 0 < m)
     (A : OracleComp T F P) {Q : ℕ} (hQ : A.QueryBound Q)
     (accept : P → (Fin m → F) → (Fin k → F) → Prop)
@@ -226,8 +218,7 @@ theorem finite_domain_restriction {m k : ℕ} (hm : 0 < m)
   rw [h1, h2]
 
 open Classical in
-/-- **Finite-domain invariance.** Embedding a finite game into a larger split domain preserves its
-uniform win probability because the junk coordinates do not affect the event. -/
+/-- Adding independent junk coordinates to a finite game preserves its win probability. -/
 theorem fsWinsFull_mapDomain_measure_eq {T₀ J : Type*} [Fintype T₀] [DecidableEq T₀]
     [Fintype J] [DecidableEq J] {m k : ℕ}
     (A : OracleComp T₀ F P) (accept : P → (Fin m → F) → (Fin k → F) → Prop)
@@ -248,8 +239,8 @@ theorem fsWinsFull_mapDomain_measure_eq {T₀ J : Type*} [Fintype T₀] [Decidab
     uniformOfFintype_map_precomp_injective Sum.inl Sum.inl_injective]
 
 open Classical in
-/-- **Split-domain equivalence.** If game points lie in the designated component, the split and
-original machines have the same full-record outcome on agreeing tables. -/
+/-- Split and original machines have the same outcome on agreeing tables when all game points lie
+in the designated component. -/
 theorem fsWinsFull_splitDomain {T T_D : Type*} [DecidableEq T] [Fintype F]
     {m k : ℕ} (ι : T_D → T) (ρ : T → Option T_D) (S : Finset T)
     (hρ₂ : ∀ t tD, ρ t = some tD → t = ι tD)
@@ -275,10 +266,8 @@ theorem fsWinsFull_splitDomain {T T_D : Type*} [DecidableEq T] [Fintype F]
   rw [h1, h2]
 
 open Classical in
-/-- **Arbitrary-domain pricing.** A bound uniform over `Q`-query machines on the designated finite
-domain also bounds a `Q`-query machine on an arbitrary domain. `splitDomain` preserves designated
-game points, and `fsWinsFull_restrictSum_le` averages over the finite junk table. For deployed
-transcripts, use `Subtype.val` and `truncateTranscript`. -/
+/-- A bound for all `Q`-query machines on the designated finite domain also bounds a `Q`-query
+machine on an arbitrary domain. -/
 theorem fsWinsFull_unbounded_measure_le {T T_D : Type*} [DecidableEq T]
     [Fintype T_D] [DecidableEq T_D] {m k : ℕ}
     (ι : T_D → T) (ρ : T → Option T_D)

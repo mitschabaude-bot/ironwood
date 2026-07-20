@@ -10,10 +10,8 @@ only at its captured transcript prefix, converted by `markerSchedule` to the mod
 
 With `numProofs = 2`, the check covers the per-proof absorb order that the single-action fixture cannot
 distinguish. The Rust capture is trusted to provide the typed proof data, transcript events, and
-challenges. This file does not replay transcript bytes.
-
-TODO: once a general transcript-ordering theorem lands, either point this oracle at it or keep it as
-a concrete regression for the captured proof.
+challenges, not transcript bytes. General IPA ordering and sub-proof traversal are proved elsewhere;
+this remains a concrete full-schedule regression.
 -/
 
 namespace Zcash.Snark.Fixture2

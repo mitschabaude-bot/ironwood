@@ -32,10 +32,8 @@ def Extractable [Zero α] : {d : ℕ} → ((Fin d → α) → Prop) → Prop
 
 /-! ## The round-by-round ladder
 
-Call a challenge prefix *doomed* when its continuation is not `Extractable`. At most three
-challenges escape a doomed state: zero and at most two extractable continuations. An accepted
-vector therefore proves extraction or escapes at some round, which is the event charged by the
-Fiat–Shamir query loss. -/
+An accepted vector either extracts or escapes a nonextractable prefix through at most three
+challenges. -/
 
 /-- The challenge vector reaches a doomed state and then draws zero or an extractable
 continuation. -/
@@ -45,8 +43,7 @@ def LadderEscape [Zero α] : {d : ℕ} → ((Fin d → α) → Prop) → (Fin d 
       (¬ Extractable acc ∧ (χ 0 = 0 ∨ Extractable (fun rest => acc (Fin.cons (χ 0) rest))))
       ∨ LadderEscape (fun rest => acc (Fin.cons (χ 0) rest)) (Fin.tail χ)
 
-/-- **Ladder walk.** An accepted challenge vector either makes the root `Extractable` or escapes
-a doomed state at some round. -/
+/-- An accepted vector either extracts at the root or escapes at some round. -/
 theorem extractable_or_ladderEscape [Zero α] :
     {d : ℕ} → (acc : (Fin d → α) → Prop) → (χ : Fin d → α) → acc χ →
     Extractable acc ∨ LadderEscape acc χ
@@ -65,8 +62,7 @@ theorem extractable_or_ladderEscape [Zero α] :
         · exact Or.inr (Or.inl ⟨hdoom, Or.inr hext⟩)
       · exact Or.inr (Or.inr hesc)
 
-/-- **Doomed-state escape bound.** A nonextractable state has at most two nonzero extractable
-continuations; including zero, its escape set lies in three challenges. -/
+/-- A nonextractable state's escape set lies in zero and at most two other challenges. -/
 theorem escapeSet_subset_triple [Zero α] {d : ℕ} {acc : (Fin (d + 1) → α) → Prop}
     (hdoom : ¬ Extractable acc) :
     ∃ a b : α, {u : α | u = 0 ∨ Extractable (fun rest => acc (Fin.cons u rest))}
@@ -145,8 +141,7 @@ theorem exists_mem_ladderEscapeSet [Zero α] :
         exact ⟨j.succ, hj⟩
 
 open Classical in
-/-- Every round's escape set sits inside three challenges (`escapeSet_subset_triple` — empty once
-the state is extractable). -/
+/-- Every round's escape set lies in at most three challenges. -/
 theorem ladderEscapeSet_subset_triple [Zero α] :
     {d : ℕ} → (acc : (Fin d → α) → Prop) → (χ : Fin d → α) → (j : ℕ) →
     ∃ a b : α, ladderEscapeSet acc χ j ⊆ {0, a, b}

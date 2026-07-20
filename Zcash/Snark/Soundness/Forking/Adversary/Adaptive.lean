@@ -3,8 +3,8 @@ import Zcash.Snark.Soundness.Forking.Adversary.OracleComp
 /-!
 # Minimal adaptive Fiat–Shamir interface
 
-This module defines the interfaces used by the recursive extractor: transcript decoding,
-the full-record attack event, the `z = 0` loss, and the bounded transcript domain.
+Interfaces for transcript decoding, the full-record attack event, the `z = 0` loss, and bounded
+transcripts.
 -/
 
 namespace Zcash.Snark
@@ -64,9 +64,8 @@ end AdaptiveGame
 section DomainRestriction
 
 open Classical in
-/-- **Finite-domain restriction.** Junk oracle points do not improve the full-record advantage.
-Conditioning on their table gives `A.restrictSum j` on `T` with the same query bound, so any
-uniform bound for the restricted machines also bounds the split-domain machine. -/
+/-- Conditioning on junk oracle values reduces the split-domain game to a machine on `T` with the
+same query bound. -/
 theorem fsWinsFull_restrictSum_le {T J F P : Type*} [Fintype T] [DecidableEq T]
     [Fintype J] [DecidableEq J] [Fintype F] [Nonempty F] {m k : ℕ}
     (A : OracleComp (T ⊕ J) F P) (accept : P → (Fin m → F) → (Fin k → F) → Prop)

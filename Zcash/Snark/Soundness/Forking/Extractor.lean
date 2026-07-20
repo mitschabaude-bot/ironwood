@@ -203,7 +203,8 @@ def deployed_forking_tree [DecidableEq F] [DecidableEq G] {U W : G} {z : F} (hz 
 `extractable_of_prob` returns only a challenge tree. `Prover` supplies the round points and leaf
 openings chosen along each prefix. `proverAccept_forkValid` combines them into a `DForkCert`.
 
-Connecting a real Fiat–Shamir adversary to this strategy type remains outside this module.
+`Soundness.Forking.Adversary.Recursive` connects an arbitrary querying Fiat–Shamir adversary to the
+explicit certificate path; it does not use this legacy propositional strategy interface.
 -/
 
 /-- A prefix-determined IPA prover strategy with round points and leaf openings. -/

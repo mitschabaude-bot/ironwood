@@ -8,11 +8,8 @@ This file checks the deployed absorb/squeeze order against a single-action Rust 
 matches `nonInteractiveFingerprint` to the captured MSM. `capturedFs` returns a captured challenge
 only at its captured transcript prefix, converted by `markerSchedule` to the model's marker encoding.
 
-The Rust capture is trusted to provide the typed proof data, transcript events, and challenges. This
-file does not replay transcript bytes. The multi-action fixture checks the per-proof interleaving.
-
-TODO: once a general transcript-ordering theorem lands, either point this oracle at it or keep it as
-a concrete regression for the captured proof.
+The Rust capture supplies trusted typed data, events, and challenges, not transcript bytes. General
+ordering is proved elsewhere; the multi-action fixture checks per-proof interleaving.
 -/
 
 namespace Zcash.Snark.Fixture

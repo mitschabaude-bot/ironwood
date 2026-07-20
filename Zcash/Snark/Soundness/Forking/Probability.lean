@@ -16,7 +16,8 @@ The main results are:
 * `extractable_of_prob`: if acceptance exceeds `kerr / |domain|`, an `Extractable` tree exists.
 
 The proof uses the multi-round `kerr` count directly. It does not compound a per-round cubic loss.
-`Forking.Oracle` describes the remaining adversary and random-oracle assumptions.
+`Forking.Oracle` describes the random-oracle idealization, and `Forking.Adversary` supplies the
+querying-adversary reduction and query loss.
 -/
 
 namespace Zcash.Snark
@@ -65,8 +66,7 @@ theorem map_fst_uniformOfFintype {A B : Type*} [Fintype A] [Fintype B] [Nonempty
     ENNReal.mul_inv_cancel (Nat.cast_ne_zero.mpr Fintype.card_ne_zero)
       (ENNReal.natCast_ne_top _), one_mul]
 
-/-- Reading a uniform table at distinct points gives a uniform answer vector. Unread coordinates
-integrate out, and `uniformOfFintype_map_eval_injective` reindexes the read coordinates. -/
+/-- Reading a uniform table at distinct points gives a uniform answer vector. -/
 theorem uniformOfFintype_map_precomp_injective {ι T F : Type*} [Fintype ι] [DecidableEq ι]
     [Fintype T] [DecidableEq T] [Fintype F] [Nonempty F]
     (φ : ι → T) (hφ : Function.Injective φ) :
@@ -82,8 +82,7 @@ theorem uniformOfFintype_map_precomp_injective {ι T F : Type*} [Fintype ι] [De
     map_uniformOfFintype_equiv (Equiv.piEquivPiSubtypeProd (fun t => t ∈ Set.range φ) (fun _ => F)),
     map_fst_uniformOfFintype, uniformOfFintype_map_eval_injective φ hφ]
 
-/-- Uniform measure of an arbitrary set: its counting fraction `|s| / |α|` (the `Set` form of
-`uniformOfFintype_toOuterMeasure_finset`). -/
+/-- A set's uniform measure is its counting fraction. -/
 theorem uniformOfFintype_toOuterMeasure_set {α : Type*} [Fintype α] [Nonempty α] (s : Set α) :
     (PMF.uniformOfFintype α).toOuterMeasure s = (Nat.card s : ℝ≥0∞) / Fintype.card α := by
   classical
@@ -91,8 +90,7 @@ theorem uniformOfFintype_toOuterMeasure_set {α : Type*} [Fintype α] [Nonempty 
     ← uniformOfFintype_toOuterMeasure_finset, Set.coe_toFinset]
 
 open Classical in
-/-- Uniform-product fiber bound. If every set `S b` has measure at most `β`, then choosing `b`
-before testing the independent first coordinate still gives probability at most `β`. -/
+/-- A uniform product inherits a bound that holds on every first-coordinate fiber. -/
 theorem uniformOfFintype_prod_fiber_bound {A B : Type*} [Fintype A] [Fintype B] [Nonempty A]
     [Nonempty B] (S : B → Set A) {β : ℝ≥0∞}
     (hS : ∀ b, (PMF.uniformOfFintype A).toOuterMeasure (S b) ≤ β) :
@@ -154,9 +152,7 @@ theorem uniformOfFintype_prod_fiber_bound_right {A B : Type*} [Fintype A] [Finty
     _ = β * Fintype.card (A × B) := by rw [Fintype.card_prod]; push_cast; ring
 
 open Classical in
-/-- **Fresh-read bound.** A choice based only on oracle answers outside `Set.range φ` cannot steer
-the answers at the distinct points `φ i`. If every chosen target has measure at most `β`, so does
-the joint event. -/
+/-- Unread oracle coordinates remain uniform after choosing a target from the other coordinates. -/
 theorem uniformOfFintype_fresh_read_bound {ι T F X : Type*} [Fintype ι] [DecidableEq ι]
     [Fintype T] [DecidableEq T] [Fintype F] [Nonempty F]
     (φ : ι → T) (hφ : Function.Injective φ)
@@ -220,8 +216,7 @@ theorem map_eval_uniformOfFintype {T F : Type*} [Fintype T] [DecidableEq T] [Fin
     map_uniformOfFintype_equiv (Equiv.piEquivPiSubtypeProd (fun x => x = t) (fun _ => F)),
     map_fst_uniformOfFintype, map_uniformOfFintype_equiv (Equiv.funUnique {x : T // x = t} F)]
 
-/-- The answer at one point of a uniform table lands in a set with that set's own probability —
-the event form of the one-point marginal. -/
+/-- A uniform table's answer at one point has the uniform marginal. -/
 theorem uniformOfFintype_point_measure {T F : Type*} [Fintype T] [DecidableEq T] [Fintype F]
     [Nonempty F] (t : T) (s : Set F) :
     (PMF.uniformOfFintype (T → F)).toOuterMeasure {O : T → F | O t ∈ s}
@@ -229,8 +224,7 @@ theorem uniformOfFintype_point_measure {T F : Type*} [Fintype T] [DecidableEq T]
   have h : {O : T → F | O t ∈ s} = (fun O : T → F => O t) ⁻¹' s := rfl
   rw [h, ← PMF.toOuterMeasure_map_apply, map_eval_uniformOfFintype]
 
-/-- **One-point conditioning.** If an event is unchanged by updating the table at `t`, fixing
-`O t = u` multiplies its measure by `1/|F|`. -/
+/-- Conditioning an update-invariant event on `O t = u` costs `1/|F|`. -/
 theorem uniformOfFintype_cond_point {T F : Type*} [Fintype T] [DecidableEq T] [Fintype F]
     [Nonempty F] (t : T) (u : F) (E : Set (T → F))
     (hE : ∀ (O : T → F) (v : F), Function.update O t v ∈ E ↔ O ∈ E) :
@@ -262,8 +256,7 @@ theorem uniformOfFintype_cond_point {T F : Type*} [Fintype T] [DecidableEq T] [F
   rw [one_mul, one_div, div_eq_mul_inv, mul_comm]
 
 open Classical in
-/-- Double counting: summing over answers `u` the probability that `u` lies in a table-chosen set
-is the expected size of that set — at most `ε · |F|` when every choice has measure at most `ε`. -/
+/-- Bound the expected size of a table-chosen set by its uniform-measure bound. -/
 theorem sum_point_mem_measure_le {T F : Type*} [Fintype T] [DecidableEq T] [Fintype F]
     [Nonempty F] (S : (T → F) → Set F) {ε : ℝ≥0∞}
     (hS : ∀ O, (PMF.uniformOfFintype F).toOuterMeasure (S O) ≤ ε) :
@@ -310,8 +303,7 @@ theorem sum_point_mem_measure_le {T F : Type*} [Fintype T] [DecidableEq T] [Fint
             (ENNReal.natCast_ne_top _)]
 
 open Classical in
-/-- **Blind-set point bound.** If `S O` is unchanged by updating `O t`, then `O t ∈ S O` has
-probability at most the largest measure of `S O`. -/
+/-- An update-blind set contains `O t` with at most its uniform-measure bound. -/
 theorem uniformOfFintype_point_mem_blind_le {T F : Type*} [Fintype T] [DecidableEq T] [Fintype F]
     [Nonempty F] (t : T) (S : (T → F) → Set F)
     (hblind : ∀ (O : T → F) (v : F), S (Function.update O t v) = S O) {ε : ℝ≥0∞}
@@ -373,8 +365,7 @@ theorem extractable_of_prob [Fintype α] [DecidableEq α] [Zero α] [Nonempty α
     gcongr
   exact absurd h (not_lt.mpr hmono)
 
-/-- Cauchy–Schwarz for finite `ℝ≥0∞` values: `(∑ pᵢ)² ≤ |s| · ∑ pᵢ²`, the arithmetic core of local
-forking. -/
+/-- Finite `ℝ≥0∞` Cauchy–Schwarz for the local forking bound. -/
 theorem ennreal_sq_sum_le_card_mul_sum_sq {ι : Type*} (s : Finset ι) (f : ι → ℝ≥0∞)
     (hf : ∀ i ∈ s, f i ≠ ∞) :
     (∑ i ∈ s, f i) ^ 2 ≤ s.card * ∑ i ∈ s, (f i) ^ 2 := by
@@ -388,8 +379,7 @@ theorem ennreal_sq_sum_le_card_mul_sum_sq {ι : Type*} (s : Finset ι) (f : ι �
   simp_rw [ENNReal.toReal_pow]
   exact sq_sum_le_card_mul_sum_sq
 
-/-- The pair-count identity: the accepting ordered pairs split into the off-diagonal distinct pairs
-and the diagonal (counted by the accepting set). -/
+/-- Split accepting ordered pairs into distinct and diagonal pairs. -/
 theorem acc_pair_card {F : Type*} [Fintype F] [DecidableEq F] (P : F → Prop) [DecidablePred P] :
     (Finset.univ.filter P).card * (Finset.univ.filter P).card
       = (Finset.univ.filter (fun p : F × F => P p.1 ∧ P p.2 ∧ p.1 ≠ p.2)).card
@@ -406,9 +396,7 @@ theorem acc_pair_card {F : Type*} [Fintype F] [DecidableEq F] (P : F → Prop) [
   rw [hoff, Finset.offDiag_card]
   exact (Nat.sub_add_cancel hle).symm
 
-/-- **Local forking, counting form.** The square of the accepting-pair count is bounded by the
-number of states times the distinct accepting-fork count plus the diagonal, yielding the count form
-of `ε² − ε/N`. -/
+/-- Counting form of the local `ε² − ε/N` forking bound. -/
 theorem forking_card_bound {Ψ F : Type*} [Fintype Ψ] [Fintype F] [DecidableEq F]
     (acc : Ψ → F → Prop) [∀ ψ, DecidablePred (acc ψ)] :
     (∑ ψ : Ψ, (Finset.univ.filter (acc ψ)).card) ^ 2

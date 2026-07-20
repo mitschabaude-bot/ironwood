@@ -22,8 +22,8 @@ The deployed route pins the IPA commitment and value to the proof's `multiopenCo
 `multiopenValue`:
 
 1. `deployedAccepts_verifierEq` derives halo2's explicit IPA verifier equation.
-2. The legacy `FiatShamirTree` interface supplies forked transcript data. The live path in
-   `Soundness.Forking.Rewind` replaces most of that interface with explicit reductions.
+2. The legacy `FiatShamirTree` supplies forks; `Soundness.Forking.Adversary` computes them from a
+   bounded-query machine and charges query loss.
 3. A fork either yields a clean IPA opening or computes a nontrivial `(g, U, W)` relation.
 
 ## The reduction form
@@ -42,11 +42,8 @@ reductions return it explicitly instead of asserting that one exists.
 * **Circuit satisfaction assumed.** It also supplies `circuitSat a` rather than deriving it from
   the deployed gate check (`constraint_identity_of_accept` + the multiopen decode).
 
-What is proven lives in the component lemmas (`extract_correct`, `accepting_fold_eq`,
-`quotientCheck_sound`, and the computed binding reduction `NontrivialDLRelation.ofCollision`);
-the open work is wiring
-them onto this path. `Soundness.Vesta` instantiates the capstones at the concrete curve;
-`Soundness.KnowledgeSoundness` lists the assumptions.
+This conditional family leaves those components opaque. The computed route is in
+`Forking.Adversary.Algebraic`; `KnowledgeSoundness` records its computational boundary.
 -/
 
 namespace Zcash.Snark

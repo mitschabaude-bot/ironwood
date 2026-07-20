@@ -11,10 +11,5 @@ import Zcash.Snark.Soundness.Forking.Adversary.Provenance
 /-!
 # Fiat–Shamir adversary and extraction
 
-`Soundness/Forking/Adversary/` constructs the fork data consumed by the reusable kernel:
-
-* `OracleComp` and `Adaptive` define the querying adversary and deployed attack game.
-* `PreIpa` and `DomainReduction` connect that game to the deployed transcript and oracle domain.
-* `Recursive` and `ExpectedRuns` compute the fork certificate and analyze its run count.
-* `Algebraic` and `Provenance` package the certificate and standard AGM data for the DL reduction.
+Model a querying adversary, compute its fork certificate, and package the AGM reduction input.
 -/

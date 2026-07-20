@@ -5,12 +5,8 @@ import Mathlib.Data.Fintype.Perm
 /-!
 # Executable recursive Fiat–Shamir forking
 
-This module computes an algebraic fork certificate from an oracle adversary. Rewinding reruns the
-adversary after changing one oracle answer; forking collects three successful continuations.
-
-An oracle table and finite extractor tape determine the algorithm. Each tape node tries a finite
-challenge order with fresh child tapes, so extraction is total and returns certificate data rather
-than selecting an existential witness.
+Rerun an oracle adversary under one-point reprogramming to compute a ternary algebraic fork
+certificate from a finite tape.
 -/
 
 namespace Zcash.Snark
@@ -242,8 +238,7 @@ def addRuns {α : Type*} (n : ℕ) (r : RecursiveForkAttempt α) : RecursiveFork
 
 end RecursiveForkAttempt
 
-/-- Scan a finite challenge order until one fresh, nonzero successful attempt is found.  The
-remaining order and the updated seen set let a caller continue sampling without replacement. -/
+/-- Scan until a fresh nonzero attempt succeeds, returning the remaining order and seen set. -/
 def nextForkChallenge {F α : Type*} [Zero F] [DecidableEq F]
     (attempt : F → RecursiveForkAttempt α) (seen : List F) : List F →
     RecursiveForkAttempt ((F × α) × List F × List F)
@@ -507,9 +502,8 @@ section Extractor
 variable {T F G P ι : Type*} [DecidableEq T] [Field F] [DecidableEq F]
   [AddCommGroup G] [Module F G] [Fintype ι]
 
-/-- Run recursive algebraic forking from a cached adversary output. The current run is the first
-branch; reprogrammed runs with changed trunks are rejected. A node is returned after two more
-distinct nonzero challenges succeed. The caller checks `DeployedForkValid`. -/
+/-- Fork from a cached run, rejecting changed trunks until two further distinct nonzero challenges
+succeed. -/
 def recursiveAlgebraicForkFrom
     (basis : ι → G) (k : ℕ)
     (A : OracleComp T F P)
@@ -580,8 +574,7 @@ def recursiveAlgebraicFork
 
 /-! ## Worst-case run bound -/
 
-/-- A bounded recursive tape makes at most `(2n+1)^d` adversary runs.  This deliberately uses a
-simple worst-case bound: each of the two continuation scans may inspect all `n` challenges. -/
+/-- A bounded recursive tape makes at most `(2n+1)^d` adversary runs. -/
 theorem recursiveAlgebraicForkFrom_runs_le
     (basis : ι → G) (k : ℕ)
     (A : OracleComp T F P) (prefixes : P → Fin k → T)
@@ -682,9 +675,7 @@ theorem recursiveAlgebraicFork_runs_le
     (Fintype.card F) 0 (by omega) O (A.run O) tape.toCoins tape.toCoins_bounded
 
 open Classical in
-/-- **Unconditional expected-run bound.** Summing over the uniform complete extractor tape needs no
-fork-spread hypothesis: the deterministic bound applies to every tape.  After division by the tape
-cardinality this states `E[runs] ≤ (2·|F|+1)^k`. -/
+/-- The complete-tape expectation is at most `(2·|F|+1)^k`, not polynomial AFK. -/
 theorem recursiveAlgebraicFork_sum_runs_le_unconditional
     (basis : ι → G) (k : ℕ)
     (A : OracleComp T F P) (prefixes : P → Fin k → T)
@@ -703,8 +694,7 @@ theorem recursiveAlgebraicFork_sum_runs_le_unconditional
     _ = _ := by rw [Finset.sum_const, Finset.card_univ, smul_eq_mul, Nat.mul_comm]
 
 open Classical in
-/-- The same unconditional expectation bound with both the finite random-oracle table and extractor
-tape sampled uniformly.  This is the operational coin space used by the computed reduction. -/
+/-- The unconditional run bound over uniform oracle-table and extractor-tape coins. -/
 theorem recursiveAlgebraicFork_oracle_tape_sum_runs_le_unconditional [Fintype T]
     (basis : ι → G) (k : ℕ)
     (A : OracleComp T F P) (prefixes : P → Fin k → T)
@@ -733,11 +723,7 @@ private theorem nat_le_two_pow (n : ℕ) : n ≤ 2 ^ n := by
       have hone : 1 ≤ 2 ^ n := one_le_pow₀ (by omega)
       omega
 
-/-- Rewrites the unconditional worst-case bound as a polynomial in the instance size `2^k` for a
-fixed challenge field, with exponent `2·|F|+1`.  This intentionally records the exponential-in-`k`
-extractor selected by the model.  `ExpectedRuns` separately proves a much sharper conditional bound
-under fork spread; that optimization is not needed for totality or the unconditional expectation
-theorems above. -/
+/-- Rewrite the exhaustive bound as `(2^k)^(2·|F|+1)`; its field-sized exponent is not polynomial AFK. -/
 theorem recursiveAlgebraicFork_runs_le_instance_pow
     (basis : ι → G) (k : ℕ)
     (A : OracleComp T F P) (prefixes : P → Fin k → T)
@@ -755,10 +741,7 @@ theorem recursiveAlgebraicFork_runs_le_instance_pow
 
 /-! ## Certificate semantics -/
 
-/-- `cert` is an explicit algebraic fork tree for `acc`. The certificate stores inverted
-Fiat–Shamir challenges and swaps the two round points, exactly as required by
-`DeployedForkValid`; the relation `acc` continues to use the deployed verifier's original
-challenge convention. -/
+/-- An explicit algebraic fork tree for `acc`, using the conventions of `DeployedForkValid`. -/
 def AlgebraicForkRealizes (basis : ι → G) (decode : T → G × G) :
     {d : ℕ} → ((Fin d → T) → (Fin d → F) → F → F → Prop) →
       AlgebraicDForkCert (F := F) basis d → Prop
@@ -797,8 +780,8 @@ def RecursiveRunHistory (k m : ℕ) (hmk : m ≤ k) (prefixes : P → Fin k → 
     (O : T → F) (p : P) (history : Fin m → T × F) : Prop :=
   ∀ i, prefixes p ⟨i.val, by omega⟩ = (history i).1 ∧ O (history i).1 = (history i).2
 
-/-- Runs represented by one recursive invocation, starting at round `m`.  `history` retains the
-fork points fixed above the node, so every leaf agrees with the complete path that produced it. -/
+/-- Runs represented by one recursive invocation, retaining the fork points fixed above round
+`m`. -/
 def RecursiveRunSuffix (k m d : ℕ) (hmk : m + d = k)
     (A : OracleComp T F P) (prefixes : P → Fin k → T) (final : P → F × F)
     (win stable : (T → F) → P → Prop) (history : Fin m → T × F) :
@@ -808,8 +791,7 @@ def RecursiveRunSuffix (k m d : ℕ) (hmk : m + d = k)
     (∀ i : Fin d, prefixes p ⟨m + i.val, by omega⟩ = ts i) ∧
     (∀ i, O (ts i) = cs i) ∧ final p = (c, f)
 
-/-- Every certificate returned by the recursive algorithm records actual winning adversary runs,
-providing the executable counterpart of the propositional `Extractable2` tree. -/
+/-- Every returned certificate records actual winning adversary runs. -/
 theorem recursiveAlgebraicForkFrom_realizes
     (basis : ι → G) (k : ℕ) (A : OracleComp T F P)
     (prefixes : P → Fin k → T)
@@ -1116,9 +1098,8 @@ theorem recursiveForkReached_child (k : ℕ) (prefixes : P → Fin k → T)
           rw [hnext]
           simpa only [hc, RecursiveForkCoins.nodeAt] using hn
 
-/-- Escape sets for one fixed recursive-extractor tape.  At a decoded round point, the set contains
-zero and the recursively successful replacement challenges exactly when fewer than three distinct
-nonzero replacements succeed.  The tape node is selected only from earlier decoded challenges. -/
+/-- Escape sets for one tape: zero and successful replacements at nodes with fewer than three
+distinct nonzero successes. -/
 noncomputable def recursiveForkEscapeSet
     (basis : ι → G) (k : ℕ)
     (A : OracleComp T F P) (prefixes : P → Fin k → T)

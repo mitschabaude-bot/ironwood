@@ -6,9 +6,8 @@ import Zcash.Snark.Verifier.FiatShamir
 These theorems show that verifier assembly and the Fiat–Shamir schedule traverse every sub-proof for
 arbitrary `shape.numProofs`. Every consensus-valid Orchard action count is one instance.
 
-They do not prove byte-level Rust faithfulness; the generated fixtures cover that boundary. Most are
-definitional pins. `subProofBlocks_length_const` proves that flattening neither drops nor duplicates a
-block, and `subProofOpeningQueries_commId_disjoint` prevents multiopen grouping across sub-proofs.
+Fixtures compare trusted typed Rust captures, not transcript bytes. Most results here are
+definitional pins; the remaining lemmas prevent block loss and cross-proof multiopen grouping.
 -/
 
 namespace Zcash.Snark

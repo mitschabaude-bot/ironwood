@@ -3,9 +3,7 @@ import Zcash.Snark.Soundness.AGM.Probability
 /-!
 # Relation-to-DL probability with extractor coins
 
-The Fiat–Shamir reduction draws an oracle table and extractor tape independently of the public
-basis and discrete-log challenge slot. This module carries those finite coins through the
-fixed-slot reduction, which hides the challenge in one uniformly sampled basis position.
+Carry independent extractor coins through the fixed-slot DL reduction with a uniformly hidden slot.
 -/
 
 open scoped ENNReal

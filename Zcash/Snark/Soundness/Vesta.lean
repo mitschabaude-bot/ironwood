@@ -17,14 +17,15 @@ the concrete-curve forms of the abstract capstones.
 
 The only structure the `Fp`-action needs that the curve does not already carry is the Vesta group
 order: every point is `p`-torsion (`p = scalarFieldOrder`). Given that, `AddCommGroup.zmodModule`
-turns the curve into an `Fp`-module and the end-to-end theorems apply verbatim.
+turns the curve into an `Fp`-module and the abstract theorems specialize to Vesta.
 
 ## Assumptions
 
-* **The Vesta group order — no assumption.** CompElliptic's `Pasta.Vesta.card_eq` proves
-  `Nat.card VestaG = scalarFieldOrder` (an elementary point-count bound stands in for Hasse, which
-  Mathlib lacks — see CompElliptic's `CurveOrder`), whence every point is annihilated by the group
-  order (`vestaOrder`).
+* **The Vesta group order.** CompElliptic's `Pasta.Vesta.card_eq` supplies
+  `Nat.card VestaG = scalarFieldOrder`, from which `vestaOrder` proves that every point is annihilated
+  by the scalar-field order. This does not require a caller-supplied hypothesis, but `card_eq` is a
+  closed computation certified with `native_decide`; concrete Vesta endpoints inherit that pinned
+  compiler-trust axiom.
 -/
 
 namespace Zcash.Snark
@@ -34,34 +35,33 @@ open CompElliptic.Curves.Pasta CompElliptic.CurveForms.ShortWeierstrass CompElli
 /-- The deployed verifier group `E_q`, concretely `SWPoint Vesta.curve`: the points of `y² = x³ + 5`. -/
 abbrev VestaG := SWPoint Vesta.curve
 
-/-- The Vesta group order as a proposition: every Vesta point is `p`-torsion, i.e. the group order
-divides `p = scalarFieldOrder`. Proven unconditionally (`vestaOrder`); carried as a `Fact` so
-`vestaFpModule` can consume it. -/
+/-- The Vesta group-order proposition: every Vesta point is `p`-torsion for
+`p = scalarFieldOrder`. `vestaOrder` supplies it from CompElliptic's pinned point-count result, and
+`vestaFpModule` consumes it through `Fact`. -/
 abbrev VestaOrder : Prop := ∀ P : VestaG, (scalarFieldOrder : ℕ) • P = 0
 
-/-- The Vesta group order, unconditionally: CompElliptic's `Pasta.Vesta.card_eq` gives
-`Nat.card VestaG = scalarFieldOrder` with no assumption, and a finite group is annihilated by its
-order. -/
+/-- Derive the Vesta group-order proposition from CompElliptic's `Pasta.Vesta.card_eq` and the fact
+that a finite group is annihilated by its cardinality. The theorem has no explicit hypothesis, but
+inherits `card_eq`'s pinned `native_decide` axiom. -/
 theorem vestaOrder : VestaOrder := by
   intro P
   have hcard : Nat.card VestaG = scalarFieldOrder := Vesta.card_eq
   rw [← hcard]
   exact addOrderOf_dvd_iff_nsmul_eq_zero.mp (addOrderOf_dvd_natCard P)
 
-/-- The Vesta order `Fact` — hence the `Fp`-module — is supplied unconditionally, from `vestaOrder`
-(CompElliptic pins the order with no assumption). -/
+/-- Install the Vesta order proved by `vestaOrder` as the `Fact` used by the `Fp`-module instance. -/
 instance : Fact VestaOrder := ⟨vestaOrder⟩
 
 /-- Given the Vesta group order (`Fact VestaOrder`), the curve is an `Fp`-module
 (`AddCommGroup.zmodModule` on the `p`-torsion). Conditional — it fires only when the order `Fact`
-is in scope (now unconditionally, via `vestaOrder`). Computable (curve addition and the
+is in scope; this file installs that fact via `vestaOrder`. Computable (curve addition and the
 `ZMod`-action both are), so the break reductions stay plain `def`s at the concrete curve. -/
 instance vestaFpModule [h : Fact VestaOrder] : Module Fp VestaG :=
   AddCommGroup.zmodModule h.out
 
 /-- **Conditional soundness at Vesta.** `orchard_verifier_sound_conditional` specialised to
-`SWPoint Vesta.curve`; the Vesta group order (hence the `Fp`-module structure) is pinned
-unconditionally. Inherits the conditional status — see that docstring.
+`SWPoint Vesta.curve`; the Vesta group order (hence the `Fp`-module structure) is supplied by the
+pinned CompElliptic point-count result. Inherits the conditional status — see that docstring.
 The deployed Vesta capstones are `orchard_verifier_vesta_opening_of_forked`/`_constraint_of_forked`
 below, with `NontrivialRelation.ofUnopenedForkVesta` the computed break. -/
 theorem orchard_verifier_sound_vesta_conditional
@@ -91,9 +91,10 @@ def NontrivialRelation.ofUnopenedForkVesta [DecidableEq VestaG]
 
 /-- **Deployed opening over Vesta, given a clean fork.**
 `orchard_verifier_deployed_opening_of_forked` specialised to `SWPoint Vesta.curve`: same
-hypotheses as the abstract theorem (the Vesta order is unconditional). The clean-accept hypothesis is what
-DLR hardness forces (`NontrivialRelation.ofUnopenedForkVesta`); for `hcirc`'s unsatisfiable
-shape see the section note in `Soundness.Main`. -/
+hypotheses as the abstract theorem; the `Fp`-module comes from the pinned Vesta point-count result.
+The clean-accept hypothesis is what DLR hardness forces
+(`NontrivialRelation.ofUnopenedForkVesta`); for `hcirc`'s unsatisfiable shape see the section note in
+`Soundness.Main`. -/
 theorem orchard_verifier_vesta_opening_of_forked [DecidableEq VestaG] [Inhabited VestaG]
     {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp VestaG)
     (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp)
@@ -113,7 +114,7 @@ open Polynomial in
 `orchard_verifier_deployed_constraint_of_forked` specialised to `SWPoint Vesta.curve`: the opening
 for the declared `fs.openedCommitment` and the pinned `multiopenValue`, and `circuitSat` (concrete
 `circuitSatViaGates`) from the verifier's gate point-check `hquot` lifted by Schwartz–Zippel
-(`hgood`). Same hypotheses as the abstract theorem (the Vesta order is unconditional); `hquot`/`hgood` share
+(`hgood`). The `Fp`-module comes from the pinned Vesta point-count result. `hquot`/`hgood` share
 `hcirc`'s unsatisfiable shape (see the section note in `Soundness.Main`). -/
 theorem orchard_verifier_vesta_constraint_of_forked [DecidableEq VestaG] [Inhabited VestaG]
     {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp VestaG)
@@ -143,9 +144,7 @@ theorem orchard_verifier_vesta_constraint_of_forked [DecidableEq VestaG] [Inhabi
 theorem evalVector_zero {F : Type*} [Field F] (k : ℕ) (x : F) : evalVector k x 0 = 1 := by
   simp [evalVector]
 
-/-- halo2's adjusted IPA witness: `aMulti` with its `g₀`-coefficient shifted by the claimed value `v` and the
-synthetic blinder `ξ·s` folded in, so `commit` sends it to the adjusted commitment `⟨aMulti,G⟩ − [v]g₀ + [ξ]S`.
-A *definition* (not a posited `aDep` with a relation `hP`), so `hP` holds by `commit`'s linearity. -/
+/-- The IPA witness after folding in the value term and synthetic blinder. -/
 def adjustedWitness {k : ℕ} (aMulti s : Fin (2 ^ k) → Fp) (v ξ : Fp) : Fin (2 ^ k) → Fp :=
   aMulti - Pi.single 0 v + ξ • s
 
@@ -157,10 +156,8 @@ theorem commit_adjustedWitness {G : Type*} [AddCommGroup G] [Module Fp G] (urs :
     intro a a'; simp only [commit, Pi.sub_apply, sub_smul, Finset.sum_sub_distrib]
   rw [adjustedWitness, commit_add, csub, commit_single, commit_smul]
 
-/-- **Every Vesta point propositionally lies in the `g`-span.** At Vesta's prime order a nonzero generator
-`urs.g 0` generates the whole group. This theorem is proof-level only: selecting its existential witness
-would compute a discrete logarithm, so computational reductions must receive the representation as input and
-must not use `Classical.choose` on this result. -/
+/-- Every Vesta point propositionally lies in the span of a nonzero `urs.g 0`.
+Computational reductions must receive, rather than choose, this representation. -/
 theorem commit_surjective (urs : URS VestaG) (hg0 : urs.g 0 ≠ 0)
     (P : VestaG) : ∃ aMulti : Fin (2 ^ urs.k) → Fp, commit urs aMulti = P := by
   have hinj : Function.Injective (fun c : Fp => c • urs.g 0) := by
@@ -189,17 +186,7 @@ theorem blinder_value_recovery_badSet {k : ℕ} (s : Fin (2 ^ k) → Fp) (xEval 
 
 open scoped ENNReal in
 open Classical in
-/-- **Legacy propositional capstone.** Open the deployed Orchard commitment over Vesta using the
-forking result.
-
-`aMulti` opens the commitment after removing its declared `U` and `W` components. Real commitments
-are blinded, so this adjusted point—not the raw commitment—has the `g`-only representation supplied
-by the algebraic prover. The returned value is `multiopenValue − ξ·⟨s,b⟩`; honest blinding makes the
-second term zero.
-
-`hbridge` connects the accept event to the prover strategy, and `hprob` must beat the knowledge
-error. This definition remains noncomputable because it selects an existential fork certificate.
-`deployed_forking_relation` is the executable kernel for an explicit certificate. -/
+/-- Legacy propositional opening from high acceptance of a bridged prover strategy. -/
 noncomputable def legacy_orchard_verifier_vesta_forking_opening [DecidableEq VestaG]
     [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp)
@@ -233,11 +220,7 @@ noncomputable def legacy_orchard_verifier_vesta_forking_opening [DecidableEq Ves
 open Polynomial in
 open scoped ENNReal in
 open Classical in
-/-- **Legacy propositional capstone.** Add the constraint conclusion to
-`legacy_orchard_verifier_vesta_forking_opening`.
-
-`hξ` restores the claimed value by proving the blinding shift is zero. The `hquot` and `hgood`
-hypotheses retain the all-openings caveat from the legacy constraint theorem. -/
+/-- Add the legacy constraint conclusion to the propositional opening. -/
 noncomputable def legacy_orchard_verifier_vesta_forking_constraint [DecidableEq VestaG]
     [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp)
@@ -294,15 +277,7 @@ theorem sum_getD_single {k : ℕ} {G : Type*} [AddCommGroup G] [Module Fp G] (gg
 
 open scoped ENNReal in
 open Classical in
-/-- **Legacy propositional capstone.** Open the deployed Orchard commitment for a fixed proof string.
-
-The accept event is halo2's verifier equation, and `deployedVerifierEq_iff_flatAccept` proves its
-bridge to the constant strategy. The multiopen and `S` witnesses open their points after removing
-declared `U` and `W` components; `hU` cancels the remaining `U` component.
-
-`hprob` measures this one proof over all round challenges, not the Fiat–Shamir attack event. It gives
-the static statement that acceptance above the knowledge-error threshold yields an opening. Use the
-adaptive variants for a prefix-respecting strategy and reprogrammed-oracle runs. -/
+/-- Legacy propositional opening for one fixed proof over all round challenges. -/
 noncomputable def legacy_orchard_verifier_vesta_forking_opening_deployed [DecidableEq VestaG]
     [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp)
@@ -349,12 +324,7 @@ noncomputable def legacy_orchard_verifier_vesta_forking_opening_deployed [Decida
 open Polynomial in
 open scoped ENNReal in
 open Classical in
-/-- **Legacy propositional capstone.** Add the constraint conclusion to
-`legacy_orchard_verifier_vesta_forking_opening_deployed`.
-
-`hξ` restores the claimed value by proving the blinding shift is zero. `hprob` still measures one
-fixed proof, not the Fiat–Shamir attack event. The `hquot` and `hgood` hypotheses retain the
-all-openings caveat described by `orchard_verifier_deployed_constraint_of_forked`. -/
+/-- Add the legacy constraint conclusion for one fixed proof. -/
 noncomputable def legacy_orchard_verifier_vesta_forking_constraint_deployed [DecidableEq VestaG]
     [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp)
@@ -397,13 +367,7 @@ noncomputable def legacy_orchard_verifier_vesta_forking_constraint_deployed [Dec
 
 open scoped ENNReal in
 open Classical in
-/-- **Legacy propositional capstone.** Open the deployed Orchard commitment for a prefix-respecting
-prover strategy.
-
-The verifier runs on the proof assembled for each challenge path, and
-`deployedVerifierEq_iff_flatAccept_adaptive` proves the bridge to `P`. Thus `hprob` measures an
-adaptive strategy rather than one fixed proof. The executable adversary path is in
-`Soundness.Forking.Adversary.Algebraic`. -/
+/-- Legacy propositional opening for a prefix-respecting prover strategy. -/
 noncomputable def legacy_orchard_verifier_vesta_forking_opening_adaptive [DecidableEq VestaG]
     [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp)
@@ -447,11 +411,7 @@ noncomputable def legacy_orchard_verifier_vesta_forking_opening_adaptive [Decida
 open Polynomial in
 open scoped ENNReal in
 open Classical in
-/-- **Legacy propositional capstone.** Add the constraint conclusion to
-`legacy_orchard_verifier_vesta_forking_opening_adaptive`.
-
-`hξ` restores the claimed value. The `hquot` and `hgood` hypotheses retain the all-openings caveat.
-The executable adversary path is in `Soundness.Forking.Adversary.Algebraic`. -/
+/-- Add the legacy constraint conclusion for a prefix-respecting strategy. -/
 noncomputable def legacy_orchard_verifier_vesta_forking_constraint_adaptive
     [DecidableEq VestaG] [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG) (ch : Challenges shape.k Fp)
@@ -495,22 +455,12 @@ noncomputable def legacy_orchard_verifier_vesta_forking_constraint_adaptive
 
 /-! ## Legacy propositional forking capstones
 
-These compatibility wrappers cover fixed proofs, prefix-respecting strategies, and their
-reprogrammed-oracle forms. Their `_of_forked` kernels are computable when given explicit
-certificates, but the wrappers select existential certificates and therefore remain
-`noncomputable`.
-
-Each endpoint removes declared `U` and `W` components before opening the commitment; `hU` cancels the
-total `U` component. The executable arbitrary-query path is in
-`Soundness.Forking.Adversary.Algebraic`. -/
+These noncomputable compatibility wrappers cover fixed and prefix-respecting proofs under oracle
+reprogramming. The executable arbitrary-query path is in `Forking.Adversary.Algebraic`. -/
 
 open scoped ENNReal in
 open Classical in
-/-- **Legacy propositional capstone.** Apply the fixed-proof opening theorem to reprogrammed-oracle
-runs.
-
-`roChallenges_reprogramRounds` identifies each run with replacement of the IPA round challenges.
-This remains a fixed-proof acceptance statement; the adaptive endpoints model the attack event. -/
+/-- Legacy fixed-proof opening under oracle reprogramming. -/
 noncomputable def legacy_orchard_verifier_vesta_forking_opening_rewind [DecidableEq VestaG]
     [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG)
@@ -537,11 +487,7 @@ noncomputable def legacy_orchard_verifier_vesta_forking_opening_rewind [Decidabl
 open Polynomial in
 open scoped ENNReal in
 open Classical in
-/-- **Legacy propositional capstone.** Add the constraint conclusion to
-`legacy_orchard_verifier_vesta_forking_opening_rewind`.
-
-The accept event uses reprogrammed-oracle runs. The `hquot` and `hgood` all-openings caveat and the
-fixed-proof scope are unchanged. -/
+/-- Add the legacy fixed-proof constraint conclusion under reprogramming. -/
 noncomputable def legacy_orchard_verifier_vesta_forking_constraint_rewind
     [DecidableEq VestaG] [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG)
@@ -586,11 +532,7 @@ noncomputable def legacy_orchard_verifier_vesta_forking_constraint_rewind
 
 open scoped ENNReal in
 open Classical in
-/-- **Legacy propositional capstone.** Apply the round-adaptive opening theorem to
-reprogrammed-oracle runs on each spliced proof.
-
-`roChallenges_reprogramRounds` supplies the path's round challenges, while
-`roChallenges_spliceIpa_pre` shows that splicing leaves the pre-IPA challenges unchanged. -/
+/-- Legacy prefix-respecting opening under oracle reprogramming. -/
 noncomputable def legacy_orchard_verifier_vesta_forking_opening_adaptive_rewind
     [DecidableEq VestaG] [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG)
@@ -623,11 +565,7 @@ noncomputable def legacy_orchard_verifier_vesta_forking_opening_adaptive_rewind
 open Polynomial in
 open scoped ENNReal in
 open Classical in
-/-- **Legacy propositional capstone.** Add the constraint conclusion to
-`legacy_orchard_verifier_vesta_forking_opening_adaptive_rewind`.
-
-The accept event uses reprogrammed-oracle runs on each spliced proof. The `hquot` and `hgood`
-all-openings caveat is unchanged. -/
+/-- Add the legacy prefix-respecting constraint conclusion under reprogramming. -/
 noncomputable def legacy_orchard_verifier_vesta_forking_constraint_adaptive_rewind
     [DecidableEq VestaG] [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG)

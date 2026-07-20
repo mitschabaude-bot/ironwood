@@ -13,8 +13,8 @@ Reprogramming and uniform-challenge results live in `Soundness.Forking.Oracle`.
 `deriveChallenges` records the absorb/squeeze order from halo2's PLONK, multiopen, and commitment
 verifiers. `nonInteractiveFingerprint` runs `assemble` at those derived challenges.
 
-The remaining Fiat–Shamir assumption is that the hash behaves as a random oracle. The captured
-fingerprint checks do not use that assumption: they replay captured transcript events and challenges.
+The security development idealizes `squeeze` as a random oracle; identifying deployed Blake2b and
+field conversion with it is external. Fixtures use trusted typed captures, not transcript bytes.
 -/
 
 namespace Zcash.Snark

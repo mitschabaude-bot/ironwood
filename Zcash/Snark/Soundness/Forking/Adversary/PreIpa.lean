@@ -2,15 +2,10 @@ import Zcash.Snark.Soundness.Forking.Adversary.Adaptive
 import Zcash.Snark.Soundness.Forking.Ordering
 
 /-!
-# The pre-IPA squeeze points, sealed
+# Pre-IPA squeeze points
 
-The deployed schedule squeezes eleven pre-IPA challenges from prefixes determined by the initial
-transcript and proof. `preIpaSqueezePoints` names them, and `roChallenges_eq_chRecord` proves that
-the deployed derivation reads exactly those answers and the IPA-round answers.
-
-Splicing IPA fields preserves all eleven prefixes. Each is a prefix of `preIpaTranscript`, hence
-strictly shorter than every IPA-round transcript. `roChallenges_extendO_eq_chRecord` then grounds
-the bounded-table game in the deployed challenge derivation. -/
+`preIpaSqueezePoints` names the eleven deployed pre-IPA queries. They are shape-determined,
+unchanged by IPA splicing, and read exactly by the deployed challenge derivation. -/
 
 namespace Zcash.Snark
 
@@ -106,8 +101,7 @@ theorem chRecord_update {k : ℕ} (ν : Fin 11 → Fp) (χ : Fin k → Fp) :
       = chRecord ν χ :=
   chExt rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl rfl
 
-/-- **Full-record seal.** `roChallenges O init ps` is exactly the table's answers at the eleven
-pre-IPA squeeze points and the IPA-round transcripts. -/
+/-- `roChallenges` reads the table at the eleven pre-IPA points and the IPA-round transcripts. -/
 theorem roChallenges_eq_chRecord {shape : Shape} (O : List (TranscriptElt Fp G) → Fp)
     (init : List (TranscriptElt Fp G)) (ps : ProofString shape Fp G) :
     roChallenges O init ps
@@ -128,8 +122,7 @@ theorem roChallenges_eq_chRecord {shape : Shape} (O : List (TranscriptElt Fp G) 
   · funext j
     exact deriveChallenges_ipaRound_eq (ofOracle O) init ps j
 
-/-- Splicing a strategy path's IPA fields moves none of the eleven pre-IPA squeeze points: they
-read only the pre-IPA proof fields (including `ipaS`), which `spliceIpa` preserves. -/
+/-- IPA splicing preserves all eleven pre-IPA squeeze points. -/
 theorem preIpaSqueezePoints_spliceIpa {shape : Shape} (init : List (TranscriptElt Fp G))
     (ps : ProofString shape Fp G) (R : Fin shape.k → G × G) (c f : Fp) :
     preIpaSqueezePoints init (spliceIpa ps R c f) = preIpaSqueezePoints init ps := rfl
@@ -216,14 +209,11 @@ theorem preIpaSqueezePoints_length_le {shape : Shape} (init : List (TranscriptEl
     (preIpaSqueezePoints init ps i).length ≤ (preIpaTranscript init ps).length :=
   (preIpaSqueezePoints_prefix init ps i).length_le
 
-/-! ## The squeeze lengths are shape-determined
+/-! ## Shape-determined squeeze lengths
 
-`Shape` fixes every absorb length except the optional final permutation evaluation.
-`PsWellFormed` fixes that position, so `preIpaLen` gives all eleven lengths independently of the
-adversary's output. -/
+`PsWellFormed` makes all eleven pre-IPA squeeze lengths depend only on `Shape`. -/
 
-/-- The deployed reader's parse shape: `lastEval` is present for every permutation set except the
-last. The only pre-IPA field whose absorb length is not already `Shape`-determined. -/
+/-- Reader shape: `lastEval` is present for every nonfinal permutation set. -/
 def PsWellFormed {shape : Shape} (ps : ProofString shape Fp G) : Prop :=
   ∀ (p : Fin shape.numProofs) (s : Fin shape.numPermutationSets),
     (ps.permutationSetEvals p s).lastEval.isSome = ((s : ℕ) + 1 < shape.numPermutationSets)
@@ -410,9 +400,7 @@ private theorem len_sqPt10 {shape : Shape} (init : List (TranscriptElt Fp G))
     (sqPt10 init ps).length = (sqPt9 init ps).length + 1 := by
   simp [sqPt10]
 
-/-- **The squeeze lengths are output-independent.** Under the reader's parse shape, each pre-IPA
-squeeze prefix has the explicit shape-determined length — the fully adaptive game's pre-chain is
-decodable by `List.take` at fixed positions. -/
+/-- Each well-formed pre-IPA squeeze prefix has its shape-determined length. -/
 theorem preIpaSqueezePoints_length_eq {shape : Shape} (init : List (TranscriptElt Fp G))
     (ps : ProofString shape Fp G) (hwf : PsWellFormed ps) (i : Fin 11) :
     (preIpaSqueezePoints init ps i).length = preIpaLen shape init.length i := by
@@ -447,11 +435,9 @@ theorem preIpaTranscript_length_eq {shape : Shape} (init : List (TranscriptElt F
   rw [← preIpaSqueezePoints_last init ps]
   exact preIpaSqueezePoints_length_eq init ps hwf 10
 
-/-! ## The absorb encoding is injective
+/-! ## Injective absorb encoding
 
-Equal pre-IPA transcripts of well-formed proofs have equal pre-IPA fields. The proof peels each
-fixed-length absorb block and packages the result as `preIpaTranscript_inj`, leaving only the IPA
-suffix to splice. -/
+Equal pre-IPA transcripts of well-formed proofs have equal pre-IPA fields. -/
 
 private theorem flatten_ofFn_inj {β : Type*} : ∀ {a : ℕ} (g h : Fin a → List β),
     (List.ofFn g).flatten = (List.ofFn h).flatten →
@@ -556,9 +542,7 @@ private theorem psExt {shape : Shape} {p q : ProofString shape Fp G}
     (h20 : p.ipaF = q.ipaF) : p = q := by
   cases p; cases q; simp_all
 
-/-- **The pre-IPA encoding is injective.** Two well-formed proof strings with the same pre-IPA
-transcript agree on every pre-IPA field — as one structure equality: `ps` is `ps'` with `ps`'s own
-IPA fields spliced in. -/
+/-- Two well-formed proofs with the same pre-IPA transcript differ only in their IPA fields. -/
 theorem preIpaTranscript_inj {shape : Shape} (init : List (TranscriptElt Fp G))
     {ps ps' : ProofString shape Fp G} (hwf : PsWellFormed ps) (hwf' : PsWellFormed ps')
     (h : preIpaTranscript init ps = preIpaTranscript init ps') :
@@ -668,8 +652,7 @@ def extendO {F G : Type*} [Zero F] {L : ℕ} (O : BTranscript F G L → F) :
     List (TranscriptElt F G) → F :=
   fun l => if h : l.length ≤ L then O ⟨l, h⟩ else 0
 
-/-- **Bounded-table grounding.** Extending a bounded table and running `roChallenges` returns its
-answers at the eleven pre-IPA points and the `k` round transcripts. -/
+/-- Extending a bounded table preserves all pre-IPA and IPA-round challenge reads. -/
 theorem roChallenges_extendO_eq_chRecord {shape : Shape} {L : ℕ}
     (O : BTranscript Fp G L → Fp) (init : List (TranscriptElt Fp G))
     (ps : ProofString shape Fp G)

@@ -1,28 +1,10 @@
 import Zcash.Snark.Soundness.Forking.Adversary.Recursive
 
 /-!
-# Expected run count of the recursive extractor under fork spread
+# Expected extractor runs under fork spread
 
-The extractor is efficient when every reachable node has enough successful nonzero continuations,
-a condition called *fork spread*. With at least `σ₀` such challenges, its expected run count is at
-most `(6·|F|/(σ₀−1))^k`, or `(6/δ)^k` at density `δ`.
-
-The proof counts finite tapes exactly. `card_scanRank_lt_mul_le` bounds how many candidates precede
-the second success, `sum_eval_pi` marginalizes independent child tapes, and `paidList` matches the
-two scans in `nextForkChallenge`.
-
-## Optional sharper bound
-
-Fork spread is an *optional efficiency condition*, not a soundness assumption.  This file bounds
-the extractor's expected run count — how many times the reduction re-runs the adversary (the `.runs`
-counter), not Lean execution time — by a substantially smaller expression when every reachable node
-has many successful continuations.
-
-The selected baseline extractor is intentionally exponential in the round count.  Its unconditional
-pointwise and uniform oracle-and-tape expectation bounds are proved in `Recursive` by
-`recursiveAlgebraicFork_runs_le` and
-`recursiveAlgebraicFork_oracle_tape_sum_runs_le_unconditional`; neither uses fork spread.  Thus this
-module supplies an optimization theorem rather than an accepted proof boundary.
+Under optional fork spread, `E[runs] ≤ (6·|F|/(σ₀−1))^k`; `.runs` counts adversary calls. An
+unconditional polynomial AFK bound remains open.
 -/
 
 namespace Zcash.Snark
@@ -151,10 +133,7 @@ theorem card_orders_scanRank_lt_congr (A : Finset F) {x y : F} (hx : x ∈ A) (h
   simpa [Equiv.swap_apply_self] using this
 
 open Classical in
-/-- **The rank-counting bound.** A member of `A` has rank below `j` in at most a `j/|A|` fraction
-of sampling orders: `|A| · #{orders : rank < j} ≤ j · #orders`. Double counting over the swap
-symmetry (`card_orders_scanRank_lt_congr`) and rank injectivity
-(`card_filter_scanRank_lt_le`). -/
+/-- A member of `A` has rank below `j` in at most a `j/|A|` fraction of sampling orders. -/
 theorem card_scanRank_lt_mul_le (A : Finset F) {x : F} (hx : x ∈ A) (j : ℕ) :
     A.card * (Finset.univ.filter (fun e : Fin n ≃ F => scanRank e A x < j)).card
       ≤ j * Fintype.card (Fin n ≃ F) := by
@@ -202,8 +181,7 @@ section PaidScan
 
 variable {F α : Type*} [Zero F] [DecidableEq F]
 
-/-- The candidates a scan pays for: skipped challenges are free, the first success ends the scan,
-and failures accumulate. Mirrors `nextForkChallenge` exactly (`nextForkChallenge_runs_eq`). -/
+/-- Candidates paid by a scan: failures followed by its first success, if any. -/
 def paidList (attempt : F → RecursiveForkAttempt α) (seen : List F) : List F → List F
   | [] => []
   | u :: us =>
@@ -384,10 +362,7 @@ section ScanRankBound
 variable {F : Type*} [Zero F] [DecidableEq F] [Fintype F]
 
 open Classical in
-/-- **One scan pays only low-rank candidates.** A scan over a suffix `l'` of the sampling order,
-whose skip-set accounts for every already-passed good challenge (`hMseen`) with at most one good
-challenge passed so far (`hMl₀`), spends its runs only on candidates with fewer than two good
-challenges sampled before them. -/
+/-- A scan pays only candidates preceded by fewer than two good challenges. -/
 theorem nextForkChallenge_runs_le_rank_sum {α : Type*}
     (attempt : F → RecursiveForkAttempt α) (order : Fin (Fintype.card F) ≃ F)
     (M : Finset F) (hM : ∀ v ∈ M, v ≠ 0 ∧ (attempt v).output.isSome)
@@ -445,9 +420,7 @@ variable (basis : ι → G) (k : ℕ) (A : OracleComp T F P) (prefixes : P → F
   (rounds : P → Fin k → AlgebraicPoint (F := F) basis × AlgebraicPoint (F := F) basis)
   (final : P → F × F) (win : (T → F) → P → Prop) (decideWin : ∀ O p, Decidable (win O p))
 
-/-- One reprogrammed scan candidate at round `m`: rerun the adversary with the round challenge
-replaced, reject changed trunks, and recursively extract the continuation with the fresh child
-coins. Mirrors the inline `candidate` of `recursiveAlgebraicForkFrom` definitionally. -/
+/-- Rerun the adversary with round `m` reprogrammed, rejecting changed trunks before recursion. -/
 def scanCandidate {d : ℕ} (m : ℕ) (hmk : m + (d + 1) = k) (O : T → F)
     (childC : F → RecursiveForkCoins F d) (u : F) :
     RecursiveForkAttempt (AlgebraicDForkCert (F := F) basis d) :=
@@ -468,9 +441,8 @@ noncomputable def goodChallenges [Fintype F] {d : ℕ} (m : ℕ) (hmk : m + (d +
     (scanCandidate basis k A prefixes rounds final win decideWin m hmk O childC u).output.isSome)
 
 open Classical in
-/-- **Pointwise node accounting.** One extractor node pays the abort unit, its first branch, and
-at most twice the low-rank candidates of its sampling order: each of the two chained scans pays
-only candidates with fewer than two good challenges sampled before them. -/
+/-- One extractor node pays the abort unit, its first branch, and at most twice its low-rank
+candidates. -/
 theorem recursiveAlgebraicForkFrom_node_runs_le [Fintype F] {d m : ℕ}
     (hmk : m + (d + 1) = k) (O : T → F) (p : P) (order : Fin (Fintype.card F) ≃ F)
     (childC : F → RecursiveForkCoins F d) :
@@ -604,16 +576,15 @@ variable (basis : ι → G) (k : ℕ) (A : OracleComp T F P) (prefixes : P → F
   (final : P → F × F) (win : (T → F) → P → Prop) (decideWin : ∀ O p, Decidable (win O p))
 
 open Classical in
-/-- **Fork spread.** Every reachable extractor node has at least `σ₀` nonzero challenges with
-trunk-stable successful continuations. A good-set density `δ` gives `σ₀ = δ·|F|`. -/
+/-- Every reachable node has at least `σ₀` nonzero, trunk-stable successful continuations. The run
+bound uses density `(σ₀−1)/|F|` after excluding the incumbent branch. -/
 def ForkSpread (σ₀ : ℕ) : Prop :=
   ∀ (d m : ℕ) (hmk : m + (d + 1) = k) (O : T → F) (childC : F → RecursiveForkCoins F d),
     σ₀ ≤ (goodChallenges basis k A prefixes rounds final win decideWin m hmk O childC).card
 
 open Classical in
-/-- **Expected-run recursion.** Under fork spread, the expected run count at depth `d` is at most
-`(6·|F|/(σ₀−1))^d`. Rank counting bounds both scans, and independent child tapes close the
-recursion. -/
+/-- Under fork spread, the depth-`d` expected run count is at most
+`(6·|F|/(σ₀−1))^d`. -/
 theorem recursiveAlgebraicForkFrom_sum_runs_le_of_forkSpread {σ₀ : ℕ} (h2 : 2 ≤ σ₀)
     (hspread : ForkSpread basis k A prefixes rounds final win decideWin σ₀) :
     ∀ (d m : ℕ) (hmk : m + d = k) (O : T → F) (p : P),
@@ -924,8 +895,8 @@ theorem recursiveAlgebraicForkFrom_sum_runs_le_of_forkSpread {σ₀ : ℕ} (h2 :
             ring
 
 open Classical in
-/-- **Expected-run bound under fork spread.** Over the uniform tape,
-`E[runs] ≤ (6·|F|/(σ₀−1))^k`; at density `δ`, this is `(6/δ)^k`. -/
+/-- Over the uniform tape, fork spread gives `E[runs] ≤ (6·|F|/(σ₀−1))^k`, or `(6/δ)^k`
+for `δ = (σ₀−1)/|F|`. -/
 theorem recursiveAlgebraicFork_sum_runs_le_of_forkSpread {σ₀ : ℕ} (h2 : 2 ≤ σ₀)
     (hspread : ForkSpread basis k A prefixes rounds final win decideWin σ₀)
     (O : T → F) :

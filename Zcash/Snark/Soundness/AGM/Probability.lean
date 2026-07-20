@@ -22,8 +22,7 @@ Sample scalars `s : ι → F` and present the basis `s i • B`. Independently s
 ## Tightness
 
 The fixed-slot construction loses a factor `|ι|` (`2 ^ k + 2` for the deployed augmented basis).
-A tighter AGM reduction can randomize the challenge into every slot and lose only `1/|F|`; that is
-follow-up work.
+No tighter relation-to-DL reduction is proved in this module.
 
 ## Boundary
 
