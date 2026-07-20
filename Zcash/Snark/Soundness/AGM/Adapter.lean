@@ -429,6 +429,21 @@ def groupRepresentationOfCollision (urs : URS G) {a a' : Fin (2 ^ urs.k) → F}
     GroupRepresentation (F := F) urs.g (0 : G) :=
   (relationWitnessOfCollision urs hneq hcollision).toGroupRepresentation
 
+/-- A relation among the URS generators alone is a relation over the augmented `(g, U, W)` basis,
+with zero coefficients at the `U` and `W` slots. Composed with `relationWitnessOfCollision`, this
+turns a commitment collision into the relation form the fixed-slot DL reduction consumes. -/
+def AlgebraicRelationWitness.augment {n : ℕ} {g : Fin n → G} (U W : G)
+    (r : AlgebraicRelationWitness (F := F) g) :
+    AlgebraicRelationWitness (F := F) (augmentedBasis g U W) :=
+  AugmentedRelationWitness.toAlgebraicRelationWitness
+    { a := r.coeffs
+      α := 0
+      β := 0
+      nontrivial := Or.inl r.nontrivial
+      relation := by
+        rw [zero_smul, zero_smul, add_zero, add_zero]
+        exact r.relation }
+
 /-- Use a commitment collision to solve DL when its difference hits the fixed challenge slot. -/
 def discreteLogOfCollisionAtChallenge (urs : URS G) (B : G)
     {a a' : Fin (2 ^ urs.k) → F} (logs : Fin (2 ^ urs.k) → F)

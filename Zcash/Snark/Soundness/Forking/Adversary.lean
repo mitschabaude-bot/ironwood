@@ -398,6 +398,37 @@ theorem escapesDuringC_completing (esc : T → (T → F) → Set F) {P : Type*} 
     (escapesDuringC_queryList esc _ (by exact List.mem_ofFn.mpr ⟨j, rfl⟩) h)
 
 
+/-- Answer a split-domain machine's junk queries from a fixed table: `inl`-queries go to the real
+oracle, `inr`-queries are answered from `j`. This is the restriction of an adversary that may
+query points outside the game's transcript domain — hashing longer strings and using their answers
+as grinding randomness. For each fixed junk table the restriction queries only `T` within the same
+budget (`queryBound_restrictSum`), and over a uniform split-domain table the junk answers are an
+independent uniform table, so the original advantage is an average of the restrictions' advantages
+(`fsWinsFull_restrictSum_le`, `Soundness.Forking.Adaptive`): larger oracle domains add no power. -/
+def restrictSum {J : Type*} (j : J → F) : OracleComp (T ⊕ J) F α → OracleComp T F α
+  | .pure a => .pure a
+  | .query (Sum.inl t) k => .query t (fun u => restrictSum j (k u))
+  | .query (Sum.inr x) k => restrictSum j (k (j x))
+
+/-- The restriction's run against `O` is the original run against `O` with the junk table glued
+on. -/
+theorem run_restrictSum {J : Type*} (j : J → F) :
+    (A : OracleComp (T ⊕ J) F α) → (O : T → F) →
+    (restrictSum j A).run O = A.run (Sum.elim O j)
+  | .pure _, _ => rfl
+  | .query (Sum.inl t) k, O => run_restrictSum j (k (O t)) O
+  | .query (Sum.inr x) k, O => run_restrictSum j (k (j x)) O
+
+/-- Restriction never adds queries: the junk answers are read from the fixed table for free. -/
+theorem queryBound_restrictSum {J : Type*} {A : OracleComp (T ⊕ J) F α} {Q : ℕ}
+    (h : A.QueryBound Q) (j : J → F) : (restrictSum j A).QueryBound Q := by
+  induction h with
+  | pure a Q => exact .pure a Q
+  | @query t k Q hk ih =>
+      cases t with
+      | inl t => exact .query fun u => ih u
+      | inr x => exact (ih (j x)).mono (Nat.le_succ Q)
+
 /-- A cache-avoiding machine queries pairwise-distinct points along every run, and none of them is a
 cached point: the structural distinctness (`Nodup`) that lets a reprogram at one query be replayed
 without disturbing the others — the foundation of the rewinding fork. -/

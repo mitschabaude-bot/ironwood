@@ -273,7 +273,7 @@
       "id": "agm",
       "chapter": "AGM to discrete log",
       "title": "Price the relation branch",
-      "claim": "The algebraic Fiat-Shamir game produces PR #28's deployed instances, identifies its binding event with the relation event, and feeds that event to the plain-DL probability bound.",
+      "claim": "The algebraic Fiat-Shamir game produces PR #28's deployed instances, states binding as a computable value mismatch against the carried aggregate opening (never as nonexistence of an opening, which holds vacuously in a prime-order group), and feeds every mismatch run's explicit relation to the plain-DL probability bound.",
       "summary": "PR #28 defines AlgebraicDForkCert, the deployed AGM instance, and the fixed-slot relation-to-DL reduction. PR #56 supplies the executable adaptive side: every adversary-emitted group point carries a basis representation; recursiveAlgebraicFork computes the fork tree from an oracle table and finite tape; algebraicForkCertAttempt_valid proves the resulting certificate valid; and computedDeployedAlgebraicInstance packages it for PR #28. The final theorem bounds the real binding probability by query loss, the z = 0 slice, and the plain-DL term.",
       "nodes": [
         "relation",
@@ -385,7 +385,7 @@
         "Every group point in the adaptive Fiat-Shamir adversary's proof output carries its representation over (g,U,W).",
         "The recursive extractor computes an AlgebraicDForkCert from explicit oracle and tape coins, and every returned certificate records real accepting runs.",
         "Every computed certificate is valid for PR #28's deployed instance, with no Classical.choice at the producer boundary.",
-        "A real binding run that produces an instance forces that instance into the algebraic relation branch.",
+        "On a real binding run - acceptance while the accepted value disagrees with the carried aggregate opening - every produced instance yields an explicit relation: the kernel's relation branch, or the commitment collision between its clean opening and the carried opening.",
         "The full real binding probability is bounded by extraction loss, the z = 0 slice, and the fixed-slot DL term.",
         "The fixed-slot relation-to-discrete-log transformation is deterministic and its miss refers to the same relation.",
         "For distinct parameter queries, the Fiat-Shamir binding event in the uniform generator-RO model is bounded by the discrete-log advantage."

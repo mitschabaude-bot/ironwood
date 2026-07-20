@@ -701,8 +701,19 @@ private theorem nat_le_two_pow (n : ℕ) : n ≤ 2 ^ n := by
       have hone : 1 ≤ 2 ^ n := one_le_pow₀ (by omega)
       omega
 
-/-- For a fixed challenge field, the deterministic run bound is polynomial in the IPA instance
-length `2^k`.  The exponent depends only on the fixed field, not on `k`. -/
+/-- For a fixed challenge field, the deterministic run bound is formally polynomial in the IPA
+instance length `2^k`, with an exponent depending only on the fixed field.
+
+**This is not an efficiency statement.** The exponent is `2·|Fp| + 1 ≈ 2^{255}`, so this bound
+says only that the extractor is total with an exact finite worst case. The meaningful efficiency
+statement is the sampling-without-replacement *expected*-run bound: under fork spread — every
+reachable node offers at least `σ₀` good challenges — the expected number of adversary runs over
+the uniform tape is at most `(6·|Fp|/(σ₀−1))^k`
+(`Soundness.Forking.ExpectedRuns.recursiveAlgebraicFork_sum_runs_le_of_forkSpread`), i.e.
+`(6/δ)^k` for good sets of density `δ`. The remaining efficiency floor is the unconditional
+Attema–Fehr–Klooß composition: pricing the sparse-fork slice a grinding Fiat–Shamir adversary can
+force, which requires lazily-sampled tables; until that is formalized, the plain-DL hypothesis
+`TextbookDLWithCoinsAdvantageLE` should be read against the spread-conditional expected time. -/
 theorem recursiveAlgebraicFork_runs_le_instance_pow
     (basis : ι → G) (k : ℕ)
     (A : OracleComp T F P) (prefixes : P → Fin k → T)

@@ -153,7 +153,46 @@ theorem kerr_lt_verifierEq_of_deployedAccepts [DecidableEq G] [Inhabited G] {sha
 that result to an opening of the multiopen commitment at value `v − ξ·⟨s,b⟩`.
 -/
 
-/-- Compute a multiopen IPA opening or nontrivial relation from an explicit valid fork certificate.
+/-- Compute a multiopen IPA opening or nontrivial relation from an explicit valid fork certificate
+whose whole commitment carries the declared `U` coefficient `vU`.
+
+An AGM prover's aggregate commitment decomposes as `commit aDep + vU • U + blind • W` with `vU`
+read off its own representation; halo2's `U` slot carries `z` times the claimed value, so a nonzero
+declared `vU` shifts the opened value by `z⁻¹·vU`. The opening value is `v + z⁻¹·vU − ξ·⟨s,b⟩`.
+The result is computed data; no certificate or witness is chosen from an existential
+proposition. -/
+def deployed_forking_relation_shifted [DecidableEq G] [Inhabited G] (urs : URS G)
+    (b : Fin (2 ^ urs.k) → Fp) (v ξ z vU blind : Fp) (aMulti aDep s : Fin (2 ^ urs.k) → Fp)
+    (cert : DForkCert Fp G urs.k) (hz : z ≠ 0) (hb0 : b 0 = 1)
+    (hP : commit urs aDep = commit urs aMulti - v • urs.g 0 + ξ • commit urs s)
+    (hvalid : DeployedForkValid urs.g b urs.u urs.w z
+        (commit urs aDep + vU • urs.u + blind • urs.w) cert) :
+    (Σ' a, IpaRelation urs (commit urs aMulti) b (v + z⁻¹ * vU - ξ * innerProduct s b) a)
+      ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w :=
+  have hvalid' : DeployedForkValid urs.g b urs.u urs.w z
+      (commit urs aDep + (z * (z⁻¹ * vU)) • urs.u + blind • urs.w) cert := by
+    rwa [mul_inv_cancel_left₀ hz]
+  match deployed_forking_tree hz urs.g b aDep (z⁻¹ * vU) blind cert hvalid' with
+  | .inl ⟨blind', t, ht⟩ =>
+      if hclean : IpaAcceptV urs.g b (commit urs aDep) (z⁻¹ * vU) (projTree t) then
+        match ipaRelation_extract urs b (commit urs aDep) (z⁻¹ * vU) (projTree t) hclean with
+        | ⟨a, ha⟩ =>
+            PSum.inl ⟨_, by
+              have h1 := ipaRelation_unshift_value urs (commit urs aDep + v • urs.g 0) b v
+                (z⁻¹ * vU) a hb0 (by rw [add_sub_cancel_right]; exact ha)
+              have h2 : commit urs aDep + v • urs.g 0 = commit urs aMulti + ξ • commit urs s := by
+                rw [hP]; abel
+              rw [h2] at h1
+              have h3 := ipaRelation_unblind_value urs (commit urs aMulti) b (z⁻¹ * vU + v) ξ s _ h1
+              exact ⟨h3.1, h3.2.trans (by ring)⟩⟩
+      else
+        PSum.inr (NontrivialRelation.ofDeployedTree hz urs.g b (commit urs aDep) (z⁻¹ * vU)
+          blind' t ht hclean)
+  | .inr hrel => PSum.inr hrel
+
+/-- Compute a multiopen IPA opening or nontrivial relation from an explicit valid fork certificate,
+for a whole commitment with no declared `U` component (`vU = z·0`) — the
+`deployed_forking_relation_shifted` special case the legacy capstones consume.
 
 The opening value is `v − ξ·⟨s,b⟩`. The result is computed data; no certificate or witness is chosen
 from an existential proposition. -/
@@ -165,20 +204,9 @@ def deployed_forking_relation [DecidableEq G] [Inhabited G] (urs : URS G)
         (commit urs aDep + (z * 0) • urs.u + blind • urs.w) cert) :
     (Σ' a, IpaRelation urs (commit urs aMulti) b (v - ξ * innerProduct s b) a)
       ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w :=
-  match deployed_forking_tree hz urs.g b aDep 0 blind cert hvalid with
-  | .inl ⟨blind', t, ht⟩ =>
-      if hclean : IpaAcceptV urs.g b (commit urs aDep) 0 (projTree t) then
-        match ipaRelation_extract urs b (commit urs aDep) 0 (projTree t) hclean with
-        | ⟨a, ha⟩ =>
-            PSum.inl ⟨_, ipaRelation_unblind_value urs (commit urs aMulti) b v ξ s _
-              (by
-                have h1 := ipaRelation_unshift urs (commit urs aDep + v • urs.g 0) b v a hb0
-                  (by rw [add_sub_cancel_right]; exact ha)
-                have h2 : commit urs aDep + v • urs.g 0 = commit urs aMulti + ξ • commit urs s := by
-                  rw [hP]; abel
-                rw [h2] at h1; exact h1)⟩
-      else
-        PSum.inr (NontrivialRelation.ofDeployedTree hz urs.g b (commit urs aDep) 0 blind' t ht hclean)
+  match deployed_forking_relation_shifted urs b v ξ z (z * 0) blind aMulti aDep s cert
+      hz hb0 hP hvalid with
+  | .inl ⟨a, ha⟩ => PSum.inl ⟨a, ha.1, ha.2.trans (by ring)⟩
   | .inr hrel => PSum.inr hrel
 
 /-! ## Closing the rewinding gap: the forked transcripts are *produced* by the probability

@@ -39,6 +39,16 @@ attack event through the AGM reduction.
 
 `uniformChallenge_badSet` is used directly for the `1/p` blinding budget.
 
+Two adversary-model boundaries are closed by lemmas rather than assumptions. An adversary free to
+hash transcripts outside the bounded game domain — and to use those answers as grinding
+randomness — restricts, junk table by junk table, to a bounded-domain adversary with the same
+query budget and the same average advantage (`fsWinsFull_restrictSum_le`,
+`Soundness.Forking.Adaptive`; instantiate the domain split along `Equiv.sumCompl`). A randomized
+adversary is the uniform mixture of its deterministic members, and the binding bound holds for the
+mixture whenever the DL hypothesis holds per member
+(`ComputedAlgebraicFSFamilyRand.binding_prob_le_of_textbookDL_rand`,
+`Soundness.Forking.Algebraic`).
+
 The remaining deployment assumption is that Blake2b behaves as this random oracle.
 -/
 

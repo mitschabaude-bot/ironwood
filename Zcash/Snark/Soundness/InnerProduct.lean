@@ -77,6 +77,18 @@ theorem ipaRelation_unshift (urs : URS G) (P : G) (b : Fin (2 ^ urs.k) → F) (v
   · rw [commit_add, commit_single, hc]; abel
   · rw [innerProduct_add, innerProduct_single, hi, hb0, mul_one, zero_add]
 
+/-- Convert an opening of `P − [v]g₀` at value `w` to an opening of `P` at value `w + v`, using
+`b 0 = 1` — the value-general form of `ipaRelation_unshift`, needed when the whole commitment
+carries a declared `U` component and the base opening value is nonzero. -/
+theorem ipaRelation_unshift_value (urs : URS G) (P : G) (b : Fin (2 ^ urs.k) → F) (v w : F)
+    (a : Fin (2 ^ urs.k) → F) (hb0 : b 0 = 1)
+    (h : IpaRelation urs (P - v • urs.g 0) b w a) :
+    IpaRelation urs P b (w + v) (a + Pi.single 0 v) := by
+  obtain ⟨hc, hi⟩ := h
+  refine ⟨?_, ?_⟩
+  · rw [commit_add, commit_single, hc]; abel
+  · rw [innerProduct_add, innerProduct_single, hi, hb0, mul_one]
+
 /-- `commit` is homogeneous: `⟨c • a, G⟩ = c • ⟨a, G⟩`. -/
 theorem commit_smul (urs : URS G) (c : F) (a : Fin (2 ^ urs.k) → F) :
     commit urs (c • a) = c • commit urs a := by

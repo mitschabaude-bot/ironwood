@@ -62,6 +62,7 @@ import Zcash.Snark.Soundness.Forking.Rewind
 import Zcash.Snark.Soundness.Forking.Adversary
 import Zcash.Snark.Soundness.Forking.Adaptive
 import Zcash.Snark.Soundness.Forking.PreIpa
+import Zcash.Snark.Soundness.Forking.ExpectedRuns
 import Zcash.Snark.Soundness.Vesta
 -- AGM binding reduction: consume computed deployed relations through the fixed-slot discrete-log
 -- adapter and representation-carrying algebraic-prover model (#15).

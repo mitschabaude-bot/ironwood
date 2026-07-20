@@ -16,10 +16,16 @@ the multiopen commitment, `S`, and every IPA round point. The grinding tree then
 
 Given an oracle table and a finite extractor tape, the recursive algorithm computes an
 `AlgebraicDForkCert`, proves that it represents real accepting runs, and packages the PR #28
-`DeployedAlgebraicForkingInstance`. On a binding-attack run, the instance takes the relation branch.
-The basis-indexed probability theorem then bounds the real binding event by the query loss, the
-`z = 0` slice, and the fixed-slot plain-DL term. No certificate is selected from propositional
-`Extractable2` data.
+`DeployedAlgebraicForkingInstance`. On a binding-attack run — acceptance while the accepted
+multiopen value disagrees with the adversary's own carried aggregate opening — every produced
+instance yields an explicit relation: the kernel's relation branch directly, or the commitment
+collision between its clean opening and the carried opening
+(`DeployedAlgebraicForkingInstance.runRelation`). The basis-indexed probability theorem then
+bounds the real binding event by the query loss, the `z = 0` slice, and the fixed-slot plain-DL
+term. No certificate is selected from propositional `Extractable2` data, and no event is stated
+as nonexistence of an opening — in a prime-order group an opening exists propositionally for
+essentially every basis, so a `¬ ∃`-opening event would be almost empty and any bound on it
+vacuous (the trap documented at `Zcash.Security.BindingSignature.Balance`).
 -/
 
 namespace Zcash.Snark
@@ -208,26 +214,34 @@ end AlgebraicProofString
 
 /-- The algebraic proof output and the aggregate data needed after transcript assembly.
 
-`aMulti` and `s` describe the `g` coefficients of the multiopen commitment and `S`; their separate
-`W` coefficients retain commitment blinding. The underlying `AlgebraicProofString` carries full
-`(g,U,W)` representations for every group element. This is the exact producer interface consumed by
-`DeployedAlgebraicForkingInstance`. -/
+`(aMulti, multiU, multiBlind)` and `(s, sU, sBlind)` are the complete `(g, U, W)` coordinates of
+the multiopen commitment and of `S`. An algebraic adversary reads them off its own per-point
+representations by linear algebra — the aggregates are the corresponding linear combinations of
+the emitted coordinates — so this interface is realizable by every AGM adversary, with no
+restriction on `U` components; honest proofs have `multiU = 0` and `sU = 0`. The underlying
+`AlgebraicProofString` carries full `(g,U,W)` representations for every group element. This is the
+exact producer interface consumed by `DeployedAlgebraicForkingInstance`, whose declared `U`
+coefficient is `multiU ν + ξ·sU`. -/
 structure AlgebraicWfProof {shape : Shape}
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
     (vk : VerifyingKey shape Fp VestaG) where
   algebraicProof : AlgebraicProofString shape basis
   wellFormed : PsWellFormed algebraicProof.erase
   aMulti : (Fin 11 → Fp) → Fin (2 ^ shape.k) → Fp
+  multiU : (Fin 11 → Fp) → Fp
   multiBlind : (Fin 11 → Fp) → Fp
   multiopen_repr : ∀ ν,
     commit (ursOfAugmentedBasis shape.k basis) (aMulti ν) +
+        multiU ν • (ursOfAugmentedBasis shape.k basis).u +
         multiBlind ν • (ursOfAugmentedBasis shape.k basis).w =
       multiopenCommitment (ursOfAugmentedBasis shape.k basis).g
         (ursOfAugmentedBasis shape.k basis).w (ursOfAugmentedBasis shape.k basis).u
         vk algebraicProof.erase (chRecord ν (fun _ => 0))
   s : Fin (2 ^ shape.k) → Fp
+  sU : Fp
   sBlind : Fp
   ipaS_repr : commit (ursOfAugmentedBasis shape.k basis) s +
+      sU • (ursOfAugmentedBasis shape.k basis).u +
       sBlind • (ursOfAugmentedBasis shape.k basis).w = algebraicProof.ipaS.point
 
 namespace AlgebraicWfProof
@@ -305,8 +319,18 @@ theorem preIpaTranscript_eq_of_fullPrefix_eq {shape : Shape}
           rw [← hq, List.take_append_of_le_length (le_refl _)]
           simp
 
-/-- The deployed binding-attack event: verifier acceptance without the opening that the AGM
-instance would return on its clean branch. -/
+/-- The deployed binding-attack event: verifier acceptance while the effective accepted multiopen
+value — the verifier's value plus the `z⁻¹·(multiU + ξ·sU)` shift contributed by the declared `U`
+coefficients, zero for honest proofs — disagrees with the value the adversary's own carried
+aggregate opening gives.
+
+The event is a computable mismatch, never nonexistence of an opening: in a prime-order group an
+opening of any commitment at any value exists propositionally for essentially every basis (the
+kernel of `commit` is a hyperplane), so a `¬ ∃`-opening event would be almost empty and any bound
+on it vacuous — the same trap `Zcash.Security.BindingSignature.Balance` documents for relations.
+The mismatch event contains that no-opening event, and on a mismatch run every clean opening the
+kernel extracts is a commitment collision against `aMulti`
+(`DeployedAlgebraicForkingInstance.runRelation`). -/
 def fullAlgebraicBindingAttack {shape : Shape}
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
     (vk : VerifyingKey shape Fp VestaG) (p : AlgebraicWfProof basis vk)
@@ -314,11 +338,10 @@ def fullAlgebraicBindingAttack {shape : Shape}
   DeployedIpaVerifierEq (ursOfAugmentedBasis shape.k basis).g
       (ursOfAugmentedBasis shape.k basis).w (ursOfAugmentedBasis shape.k basis).u
       vk p.proof.1 (chRecord ν χ) ∧
-    ¬ ∃ a, IpaRelation (ursOfAugmentedBasis shape.k basis)
-      (commit (ursOfAugmentedBasis shape.k basis) (p.aMulti ν))
-      (evalVector shape.k (ν 7))
-      (multiopenValue vk p.proof.1 (chRecord ν (fun _ => 0)) -
-        ν 9 * innerProduct p.s (evalVector shape.k (ν 7))) a
+    innerProduct (p.aMulti ν) (evalVector shape.k (ν 7)) ≠
+      multiopenValue vk p.proof.1 (chRecord ν (fun _ => 0)) +
+        (ν 10)⁻¹ * (p.multiU ν + ν 9 * p.sU) -
+        ν 9 * innerProduct p.s (evalVector shape.k (ν 7))
 
 /-- The binding attack with the `z ≠ 0` guard required by the fork kernel. -/
 def fullAlgebraicBindingAttackZ {shape : Shape}
@@ -329,9 +352,10 @@ def fullAlgebraicBindingAttackZ {shape : Shape}
 
 /-- Verifier acceptance with the nonzero folding challenge required by the IPA extractor.
 
-Unlike `fullAlgebraicBindingAttackZ`, this predicate does not test whether an opening exists.  The
-recursive extractor only needs accepting transcripts; the no-opening condition is checked on the
-real attack run when proving that the computed AGM instance returns its relation branch. -/
+Unlike `fullAlgebraicBindingAttackZ`, this predicate does not compare the accepted value with the
+carried aggregate opening.  The recursive extractor only needs accepting transcripts; the mismatch
+is used on the real attack run when proving that the computed relation finder returns an explicit
+relation (`DeployedAlgebraicForkingInstance.runRelation`). -/
 def fullAlgebraicAcceptZ {shape : Shape}
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
     (vk : VerifyingKey shape Fp VestaG) (p : AlgebraicWfProof basis vk)
@@ -427,7 +451,8 @@ theorem algebraicForkCertAttempt_valid {shape : Shape}
       (commit urs
           (adjustedWitness (p₀.aMulti ν₀) p₀.s
             (multiopenValue vk p₀.proof.1 (chRecord ν₀ (fun _ => 0))) (ν₀ 9)) +
-        (ν₀ 10 * 0) • urs.u + (p₀.multiBlind ν₀ + ν₀ 9 * p₀.sBlind) • urs.w)
+        (p₀.multiU ν₀ + ν₀ 9 * p₀.sU) • urs.u +
+        (p₀.multiBlind ν₀ + ν₀ 9 * p₀.sBlind) • urs.w)
       cert.toDForkCert := by
   let p₀ := A.run O
   let ν₀ : Fin 11 → Fp := fun i => O (algebraicFullPrefixesPre init p₀ i)
@@ -509,7 +534,8 @@ theorem algebraicForkCertAttempt_valid {shape : Shape}
       = (commit urs
             (adjustedWitness (p₀.aMulti ν₀) p₀.s
               (multiopenValue vk p₀.proof.1 (chRecord ν₀ (fun _ => 0))) (ν₀ 9))
-          + (ν₀ 10 * 0) • urs.u + (p₀.multiBlind ν₀ + ν₀ 9 * p₀.sBlind) • urs.w) := by
+          + (p₀.multiU ν₀ + ν₀ 9 * p₀.sU) • urs.u
+          + (p₀.multiBlind ν₀ + ν₀ 9 * p₀.sBlind) • urs.w) := by
     intro chi
     dsimp only [urs]
     dsimp only [AlgebraicWfProof.proof]
@@ -531,7 +557,8 @@ theorem algebraicForkCertAttempt_valid {shape : Shape}
       (commit urs
           (adjustedWitness (p₀.aMulti ν₀) p₀.s
             (multiopenValue vk p₀.proof.1 (chRecord ν₀ (fun _ => 0))) (ν₀ 9)) +
-        (ν₀ 10 * 0) • urs.u + (p₀.multiBlind ν₀ + ν₀ 9 * p₀.sBlind) • urs.w) cs
+        (p₀.multiU ν₀ + ν₀ 9 * p₀.sU) • urs.u +
+        (p₀.multiBlind ν₀ + ν₀ 9 * p₀.sBlind) • urs.w) cs
   have hsplice : p'.proof.1 =
       spliceIpa p₀.proof.1 p'.proof.1.ipaRounds p'.proof.1.ipaC p'.proof.1.ipaF :=
     preIpaTranscript_inj init p'.proof.2 p₀.proof.2 hs.1
@@ -603,7 +630,8 @@ theorem algebraicForkCertAttempt_valid_canonical {shape : Shape}
       (commit urs
           (adjustedWitness (p.aMulti ν) p.s
             (multiopenValue vk p.proof.1 (chRecord ν (fun _ => 0))) (ν 9)) +
-        (ν 10 * 0) • urs.u + (p.multiBlind ν + ν 9 * p.sBlind) • urs.w)
+        (p.multiU ν + ν 9 * p.sU) • urs.u +
+        (p.multiBlind ν + ν 9 * p.sBlind) • urs.w)
       cert.toCanonicalBasis.toDForkCert := by
   rw [AlgebraicDForkCert.toCanonicalBasis_toDForkCert]
   exact algebraicForkCertAttempt_valid basis vk init A O coins cert hout
@@ -623,7 +651,7 @@ def deployedAlgebraicInstanceOfCert {shape : Shape}
       (commit (ursOfAugmentedBasis shape.k basis)
           (adjustedWitness (p.aMulti ν) p.s
             (multiopenValue vk p.proof.1 (chRecord ν (fun _ => 0))) (ν 9)) +
-        (ν 10 * 0) • (ursOfAugmentedBasis shape.k basis).u +
+        (p.multiU ν + ν 9 * p.sU) • (ursOfAugmentedBasis shape.k basis).u +
         (p.multiBlind ν + ν 9 * p.sBlind) • (ursOfAugmentedBasis shape.k basis).w)
       cert.toDForkCert) :
     DeployedAlgebraicForkingInstance (G := VestaG) shape.k basis :=
@@ -631,6 +659,7 @@ def deployedAlgebraicInstanceOfCert {shape : Shape}
     v := multiopenValue vk p.proof.1 (chRecord ν (fun _ => 0))
     ξ := ν 9
     z := ν 10
+    vU := p.multiU ν + ν 9 * p.sU
     blind := p.multiBlind ν + ν 9 * p.sBlind
     aMulti := p.aMulti ν
     aDep := adjustedWitness (p.aMulti ν) p.s
@@ -643,8 +672,10 @@ def deployedAlgebraicInstanceOfCert {shape : Shape}
       (multiopenValue vk p.proof.1 (chRecord ν (fun _ => 0))) (ν 9)
     hvalid := hvalid }
 
-/-- Excluding the clean opening at the root forces a checked instance into its relation branch. -/
-theorem deployedAlgebraicInstanceOfCert_producesRelation
+/-- On a mismatch run, a checked instance always yields an explicit relation: the kernel's
+relation branch directly, or the commitment collision between its clean opening and the carried
+aggregate opening `aMulti`. -/
+theorem deployedAlgebraicInstanceOfCert_runRelation_isSome
     {shape : Shape} {basis : AugmentedIndex (2 ^ shape.k) → VestaG}
     {vk : VerifyingKey shape Fp VestaG}
     (p : AlgebraicWfProof basis vk) (ν : Fin 11 → Fp)
@@ -658,24 +689,16 @@ theorem deployedAlgebraicInstanceOfCert_producesRelation
       (commit (ursOfAugmentedBasis shape.k basis)
           (adjustedWitness (p.aMulti ν) p.s
             (multiopenValue vk p.proof.1 (chRecord ν (fun _ => 0))) (ν 9)) +
-        (ν 10 * 0) • (ursOfAugmentedBasis shape.k basis).u +
+        (p.multiU ν + ν 9 * p.sU) • (ursOfAugmentedBasis shape.k basis).u +
         (p.multiBlind ν + ν 9 * p.sBlind) • (ursOfAugmentedBasis shape.k basis).w)
       cert.toDForkCert)
-    (hno : ¬ ∃ a, IpaRelation (ursOfAugmentedBasis shape.k basis)
-      (commit (ursOfAugmentedBasis shape.k basis) (p.aMulti ν))
-      (evalVector shape.k (ν 7))
-      (multiopenValue vk p.proof.1 (chRecord ν (fun _ => 0)) -
-        ν 9 * innerProduct p.s (evalVector shape.k (ν 7))) a) :
-    (deployedAlgebraicInstanceOfCert p ν cert hz hvalid).ProducesRelation := by
-  unfold DeployedAlgebraicForkingInstance.ProducesRelation
-  cases hrun : (deployedAlgebraicInstanceOfCert p ν cert hz hvalid).run with
-  | inl hopen =>
-      exfalso
-      apply hno
-      exact ⟨hopen.1, by
-        simpa only [deployedAlgebraicInstanceOfCert,
-          DeployedAlgebraicForkingInstance.Opening] using hopen.2⟩
-  | inr hrel => exact ⟨hrel, rfl⟩
+    (hmm : innerProduct (p.aMulti ν) (evalVector shape.k (ν 7)) ≠
+      multiopenValue vk p.proof.1 (chRecord ν (fun _ => 0)) +
+        (ν 10)⁻¹ * (p.multiU ν + ν 9 * p.sU) -
+        ν 9 * innerProduct p.s (evalVector shape.k (ν 7))) :
+    (deployedAlgebraicInstanceOfCert p ν cert hz hvalid).runRelation.isSome :=
+  DeployedAlgebraicForkingInstance.runRelation_isSome_of_mismatch
+    (deployedAlgebraicInstanceOfCert p ν cert hz hvalid) hmm
 
 /-- Compute the PR #28 deployed instance from one FS oracle table and recursive-extractor coins.
 
@@ -704,9 +727,10 @@ def computedDeployedAlgebraicInstance {shape : Shape}
       let b := evalVector shape.k (ν 7)
       let v := multiopenValue vk p.proof.1 (chRecord ν (fun _ => 0))
       let aDep := adjustedWitness (p.aMulti ν) p.s v (ν 9)
+      let vU := p.multiU ν + ν 9 * p.sU
       let blind := p.multiBlind ν + ν 9 * p.sBlind
       have hvalid : DeployedForkValid urs.g b urs.u urs.w (ν 10)
-          (commit urs aDep + (ν 10 * 0) • urs.u + blind • urs.w)
+          (commit urs aDep + vU • urs.u + blind • urs.w)
           canonicalCert.toDForkCert := by
         have hcert' : (algebraicForkCertAttempt basis vk init A O coins).output = some cert := by
           simpa only [certAttempt] using hcert
@@ -786,8 +810,10 @@ theorem computedAlgebraicInstanceFailure_measure_le {shape : Shape}
     (computedAlgebraicInstanceFailureSet_subset_certFailure basis vk init A tape)) ?_
   exact algebraicForkCertFailure_measure_le basis vk init A tape hQ
 
-/-- A computed instance obtained on a real binding-attack run returns the relation branch. -/
-theorem computedDeployedAlgebraicInstance_producesRelation
+/-- A computed instance obtained on a real binding-attack run always returns an explicit
+relation: the kernel's relation branch, or the collision of its clean opening with the carried
+aggregate opening. -/
+theorem computedDeployedAlgebraicInstance_runRelation_isSome
     {shape : Shape}
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
     (vk : VerifyingKey shape Fp VestaG) (init : List (TranscriptElt Fp VestaG))
@@ -800,7 +826,7 @@ theorem computedDeployedAlgebraicInstance_producesRelation
     (hwin : fsWinsFull A (fullAlgebraicBindingAttack basis vk)
       (algebraicFullPrefixesPre init) (algebraicFullPrefixes init) O)
     (hinst : (computedDeployedAlgebraicInstance basis vk init A O coins).output = some x) :
-    x.ProducesRelation := by
+    x.runRelation.isSome := by
   rw [fsWinsFull] at hwin
   unfold computedDeployedAlgebraicInstance at hinst
   dsimp only at hinst
@@ -811,12 +837,12 @@ theorem computedDeployedAlgebraicInstance_producesRelation
     · rename_i hz
       injection hinst with hx
       subst x
-      apply deployedAlgebraicInstanceOfCert_producesRelation
+      apply deployedAlgebraicInstanceOfCert_runRelation_isSome
       exact hwin.2
     · simp at hinst
 
-/-- Tape-form specialization of `computedDeployedAlgebraicInstance_producesRelation`. -/
-theorem computedDeployedAlgebraicInstanceFromTape_producesRelation
+/-- Tape-form specialization of `computedDeployedAlgebraicInstance_runRelation_isSome`. -/
+theorem computedDeployedAlgebraicInstanceFromTape_runRelation_isSome
     {shape : Shape}
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
     (vk : VerifyingKey shape Fp VestaG) (init : List (TranscriptElt Fp VestaG))
@@ -829,8 +855,8 @@ theorem computedDeployedAlgebraicInstanceFromTape_producesRelation
     (hwin : fsWinsFull A (fullAlgebraicBindingAttack basis vk)
       (algebraicFullPrefixesPre init) (algebraicFullPrefixes init) O)
     (hinst : (computedDeployedAlgebraicInstanceFromTape basis vk init A O tape).output = some x) :
-    x.ProducesRelation :=
-  computedDeployedAlgebraicInstance_producesRelation basis vk init A O tape.toCoins hwin hinst
+    x.runRelation.isSome :=
+  computedDeployedAlgebraicInstance_runRelation_isSome basis vk init A O tape.toCoins hwin hinst
 
 /-! ## Computed basis-indexed producer -/
 
@@ -862,17 +888,18 @@ def instanceAttempt (family : ComputedAlgebraicFSFamily shape)
   computedDeployedAlgebraicInstanceFromTape basis (family.vk basis) family.init
     (family.adversary basis) coins.1 coins.2
 
-/-- The computed relation finder supplied to the coin-aware fixed-slot DL reduction. -/
+/-- The computed relation finder supplied to the coin-aware fixed-slot DL reduction: run the
+produced instance and return its explicit relation — the kernel's relation branch, or the
+commitment collision between its clean opening and the carried aggregate opening
+(`DeployedAlgebraicForkingInstance.runRelation`). No opening is discarded on a binding run
+(`relationFinder_isSome_of_bindingWin`). -/
 def relationFinder (family : ComputedAlgebraicFSFamily shape) :
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG) → family.Coins →
       Option (AlgebraicRelationWitness (F := Fp) basis) :=
   fun basis coins =>
     match (family.instanceAttempt basis coins).output with
     | none => none
-    | some x =>
-      match x.run with
-      | PSum.inl _ => none
-      | PSum.inr relation => some relation
+    | some x => x.runRelation
 
 /-- The real binding-attack event for one oracle table. -/
 def bindingWin (family : ComputedAlgebraicFSFamily shape)
@@ -933,7 +960,9 @@ theorem failedBinding_measure_le (family : ComputedAlgebraicFSFamily shape)
     (le_trans (MeasureTheory.measure_union_le _ _) ?_)
   exact add_le_add haccept hzero
 
-/-- On a binding-attack run, every returned instance is retained by the relation finder. -/
+/-- On a binding-attack run, every returned instance is retained by the relation finder: the
+mismatch with the carried aggregate opening turns even a clean extracted opening into a
+commitment-collision relation. -/
 theorem relationFinder_isSome_of_bindingWin
     (family : ComputedAlgebraicFSFamily shape)
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG) (coins : family.Coins)
@@ -941,12 +970,11 @@ theorem relationFinder_isSome_of_bindingWin
     (hsome : (family.instanceAttempt basis coins).output.isSome) :
     (family.relationFinder basis coins).isSome := by
   obtain ⟨x, hx⟩ := Option.isSome_iff_exists.mp hsome
-  have hrel := computedDeployedAlgebraicInstanceFromTape_producesRelation basis
+  have hrel := computedDeployedAlgebraicInstanceFromTape_runRelation_isSome basis
     (family.vk basis) family.init (family.adversary basis) coins.1 coins.2 hwin hx
   unfold relationFinder
   rw [hx]
-  obtain ⟨relation, hrelation⟩ := hrel
-  simp [hrelation]
+  exact hrel
 
 /-- Basis/coin pairs on which the real binding attack occurs and the recursive extractor returns an
 instance. -/
@@ -1134,5 +1162,69 @@ theorem binding_prob_le_of_generatorRO_textbookDL
     (orchard_uniformURSIdentification_of_generatorRO shape.k B hB query hquery) hDL
 
 end ComputedAlgebraicFSFamily
+
+/-! ## Randomized adversaries
+
+The family interface is deterministic given the oracle table. A real attacker also draws private
+coins; it is the uniform mixture of its deterministic members, and the binding bound holds for the
+mixture whenever the DL hypothesis holds for every member — the query-loss and `z = 0` terms are
+already member-independent. Larger oracle domains are handled one layer down:
+`fsWinsFull_restrictSum_le` (`Soundness.Forking.Adaptive`) restricts any split-domain adversary to
+the deployed bounded transcript domain, junk table by junk table, at the same query budget. -/
+
+/-- A basis-indexed family whose adversary additionally draws private coins from a finite type
+`R`, independent of the oracle table and the extractor tape. All members share one transcript
+prefix, so they share one oracle-and-tape coin type. -/
+structure ComputedAlgebraicFSFamilyRand (shape : Shape) (R : Type*) where
+  init : List (TranscriptElt Fp VestaG)
+  vk : (basis : AugmentedIndex (2 ^ shape.k) → VestaG) → VerifyingKey shape Fp VestaG
+  adversary : (basis : AugmentedIndex (2 ^ shape.k) → VestaG) → R → OracleComp
+    (BTranscript Fp VestaG (preIpaLen shape init.length 10 + 3 * shape.k)) Fp
+    (AlgebraicWfProof basis (vk basis))
+  Q : ℕ
+  queryBound : ∀ basis r, (adversary basis r).QueryBound Q
+
+namespace ComputedAlgebraicFSFamilyRand
+
+variable {shape : Shape} {R : Type*}
+
+/-- The deterministic member obtained by fixing the private coins. -/
+abbrev determinize (fam : ComputedAlgebraicFSFamilyRand shape R) (r : R) :
+    ComputedAlgebraicFSFamily shape :=
+  { init := fam.init
+    vk := fam.vk
+    adversary := fun basis => fam.adversary basis r
+    Q := fam.Q
+    queryBound := fun basis => fam.queryBound basis r }
+
+/-- The oracle-table and extractor-tape coins, shared by every member. -/
+abbrev Coins (fam : ComputedAlgebraicFSFamilyRand shape R) :=
+  (BTranscript Fp VestaG (preIpaLen shape fam.init.length 10 + 3 * shape.k) → Fp) ×
+    RecursiveForkTape Fp shape.k
+
+open Classical in
+/-- **Randomized adversaries average out.** The real binding event of an adversary drawing
+uniform private coins `r` — alongside the sampled basis scalars and the oracle/tape coins — is
+bounded by the same three terms as each deterministic member, provided the textbook-DL bound
+holds for every member's relation finder: fixing the private coins fixes an ordinary family, and
+the query-loss and `z = 0` terms depend only on the shared query budget. -/
+theorem binding_prob_le_of_textbookDL_rand [Fintype R] [Nonempty R]
+    (B : VestaG) (fam : ComputedAlgebraicFSFamilyRand shape R) {bound : ℝ≥0∞}
+    (hDL : ∀ r, TextbookDLWithCoinsAdvantageLE B (fam.determinize r).relationFinder bound) :
+    (PMF.uniformOfFintype
+        (((AugmentedIndex (2 ^ shape.k) → Fp) × fam.Coins) × R)).toOuterMeasure
+        {p : ((AugmentedIndex (2 ^ shape.k) → Fp) × fam.Coins) × R |
+          p.1 ∈ (ComputedAlgebraicFSFamily.bindingSet B (fam.determinize p.2) :
+            Set ((AugmentedIndex (2 ^ shape.k) → Fp) × fam.Coins))}
+      ≤ (fam.Q + shape.k) * (3 / Fintype.card Fp) +
+        (fam.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
+        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+  apply uniformOfFintype_prod_fiber_bound
+    (fun r => (ComputedAlgebraicFSFamily.bindingSet B (fam.determinize r) :
+      Set ((AugmentedIndex (2 ^ shape.k) → Fp) × fam.Coins)))
+  intro r
+  exact ComputedAlgebraicFSFamily.binding_prob_le_of_textbookDL B (fam.determinize r) (hDL r)
+
+end ComputedAlgebraicFSFamilyRand
 
 end Zcash.Snark

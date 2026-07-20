@@ -62,6 +62,50 @@ theorem fsAdvantageFull_zero_slice_le (A : OracleComp T F P)
 
 end AdaptiveGame
 
+section DomainRestriction
+
+open Classical in
+/-- **Larger oracle domains add no power.** An adversary over a split domain `T ⊕ J` — free to
+query junk points outside the game's transcript domain and use their answers as grinding
+randomness — wins the full-record game with probability at most any bound that holds uniformly
+over its junk-table restrictions: on a uniform split-domain table the junk answers form an
+independent uniform table `j`, and conditioned on `j` the run is exactly the equally-bounded
+restricted machine `A.restrictSum j` against a uniform `T`-table
+(`OracleComp.run_restrictSum`, `OracleComp.queryBound_restrictSum`). Any refinement of the
+deployed bounded transcript domain splits as such a sum along `Equiv.sumCompl`, so the
+bounded-domain capstones extend to adversaries hashing arbitrary in-refinement transcripts. -/
+theorem fsWinsFull_restrictSum_le {T J F P : Type*} [Fintype T] [DecidableEq T]
+    [Fintype J] [DecidableEq J] [Fintype F] [Nonempty F] {m k : ℕ}
+    (A : OracleComp (T ⊕ J) F P) (accept : P → (Fin m → F) → (Fin k → F) → Prop)
+    (prefixesPre : P → Fin m → T) (prefixes : P → Fin k → T) {β : ℝ≥0∞}
+    (hβ : ∀ j : J → F, (PMF.uniformOfFintype (T → F)).toOuterMeasure
+      {O : T → F | fsWinsFull (A.restrictSum j) accept prefixesPre prefixes O} ≤ β) :
+    (PMF.uniformOfFintype ((T ⊕ J) → F)).toOuterMeasure
+      {O' : (T ⊕ J) → F | fsWinsFull A accept
+        (fun p i => Sum.inl (prefixesPre p i)) (fun p i => Sum.inl (prefixes p i)) O'} ≤ β := by
+  have hwin : ∀ O' : (T ⊕ J) → F,
+      fsWinsFull A accept (fun p i => Sum.inl (prefixesPre p i))
+          (fun p i => Sum.inl (prefixes p i)) O'
+        ↔ fsWinsFull (A.restrictSum (fun x => O' (Sum.inr x))) accept prefixesPre prefixes
+            (fun t => O' (Sum.inl t)) := by
+    intro O'
+    have helim : Sum.elim (fun t => O' (Sum.inl t)) (fun x => O' (Sum.inr x)) = O' := by
+      funext y
+      cases y <;> rfl
+    rw [fsWinsFull, fsWinsFull, OracleComp.run_restrictSum, helim]
+  have hset : {O' : (T ⊕ J) → F | fsWinsFull A accept
+        (fun p i => Sum.inl (prefixesPre p i)) (fun p i => Sum.inl (prefixes p i)) O'}
+      = (Equiv.sumArrowEquivProdArrow T J F) ⁻¹' {x : (T → F) × (J → F) |
+          x.1 ∈ {O : T → F |
+            fsWinsFull (A.restrictSum x.2) accept prefixesPre prefixes O}} := by
+    ext O'
+    exact hwin O'
+  rw [hset, ← PMF.toOuterMeasure_map_apply,
+    map_uniformOfFintype_equiv (Equiv.sumArrowEquivProdArrow T J F)]
+  exact uniformOfFintype_prod_fiber_bound _ hβ
+
+end DomainRestriction
+
 /-- Extend a round-prefix decoder with the pre-IPA prefix chain available at each round point. -/
 structure FullDecode (T : Type*) {P : Type*} (m k : ℕ) (prefixesPre : P → Fin m → T)
     (prefixes : P → Fin k → T) extends PrefixDecode T k prefixes where
