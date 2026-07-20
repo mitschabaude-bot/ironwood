@@ -41,11 +41,14 @@ lives in the augmented basis — a collision computes a `NontrivialRelation` amo
 `hquot`/`hgood` hypotheses of the terminal endpoints keep the plain chain's canonical-decode scoping
 (`Soundness.Multiopen.Decode`, the scope section).
 
-Not yet built: the `x₁` layer's measure-driven production. Each `x₁`-rewound run's aggregate
-witness arrives in this same augmented representation, so feeding
-`deployed_witness_member_binding`'s per-run hypotheses from an `x₁` accept measure needs the opened
-mirror of that lemma; the per-set gluing is `deployed_witness_two_level`
-(`Soundness.Multiopen.Deployed`).
+The `x₁` layer continues the chain to the member commitments: each `x₁`-rewound run's aggregate
+witness arrives in this same augmented representation, so `opened_witness_member_binding` mirrors
+the plain member binding with componentwise decode, and `openedMemberBinding_of_x1Prob` produces
+its inputs from the `x₁` accept measure (`OpenedX1Accept` — each run carrying its own opened `x₄`
+batch, the stacked floors explicit). The per-set gluing is `deployed_witness_two_level`
+(`Soundness.Multiopen.Deployed`). What remains fingerprint-delegated: the per-member claimed
+evaluations at the original rotated points and the gate/`x`→`x₃` transport
+(`Soundness.Multiopen.Decode`, the deployed-status section).
 -/
 
 namespace Zcash.Snark
@@ -571,6 +574,255 @@ theorem opened_constraint_of_opening_or_relation {urs : URS G} {P : G}
       instanceIndex fixedCols y gates hpoly deg x hrel (hbatch a hrel) (hquot a hrel) (hgood a hrel)
       hencodes)
   · exact Or.inr hrel
+
+
+/-! ## The opened `x₁` layer: member binding through the declared components -/
+
+/-- The scalar-component Vandermonde decode across `x₁` rewinds — the companion of `x1DecodeCols`
+for the declared `U`/`W` components. -/
+noncomputable def x1DecodeComp {n : ℕ} (z : Fin n → Fp) (c : Fin n → Fp) : Fin n → Fp :=
+  fun j => ∑ r, (Matrix.vandermonde z)⁻¹ j r • c r
+
+/-- **The extracted witness bound to the member commitments, through the opened chain.** Augmented
+mirror of `deployed_witness_member_binding`: each `x₁`-rewound run's aggregate witness arrives with
+declared `U`/`W` components (its own opened `x₄` decode), so the member decode runs componentwise —
+the same inverse matrix decodes the witness vectors and both component families. The conclusions:
+each decoded member triple opens its member commitment in augmented form; the honest opened `x₄`
+decode triple at set `i`'s batch position is the `ch.x1`-power combination of the decoded member
+triples; and every run's value equation transports to the decoded members. Per-member claimed
+evaluations at the original rotated points and the gate/`x`→`x₃` transport remain the
+fingerprint-delegated half (`Soundness.Multiopen.Decode`, the deployed-status section). -/
+theorem opened_witness_member_binding [DecidableEq G] [Inhabited G] {shape : Shape}
+    (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
+    (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
+    {b : Fin (2 ^ urs.k) → Fp} {a : Fin (2 ^ urs.k) → Fp} {pU pW : Fp}
+    (pbatch : OpenedBatchOpenings urs b (x4BatchCommitments urs hk vk ps ch)
+      (x4BatchEvals vk ps ch) a pU pW)
+    (i : ℕ) (hi : i < deployedX4PairCount vk ps ch)
+    (χ : Fin (deployedSetQueries vk ps ch i).length → Fp) (hχ : Function.Injective χ)
+    (cur : Fin (deployedSetQueries vk ps ch i).length) (hcur : χ cur = ch.x1)
+    (runs : Fin (deployedSetQueries vk ps ch i).length → X1Run shape G)
+    (w : Fin (deployedSetQueries vk ps ch i).length → (Fin (2 ^ urs.k) → Fp))
+    (wU wW : Fin (deployedSetQueries vk ps ch i).length → Fp)
+    (bv : Fin (deployedSetQueries vk ps ch i).length → (Fin (2 ^ urs.k) → Fp))
+    (uv : Fin (deployedSetQueries vk ps ch i).length → Fp)
+    (hwC : ∀ r, commit urs (w r) + wU r • urs.u + wW r • urs.w
+      = ((deployedX4Qs vk ((runs r).spliced ps) ((runs r).challenges ch (χ r))).getD i
+            (Msm.zero shape.k Fp G)).eval ⟨shape.k, hk ▸ urs.g, urs.w, urs.u⟩)
+    (hwu : ∀ r, commitGen (bv r) (w r) = uv r)
+    (hwcur : w cur = (openedColumnDecode pbatch).coeffs
+      ⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩)
+    (hwUcur : wU cur = (openedColumnDecode pbatch).uComp
+      ⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩)
+    (hwWcur : wW cur = (openedColumnDecode pbatch).wComp
+      ⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩) :
+    (∀ m : Fin (deployedSetQueries vk ps ch i).length,
+      commit urs (x1DecodeCols χ w m) + x1DecodeComp χ wU m • urs.u
+          + x1DecodeComp χ wW m • urs.w
+        = ((deployedSetQueries vk ps ch i).getD (m : ℕ) (.point 0, [])).1.eval
+            ⟨shape.k, hk ▸ urs.g, urs.w, urs.u⟩)
+    ∧ ((openedColumnDecode pbatch).coeffs ⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩
+        = ∑ m : Fin (deployedSetQueries vk ps ch i).length,
+            ch.x1 ^ (m : ℕ) • x1DecodeCols χ w m)
+    ∧ ((openedColumnDecode pbatch).uComp ⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩
+        = ∑ m : Fin (deployedSetQueries vk ps ch i).length,
+            ch.x1 ^ (m : ℕ) • x1DecodeComp χ wU m)
+    ∧ ((openedColumnDecode pbatch).wComp ⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩
+        = ∑ m : Fin (deployedSetQueries vk ps ch i).length,
+            ch.x1 ^ (m : ℕ) • x1DecodeComp χ wW m)
+    ∧ (∀ r, ∑ m : Fin (deployedSetQueries vk ps ch i).length,
+        χ r ^ (m : ℕ) • commitGen (bv r) (x1DecodeCols χ w m) = uv r) := by
+  have hqs : i < (deployedX4Qs vk ps ch).length := by
+    have hle : deployedX4PairCount vk ps ch ≤ (deployedX4Qs vk ps ch).length := by
+      simp only [deployedX4PairCount, deployedX4Pairs, List.length_zip]
+      exact min_le_left _ _
+    omega
+  have haC : ∀ r, commit urs (w r) + wU r • urs.u + wW r • urs.w
+      = ∑ m : Fin (deployedSetQueries vk ps ch i).length, χ r ^ (m : ℕ)
+          • ((deployedSetQueries vk ps ch i).getD (m : ℕ) (.point 0, [])).1.eval
+              ⟨shape.k, hk ▸ urs.g, urs.w, urs.u⟩ := by
+    intro r
+    rw [hwC r,
+      x1Run_x4Qs_getD_eval (hk ▸ urs.g) urs.w urs.u vk ps ch (runs r) (χ r) hqs,
+      Fin.sum_univ_eq_sum_range
+        (fun m => χ r ^ m • ((deployedSetQueries vk ps ch i).getD m (.point 0, [])).1.eval
+          ⟨shape.k, hk ▸ urs.g, urs.w, urs.u⟩)]
+  refine ⟨fun m => ?_, ?_, ?_, ?_, fun r => x1DecodeCols_value χ hχ w bv uv hwu r⟩
+  · -- The three linear pieces collapse to one inverse-matrix combination of the per-run augmented
+    -- equations, which the module-valued decode inverts.
+    have hlin : commit urs (x1DecodeCols χ w m) + x1DecodeComp χ wU m • urs.u
+        + x1DecodeComp χ wW m • urs.w
+        = ∑ r, (Matrix.vandermonde χ)⁻¹ m r •
+            (commit urs (w r) + wU r • urs.u + wW r • urs.w) := by
+      simp only [x1DecodeCols, x1DecodeComp]
+      rw [commit_eq_commitGen, commitGen_sum, Finset.sum_smul, Finset.sum_smul,
+        ← Finset.sum_add_distrib, ← Finset.sum_add_distrib]
+      refine Finset.sum_congr rfl fun r _ => ?_
+      rw [commitGen_smul_left, smul_eq_mul, smul_eq_mul, mul_smul, mul_smul, smul_add, smul_add,
+        commit_eq_commitGen]
+    rw [hlin]
+    exact vandermonde_decode_map _ (vandermonde_inv_left χ hχ) haC m
+  · rw [← hwcur, ← hcur]
+    exact x1DecodeCols_reconstruct χ hχ w cur
+  · rw [← hwUcur, ← hcur]
+    simp only [x1DecodeComp]
+    exact (vandermonde_reconstruct_map wU _ (vandermonde_inv_right χ hχ) cur).symm
+  · rw [← hwWcur, ← hcur]
+    simp only [x1DecodeComp]
+    exact (vandermonde_reconstruct_map wW _ (vandermonde_inv_right χ hχ) cur).symm
+
+
+/-- The opened `x₁` accept event at compression challenge `χv`: some `x₁`-rewound run carries a
+full opened `x₄` batch over its own deployed aggregates. Each run's aggregate witnesses are that
+run's own `x₄`-level decode — the stacked floors, per run, made explicit; the honest run witnesses
+the event at `ch.x1` through the honest batch. -/
+def OpenedX1Accept [DecidableEq G] [Inhabited G] {shape : Shape} (urs : URS G)
+    (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G) (ps : ProofString shape Fp G)
+    (ch : Challenges shape.k Fp) (χv : Fp) : Prop :=
+  ∃ (run : X1Run shape G) (bR aR : Fin (2 ^ urs.k) → Fp) (pUR pWR : Fp),
+    Nonempty (OpenedBatchOpenings urs bR
+      (x4BatchCommitments urs hk vk (run.spliced ps) (run.challenges ch χv))
+      (x4BatchEvals vk (run.spliced ps) (run.challenges ch χv)) aR pUR pWR)
+
+open scoped ENNReal in
+open Classical in
+-- The member-index types carry `deployedSetQueries`-shaped lengths, so defeq checks are heavy;
+-- the budget below covers them.
+set_option maxHeartbeats 1000000 in
+/-- **The `x₁` forking floor through the opened chain.** If the opened `x₁` accept measure beats
+`(len − 1) / p` for point set `i`'s member count, the member-binding output exists — decoded member
+triples opening the actual queried column commitments in augmented form, with the honest opened
+`x₄`-decode triple at set `i`'s batch position reconstructed as their `ch.x1`-power combination —
+produced, not assumed: each rewound run's aggregate witness is its own opened `x₄` decode, and the
+honest slot is rebuilt from the honest batch. The measure hypothesis carries the same random-oracle
+uniformity axiom as every `hprob` (`Soundness.Forking.Oracle`); the runs are the `reprogramX1`
+reprogramming events (`Soundness.Forking.Rewind`) on the spliced strings. -/
+theorem openedMemberBinding_of_x1Prob [DecidableEq G] [Inhabited G] {shape : Shape}
+    (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
+    (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
+    {b : Fin (2 ^ urs.k) → Fp} {a : Fin (2 ^ urs.k) → Fp} {pU pW : Fp}
+    (pbatch : OpenedBatchOpenings urs b (x4BatchCommitments urs hk vk ps ch)
+      (x4BatchEvals vk ps ch) a pU pW)
+    (i : ℕ) (hi : i < deployedX4PairCount vk ps ch)
+    (hlen : 0 < (deployedSetQueries vk ps ch i).length)
+    (hprob1 : (((deployedSetQueries vk ps ch i).length - 1 : ℕ) : ℝ≥0∞) / Fintype.card Fp
+      < (PMF.uniformOfFintype Fp).toOuterMeasure (Finset.univ.filter
+          (OpenedX1Accept urs hk vk ps ch))) :
+    ∃ (colsM : Fin (deployedSetQueries vk ps ch i).length → (Fin (2 ^ urs.k) → Fp))
+      (uM wM : Fin (deployedSetQueries vk ps ch i).length → Fp),
+      (∀ m : Fin (deployedSetQueries vk ps ch i).length,
+        commit urs (colsM m) + uM m • urs.u + wM m • urs.w
+          = ((deployedSetQueries vk ps ch i).getD (m : ℕ) (.point 0, [])).1.eval
+              ⟨shape.k, hk ▸ urs.g, urs.w, urs.u⟩)
+      ∧ ((openedColumnDecode pbatch).coeffs ⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩
+          = ∑ m : Fin (deployedSetQueries vk ps ch i).length, ch.x1 ^ (m : ℕ) • colsM m)
+      ∧ ((openedColumnDecode pbatch).uComp ⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩
+          = ∑ m : Fin (deployedSetQueries vk ps ch i).length, ch.x1 ^ (m : ℕ) • uM m)
+      ∧ ((openedColumnDecode pbatch).wComp ⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩
+          = ∑ m : Fin (deployedSetQueries vk ps ch i).length, ch.x1 ^ (m : ℕ) • wM m) := by
+  classical
+  have hcast : (deployedSetQueries vk ps ch i).length - 1 + 1
+      = (deployedSetQueries vk ps ch i).length := Nat.succ_pred_eq_of_pos hlen
+  have hx₁ : OpenedX1Accept urs hk vk ps ch ch.x1 :=
+    ⟨honestX1Run ps ch, b, a, pU, pW, ⟨pbatch⟩⟩
+  obtain ⟨ξ₀, hξinj₀, hξzero₀, hacc₀⟩ := exists_injective_accepting_of_measure
+    (acc := OpenedX1Accept urs hk vk ps ch) (x₀ := ch.x1) hx₁ hprob1
+  -- Recast the rewound family to the member index type and pin the honest slot.
+  set χ : Fin (deployedSetQueries vk ps ch i).length → Fp :=
+    fun m => ξ₀ (Fin.cast hcast.symm m) with hχdef
+  have hχinj : Function.Injective χ := by
+    intro m m' h
+    have h2 : Fin.cast hcast.symm m = Fin.cast hcast.symm m' := hξinj₀ h
+    have h3 := congrArg Fin.val h2
+    exact Fin.ext h3
+  have hcurv : χ ⟨0, hlen⟩ = ch.x1 := by
+    have hzero : Fin.cast hcast.symm
+        (⟨0, hlen⟩ : Fin (deployedSetQueries vk ps ch i).length)
+        = (0 : Fin ((deployedSetQueries vk ps ch i).length - 1 + 1)) := by
+      apply Fin.ext
+      simp
+    rw [hχdef]
+    show ξ₀ (Fin.cast hcast.symm ⟨0, hlen⟩) = ch.x1
+    rw [hzero, hξzero₀]
+  have hacc : ∀ m : Fin (deployedSetQueries vk ps ch i).length,
+      OpenedX1Accept urs hk vk ps ch (χ m) := fun m => hacc₀ _
+  choose runsF bF aF pUF pWF hpbne using hacc
+  -- Per-run aggregate triples: each run's own opened x₄ decode, at set i's batch position.
+  have hidx : ∀ m : Fin (deployedSetQueries vk ps ch i).length,
+      deployedX4PairCount vk ps ch - 1 - i
+        < deployedX4PairCount vk ((runsF m).spliced ps) ((runsF m).challenges ch (χ m)) + 1 := by
+    intro m
+    rw [x1Run_pairCount vk ps ch (runsF m) (χ m)]
+    omega
+  -- The x₁ family fed to the member binding: choice data off the honest slot, the honest batch at it.
+  set cur : Fin (deployedSetQueries vk ps ch i).length := ⟨0, hlen⟩ with hcurdef
+  set runs' : Fin (deployedSetQueries vk ps ch i).length → X1Run shape G :=
+    Function.update runsF cur (honestX1Run ps ch) with hrunsdef
+  set w' : Fin (deployedSetQueries vk ps ch i).length → (Fin (2 ^ urs.k) → Fp) :=
+    Function.update
+      (fun m => (openedColumnDecode (hpbne m).some).coeffs
+        ⟨deployedX4PairCount vk ps ch - 1 - i, hidx m⟩)
+      cur
+      ((openedColumnDecode pbatch).coeffs
+        ⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩) with hwdef
+  set wU' : Fin (deployedSetQueries vk ps ch i).length → Fp :=
+    Function.update
+      (fun m => (openedColumnDecode (hpbne m).some).uComp
+        ⟨deployedX4PairCount vk ps ch - 1 - i, hidx m⟩)
+      cur
+      ((openedColumnDecode pbatch).uComp
+        ⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩) with hwUdef
+  set wW' : Fin (deployedSetQueries vk ps ch i).length → Fp :=
+    Function.update
+      (fun m => (openedColumnDecode (hpbne m).some).wComp
+        ⟨deployedX4PairCount vk ps ch - 1 - i, hidx m⟩)
+      cur
+      ((openedColumnDecode pbatch).wComp
+        ⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩) with hwWdef
+  have hIdxEq : deployedX4PairCount vk ps ch - 1 - (deployedX4PairCount vk ps ch - 1 - i)
+      = i := by omega
+  have hwC : ∀ r, commit urs (w' r) + wU' r • urs.u + wW' r • urs.w
+      = ((deployedX4Qs vk ((runs' r).spliced ps) ((runs' r).challenges ch (χ r))).getD i
+            (Msm.zero shape.k Fp G)).eval ⟨shape.k, hk ▸ urs.g, urs.w, urs.u⟩ := by
+    intro r
+    rcases eq_or_ne r cur with hr | hr
+    · subst hr
+      rw [hwdef, hwUdef, hwWdef, hrunsdef]
+      simp only [Function.update_self]
+      have hj : ((⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩ :
+          Fin (deployedX4PairCount vk ps ch + 1)) : ℕ) < deployedX4PairCount vk ps ch := by
+        show deployedX4PairCount vk ps ch - 1 - i < deployedX4PairCount vk ps ch
+        omega
+      rw [(openedColumnDecode pbatch).commitment
+          ⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩,
+        x4BatchCommitments_getD urs hk vk ps ch hj, hIdxEq, hcurv]
+      rfl
+    · rw [hwdef, hwUdef, hwWdef, hrunsdef]
+      simp only [Function.update_of_ne hr]
+      have hpc := x1Run_pairCount vk ps ch (runsF r) (χ r)
+      have hjR : ((⟨deployedX4PairCount vk ps ch - 1 - i, hidx r⟩ :
+          Fin (deployedX4PairCount vk ((runsF r).spliced ps)
+            ((runsF r).challenges ch (χ r)) + 1)) : ℕ)
+          < deployedX4PairCount vk ((runsF r).spliced ps) ((runsF r).challenges ch (χ r)) := by
+        show deployedX4PairCount vk ps ch - 1 - i
+          < deployedX4PairCount vk ((runsF r).spliced ps) ((runsF r).challenges ch (χ r))
+        omega
+      rw [(openedColumnDecode (hpbne r).some).commitment
+          ⟨deployedX4PairCount vk ps ch - 1 - i, hidx r⟩,
+        x4BatchCommitments_getD urs hk vk ((runsF r).spliced ps)
+          ((runsF r).challenges ch (χ r)) hjR]
+      have hIdxR : deployedX4PairCount vk ((runsF r).spliced ps) ((runsF r).challenges ch (χ r))
+          - 1 - (deployedX4PairCount vk ps ch - 1 - i) = i := by
+        omega
+      rw [hIdxR]
+  have hmb := opened_witness_member_binding urs hk vk ps ch pbatch i hi χ hχinj cur hcurv
+    runs' w' wU' wW' (fun _ _ => 0) (fun r => commitGen (fun _ => (0 : Fp)) (w' r))
+    hwC (fun r => rfl)
+    (by rw [hwdef]; exact Function.update_self ..)
+    (by rw [hwUdef]; exact Function.update_self ..)
+    (by rw [hwWdef]; exact Function.update_self ..)
+  exact ⟨x1DecodeCols χ w', x1DecodeComp χ wU', x1DecodeComp χ wW',
+    hmb.1, hmb.2.1, hmb.2.2.1, hmb.2.2.2.1⟩
 
 end Opened
 

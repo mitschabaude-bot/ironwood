@@ -96,8 +96,9 @@ record are now theorems, and the `x₁` layer beneath them is closed down to the
    extracted witness as the explicit two-level (`x₄`-then-`x₁`) power combination of member-column
    witnesses — glued over all point sets by `deployed_witness_two_level`. The honest run sits
    inside every family by structure eta (`honestX1Run`); the per-run aggregate witnesses are each
-   run's own `x₄`-level decode (the same stacked floors, per run), the hypothesis shape
-   `hwC`/`hwu` carries.
+   run's own `x₄`-level decode (the same stacked floors, per run), produced from the `x₁` accept
+   measure through the opened chain (`opened_witness_member_binding`/`openedMemberBinding_of_x1Prob`,
+   `Soundness.Multiopen.Opened`).
 
 **Delegated to the equivalence fingerprint — unchanged.** Per the principle raised in
 zcash/ironwood#21 (the `PermutationConstruction.lean:243` review thread, comment `r3493240277`:

@@ -854,11 +854,11 @@ it and the per-run value data). Then the canonical member decode
   run opens at its own `x₃`).
 
 Per-member claimed evaluations at the original rotated points and the gate/`x`→`x₃` transport remain
-the fingerprint-delegated half (`Soundness.Multiopen.Decode`, the deployed-status section). Producing
-the per-run families from an `x₁` accept measure — the analogue of `openedX4Rewind_of_x4Prob` — is
-not yet built: on this base each run's aggregate witness arrives in augmented `(g, u, w)`
-representation (`Soundness.Multiopen.Opened`), so it needs an opened mirror of this lemma. The
-per-set decodes are glued into the full two-level combination by `deployed_witness_two_level`. -/
+the fingerprint-delegated half (`Soundness.Multiopen.Decode`, the deployed-status section). On this
+base each run's aggregate witness arrives in augmented `(g, u, w)` representation, so the live form
+is the opened mirror `opened_witness_member_binding`, its inputs produced from the `x₁` accept
+measure by `openedMemberBinding_of_x1Prob` (`Soundness.Multiopen.Opened`). The per-set decodes are
+glued into the full two-level combination by `deployed_witness_two_level`. -/
 theorem deployed_witness_member_binding [DecidableEq G] [Inhabited G] {shape : Shape}
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
