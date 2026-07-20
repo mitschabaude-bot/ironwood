@@ -1,6 +1,7 @@
 import Mathlib
 import Zcash.Snark.Soundness.Main
 import Zcash.Snark.Soundness.Forking.Rewind
+import Zcash.Snark.Soundness.Multiopen.Opened
 import CompElliptic.Curves.Pasta
 import CompElliptic.Curves.PastaOrder
 
@@ -618,5 +619,168 @@ noncomputable def legacy_orchard_verifier_vesta_forking_constraint_adaptive_rewi
         (hquot a hrel') (hgood a hrel')
     exact hencodes a ⟨hrel', hsat⟩
   · exact PSum.inr hrel
+
+
+open Polynomial in
+open scoped ENNReal in
+open Classical in
+/-- **Deployed decoded constraint, per fork, batch produced by `x₄` rewinding.** The decoded
+counterpart of `orchard_verifier_vesta_constraint_of_forked`: the circuit is checked on columns
+decoded from the opened `x₄` batch over the deployed aggregates
+(`x4BatchCommitments`/`x4BatchEvals`), not through free `decodeAdvice`/`decodeInstance` functions.
+The batch is derived, not assumed: the fork's clean transcript seeds the honest slot and `hprob4`
+spends the `x₄` accept measure (`openedX4Rewind_of_x4Prob_forked`). `hquot`/`hgood` are *pinned*:
+stated once, for the canonical decode at the transcript's own extracted witness
+(`ipaRelation_extract`) — the satisfiable shape; quantifying them over every opening is vacuous at
+a nontrivial kernel (the scope section of `Soundness.Multiopen.Decode`). The measure hypothesis
+carries the random-oracle uniformity axiom (`Soundness.Forking.Oracle`). -/
+theorem orchard_verifier_vesta_decoded_constraint_of_forked_x4 [DecidableEq VestaG]
+    [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
+    (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG)
+    (ch : Challenges shape.k Fp)
+    {b : Fin (2 ^ urs.k) → Fp} {z blind : Fp}
+    {numAdvice numInstance : ℕ}
+    (adviceIndex : Fin numAdvice → Fin (deployedX4PairCount vk ps ch + 1))
+    (instanceIndex : Fin numInstance → Fin (deployedX4PairCount vk ps ch + 1))
+    (fixedCols : ℕ → Polynomial Fp)
+    (y : Fp) {ng : ℕ} (gates : Fin ng → Expr Fp) (hpoly : Polynomial Fp) (deg : ℕ) (x : Fp)
+    (fs : ForkedTranscript urs hk vk ps ch b z blind)
+    (hclean : IpaAcceptV urs.g b fs.openedCommitment (multiopenValue vk ps ch)
+      (projTree fs.tree))
+    (hprob4 : ((deployedX4PairCount vk ps ch : ℝ≥0∞)) / Fintype.card Fp
+      < (PMF.uniformOfFintype Fp).toOuterMeasure (Finset.univ.filter
+          (OpenedX4Accept urs hk vk ps ch b)))
+    (hquot : quotientCheck
+        (combineGates fixedCols
+          (selectedPolys (openedDecodedCols (openedX4Rewind_of_x4Prob_forked urs hk vk ps ch fs
+            ⟨projTree fs.tree, hclean⟩ hprob4 (ipaRelation_extract urs b fs.openedCommitment (multiopenValue vk ps ch)
+            (projTree fs.tree) hclean).1
+          (ipaRelation_extract urs b fs.openedCommitment (multiopenValue vk ps ch)
+            (projTree fs.tree) hclean).2)) adviceIndex)
+          (selectedPolys (openedDecodedCols (openedX4Rewind_of_x4Prob_forked urs hk vk ps ch fs
+            ⟨projTree fs.tree, hclean⟩ hprob4 (ipaRelation_extract urs b fs.openedCommitment (multiopenValue vk ps ch)
+            (projTree fs.tree) hclean).1
+          (ipaRelation_extract urs b fs.openedCommitment (multiopenValue vk ps ch)
+            (projTree fs.tree) hclean).2)) instanceIndex)
+          y gates) hpoly deg x)
+    (hgood :
+      combineGates fixedCols
+          (selectedPolys (openedDecodedCols (openedX4Rewind_of_x4Prob_forked urs hk vk ps ch fs
+            ⟨projTree fs.tree, hclean⟩ hprob4 (ipaRelation_extract urs b fs.openedCommitment (multiopenValue vk ps ch)
+            (projTree fs.tree) hclean).1
+          (ipaRelation_extract urs b fs.openedCommitment (multiopenValue vk ps ch)
+            (projTree fs.tree) hclean).2)) adviceIndex)
+          (selectedPolys (openedDecodedCols (openedX4Rewind_of_x4Prob_forked urs hk vk ps ch fs
+            ⟨projTree fs.tree, hclean⟩ hprob4 (ipaRelation_extract urs b fs.openedCommitment (multiopenValue vk ps ch)
+            (projTree fs.tree) hclean).1
+          (ipaRelation_extract urs b fs.openedCommitment (multiopenValue vk ps ch)
+            (projTree fs.tree) hclean).2)) instanceIndex)
+          y gates ≠ hpoly * (X ^ deg - 1) →
+      (combineGates fixedCols
+          (selectedPolys (openedDecodedCols (openedX4Rewind_of_x4Prob_forked urs hk vk ps ch fs
+            ⟨projTree fs.tree, hclean⟩ hprob4 (ipaRelation_extract urs b fs.openedCommitment (multiopenValue vk ps ch)
+            (projTree fs.tree) hclean).1
+          (ipaRelation_extract urs b fs.openedCommitment (multiopenValue vk ps ch)
+            (projTree fs.tree) hclean).2)) adviceIndex)
+          (selectedPolys (openedDecodedCols (openedX4Rewind_of_x4Prob_forked urs hk vk ps ch fs
+            ⟨projTree fs.tree, hclean⟩ hprob4 (ipaRelation_extract urs b fs.openedCommitment (multiopenValue vk ps ch)
+            (projTree fs.tree) hclean).1
+          (ipaRelation_extract urs b fs.openedCommitment (multiopenValue vk ps ch)
+            (projTree fs.tree) hclean).2)) instanceIndex)
+          y gates - hpoly * (X ^ deg - 1)).eval x ≠ 0)
+    {S : Prop}
+    (hencodes : ∀ a cols,
+      SnarkRelationWithOpenedColumns urs fs.openedCommitment b (multiopenValue vk ps ch)
+        (x4BatchCommitments urs hk vk ps ch) (x4BatchEvals vk ps ch) adviceIndex instanceIndex
+        fixedCols y gates hpoly deg fs.pU fs.pW a cols → S) :
+    S :=
+  opened_constraint_of_relation_and_batch (x4BatchCommitments urs hk vk ps ch)
+    (x4BatchEvals vk ps ch) adviceIndex instanceIndex fixedCols y gates hpoly deg x
+    (ipaRelation_extract urs b fs.openedCommitment (multiopenValue vk ps ch)
+            (projTree fs.tree) hclean).2
+    (openedX4Rewind_of_x4Prob_forked urs hk vk ps ch fs
+            ⟨projTree fs.tree, hclean⟩ hprob4 (ipaRelation_extract urs b fs.openedCommitment (multiopenValue vk ps ch)
+            (projTree fs.tree) hclean).1
+          (ipaRelation_extract urs b fs.openedCommitment (multiopenValue vk ps ch)
+            (projTree fs.tree) hclean).2)
+    hquot hgood hencodes
+
+open Polynomial in
+open scoped ENNReal in
+open Classical in
+/-- **Deployed decoded constraint capstone, through the opened commitment, with the
+mismatch-to-DLR split.** *Either* the SNARK relation holds with the circuit checked on columns
+decoded from the deployed `x₄` aggregates, *or* a nontrivial `(g, u, w)` relation exists. The
+statement is the opened commitment `deployedCommitment − pU•u − pW•w`; the batch `pbatch` is
+designated *data* over the fingerprinted grouping's own aggregates, produced upstream at the
+extracted witness by `openedX4Rewind_of_x4Prob` (spending the `x₄` floor), its opening derived, not
+assumed (`OpenedBatchOpenings.ipaRelation_of_x4Current`). `hprob` spends the round-forking floor
+(`legacy_orchard_verifier_vesta_forking_opening_deployed`, its declared-component and
+static-dichotomy caveats unchanged) and enforces the witness tie: the produced opening either
+agrees with the designated one, or the two openings collide on `commit` and the relation is
+computed (`hasNontrivialRelation_of_two_openings`). The measure hypothesis carries the
+random-oracle uniformity axiom (`Soundness.Forking.Oracle`).
+
+Named assumptions: `hU`/`hcommit`/`hs` declare the witness representations the opening rung
+consumes; `hξ` kills the synthetic-blinder value shift; `pbatch`/`hξcur` designate the batch at the
+honest batching challenge; `hquot`/`hgood` state the gate check once, for the canonical decode of
+the designated batch (the gate/`x`→`x₃` transport seam — see `Soundness.Multiopen.Decode`);
+`hencodes` consumes the decoded SNARK relation. -/
+theorem orchard_verifier_vesta_forking_constraint_deployed_x4 [DecidableEq VestaG]
+    [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
+    (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG)
+    (ch : Challenges shape.k Fp)
+    (s aMulti : Fin (2 ^ urs.k) → Fp) (pU pW sU sW : Fp)
+    {numAdvice numInstance : ℕ}
+    (adviceIndex : Fin numAdvice → Fin (deployedX4PairCount vk ps ch + 1))
+    (instanceIndex : Fin numInstance → Fin (deployedX4PairCount vk ps ch + 1))
+    (fixedCols : ℕ → Polynomial Fp)
+    (y : Fp) {ng : ℕ} (gates : Fin ng → Expr Fp) (hpoly : Polynomial Fp) (deg : ℕ) (x : Fp)
+    (hz : ch.z ≠ 0)
+    (hU : pU + ch.xi * sU = 0)
+    (hcommit : commit urs aMulti = deployedCommitment urs hk vk ps ch - pU • urs.u - pW • urs.w)
+    (hs : commit urs s = ps.ipaS - sU • urs.u - sW • urs.w)
+    (hξ : ch.xi * innerProduct s (evalVector urs.k ch.x3) = 0)
+    {a₀ : Fin (2 ^ urs.k) → Fp}
+    (pbatch : OpenedBatchOpenings urs (evalVector urs.k ch.x3)
+      (x4BatchCommitments urs hk vk ps ch) (x4BatchEvals vk ps ch) a₀ pU pW)
+    (hξcur : pbatch.batchChallenge pbatch.current = ch.x4)
+    (hquot : quotientCheck
+        (combineGates fixedCols
+          (selectedPolys (openedDecodedCols pbatch) adviceIndex)
+          (selectedPolys (openedDecodedCols pbatch) instanceIndex)
+          y gates) hpoly deg x)
+    (hgood :
+      combineGates fixedCols
+          (selectedPolys (openedDecodedCols pbatch) adviceIndex)
+          (selectedPolys (openedDecodedCols pbatch) instanceIndex)
+          y gates ≠ hpoly * (X ^ deg - 1) →
+      (combineGates fixedCols
+          (selectedPolys (openedDecodedCols pbatch) adviceIndex)
+          (selectedPolys (openedDecodedCols pbatch) instanceIndex)
+          y gates - hpoly * (X ^ deg - 1)).eval x ≠ 0)
+    {S : Prop}
+    (hencodes : ∀ a cols,
+      SnarkRelationWithOpenedColumns urs
+        (deployedCommitment urs hk vk ps ch - pU • urs.u - pW • urs.w)
+        (evalVector urs.k ch.x3) (multiopenValue vk ps ch)
+        (x4BatchCommitments urs hk vk ps ch) (x4BatchEvals vk ps ch) adviceIndex instanceIndex
+        fixedCols y gates hpoly deg pU pW a cols → S)
+    (hprob : (kerr (Fintype.card Fp) shape.k : ℝ≥0∞) / Fintype.card (Fin shape.k → Fp)
+        < (PMF.uniformOfFintype (Fin shape.k → Fp)).toOuterMeasure
+            (Finset.univ.filter (fun χ => DeployedIpaVerifierEq (hk ▸ urs.g) urs.w urs.u vk ps
+              {ch with ipaRound := χ}))) :
+    S ∨ HasNontrivialRelation (F := Fp) urs.g urs.u urs.w := by
+  have hrel₀ := pbatch.ipaRelation_of_x4Current hξcur
+  rcases legacy_orchard_verifier_vesta_forking_opening_deployed urs hk vk ps ch s aMulti pU pW
+      sU sW hz hU hcommit hs hprob with hopen | hrel
+  · rw [hξ, sub_zero] at hopen
+    obtain ⟨a, hrel'⟩ := hopen
+    by_cases hae : a = a₀
+    · exact Or.inl (opened_constraint_of_relation_and_batch (x4BatchCommitments urs hk vk ps ch)
+        (x4BatchEvals vk ps ch) adviceIndex instanceIndex fixedCols y gates hpoly deg x hrel₀
+        pbatch hquot hgood hencodes)
+    · exact Or.inr (hasNontrivialRelation_of_two_openings urs hae (hrel'.1.trans hrel₀.1.symm))
+  · exact Or.inr (HasNontrivialRelation.of_nontrivialRelation hrel)
 
 end Zcash.Snark

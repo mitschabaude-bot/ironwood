@@ -1,14 +1,15 @@
 import Mathlib
 import Zcash.Snark.Soundness.Main
 import Zcash.Snark.Soundness.Multiopen.Deployed
+import Zcash.Snark.Soundness.Multiopen.Opened
 
 /-!
 # Fixture: the decoded-column hypotheses are dischargeable
 
 Regression guard for the decoded-column capstones' hypothesis shapes: every hypothesis of the terminal
 decoded lemmas is discharged *concretely* on a toy instance, so a future reshape that reintroduces an
-unsatisfiable form (the ∀-families `hquot ∧ hgood` vacuity described in the `MultiopenDecode` scope
-section) breaks this file instead of passing silently.
+unsatisfiable form (the ∀-families `hquot ∧ hgood` vacuity described in the scope section of
+`Soundness.Multiopen.Decode`) breaks this file instead of passing silently.
 
 The first instance is the smallest single-point, rotation-free one in the model's documented scope:
 `k = 0` (one URS generator, over `G := Fp` itself, where `commit` has trivial kernel), one column, all
@@ -27,6 +28,15 @@ on a minimal *rotated-query* deployed instance: one proof, one advice column que
 and `1` (points `x` and `ωx`), plus the vanishing queries — two point sets, so the fingerprinted
 `constructIntermediateSets` grouping is genuinely multi-set and rotated. The `x₄` pair count and the
 batch column values are *computed* (`decide`), and `deployedCommitment_x4_batch` instantiates on it.
+
+The fourth instance (`toyUrsUW` section) discharges the *opened* terminal endpoint
+(`Soundness.Multiopen.Opened`) on a `k = 0` URS with nonzero `u`/`w`, so the augmented
+declared-component equations carry genuine content. The fifth (`rotBind` section) discharges
+`deployed_witness_member_binding`'s full hypothesis package on a rotated instance whose aggregates
+equal its claimed set evaluations — the satisfiable shape at `k = 0`, where the commitment and value
+functionals coincide. The sixth (`rotChB` section) discharges the pinned capstone's derived opening
+(`OpenedBatchOpenings.ipaRelation_of_x4Current`) on a designated batch at the honest batching
+challenge.
 -/
 
 namespace Zcash.Snark
@@ -311,6 +321,199 @@ theorem rot_deployed_x4_batch (ξ : Fp) :
       = ∑ j : Fin (deployedX4PairCount rotVk rotPs rotCh + 1),
           ξ ^ (j : ℕ) • x4BatchCommitments toyUrs rfl rotVk rotPs rotCh j :=
   deployedCommitment_x4_batch toyUrs rfl rotVk rotPs rotCh ξ
+
+/-! ## The opened batch on augmented data
+
+A `k = 0` URS with *nonzero* `u`/`w` (`toyUrsUW`), so the opened batch's declared-component
+equations are exercised with genuine augmented content: three columns `10, 20, 30` opened at
+challenges `0, 1, 2` by witnesses `3, 23, 73` with per-run components `(1, 2)`, `(11, 2)`,
+`(31, 2)`, values `3, 5, 15`, and the gate `a₀·a₁ − i₀` satisfied on the decoded columns
+(`3·5 = 15`). The terminal opened endpoint is discharged concretely, guarding the opened
+hypothesis shapes the same way the plain fixtures guard the decoded ones. -/
+
+/-- Toy URS at `k = 0` with nonzero blinding and inner-product generators: `g = 1`, `w = 2`,
+`u = 3`. -/
+abbrev toyUrsUW : URS Fp := ⟨0, fun _ => 1, 2, 3⟩
+
+/-- On the value side the opened decode is pinned at `k = 0`: `commitGen (fun _ => 1)` has trivial
+kernel, so the canonical decode is the claimed evaluations as constants. -/
+theorem toyUW_opened_decode_pinned {n : ℕ} {cc : Fin n → Fp} {ce : Fin n → Fp}
+    {w : Fin (2 ^ toyUrsUW.k) → Fp} {pU pW : Fp}
+    (hb : OpenedBatchOpenings toyUrsUW (fun _ => 1) cc ce w pU pW) :
+    openedDecodedCols hb = fun i => Polynomial.C (ce i) := by
+  funext i
+  have hcoeff : (openedColumnDecode hb).coeffs i = fun _ => ce i := by
+    funext j
+    have h0 : (openedColumnDecode hb).coeffs i 0 = ce i := by
+      have hv := (openedColumnDecode hb).value i
+      simpa [commitGen] using hv
+    rw [toy_fin_eq_zero j]
+    exact h0
+  show coeffsToPoly ((openedColumnDecode hb).coeffs i) = _
+  rw [hcoeff]
+  simp [coeffsToPoly]
+
+/-- The nonzero opened batch: columns `10, 20, 30` at challenges `0, 1, 2`, witnesses with genuine
+`u`/`w` components, values `3, 5, 15`. -/
+noncomputable def toyOpenedBatch :
+    OpenedBatchOpenings toyUrsUW (fun _ => 1) (![10, 20, 30] : Fin 3 → Fp)
+      (![3, 5, 15] : Fin 3 → Fp) (fun _ => 3) 1 2 where
+  batchChallenge := ![0, 1, 2]
+  challengesDistinct := by decide
+  batched := ![fun _ => 3, fun _ => 23, fun _ => 73]
+  batchedU := ![1, 11, 31]
+  batchedW := ![2, 2, 2]
+  current := 0
+  current_eq := rfl
+  currentU_eq := rfl
+  currentW_eq := rfl
+  commitment := by decide
+  value := by decide
+
+/-- The witness `3` opens the statement `(P, v) = (3, 3)` over `toyUrsUW`. -/
+theorem toyUW_opens :
+    IpaRelation toyUrsUW (3 : Fp) (fun _ => 1) (3 : Fp) (fun _ => (3 : Fp)) := by
+  constructor <;> decide
+
+/-- The combined gate numerator over the opened decoded columns vanishes: `3·5 − 15 = 0`. -/
+theorem toyUW_numerator {w : Fin (2 ^ toyUrsUW.k) → Fp} {pU pW : Fp}
+    (hb : OpenedBatchOpenings toyUrsUW (fun _ => 1) (![10, 20, 30] : Fin 3 → Fp)
+      (![3, 5, 15] : Fin 3 → Fp) w pU pW) :
+    combineGates (fun _ => 0) (selectedPolys (openedDecodedCols hb) ![0, 1])
+      (selectedPolys (openedDecodedCols hb) ![2]) 0 toyGatesProd = 0 := by
+  rw [toyUW_opened_decode_pinned hb]
+  have h0 : selectedPolys (fun i => Polynomial.C ((![3, 5, 15] : Fin 3 → Fp) i))
+      (![0, 1] : Fin 2 → Fin 3) 0 = Polynomial.C 3 := by
+    simp [selectedPolys, finFn]
+  have h1 : selectedPolys (fun i => Polynomial.C ((![3, 5, 15] : Fin 3 → Fp) i))
+      (![0, 1] : Fin 2 → Fin 3) 1 = Polynomial.C 5 := by
+    simp [selectedPolys, finFn]
+  have h2 : selectedPolys (fun i => Polynomial.C ((![3, 5, 15] : Fin 3 → Fp) i))
+      (![2] : Fin 1 → Fin 3) 0 = Polynomial.C 15 := by
+    simp [selectedPolys, finFn]
+  simp only [combineGates, gatePolys, toyGatesProd, List.ofFn_succ, List.ofFn_zero,
+    List.foldl_cons, List.foldl_nil, Expr.toPoly, h0, h1, h2, zero_mul, zero_add]
+  simp only [← Polynomial.C_mul, ← Polynomial.C_neg, ← Polynomial.C_add, Polynomial.C_eq_zero]
+  norm_num
+
+/-- The terminal opened constraint endpoint discharged concretely on augmented data: the guard that
+the opened hypothesis shapes stay satisfiable. -/
+theorem toyUW_opened_relation_and_batch_discharged : True :=
+  opened_constraint_of_relation_and_batch (urs := toyUrsUW)
+    (![10, 20, 30] : Fin 3 → Fp) (![3, 5, 15] : Fin 3 → Fp) ![0, 1] ![2]
+    (fun _ => 0) 0 toyGatesProd 0 1 0 toyUW_opens toyOpenedBatch
+    (by rw [toyUW_numerator toyOpenedBatch]; simp [quotientCheck])
+    (by rw [toyUW_numerator toyOpenedBatch]; intro h; simp at h)
+    (fun _ _ _ => trivial)
+
+/-! ## The member binding, discharged on a rotated deployed instance
+
+`deployed_witness_member_binding`'s hypothesis package — the plain `x₄` batch, the `x₁` family
+with the honest run in the current slot, and the per-run aggregate witnesses pinned to the
+canonical decode — is discharged concretely, so a reshape that makes the package unsatisfiable
+breaks this file. At `k = 0` the commitment and value functionals coincide, so the batch is
+satisfiable only when the aggregates equal the claimed set evaluations: `rotBindPs` tweaks the
+rotated instance's proof string to sit exactly there (advice commitment `4 = u₀`, vanishing
+random `8 = u₁`, `q′` the recomputed base evaluation). -/
+
+/-- The rotated instance with aggregates matching evaluations, `q′` pending. -/
+def rotBindPs0 : ProofString rotShape Fp Fp :=
+  { rotPs with adviceCommitments := fun _ _ => 4, vanishingRandom := 8, multiopenQPrime := 0 }
+
+/-- The rotated instance for the member-binding guard: aggregates equal claimed set evaluations
+and `q′` is the recomputed base evaluation (which reads no `q′`), so the `x₄` batch columns and
+evaluations coincide. -/
+def rotBindPs : ProofString rotShape Fp Fp :=
+  { rotBindPs0 with multiopenQPrime := deployedBaseEval rotVk rotBindPs0 rotCh }
+
+/-- The `x₄` batch columns and evaluations of the guard instance coincide — computed. -/
+theorem rotBind_CE :
+    x4BatchCommitments toyUrs rfl rotVk rotBindPs rotCh = x4BatchEvals rotVk rotBindPs rotCh := by
+  decide
+
+/-- The plain `x₄` batch of the guard instance: each rewound witness is the power combination of
+the (coinciding) batch evaluations, at the batching challenges `0, 1, 2` read off the slot index. -/
+noncomputable def rotBindBatch :
+    BatchOpeningsForWitness toyUrs (fun _ => 1)
+      (x4BatchCommitments toyUrs rfl rotVk rotBindPs rotCh) (x4BatchEvals rotVk rotBindPs rotCh)
+      (fun _ => ∑ j : Fin (deployedX4PairCount rotVk rotBindPs rotCh + 1),
+        (((0 : Fin (deployedX4PairCount rotVk rotBindPs rotCh + 1)) : ℕ) : Fp) ^ (j : ℕ)
+          • x4BatchEvals rotVk rotBindPs rotCh j) where
+  batchChallenge := fun r => ((r : ℕ) : Fp)
+  challengesDistinct := by decide
+  batched := fun r _ => ∑ j : Fin (deployedX4PairCount rotVk rotBindPs rotCh + 1),
+    (((r : Fin (deployedX4PairCount rotVk rotBindPs rotCh + 1)) : ℕ) : Fp) ^ (j : ℕ)
+      • x4BatchEvals rotVk rotBindPs rotCh j
+  current := 0
+  current_eq := rfl
+  commitment := by decide
+  value := by decide
+
+/-- `deployed_witness_member_binding`'s hypotheses discharged concretely on the guard instance:
+the advice point set (one member), the honest `x₁` run in the single slot, and the aggregate
+witness pinned to the canonical decode. -/
+theorem rotBind_member_binding_discharged : True := by
+  have hres := deployed_witness_member_binding (shape := rotShape) toyUrs rfl rotVk rotBindPs
+    rotCh (b := fun _ => 1) rotBindBatch 0 (by decide)
+    (fun _ => 3) (by decide) ⟨0, by decide⟩ rfl
+    (fun _ => honestX1Run rotBindPs rotCh)
+    (fun _ => (decodedCols_spec rotBindBatch).decodedColumns.coeffs
+      ⟨deployedX4PairCount rotVk rotBindPs rotCh - 1 - 0, by omega⟩)
+    (fun _ _ => 1)
+    (fun _ => commitGen (fun _ => (1 : Fp))
+      ((decodedCols_spec rotBindBatch).decodedColumns.coeffs
+        ⟨deployedX4PairCount rotVk rotBindPs rotCh - 1 - 0, by omega⟩))
+    ?_ ?_ ?_
+  · trivial
+  · intro r
+    show commit toyUrs ((decodedCols_spec rotBindBatch).decodedColumns.coeffs
+        ⟨deployedX4PairCount rotVk rotBindPs rotCh - 1 - 0, by omega⟩)
+        = ((deployedX4Qs rotVk rotBindPs rotCh).getD 0 (Msm.zero rotShape.k Fp Fp)).eval
+            ⟨rotShape.k, toyUrs.g, toyUrs.w, toyUrs.u⟩
+    rw [(decodedCols_spec rotBindBatch).decodedColumns.commitment
+      ⟨deployedX4PairCount rotVk rotBindPs rotCh - 1 - 0, by omega⟩]
+    decide
+  · intro r
+    rfl
+  · rfl
+
+/-! ## The pinned-capstone derivation, exercised
+
+`rotChB` puts the honest batching challenge at `0`, so a designated batch whose current slot sits
+at challenge `0` satisfies the pinned capstone's `hξcur`, and the derived opening
+(`OpenedBatchOpenings.ipaRelation_of_x4Current`) is exercised concretely. -/
+
+/-- The guard instance's challenge record with the honest batching challenge at `0`. -/
+def rotChB : Challenges rotShape.k Fp := { rotCh with x4 := 0 }
+
+/-- A designated opened batch for the guard instance at the honest batching challenge, with
+component-free slots (`toyUrs` has `u = w = 0`). -/
+noncomputable def rotBindOpenedBatch :
+    OpenedBatchOpenings toyUrs (fun _ => 1)
+      (x4BatchCommitments toyUrs rfl rotVk rotBindPs rotChB)
+      (x4BatchEvals rotVk rotBindPs rotChB)
+      (fun _ => ∑ j : Fin (deployedX4PairCount rotVk rotBindPs rotChB + 1),
+        (((0 : Fin (deployedX4PairCount rotVk rotBindPs rotChB + 1)) : ℕ) : Fp) ^ (j : ℕ)
+          • x4BatchEvals rotVk rotBindPs rotChB j) 0 0 where
+  batchChallenge := fun r => ((r : ℕ) : Fp)
+  challengesDistinct := by decide
+  batched := fun r _ => ∑ j : Fin (deployedX4PairCount rotVk rotBindPs rotChB + 1),
+    (((r : Fin (deployedX4PairCount rotVk rotBindPs rotChB + 1)) : ℕ) : Fp) ^ (j : ℕ)
+      • x4BatchEvals rotVk rotBindPs rotChB j
+  batchedU := fun _ => 0
+  batchedW := fun _ => 0
+  current := 0
+  current_eq := rfl
+  currentU_eq := rfl
+  currentW_eq := rfl
+  commitment := by decide
+  value := by decide
+
+/-- The pinned capstone's derived opening discharged concretely: the designated batch at the
+honest batching challenge opens the opened statement, no opening assumed. -/
+theorem rotBindB_pinned_opening_discharged : True := by
+  have := rotBindOpenedBatch.ipaRelation_of_x4Current (by decide)
+  trivial
 
 end MultiopenDecodeFixture
 end Zcash.Snark

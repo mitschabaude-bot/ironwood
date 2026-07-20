@@ -37,6 +37,13 @@ evaluation are pinned), so quantified over all of it the pair `hquot ∧ hgood` 
 tweak one gate-read column by a kernel vector vanishing at the opened point and at `x`. For the same
 reason they are dischargeable only with `x` the opened point.
 
+The same tweak reaches the `∀`-witness endpoints (`decoded_constraint_of_opening_or_relation` and its
+opened mirror): the decode's current slot moves with the quantified opening, so their `hquot ∧ hgood`
+package is jointly unsatisfiable once the commitment kernel is nontrivial (`2^k > 2`). They are kept as
+reduction-shaped compatibility forms; the live capstones pin the witness — the fork's deterministic
+extraction, or a designated batch whose disagreement with any produced opening computes the relation
+(`hasNontrivialRelation_of_two_openings`, the mismatch-to-DLR split) — and state the pair once.
+
 ## Deployed status (issue #18) — what is closed, what remains
 
 Issue #18's stated hole — bind the *extracted* IPA witness to the real circuit columns via
@@ -57,14 +64,18 @@ record are now theorems, and the `x₁` layer beneath them is closed down to the
 
 2. **The `x₄` accept-probability floor.** Producing the rewound family from an accept-*measure*
    hypothesis is proven: `exists_injective_accepting_of_measure` (`Soundness.Forking.Probability`, the
-   single-squeeze counting form of the forking floor) and `deployedMultiopenRewind_of_x4Prob`. The
-   Vesta rung `orchard_verifier_vesta_forking_constraint_deployed_x4` consumes it end-to-end, the two
-   rewinding floors (`hprob` for the IPA rounds, `hprob4` for the `x₄` squeeze) stacked explicitly.
-   The runs are the `reprogramX4` reprogramming events (`Soundness.Forking.Rewind`, sealed by
-   `Forking.Ordering`); each run's accepting transcript inside `hprob4`'s event is that run's own
-   round-forking output (the codebase-wide floor, with the RO uniformity axiom, as everywhere);
-   `x4_cleanTree_of_deployedAccepts` feeds that per-run event from `DeployedAccepts`-level facts,
-   its fixed-`ps` caveat recorded on the lemma.
+   single-squeeze counting form of the forking floor), `deployedMultiopenRewind_of_x4Prob` for the raw
+   deployed statement, and — since the fork bridge opens the *adjusted* commitment
+   `deployedCommitment − pU•u − pW•w` — `openedX4Rewind_of_x4Prob` (`Soundness.Multiopen.Opened`) for
+   the fork's opened statement, the form deployed accepts actually feed
+   (`openedX4Accept_of_deployedAccepts`). The Vesta rung
+   `orchard_verifier_vesta_forking_constraint_deployed_x4` consumes the opened chain end-to-end, the
+   two rewinding floors (`hprob` for the IPA rounds, `hprob4` for the `x₄` squeeze) stacked
+   explicitly. The runs are the `reprogramX4` reprogramming events (`Soundness.Forking.Rewind`,
+   sealed by `Forking.Ordering`); each run's accepting transcript inside `hprob4`'s event is that
+   run's own round-forking output (the codebase-wide floor, with the RO uniformity axiom, as
+   everywhere); `x4_cleanTree_of_deployedAccepts` feeds that per-run event from
+   `DeployedAccepts`-level facts, its fixed-`ps` caveat recorded on the lemma.
 
 3. **The `x₁` layer — closed to the member commitments.** The within-set algebra is proven — each
    aggregate is an `x₁`-power batch of the member commitments the grouping routes to its set
@@ -83,9 +94,10 @@ record are now theorems, and the `x₁` layer beneath them is closed down to the
    permutation/lookup products, vanishing) — reconstructs the honest aggregate witness at `ch.x1`,
    and, composed with `DecodedColumnFamilyOfBatch.currentWitness_eq` for the `x₄` batch, exhibits the
    extracted witness as the explicit two-level (`x₄`-then-`x₁`) power combination of member-column
-   witnesses. The honest run sits inside every family by structure eta (`honestX1Run`); the per-run
-   aggregate witnesses are each run's own `x₄`-level decode (the same stacked floors, per run), the
-   hypothesis shape `hwC`/`hwu` carries.
+   witnesses — glued over all point sets by `deployed_witness_two_level`. The honest run sits
+   inside every family by structure eta (`honestX1Run`); the per-run aggregate witnesses are each
+   run's own `x₄`-level decode (the same stacked floors, per run), the hypothesis shape
+   `hwC`/`hwu` carries.
 
 **Delegated to the equivalence fingerprint — unchanged.** Per the principle raised in
 zcash/ironwood#21 (the `PermutationConstruction.lean:243` review thread, comment `r3493240277`:
@@ -99,8 +111,8 @@ member *commitments* and transports per-run set evaluations; tying those to the 
 per-point evaluations is the `r`-polynomial (`x₂`/`x₃`) content carried by the fingerprint, not
 re-proven here.
 
-Do **not** generalize the legacy raw endpoints
-(`orchard_verifier_vesta_opening_reduction`/`_constraint_reduction`), which stay compatibility-shaped.
+Do **not** generalize the free-decode endpoints (`orchard_verifier_vesta_constraint_of_forked` and
+the `legacy_orchard_verifier_vesta_forking_*` rungs), which stay compatibility-shaped.
 -/
 
 namespace Zcash.Snark
@@ -138,22 +150,6 @@ structure BatchOpeningsForWitness (urs : URS G) (b : Fin (2 ^ urs.k) → Fp) {nu
   value :
     ∀ r, commitGen b (batched r)
       = ∑ j : Fin numColumns, batchChallenge r ^ (j : ℕ) • columnEvals j
-
-/-- The exact multiopen-rewinding output the decoded-column capstone consumes, indexed by the accepting
-clean IPA transcript `t` it is rewound from.
-
-The index records the intended provenance but is not itself binding — no field constrains `witness` by
-`t`. The tie is enforced where the structure is consumed: the decoded capstones extract the transcript's
-own witness from `t`'s acceptance and either identify it with `witness` or return the
-`HasNontrivialRelation` branch (two distinct openings of the pinned `(P, b, v)` collide on `commit`,
-`hasNontrivialRelation_of_two_openings`). It is not a free function from arbitrary mathematical openings
-to columns. -/
-structure MultiopenRewindBatch (urs : URS G) (P : G) (b : Fin (2 ^ urs.k) → Fp) (v : Fp)
-    {numColumns : ℕ} (columnCommitments : Fin numColumns → G) (columnEvals : Fin numColumns → Fp)
-    (t : IpaTreeV Fp G urs.k) where
-  witness : Fin (2 ^ urs.k) → Fp
-  opens : IpaRelation urs P b v witness
-  batchOpenings : BatchOpeningsForWitness urs b columnCommitments columnEvals witness
 
 /-- Terminal form of the multiopen-rewinding output, for capstones whose forking ladder exposes only the
 final opened multiopen relation (post unshift/unblind). The `∀`-witness shape costs nothing beyond a

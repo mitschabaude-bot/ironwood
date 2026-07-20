@@ -11,9 +11,9 @@ import Zcash.Snark.Soundness.Multiopen.Decode
 development (`Multiopen/Decode.lean`, `Multiopen/Deployed.lean`, `Multiopen/DecodeFixture.lean`)
 was written against the *propositional* interface `HasNontrivialRelation` / `deployed_to_acceptV`.
 
-This module re-exposes that propositional interface on top of the structure-based API, ports the two
-small spine lemmas the decode proofs need (`Msm.eval_{zero,scale,add}` and
-`exists_injective_accepting_of_measure`), and states the decoded-column constraint bridges
+This module re-exposes that propositional interface on top of the structure-based API, ports the
+`Msm` evaluation spine lemmas the decode proofs need (`Msm.eval_{zero,scale,add}`), and states the
+decoded-column constraint bridges
 (`hasNontrivialRelation_of_two_openings`, `decoded_constraint_of_relation_and_batch`,
 `decoded_constraint_of_opening_or_relation`).
 -/
@@ -42,48 +42,6 @@ theorem eval_add {F G : Type*} [Field F] [AddCommGroup G] [Module F G]
   abel
 
 end Msm
-
-open scoped ENNReal in
-/-- **The single-squeeze forking count.** If one accepting challenge is in hand and the accept event's
-uniform measure beats `n / |α|`, then `n + 1` pairwise-distinct accepting challenges exist, with the given
-one in slot `0`. The one-challenge analogue of `extractable_of_prob` (there the event is a whole round
-*vector* and beating `kerr` forces the `(3,…,3)` tree; here beating `n/|α|` forces `n` rewound accepting
-values beside the current one) — the counting core of the multiopen `x₄` rewinding
-(`Soundness.Multiopen.Deployed`). -/
-theorem exists_injective_accepting_of_measure {α : Type*} [Fintype α] [DecidableEq α] [Nonempty α] {n : ℕ}
-    {acc : α → Prop} [DecidablePred acc] {x₀ : α} (hx₀ : acc x₀)
-    (hprob : (n : ℝ≥0∞) / Fintype.card α
-      < (PMF.uniformOfFintype α).toOuterMeasure (Finset.univ.filter acc)) :
-    ∃ ξ : Fin (n + 1) → α, Function.Injective ξ ∧ ξ 0 = x₀ ∧ ∀ r, acc (ξ r) := by
-  have hcard : n < (Finset.univ.filter acc).card := by
-    by_contra hle
-    push_neg at hle
-    have hmono : (PMF.uniformOfFintype α).toOuterMeasure (Finset.univ.filter acc)
-        ≤ (n : ℝ≥0∞) / Fintype.card α := by
-      rw [uniformOfFintype_toOuterMeasure_finset]
-      exact ENNReal.div_le_div_right (by exact_mod_cast hle) _
-    exact absurd hprob (not_lt.mpr hmono)
-  have hx₀mem : x₀ ∈ Finset.univ.filter acc := Finset.mem_filter.mpr ⟨Finset.mem_univ _, hx₀⟩
-  have herase : n ≤ ((Finset.univ.filter acc).erase x₀).card := by
-    rw [Finset.card_erase_of_mem hx₀mem]
-    omega
-  obtain ⟨S, hS, hScard⟩ := Finset.exists_subset_card_eq herase
-  let f : Fin n → α := fun i => (S.equivFin.symm (Fin.cast hScard.symm i) : α)
-  have hfinj : Function.Injective f := fun i j hij => by
-    have h1 := S.equivFin.symm.injective (Subtype.val_injective hij)
-    exact Fin.val_injective (by simpa using congrArg Fin.val h1)
-  have hfS : ∀ i, f i ∈ S := fun i => (S.equivFin.symm (Fin.cast hScard.symm i)).2
-  refine ⟨Fin.cons x₀ f, ?_, rfl, ?_⟩
-  · refine (Fin.cons_injective_iff).mpr ⟨?_, hfinj⟩
-    rintro ⟨i, hfi⟩
-    exact Finset.ne_of_mem_erase (hS (hfS i)) hfi
-  · intro r
-    cases r using Fin.cases with
-    | zero => simpa using hx₀
-    | succ i =>
-        have hmem := hS (hfS i)
-        have := Finset.mem_of_mem_erase hmem
-        simpa using (Finset.mem_filter.mp this).2
 
 section Binding
 
@@ -138,7 +96,7 @@ relation. This is the terminal constraint-side bridge used by the probability/AG
 checked on columns recovered from the verifier-opened multiopen relation, not through an arbitrary
 `decodeAdvice`/`decodeInstance` function. `hquot`/`hgood` are stated for the canonical decode
 `decodedCols hbatch` — the family this proof constructs — and are dischargeable only with `x` the opened
-point (see the `MultiopenDecode` scope section). -/
+point (see the scope section in the module docstring). -/
 theorem decoded_constraint_of_relation_and_batch {urs : URS G} {P : G}
     {b : Fin (2 ^ urs.k) → Fp} {v : Fp}
     {numColumns numAdvice numInstance : ℕ}
@@ -179,7 +137,10 @@ open Polynomial in
 /-- Lift an opening-or-DLR terminal capstone to the decoded-column constraint endpoint, provided the
 multiopen batch rewinding output is available for the final relation witness. Conditional interface: the
 batch family is assumed via `MultiopenRewindForRelation` (see its docstring), and `hquot`/`hgood` are
-stated for the canonical decode of the batch supplied at each relation witness. -/
+stated for the canonical decode of the batch supplied at each relation witness. Reduction-shaped:
+quantifying `hquot ∧ hgood` over every opening is jointly unsatisfiable once the commitment kernel is
+nontrivial (see the scope section of `Soundness.Multiopen.Decode`); the live capstones pin the
+witness. -/
 theorem decoded_constraint_of_opening_or_relation {urs : URS G} {P : G}
     {b : Fin (2 ^ urs.k) → Fp} {v : Fp}
     {numColumns numAdvice numInstance : ℕ}

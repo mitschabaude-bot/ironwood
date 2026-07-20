@@ -449,14 +449,13 @@ nontrivial `(g, U, W)` relation exists, then the accepting `x₄`-rewound run pe
 `deployedMultiopenRewind_of_x4Prob` from `DeployedAccepts`-level facts; a capstone consuming it splits
 classically on `HasNontrivialRelation` and short-circuits to the relation disjunct otherwise.
 
-Reconstruction note (fs-adversary base): the deployed fork now declares its `U`/`W` components
-(`ForkedTranscript.pU`/`pW`), and the IPA accept is stated on `ForkedTranscript.openedCommitment`
-(= `deployedCommitment` with the declared `pU • u + pW • w` removed) — matching
-`orchard_verifier_vesta_opening_of_forked`. The clean tree is therefore produced for
-`fs.openedCommitment`, not the raw `deployedCommitment` this lemma targeted before the U/W-opening
-refinement. Threading `openedCommitment` through the `x₄` rewinding chain
-(`deployedMultiopenRewind_of_x4Prob` and below) to reconnect it to the deployed capstones is the
-outstanding follow-on step for this branch.
+The fork declares its `U`/`W` components (`ForkedTranscript.pU`/`pW`) and the IPA accept is stated
+on `ForkedTranscript.openedCommitment` (= `deployedCommitment` with the declared `pU • u + pW • w`
+removed) — matching `orchard_verifier_vesta_opening_of_forked`. The clean tree is therefore
+produced for `fs.openedCommitment`, not the raw `deployedCommitment`; the opened chain
+(`Soundness.Multiopen.Opened`) consumes exactly this output: `openedX4Accept_of_deployedAccepts`
+packages it as the opened accept event, and `openedX4Rewind_of_x4Prob` produces the batch for the
+fork's opened statement.
 
 Quantifier-shape caveat: the fixed `ps` here is the constant strategy — its IPA fields open the
 honest collapse only — so a `DeployedAccepts` measure over rewound `ξ` runs fed through this lemma
@@ -855,7 +854,11 @@ it and the per-run value data). Then the canonical member decode
   run opens at its own `x₃`).
 
 Per-member claimed evaluations at the original rotated points and the gate/`x`→`x₃` transport remain
-the fingerprint-delegated half (`Soundness.Multiopen.Decode`, the deployed-status section). -/
+the fingerprint-delegated half (`Soundness.Multiopen.Decode`, the deployed-status section). Producing
+the per-run families from an `x₁` accept measure — the analogue of `openedX4Rewind_of_x4Prob` — is
+not yet built: on this base each run's aggregate witness arrives in augmented `(g, u, w)`
+representation (`Soundness.Multiopen.Opened`), so it needs an opened mirror of this lemma. The
+per-set decodes are glued into the full two-level combination by `deployed_witness_two_level`. -/
 theorem deployed_witness_member_binding [DecidableEq G] [Inhabited G] {shape : Shape}
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
@@ -904,6 +907,55 @@ theorem deployed_witness_member_binding [DecidableEq G] [Inhabited G] {shape : S
     exact x1DecodeCols_commit urs.g _ χ hχ w haC m
   · rw [← hwcur, ← hcur]
     exact x1DecodeCols_reconstruct χ hχ w cur
+
+open Classical in
+/-- **The two-level decode, composed over all point sets.** Given the honest `x₄` batch and, for
+each in-range batch position, an `x₁` member-decode family with the honest compression challenge in
+its current slot and the current witness pinned to the canonical `x₄`-decode coefficient, the
+extracted witness is the explicit two-level power combination: `x₄` powers over batch positions,
+each in-range position expanded as the `ch.x1` powers of its point set's decoded member witnesses,
+the top position keeping the `q′` coefficient. The member-opening facts for the decoded witnesses
+are `deployed_witness_member_binding`, per set; this theorem is the gluing. -/
+theorem deployed_witness_two_level [DecidableEq G] [Inhabited G] {shape : Shape}
+    (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
+    (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
+    {b : Fin (2 ^ urs.k) → Fp} {a : Fin (2 ^ urs.k) → Fp}
+    (hbatch : BatchOpeningsForWitness urs b (x4BatchCommitments urs hk vk ps ch)
+      (x4BatchEvals vk ps ch) a)
+    (χ : ∀ i : ℕ, Fin (deployedSetQueries vk ps ch i).length → Fp)
+    (hχ : ∀ i, Function.Injective (χ i))
+    (w : ∀ i : ℕ, Fin (deployedSetQueries vk ps ch i).length → (Fin (2 ^ urs.k) → Fp))
+    (cur : ∀ i : ℕ, Fin (deployedSetQueries vk ps ch i).length)
+    (hcur : ∀ i, χ i (cur i) = ch.x1)
+    (hwcur : ∀ i (hi : i < deployedX4PairCount vk ps ch),
+      w i (cur i) = (decodedCols_spec hbatch).decodedColumns.coeffs
+        ⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩) :
+    a = ∑ j : Fin (deployedX4PairCount vk ps ch + 1),
+      hbatch.batchChallenge hbatch.current ^ (j : ℕ) •
+        (if hj : (j : ℕ) < deployedX4PairCount vk ps ch then
+          ∑ m : Fin (deployedSetQueries vk ps ch
+              (deployedX4PairCount vk ps ch - 1 - (j : ℕ))).length,
+            ch.x1 ^ (m : ℕ) •
+              x1DecodeCols (χ (deployedX4PairCount vk ps ch - 1 - (j : ℕ)))
+                (w (deployedX4PairCount vk ps ch - 1 - (j : ℕ))) m
+        else (decodedCols_spec hbatch).decodedColumns.coeffs j) := by
+  refine ((decodedCols_spec hbatch).currentWitness_eq).trans ?_
+  refine Finset.sum_congr rfl fun j _ => ?_
+  refine congrArg (hbatch.batchChallenge hbatch.current ^ (j : ℕ) • ·) ?_
+  by_cases hj : (j : ℕ) < deployedX4PairCount vk ps ch
+  · rw [dif_pos hj]
+    set i := deployedX4PairCount vk ps ch - 1 - (j : ℕ) with hidef
+    have hi : i < deployedX4PairCount vk ps ch := by omega
+    have hji : (⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩ :
+        Fin (deployedX4PairCount vk ps ch + 1)) = j := by
+      apply Fin.ext
+      simp only [hidef]
+      omega
+    have hw' := hwcur i hi
+    rw [hji] at hw'
+    rw [← hw', ← hcur i]
+    exact x1DecodeCols_reconstruct (χ i) (hχ i) (w i) (cur i)
+  · rw [dif_neg hj]
 
 end Deployed
 
