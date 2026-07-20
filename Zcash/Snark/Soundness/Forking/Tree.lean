@@ -30,6 +30,144 @@ def Extractable [Zero α] : {d : ℕ} → ((Fin d → α) → Prop) → Prop
       Extractable (fun rest => acc (Fin.cons u₂ rest)) ∧
       Extractable (fun rest => acc (Fin.cons u₃ rest))
 
+/-! ## The round-by-round ladder
+
+`Extractable` doubles as a state function on challenge prefixes: a state is *doomed* when its
+continuation predicate is not extractable. A doomed state's escaping challenges — zero, or one
+whose continuation is extractable — number at most three, because three distinct nonzero escapes
+assemble the `Extractable` node. An accepted vector therefore either certifies extraction at the
+root or escapes doom at some round: the per-round structure the Fiat–Shamir query loss prices
+(`Soundness.Forking.Adversary`). -/
+
+/-- The drawn challenge vector escapes doom somewhere along the ladder: at some round the state so
+far is not extractable, yet the drawn challenge is zero or makes the continuation extractable. The
+per-round event the escape budget prices. -/
+def LadderEscape [Zero α] : {d : ℕ} → ((Fin d → α) → Prop) → (Fin d → α) → Prop
+  | 0, _, _ => False
+  | _ + 1, acc, χ =>
+      (¬ Extractable acc ∧ (χ 0 = 0 ∨ Extractable (fun rest => acc (Fin.cons (χ 0) rest))))
+      ∨ LadderEscape (fun rest => acc (Fin.cons (χ 0) rest)) (Fin.tail χ)
+
+/-- **The ladder walk.** An accepted challenge vector either certifies extraction outright — the
+whole accept predicate is extractable — or escapes doom at some round: acceptance is depth-`0`
+extractability, and a round with an extractable continuation either had an extractable state
+already or witnesses the escape. -/
+theorem extractable_or_ladderEscape [Zero α] :
+    {d : ℕ} → (acc : (Fin d → α) → Prop) → (χ : Fin d → α) → acc χ →
+    Extractable acc ∨ LadderEscape acc χ
+  | 0, acc, χ, h => Or.inl (by
+      have hχ : χ = Fin.elim0 := funext fun i => i.elim0
+      rwa [hχ] at h)
+  | d + 1, acc, χ, h => by
+      have hsub : (fun rest => acc (Fin.cons (χ 0) rest)) (Fin.tail χ) := by
+        show acc (Fin.cons (χ 0) (Fin.tail χ))
+        rw [Fin.cons_self_tail]
+        exact h
+      rcases extractable_or_ladderEscape (fun rest => acc (Fin.cons (χ 0) rest)) (Fin.tail χ)
+          hsub with hext | hesc
+      · by_cases hdoom : Extractable acc
+        · exact Or.inl hdoom
+        · exact Or.inr (Or.inl ⟨hdoom, Or.inr hext⟩)
+      · exact Or.inr (Or.inr hesc)
+
+/-- **The doomed state's escape set is three challenges at most.** When the state is not
+extractable, at most two distinct nonzero challenges have extractable continuations — a third
+would assemble the `Extractable` node — so with the zero challenge the escape set sits inside a
+three-element set. -/
+theorem escapeSet_subset_triple [Zero α] {d : ℕ} {acc : (Fin (d + 1) → α) → Prop}
+    (hdoom : ¬ Extractable acc) :
+    ∃ a b : α, {u : α | u = 0 ∨ Extractable (fun rest => acc (Fin.cons u rest))}
+      ⊆ {0, a, b} := by
+  classical
+  by_cases hne : ∃ a : α, a ≠ 0 ∧ Extractable (fun rest => acc (Fin.cons a rest))
+  · obtain ⟨a, ha0, haE⟩ := hne
+    by_cases hb : ∃ b : α, b ≠ 0 ∧ b ≠ a ∧ Extractable (fun rest => acc (Fin.cons b rest))
+    · obtain ⟨b, hb0, hba, hbE⟩ := hb
+      refine ⟨a, b, fun c hc => ?_⟩
+      rcases hc with hc | hc
+      · exact Or.inl hc
+      · by_cases hc0 : c = 0
+        · exact Or.inl hc0
+        · by_cases hca : c = a
+          · exact Or.inr (Or.inl hca)
+          · by_cases hcb : c = b
+            · exact Or.inr (Or.inr hcb)
+            · exact absurd (⟨c, a, b, hca, hcb, fun h => hba h.symm, hc0, ha0, hb0,
+                hc, haE, hbE⟩ : Extractable acc) hdoom
+    · refine ⟨a, a, fun c hc => ?_⟩
+      rcases hc with hc | hc
+      · exact Or.inl hc
+      · by_cases hc0 : c = 0
+        · exact Or.inl hc0
+        · by_cases hca : c = a
+          · exact Or.inr (Or.inl hca)
+          · exact absurd ⟨c, hc0, hca, hc⟩ hb
+  · refine ⟨0, 0, fun c hc => ?_⟩
+    rcases hc with hc | hc
+    · exact Or.inl hc
+    · by_cases hc0 : c = 0
+      · exact Or.inl hc0
+      · exact absurd ⟨c, hc0, hc⟩ hne
+
+open Classical in
+/-- The round-`j` escape set of the ladder: empty once the state is extractable, otherwise the
+doomed state's escaping challenges — zero, or one whose continuation is extractable. Indexed
+companion of `LadderEscape`; consumes the earlier challenges only (`ladderEscapeSet_congr`). -/
+def ladderEscapeSet [Zero α] : {d : ℕ} → ((Fin d → α) → Prop) → (Fin d → α) → ℕ → Set α
+  | 0, _, _, _ => ∅
+  | _ + 1, acc, _, 0 =>
+      if Extractable acc then ∅
+      else {u : α | u = 0 ∨ Extractable (fun rest => acc (Fin.cons u rest))}
+  | _ + 1, acc, χ, j + 1 => ladderEscapeSet (fun rest => acc (Fin.cons (χ 0) rest)) (Fin.tail χ) j
+
+open Classical in
+/-- The round-`j` escape set reads only the challenges before round `j`. -/
+theorem ladderEscapeSet_congr [Zero α] :
+    {d : ℕ} → (acc : (Fin d → α) → Prop) → (χ χ' : Fin d → α) → (j : ℕ) →
+    (∀ i : Fin d, (i : ℕ) < j → χ i = χ' i) →
+    ladderEscapeSet acc χ j = ladderEscapeSet acc χ' j
+  | 0, _, _, _, _, _ => rfl
+  | _ + 1, acc, χ, χ', 0, _ => rfl
+  | d + 1, acc, χ, χ', j + 1, h => by
+      have h0 : χ 0 = χ' 0 := h 0 (Nat.succ_pos j)
+      show ladderEscapeSet (fun rest => acc (Fin.cons (χ 0) rest)) (Fin.tail χ) j
+          = ladderEscapeSet (fun rest => acc (Fin.cons (χ' 0) rest)) (Fin.tail χ') j
+      rw [h0]
+      exact ladderEscapeSet_congr _ (Fin.tail χ) (Fin.tail χ') j
+        (fun i hi => h i.succ (by simp only [Fin.val_succ]; omega))
+
+/-- A ladder escape locates a round: some round's drawn challenge lies in that round's escape
+set. -/
+theorem exists_mem_ladderEscapeSet [Zero α] :
+    {d : ℕ} → (acc : (Fin d → α) → Prop) → (χ : Fin d → α) → LadderEscape acc χ →
+    ∃ j : Fin d, χ j ∈ ladderEscapeSet acc χ (j : ℕ)
+  | 0, _, _, h => absurd h not_false
+  | d + 1, acc, χ, h => by
+      rcases h with ⟨hdoom, hesc⟩ | h
+      · refine ⟨0, ?_⟩
+        show χ 0 ∈ ladderEscapeSet acc χ 0
+        simp only [ladderEscapeSet, if_neg hdoom]
+        exact hesc
+      · obtain ⟨j, hj⟩ := exists_mem_ladderEscapeSet
+          (fun rest => acc (Fin.cons (χ 0) rest)) (Fin.tail χ) h
+        exact ⟨j.succ, hj⟩
+
+open Classical in
+/-- Every round's escape set sits inside three challenges (`escapeSet_subset_triple` — empty once
+the state is extractable). -/
+theorem ladderEscapeSet_subset_triple [Zero α] :
+    {d : ℕ} → (acc : (Fin d → α) → Prop) → (χ : Fin d → α) → (j : ℕ) →
+    ∃ a b : α, ladderEscapeSet acc χ j ⊆ {0, a, b}
+  | 0, _, _, _ => ⟨0, 0, by simp [ladderEscapeSet]⟩
+  | d + 1, acc, χ, 0 => by
+      by_cases hext : Extractable acc
+      · exact ⟨0, 0, by simp only [ladderEscapeSet, if_pos hext]; exact Set.empty_subset _⟩
+      · obtain ⟨a, b, hab⟩ := escapeSet_subset_triple hext
+        exact ⟨a, b, by simp only [ladderEscapeSet, if_neg hext]; exact hab⟩
+  | d + 1, acc, χ, j + 1 =>
+      ladderEscapeSet_subset_triple (fun rest => acc (Fin.cons (χ 0) rest)) (Fin.tail χ) j
+
+
 /-- Split the accepting-vector count by the first challenge. -/
 theorem card_filter_eq_sum_slice [Fintype α] [DecidableEq α] {d : ℕ}
     (acc : (Fin (d + 1) → α) → Prop) [DecidablePred acc] :

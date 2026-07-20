@@ -112,6 +112,19 @@ inductive DForkCert (F G : Type*) : ℕ → Type _ where
   | node {d : ℕ} : G → G → F → F → F →
       DForkCert F G d → DForkCert F G d → DForkCert F G d → DForkCert F G (d + 1)
 
+/-- The number of accepting leaves stored in a forking certificate: `1` at a leaf, tripled at each
+round. This is the certificate's replay size, not the number of attempts used to find it. -/
+def DForkCert.treeRuns : {d : ℕ} → DForkCert F G d → ℕ
+  | 0, .leaf _ _ => 1
+  | _ + 1, .node _ _ _ _ _ c₁ c₂ c₃ => c₁.treeRuns + c₂.treeRuns + c₃.treeRuns
+
+/-- Every depth-`d` forking certificate stores exactly `3ᵈ` accepting leaves. -/
+theorem DForkCert.treeRuns_eq : {d : ℕ} → (c : DForkCert F G d) → c.treeRuns = 3 ^ d
+  | 0, .leaf _ _ => rfl
+  | _ + 1, .node _ _ _ _ _ c₁ c₂ c₃ => by
+      rw [DForkCert.treeRuns, c₁.treeRuns_eq, c₂.treeRuns_eq, c₃.treeRuns_eq]
+      ring
+
 /-- Every path in a fork certificate satisfies the deployed flat verifier equation. -/
 def DeployedForkValid : {d : ℕ} → (Fin (2 ^ d) → G) → (Fin (2 ^ d) → F) → (U W : G) → (z : F) → G →
     DForkCert F G d → Prop

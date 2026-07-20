@@ -31,19 +31,15 @@ conversion is exactly uniform. The real conversion has a negligible, unaccounted
 Thus the challenge distribution is proved inside the random-oracle model, while the model itself
 remains an assumption about Blake2b.
 
-## Remaining adversary model
+## Layer boundary
 
-A full reduction must model a forger that queries `O`, derive `hprob` from its advantage, and pay the
-random-oracle query loss. That adversary experiment is outside this PR. The fixed-proof endpoints
-measure one proof over all challenges; they do not yet measure a real Fiat–Shamir attack.
+This module defines the random-oracle model only. `Forking.Adversary` supplies the bounded-query
+forger, `Forking.Recursive` computes its fork certificate, and `Forking.Algebraic` carries the real
+attack event through the AGM reduction.
 
 `uniformChallenge_badSet` is used directly for the `1/p` blinding budget.
 
-Two scope notes, both part of that floor, not the derived uniformity:
-
-* Beating `kerr` proves that a witness exists; it does not implement an expected-polynomial-time
-  extractor.
-* The `z ≠ 0`, `ξ`-recovery, tree, and query-loss budgets are not yet combined into one bound.
+The remaining deployment assumption is that Blake2b behaves as this random oracle.
 -/
 
 namespace Zcash.Snark
