@@ -1,14 +1,16 @@
 import Zcash.Snark.Soundness.AGM.BindingSignature
 import Zcash.Snark.Soundness.AGM.Capstone
 import Zcash.Snark.Soundness.AGM.ProbabilityVesta
+import Zcash.Snark.Soundness.Forking.Algebraic
 import Mathlib.Util.AssertNoSorry
 
 /-!
 # AGM trust-boundary checks
 
-The definitions below compute representations, openings, or DL relations. They remain plain `def`s`,
-so they cannot select data with `Classical.choice`. `assert_no_sorry` and the guarded reports check
-their proof dependencies.
+The PR #28 kernels compute representations, openings, or DL relations as plain `def` values. The PR #56
+producer now computes the recursive fork certificate and checked deployed instance from explicit oracle and
+extractor coins. `assert_no_sorry` checks both layers, while the guarded reports pin the kernels' proof
+dependencies.
 -/
 
 open Zcash.Snark
@@ -43,6 +45,14 @@ assert_no_sorry OrchardUniformURSIdentification
 assert_no_sorry orchardGeneratorROSetup
 assert_no_sorry orchardGeneratorROBasis
 assert_no_sorry orchard_uniformURSIdentification_of_generatorRO
+assert_no_sorry recursiveAlgebraicForkFrom
+assert_no_sorry recursiveAlgebraicForkFrom_realizes
+assert_no_sorry algebraicForkCertAttempt
+assert_no_sorry algebraicForkCertAttempt_valid
+assert_no_sorry computedDeployedAlgebraicInstance
+assert_no_sorry computedAlgebraicInstanceFailure_measure_le
+assert_no_sorry ComputedAlgebraicFSFamily.binding_prob_le_of_textbookDL
+assert_no_sorry ComputedAlgebraicFSFamily.binding_prob_le_of_generatorRO_textbookDL
 assert_no_sorry Zcash.Security.BindingSignature.NontrivialRelation.toAlgebraicRelationWitness
 assert_no_sorry Zcash.Security.BindingSignature.NontrivialRelation.toDiscreteLog
 assert_no_sorry Zcash.Security.BindingSignature.orchardImbalanceToDiscreteLog

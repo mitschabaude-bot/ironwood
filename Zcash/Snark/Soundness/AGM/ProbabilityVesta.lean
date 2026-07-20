@@ -13,8 +13,8 @@ The reduction samples a basis as uniform scalar multiples of `B`.
 `orchard_uniformURSIdentification_of_generatorRO` proves this inside a uniform generator random-
 oracle model. Treating halo2's hash-to-curve as that oracle remains an assumption.
 
-The Fiat–Shamir layer must still produce `DeployedAlgebraicForkingInstance` values and relate its
-acceptance event to the relation event measured here.
+`Soundness.Forking.Algebraic` builds the basis-indexed instance family from the deployed bounded-query
+Fiat–Shamir adversary and identifies this relation event with its above-query-loss binding event.
 -/
 
 open scoped ENNReal
@@ -84,9 +84,7 @@ theorem orchard_deployed_relation_prob_le_of_textbookDL (k : ℕ) (B : VestaG)
       ≤ Fintype.card (AugmentedIndex (2 ^ k)) * bound :=
   relation_prob_le_of_textbookDL B (deployedAlgebraicRelationFinder instances) hDL
 
-/-- State the textbook-DL bound directly on the supplied instances' computed relation event.
-
-The Fiat–Shamir layer must show that its executions populate `instances`. -/
+/-- State the textbook-DL bound directly on the supplied instances' computed relation event. -/
 theorem orchard_deployed_relation_event_prob_le_of_textbookDL (k : ℕ) (B : VestaG)
     (instances : ∀ basis : AugmentedIndex (2 ^ k) → VestaG,
       Option (DeployedAlgebraicForkingInstance (G := VestaG) k basis))
