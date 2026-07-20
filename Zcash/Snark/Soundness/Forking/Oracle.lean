@@ -39,13 +39,15 @@ attack event through the AGM reduction.
 
 `uniformChallenge_badSet` is used directly for the `1/p` blinding budget.
 
-Two adversary-model boundaries are closed by lemmas rather than assumptions. An adversary free to
-hash transcripts outside the bounded game domain — and to use those answers as grinding
-randomness — restricts, junk table by junk table, to a bounded-domain adversary with the same
-query budget and the same average advantage (`fsWinsFull_restrictSum_le`,
-`Soundness.Forking.Adaptive`; instantiate the domain split along `Equiv.sumCompl`). A randomized
-adversary is the uniform mixture of its deterministic members, and the binding bound holds for the
-mixture whenever the DL hypothesis holds per member
+Three adversary-model boundaries are closed by lemmas rather than assumptions. An adversary over
+the *unbounded* transcript domain factors, table by table, through an equally-bounded adversary
+over a finite subdomain — its reachable queries and attainable game points are finite — and
+finite games are canonical under domain enlargement (`finite_domain_restriction`,
+`fsWinsFull_mapDomain_measure_eq`, `Soundness.Forking.DomainReduction`). An adversary free to
+hash junk points inside a finite enlargement — and to use those answers as grinding randomness —
+restricts, junk table by junk table, at the same query budget (`fsWinsFull_restrictSum_le`,
+`Soundness.Forking.Adaptive`). A randomized adversary is the uniform mixture of its deterministic
+members, and the binding bound holds for the mixture whenever the DL hypothesis holds per member
 (`ComputedAlgebraicFSFamilyRand.binding_prob_le_of_textbookDL_rand`,
 `Soundness.Forking.Algebraic`).
 
