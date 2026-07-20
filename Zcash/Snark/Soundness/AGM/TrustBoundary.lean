@@ -61,7 +61,12 @@ assert_no_sorry ComputedAlgebraicFSFamily.relationFinder_isSome_of_bindingWin
 assert_no_sorry ComputedAlgebraicFSFamily.snarkRelationFinder
 assert_no_sorry ComputedAlgebraicFSFamily.snarkRelation_prob_le_of_textbookDL
 assert_no_sorry ComputedAlgebraicFSFamily.acceptExtractionFailure_measure_le
+assert_no_sorry ComputedAlgebraicFSFamily.snarkNonRelationFailure
+assert_no_sorry ComputedAlgebraicFSFamily.snarkNonRelationFailure_measure_le
 assert_no_sorry ComputedAlgebraicFSFamily.snarkFailure_prob_le_of_textbookDL
+assert_no_sorry ComputedAlgebraicFSFamily.snarkFailure_prob_le_of_textbookDL_full
+assert_no_sorry ComputedAlgebraicFSFamily.snarkFailure_prob_le_of_uniformURS_textbookDL
+assert_no_sorry ComputedAlgebraicFSFamily.snarkFailure_prob_le_of_generatorRO_textbookDL
 assert_no_sorry ComputedAlgebraicFSFamily.binding_prob_le_of_textbookDL
 assert_no_sorry ComputedAlgebraicFSFamily.binding_prob_le_of_uniformURS_textbookDL
 assert_no_sorry ComputedAlgebraicFSFamily.binding_prob_le_of_generatorRO_textbookDL
@@ -70,9 +75,41 @@ assert_no_sorry OracleComp.restrictSum
 assert_no_sorry fsWinsFull_restrictSum_le
 assert_no_sorry ComputedAlgebraicFSFamilyRand.determinize
 assert_no_sorry ComputedAlgebraicFSFamilyRand.binding_prob_le_of_textbookDL_rand
+assert_no_sorry ComputedAlgebraicFSFamilyRand.snarkFailure_prob_le_of_textbookDL_rand
+assert_no_sorry ComputedAlgebraicFSFamily.snarkFailureEvent
 assert_no_sorry ComputedAlgebraicFSFamilyRand.foldedRelationFinder
 assert_no_sorry ComputedAlgebraicFSFamilyRand.binding_prob_le_of_foldedTextbookDL_rand
+assert_no_sorry ComputedAlgebraicFSFamilyRand.foldedSnarkRelationFinder
+assert_no_sorry ComputedAlgebraicFSFamilyRand.snarkFailure_prob_le_of_foldedTextbookDL_rand
+assert_no_sorry ComputedAlgebraicFSFamilyUnbounded.globalReachSet
+assert_no_sorry ComputedAlgebraicFSFamilyUnbounded.reachSet_subset_globalReachSet
+assert_no_sorry ComputedAlgebraicFSFamilyUnbounded.splitFamilyRand
+assert_no_sorry ComputedAlgebraicFSFamilyUnbounded.run_splitFamilyRand_adversary
+assert_no_sorry ComputedAlgebraicFSFamilyUnbounded.binding_prob_le_of_unbounded_foldedTextbookDL
+assert_no_sorry ComputedAlgebraicFSFamilyUnbounded.snarkFailure_prob_le_of_unbounded_foldedTextbookDL
+assert_no_sorry uniformURS_basis_transfer
+assert_no_sorry ComputedAlgebraicFSFamilyUnbounded.snarkFailureEventUnbounded
+assert_no_sorry ComputedAlgebraicFSFamilyUnbounded.snarkFailure_prob_le_of_unbounded_uniformURS_textbookDL
+assert_no_sorry ComputedAlgebraicFSFamilyUnbounded.snarkFailure_prob_le_of_unbounded_generatorRO_textbookDL
+assert_no_sorry ComputedAlgebraicFSFamilyUnbounded.bindingEventUnbounded
+assert_no_sorry ComputedAlgebraicFSFamilyUnbounded.binding_prob_le_of_unbounded_uniformURS_textbookDL
+assert_no_sorry ComputedAlgebraicFSFamilyUnbounded.binding_prob_le_of_unbounded_generatorRO_textbookDL
+assert_no_sorry ComputedAlgebraicFSFamilyUnboundedRand.determinize
+assert_no_sorry ComputedAlgebraicFSFamilyUnboundedRand.globalReachSet
+assert_no_sorry ComputedAlgebraicFSFamilyUnboundedRand.reachSet_subset_globalReachSet
+assert_no_sorry ComputedAlgebraicFSFamilyUnboundedRand.splitFamilyRand
+assert_no_sorry ComputedAlgebraicFSFamilyUnboundedRand.run_splitFamilyRand_adversary
+assert_no_sorry ComputedAlgebraicFSFamilyUnboundedRand.binding_prob_le_of_unboundedRand_foldedTextbookDL
+assert_no_sorry ComputedAlgebraicFSFamilyUnboundedRand.snarkFailure_prob_le_of_unboundedRand_foldedTextbookDL
+assert_no_sorry ComputedAlgebraicFSFamilyUnboundedRand.snarkFailureEventUnboundedRand
+assert_no_sorry ComputedAlgebraicFSFamilyUnboundedRand.snarkFailure_prob_le_of_unboundedRand_uniformURS_textbookDL
+assert_no_sorry ComputedAlgebraicFSFamilyUnboundedRand.snarkFailure_prob_le_of_unboundedRand_generatorRO_textbookDL
+assert_no_sorry ComputedAlgebraicFSFamilyUnboundedRand.bindingEventUnboundedRand
+assert_no_sorry ComputedAlgebraicFSFamilyUnboundedRand.binding_prob_le_of_unboundedRand_uniformURS_textbookDL
+assert_no_sorry ComputedAlgebraicFSFamilyUnboundedRand.binding_prob_le_of_unboundedRand_generatorRO_textbookDL
 assert_no_sorry recursiveAlgebraicForkFrom_node_runs_le
+assert_no_sorry recursiveAlgebraicFork_sum_runs_le_unconditional
+assert_no_sorry recursiveAlgebraicFork_oracle_tape_sum_runs_le_unconditional
 assert_no_sorry recursiveAlgebraicForkFrom_sum_runs_le_of_forkSpread
 assert_no_sorry recursiveAlgebraicFork_sum_runs_le_of_forkSpread
 assert_no_sorry AlgebraicPoint.point_eq_components
@@ -270,6 +307,73 @@ CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
 #guard_msgs (whitespace := lax) in
 #print axioms ComputedAlgebraicFSFamilyRand.binding_prob_le_of_foldedTextbookDL_rand
 
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamilyUnbounded.binding_prob_le_of_unbounded_foldedTextbookDL'
+depends on axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms
+  ComputedAlgebraicFSFamilyUnbounded.binding_prob_le_of_unbounded_foldedTextbookDL
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamilyRand.snarkFailure_prob_le_of_foldedTextbookDL_rand'
+depends on axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms ComputedAlgebraicFSFamilyRand.snarkFailure_prob_le_of_foldedTextbookDL_rand
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamilyUnbounded.snarkFailure_prob_le_of_unbounded_foldedTextbookDL'
+depends on axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms
+  ComputedAlgebraicFSFamilyUnbounded.snarkFailure_prob_le_of_unbounded_foldedTextbookDL
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamilyUnbounded.snarkFailure_prob_le_of_unbounded_generatorRO_textbookDL'
+depends on axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms
+  ComputedAlgebraicFSFamilyUnbounded.snarkFailure_prob_le_of_unbounded_generatorRO_textbookDL
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamilyUnbounded.binding_prob_le_of_unbounded_generatorRO_textbookDL'
+depends on axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms
+  ComputedAlgebraicFSFamilyUnbounded.binding_prob_le_of_unbounded_generatorRO_textbookDL
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamilyUnboundedRand.snarkFailure_prob_le_of_unboundedRand_generatorRO_textbookDL'
+depends on axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms
+  ComputedAlgebraicFSFamilyUnboundedRand.snarkFailure_prob_le_of_unboundedRand_generatorRO_textbookDL
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamilyUnboundedRand.binding_prob_le_of_unboundedRand_generatorRO_textbookDL'
+depends on axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms
+  ComputedAlgebraicFSFamilyUnboundedRand.binding_prob_le_of_unboundedRand_generatorRO_textbookDL
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamilyUnboundedRand.snarkFailure_prob_le_of_unboundedRand_uniformURS_textbookDL'
+depends on axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms
+  ComputedAlgebraicFSFamilyUnboundedRand.snarkFailure_prob_le_of_unboundedRand_uniformURS_textbookDL
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamilyUnboundedRand.binding_prob_le_of_unboundedRand_uniformURS_textbookDL'
+depends on axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms
+  ComputedAlgebraicFSFamilyUnboundedRand.binding_prob_le_of_unboundedRand_uniformURS_textbookDL
+
+
+/-- info: 'Zcash.Snark.recursiveAlgebraicFork_oracle_tape_sum_runs_le_unconditional' depends on
+axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs (whitespace := lax) in
+#print axioms recursiveAlgebraicFork_oracle_tape_sum_runs_le_unconditional
+
 /-- info: 'Zcash.Snark.recursiveAlgebraicFork_sum_runs_le_of_forkSpread' depends on axioms: [propext,
 Classical.choice, Quot.sound] -/
 #guard_msgs (whitespace := lax) in
@@ -302,3 +406,21 @@ axioms: [propext, Classical.choice, Quot.sound,
 CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
 #guard_msgs (whitespace := lax) in
 #print axioms ComputedAlgebraicFSFamily.snarkFailure_prob_le_of_textbookDL
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamily.snarkFailure_prob_le_of_textbookDL_full' depends on
+axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms ComputedAlgebraicFSFamily.snarkFailure_prob_le_of_textbookDL_full
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamily.snarkFailure_prob_le_of_generatorRO_textbookDL'
+depends on axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms ComputedAlgebraicFSFamily.snarkFailure_prob_le_of_generatorRO_textbookDL
+
+/-- info: 'Zcash.Snark.ComputedAlgebraicFSFamily.snarkNonRelationFailure_measure_le' depends on
+axioms: [propext, Classical.choice, Quot.sound,
+CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt._native.native_decide.ax_1_1] -/
+#guard_msgs (whitespace := lax) in
+#print axioms ComputedAlgebraicFSFamily.snarkNonRelationFailure_measure_le

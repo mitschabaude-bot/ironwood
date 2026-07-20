@@ -681,6 +681,49 @@ theorem recursiveAlgebraicFork_runs_le
   exact recursiveAlgebraicForkFrom_runs_le basis k A prefixes rounds final win decideWin
     (Fintype.card F) 0 (by omega) O (A.run O) tape.toCoins tape.toCoins_bounded
 
+open Classical in
+/-- **Unconditional expected-run bound.** Summing over the uniform complete extractor tape needs no
+fork-spread hypothesis: the deterministic bound applies to every tape.  After division by the tape
+cardinality this states `E[runs] ≤ (2·|F|+1)^k`. -/
+theorem recursiveAlgebraicFork_sum_runs_le_unconditional
+    (basis : ι → G) (k : ℕ)
+    (A : OracleComp T F P) (prefixes : P → Fin k → T)
+    (rounds : P → Fin k → AlgebraicPoint (F := F) basis × AlgebraicPoint (F := F) basis)
+    (final : P → F × F) (win : (T → F) → P → Prop)
+    (decideWin : ∀ O p, Decidable (win O p)) [Fintype F]
+    (O : T → F) :
+    ∑ tape : RecursiveForkTape F k,
+        (recursiveAlgebraicFork basis k A prefixes rounds final win decideWin
+          O tape.toCoins).runs
+      ≤ (2 * Fintype.card F + 1) ^ k * Fintype.card (RecursiveForkTape F k) := by
+  calc
+    _ ≤ ∑ _tape : RecursiveForkTape F k, (2 * Fintype.card F + 1) ^ k :=
+      Finset.sum_le_sum (fun tape _ =>
+        recursiveAlgebraicFork_runs_le basis k A prefixes rounds final win decideWin O tape)
+    _ = _ := by rw [Finset.sum_const, Finset.card_univ, smul_eq_mul, Nat.mul_comm]
+
+open Classical in
+/-- The same unconditional expectation bound with both the finite random-oracle table and extractor
+tape sampled uniformly.  This is the operational coin space used by the computed reduction. -/
+theorem recursiveAlgebraicFork_oracle_tape_sum_runs_le_unconditional [Fintype T]
+    (basis : ι → G) (k : ℕ)
+    (A : OracleComp T F P) (prefixes : P → Fin k → T)
+    (rounds : P → Fin k → AlgebraicPoint (F := F) basis × AlgebraicPoint (F := F) basis)
+    (final : P → F × F) (win : (T → F) → P → Prop)
+    (decideWin : ∀ O p, Decidable (win O p)) [Fintype F] :
+    ∑ coins : (T → F) × RecursiveForkTape F k,
+        (recursiveAlgebraicFork basis k A prefixes rounds final win decideWin
+          coins.1 coins.2.toCoins).runs
+      ≤ (2 * Fintype.card F + 1) ^ k *
+        Fintype.card ((T → F) × RecursiveForkTape F k) := by
+  calc
+    _ ≤ ∑ _coins : (T → F) × RecursiveForkTape F k,
+          (2 * Fintype.card F + 1) ^ k :=
+      Finset.sum_le_sum (fun coins _ =>
+        recursiveAlgebraicFork_runs_le basis k A prefixes rounds final win decideWin
+          coins.1 coins.2)
+    _ = _ := by rw [Finset.sum_const, Finset.card_univ, smul_eq_mul, Nat.mul_comm]
+
 /-- Every natural number is bounded by the power of two with the same exponent. -/
 private theorem nat_le_two_pow (n : ℕ) : n ≤ 2 ^ n := by
   induction n with
@@ -690,10 +733,11 @@ private theorem nat_le_two_pow (n : ℕ) : n ≤ 2 ^ n := by
       have hone : 1 ≤ 2 ^ n := one_le_pow₀ (by omega)
       omega
 
-/-- Rewrites the finite worst-case bound as a polynomial in `2^k` for a fixed challenge field.
-This is a totality result, not an efficiency result: its exponent is `2·|Fp| + 1`. The efficient
-expected-run bound in `ExpectedRuns` assumes fork spread; pricing the sparse grinding slice remains
-open, so `TextbookDLWithCoinsAdvantageLE` is still interpreted under that condition. -/
+/-- Rewrites the unconditional worst-case bound as a polynomial in the instance size `2^k` for a
+fixed challenge field, with exponent `2·|F|+1`.  This intentionally records the exponential-in-`k`
+extractor selected by the model.  `ExpectedRuns` separately proves a much sharper conditional bound
+under fork spread; that optimization is not needed for totality or the unconditional expectation
+theorems above. -/
 theorem recursiveAlgebraicFork_runs_le_instance_pow
     (basis : ι → G) (k : ℕ)
     (A : OracleComp T F P) (prefixes : P → Fin k → T)

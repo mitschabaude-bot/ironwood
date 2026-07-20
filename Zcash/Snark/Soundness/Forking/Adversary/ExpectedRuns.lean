@@ -11,20 +11,18 @@ The proof counts finite tapes exactly. `card_scanRank_lt_mul_le` bounds how many
 the second success, `sum_eval_pi` marginalizes independent child tapes, and `paidList` matches the
 two scans in `nextForkChallenge`.
 
-## Accepted efficiency floor
+## Optional sharper bound
 
-Fork spread is an *efficiency* assumption on the extractor, not a soundness one. It bounds the
-extractor's expected run count — how many times the reduction re-runs the adversary (the `.runs`
-counter), not Lean execution time — so that discrete-log extraction is expected-polynomial-time.
-Every soundness and probability bound in the stack holds with no fork-spread hypothesis.
+Fork spread is an *optional efficiency condition*, not a soundness assumption.  This file bounds
+the extractor's expected run count — how many times the reduction re-runs the adversary (the `.runs`
+counter), not Lean execution time — by a substantially smaller expression when every reachable node
+has many successful continuations.
 
-It does, though, gate the *computational* reading: the `TextbookDLWithCoinsAdvantageLE` premise can
-be discharged from standard discrete-log hardness only once the reduction is efficient, since that
-hardness bounds only efficient reductions. Without fork spread the run count stays finite but
-worst-case exponential (`recursiveAlgebraicForkFrom_runs_le`, `(2n+1)^k`), so the premise has no
-standard-hardness witness. Removing the condition is the Attema–Fehr–Klooß grinding step — a sparse
-node is expensive to scan but reached with matching rarity, so expected work stays polynomial — a
-known, self-contained development accepted here as a boundary rather than derived.
+The selected baseline extractor is intentionally exponential in the round count.  Its unconditional
+pointwise and uniform oracle-and-tape expectation bounds are proved in `Recursive` by
+`recursiveAlgebraicFork_runs_le` and
+`recursiveAlgebraicFork_oracle_tape_sum_runs_le_unconditional`; neither uses fork spread.  Thus this
+module supplies an optimization theorem rather than an accepted proof boundary.
 -/
 
 namespace Zcash.Snark

@@ -41,11 +41,12 @@ This layer is sound relative to the following, each kept explicit rather than hi
   ownership, value balance, nullifiers) is a separate workstream; this layer proves the verifier sound
   relative to the given VK, ending at "the witness satisfies the VK's constraint system."
 
-Extractor efficiency is a separate boundary, not a soundness assumption: the forking extractor's
-expected-polynomial run count rests on *fork spread* (`Forking.Adversary.ExpectedRuns`), a condition
-on the reduction's cost, not on whether extraction succeeds. The soundness bounds above do not use
-it, but discharging their discrete-log premise from *standard* (efficient-adversary) hardness does —
-the reduction must be proven efficient first.
+The selected forking extractor is exponential in the round count: unconditionally, every run and
+the uniform oracle-and-tape expectation are at most `(2·|F|+1)^k`
+(`recursiveAlgebraicFork_oracle_tape_sum_runs_le_unconditional`).  For the fixed challenge field this
+is also expressed as a polynomial in the instance size `2^k`, with a field-sized exponent.
+`Forking.Adversary.ExpectedRuns` supplies an optional sharper bound under *fork spread*; no
+fork-spread premise occurs in the baseline runtime or soundness theorems.
 
 ## For human review
 Check that `SnarkRelation` is the intended relation, that the four assumptions above are the right ones
