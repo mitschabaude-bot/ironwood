@@ -57,6 +57,8 @@ import Zcash.Snark.Soundness.Main
 -- the `x₄` multiopen rewinding (`Multiopen.Deployed`), the opened chain threading the fork's declared
 -- `U`/`W` components through the batch decode (`Multiopen.Opened`), and the discharge fixtures
 -- (`Multiopen.DecodeFixture`).
+-- Schwartz–Zippel good-challenge budgets and production (kills `hgood` at the `_xgood` rungs).
+import Zcash.Snark.Soundness.GoodChallenge
 import Zcash.Snark.Soundness.Multiopen.Decode
 import Zcash.Snark.Soundness.Multiopen.Compat
 import Zcash.Snark.Soundness.Multiopen.Deployed

@@ -93,6 +93,53 @@ polynomials at `x`. `Expr.toPoly` lifts a gate to the corresponding univariate p
 value is a polynomial evaluation — the `numerator` of `quotientCheck` — connecting
 `quotientCheck_sound` to the actual Orchard gates. -/
 
+
+/-- The Schwartz–Zippel bad set of a use site: the roots of the difference polynomial `C`. A
+challenge is *good* for `C` when it avoids this set — for `C = 0` (the identity holds as
+polynomials) nothing is excluded, and otherwise exactly the `≤ natDegree C` roots are. -/
+noncomputable def szBadSet (C : Polynomial Fp) : Finset Fp := C.roots.toFinset
+
+/-- Membership in the bad set: `x` is bad for `C` exactly when the identity fails (`C ≠ 0`) and `x`
+fails to witness it (`C.eval x = 0`). -/
+theorem mem_szBadSet {C : Polynomial Fp} {x : Fp} :
+    x ∈ szBadSet C ↔ C ≠ 0 ∧ C.eval x = 0 := by
+  simp [szBadSet, Polynomial.mem_roots']
+
+/-- **The good-challenge condition, derived from bad-set avoidance.** `x ∉ szBadSet C` is exactly
+the `hgood` shape the constraint layer consumes: if the identity fails as polynomials, the
+challenge evaluation does not vanish. -/
+theorem not_mem_szBadSet {C : Polynomial Fp} {x : Fp} :
+    x ∉ szBadSet C ↔ (C ≠ 0 → C.eval x ≠ 0) := by
+  rw [mem_szBadSet, not_and]
+
+/-- **Root counting: the bad set is small.** One Schwartz–Zippel use site over `F_p` excludes at
+most `natDegree C` challenges — the `d` of the `d / p` budget (`uniformChallenge_szBadSet` in
+`Zcash.Snark.Soundness.GoodChallenge`). -/
+theorem szBadSet_card_le (C : Polynomial Fp) : (szBadSet C).card ≤ C.natDegree :=
+  le_trans (Multiset.toFinset_card_le _) (Polynomial.card_roots' C)
+
+/-- The concrete degree bound at the vanishing-check site: the bad set of the constraint difference
+`numerator − h · (Xⁿ − 1)` has at most `max (deg numerator) (deg h + n)` elements — the explicit
+`d` for the quotient identity's Schwartz–Zippel use. -/
+theorem szBadSet_quotient_card_le (numerator h : Polynomial Fp) (n : ℕ) :
+    (szBadSet (numerator - h * (X ^ n - 1))).card
+      ≤ max numerator.natDegree (h.natDegree + n) := by
+  refine (szBadSet_card_le _).trans ((Polynomial.natDegree_sub_le _ _).trans ?_)
+  refine max_le_max le_rfl (Polynomial.natDegree_mul_le.trans (Nat.add_le_add_left ?_ _))
+  exact (Polynomial.natDegree_sub_le _ _).trans (by simp)
+
+/-- When the identity fails, the accepting challenges are exactly the bad set: the verifier's check
+passes at `x` iff `x` is a root of the constraint difference. This is the set `quotientCheck_sound`
+counts and `Zcash.Snark.Soundness.GoodChallenge` measures. -/
+theorem quotientCheck_filter_eq_szBadSet (numerator h : Polynomial Fp) (n : ℕ)
+    (hne : numerator ≠ h * (X ^ n - 1)) :
+    (univ.filter fun x => quotientCheck numerator h n x)
+      = szBadSet (numerator - h * (X ^ n - 1)) := by
+  ext x
+  simp only [mem_filter, mem_univ, true_and, mem_szBadSet, sub_ne_zero, quotientCheck,
+    eval_sub, eval_mul, eval_pow, eval_X, eval_one, sub_eq_zero]
+  exact ⟨fun hx => ⟨hne, hx⟩, fun hx => hx.2⟩
+
 /-- Lift a gate `Expr` to a univariate polynomial, replacing each query with its column polynomial. -/
 noncomputable def Expr.toPoly (fixedCols adviceCols instanceCols : ℕ → Polynomial Fp) :
     Expr Fp → Polynomial Fp

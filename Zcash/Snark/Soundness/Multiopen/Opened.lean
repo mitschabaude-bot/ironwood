@@ -3,6 +3,7 @@ import Zcash.Snark.Soundness.Main
 import Zcash.Snark.Soundness.Multiopen.Decode
 import Zcash.Snark.Soundness.Multiopen.Deployed
 import Zcash.Snark.Soundness.Multiopen.Compat
+import Zcash.Snark.Soundness.GoodChallenge
 
 /-!
 # The opened `x₄` chain: batch decode through the declared `U`/`W` components
@@ -958,6 +959,70 @@ theorem member_constraint_of_relation_and_batch [DecidableEq G] [Inhabited G] {s
       batchOpenings := pbatch
       memberDecode := mdec
       satisfiesCircuit := hsat }
+
+
+open Polynomial in
+open scoped ENNReal in
+open Classical in
+set_option maxHeartbeats 1000000 in
+/-- The member-column endpoint with the good challenge *derived*, not assumed: the fixed gate-check
+point `x` and its `hgood` are replaced by an accept event `accX` whose uniform measure beats the
+vanishing-check budget `max (deg numerator) (deg hpoly + deg) / p`; the good challenge is produced
+at the pinned member decode by `exists_accepting_good_challenge_quotient`
+(`Soundness.GoodChallenge`), so `hgood` is gone from this signature. The measure hypothesis carries
+the random-oracle uniformity axiom (`Soundness.Forking.Oracle`). -/
+theorem member_constraint_of_relation_and_batch_xgood [DecidableEq G] [Inhabited G] {shape : Shape}
+    (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
+    (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
+    {P : G} {b : Fin (2 ^ urs.k) → Fp} {v : Fp}
+    {numAdvice numInstance : ℕ}
+    (adviceSet : Fin numAdvice → ℕ)
+    (hadviceSet : ∀ j, adviceSet j < deployedX4PairCount vk ps ch)
+    (adviceMem : ∀ j : Fin numAdvice, Fin (deployedSetQueries vk ps ch (adviceSet j)).length)
+    (instanceSet : Fin numInstance → ℕ)
+    (hinstanceSet : ∀ j, instanceSet j < deployedX4PairCount vk ps ch)
+    (instanceMem : ∀ j : Fin numInstance,
+      Fin (deployedSetQueries vk ps ch (instanceSet j)).length)
+    (fixedCols : ℕ → Polynomial Fp) (y : Fp) {ng : ℕ} (gates : Fin ng → Expr Fp)
+    (hpoly : Polynomial Fp) (deg : ℕ)
+    (accX : Fp → Prop) [DecidablePred accX]
+    {pU pW : Fp} {a : Fin (2 ^ urs.k) → Fp}
+    (hrel : IpaRelation urs P b v a)
+    (pbatch : OpenedBatchOpenings urs b (x4BatchCommitments urs hk vk ps ch)
+      (x4BatchEvals vk ps ch) a pU pW)
+    (mdec : ∀ i (hi : i < deployedX4PairCount vk ps ch),
+      OpenedMemberDecode urs hk vk ps ch pbatch i hi)
+    (hquot : ∀ xv, accX xv → quotientCheck
+      (combineGates fixedCols
+        (finFn fun j : Fin numAdvice =>
+          coeffsToPoly ((mdec (adviceSet j) (hadviceSet j)).cols (adviceMem j)))
+        (finFn fun j : Fin numInstance =>
+          coeffsToPoly ((mdec (instanceSet j) (hinstanceSet j)).cols (instanceMem j)))
+        y gates) hpoly deg xv)
+    (hprobX : ((max (combineGates fixedCols
+        (finFn fun j : Fin numAdvice =>
+          coeffsToPoly ((mdec (adviceSet j) (hadviceSet j)).cols (adviceMem j)))
+        (finFn fun j : Fin numInstance =>
+          coeffsToPoly ((mdec (instanceSet j) (hinstanceSet j)).cols (instanceMem j)))
+        y gates).natDegree (hpoly.natDegree + deg) : ℕ) : ℝ≥0∞)
+        / (Fintype.card Fp : ℝ≥0∞)
+      < uniformChallenge.toOuterMeasure (Finset.univ.filter accX))
+    {S : Prop}
+    (hencodes : ∀ a,
+      SnarkRelationWithMemberColumns urs hk vk ps ch P b v adviceSet hadviceSet adviceMem
+        instanceSet hinstanceSet instanceMem fixedCols y gates hpoly deg pU pW a → S) :
+    S := by
+  obtain ⟨xg, haccX, hxg⟩ := exists_accepting_good_challenge_quotient
+    (combineGates fixedCols
+        (finFn fun j : Fin numAdvice =>
+          coeffsToPoly ((mdec (adviceSet j) (hadviceSet j)).cols (adviceMem j)))
+        (finFn fun j : Fin numInstance =>
+          coeffsToPoly ((mdec (instanceSet j) (hinstanceSet j)).cols (instanceMem j)))
+        y gates) hpoly deg hprobX
+  exact member_constraint_of_relation_and_batch urs hk vk ps ch adviceSet hadviceSet adviceMem
+    instanceSet hinstanceSet instanceMem fixedCols y gates hpoly deg xg hrel pbatch mdec
+    (hquot xg haccX)
+    (fun hne => not_mem_szBadSet.mp hxg (sub_ne_zero.mpr hne)) hencodes
 
 end Opened
 
