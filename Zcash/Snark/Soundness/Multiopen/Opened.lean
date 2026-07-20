@@ -43,7 +43,7 @@ lives in the augmented basis — a collision computes a `NontrivialRelation` amo
 
 The `x₁` layer continues the chain to the member commitments: each `x₁`-rewound run's aggregate
 witness arrives in this same augmented representation, so `opened_witness_member_binding` mirrors
-the plain member binding with componentwise decode, and `openedMemberBinding_of_x1Prob` produces
+the plain member binding with componentwise decode, and `openedMemberDecode_of_x1Prob` produces
 its inputs from the `x₁` accept measure (`OpenedX1Accept` — each run carrying its own opened `x₄`
 batch, the stacked floors explicit). The per-set gluing is `deployed_witness_two_level`
 (`Soundness.Multiopen.Deployed`). What remains fingerprint-delegated: the per-member claimed
@@ -684,6 +684,38 @@ def OpenedX1Accept [DecidableEq G] [Inhabited G] {shape : Shape} (urs : URS G)
       (x4BatchCommitments urs hk vk (run.spliced ps) (run.challenges ch χv))
       (x4BatchEvals vk (run.spliced ps) (run.challenges ch χv)) aR pUR pWR)
 
+-- The member-index types carry `deployedSetQueries`-shaped lengths, so defeq checks are heavy;
+-- the budget below covers them (as on the producer).
+set_option maxHeartbeats 1000000 in
+/-- The decoded member triples for point set `i`: each opens its member commitment — an actual
+queried column commitment — in augmented form, and the honest opened `x₄`-decode triple at set
+`i`'s batch position is the `ch.x1`-power combination of the decoded triples. Produced from the
+`x₁` accept measure by `openedMemberDecode_of_x1Prob`; consumed by the member-column constraint
+endpoint. -/
+structure OpenedMemberDecode [DecidableEq G] [Inhabited G] {shape : Shape}
+    (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
+    (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
+    {b : Fin (2 ^ urs.k) → Fp} {a : Fin (2 ^ urs.k) → Fp} {pU pW : Fp}
+    (pbatch : OpenedBatchOpenings urs b (x4BatchCommitments urs hk vk ps ch)
+      (x4BatchEvals vk ps ch) a pU pW)
+    (i : ℕ) (hi : i < deployedX4PairCount vk ps ch) where
+  cols : Fin (deployedSetQueries vk ps ch i).length → (Fin (2 ^ urs.k) → Fp)
+  uComp : Fin (deployedSetQueries vk ps ch i).length → Fp
+  wComp : Fin (deployedSetQueries vk ps ch i).length → Fp
+  commitment : ∀ m : Fin (deployedSetQueries vk ps ch i).length,
+    commit urs (cols m) + uComp m • urs.u + wComp m • urs.w
+      = ((deployedSetQueries vk ps ch i).getD (m : ℕ) (.point 0, [])).1.eval
+          ⟨shape.k, hk ▸ urs.g, urs.w, urs.u⟩
+  reconstruct :
+    (openedColumnDecode pbatch).coeffs ⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩
+      = ∑ m : Fin (deployedSetQueries vk ps ch i).length, ch.x1 ^ (m : ℕ) • cols m
+  reconstructU :
+    (openedColumnDecode pbatch).uComp ⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩
+      = ∑ m : Fin (deployedSetQueries vk ps ch i).length, ch.x1 ^ (m : ℕ) • uComp m
+  reconstructW :
+    (openedColumnDecode pbatch).wComp ⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩
+      = ∑ m : Fin (deployedSetQueries vk ps ch i).length, ch.x1 ^ (m : ℕ) • wComp m
+
 open scoped ENNReal in
 open Classical in
 -- The member-index types carry `deployedSetQueries`-shaped lengths, so defeq checks are heavy;
@@ -697,7 +729,7 @@ produced, not assumed: each rewound run's aggregate witness is its own opened `x
 honest slot is rebuilt from the honest batch. The measure hypothesis carries the same random-oracle
 uniformity axiom as every `hprob` (`Soundness.Forking.Oracle`); the runs are the `reprogramX1`
 reprogramming events (`Soundness.Forking.Rewind`) on the spliced strings. -/
-theorem openedMemberBinding_of_x1Prob [DecidableEq G] [Inhabited G] {shape : Shape}
+noncomputable def openedMemberDecode_of_x1Prob [DecidableEq G] [Inhabited G] {shape : Shape}
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
     {b : Fin (2 ^ urs.k) → Fp} {a : Fin (2 ^ urs.k) → Fp} {pU pW : Fp}
@@ -708,25 +740,19 @@ theorem openedMemberBinding_of_x1Prob [DecidableEq G] [Inhabited G] {shape : Sha
     (hprob1 : (((deployedSetQueries vk ps ch i).length - 1 : ℕ) : ℝ≥0∞) / Fintype.card Fp
       < (PMF.uniformOfFintype Fp).toOuterMeasure (Finset.univ.filter
           (OpenedX1Accept urs hk vk ps ch))) :
-    ∃ (colsM : Fin (deployedSetQueries vk ps ch i).length → (Fin (2 ^ urs.k) → Fp))
-      (uM wM : Fin (deployedSetQueries vk ps ch i).length → Fp),
-      (∀ m : Fin (deployedSetQueries vk ps ch i).length,
-        commit urs (colsM m) + uM m • urs.u + wM m • urs.w
-          = ((deployedSetQueries vk ps ch i).getD (m : ℕ) (.point 0, [])).1.eval
-              ⟨shape.k, hk ▸ urs.g, urs.w, urs.u⟩)
-      ∧ ((openedColumnDecode pbatch).coeffs ⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩
-          = ∑ m : Fin (deployedSetQueries vk ps ch i).length, ch.x1 ^ (m : ℕ) • colsM m)
-      ∧ ((openedColumnDecode pbatch).uComp ⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩
-          = ∑ m : Fin (deployedSetQueries vk ps ch i).length, ch.x1 ^ (m : ℕ) • uM m)
-      ∧ ((openedColumnDecode pbatch).wComp ⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩
-          = ∑ m : Fin (deployedSetQueries vk ps ch i).length, ch.x1 ^ (m : ℕ) • wM m) := by
+    OpenedMemberDecode urs hk vk ps ch pbatch i hi := by
   classical
   have hcast : (deployedSetQueries vk ps ch i).length - 1 + 1
       = (deployedSetQueries vk ps ch i).length := Nat.succ_pred_eq_of_pos hlen
   have hx₁ : OpenedX1Accept urs hk vk ps ch ch.x1 :=
     ⟨honestX1Run ps ch, b, a, pU, pW, ⟨pbatch⟩⟩
-  obtain ⟨ξ₀, hξinj₀, hξzero₀, hacc₀⟩ := exists_injective_accepting_of_measure
+  have hex := exists_injective_accepting_of_measure
     (acc := OpenedX1Accept urs hk vk ps ch) (x₀ := ch.x1) hx₁ hprob1
+  set ξ₀ := Classical.choose hex with hξ₀def
+  have hspec := Classical.choose_spec hex
+  have hξinj₀ : Function.Injective ξ₀ := hspec.1
+  have hξzero₀ : ξ₀ 0 = ch.x1 := hspec.2.1
+  have hacc₀ : ∀ r, OpenedX1Accept urs hk vk ps ch (ξ₀ r) := hspec.2.2
   -- Recast the rewound family to the member index type and pin the honest slot.
   set χ : Fin (deployedSetQueries vk ps ch i).length → Fp :=
     fun m => ξ₀ (Fin.cast hcast.symm m) with hχdef
@@ -821,8 +847,117 @@ theorem openedMemberBinding_of_x1Prob [DecidableEq G] [Inhabited G] {shape : Sha
     (by rw [hwdef]; exact Function.update_self ..)
     (by rw [hwUdef]; exact Function.update_self ..)
     (by rw [hwWdef]; exact Function.update_self ..)
-  exact ⟨x1DecodeCols χ w', x1DecodeComp χ wU', x1DecodeComp χ wW',
-    hmb.1, hmb.2.1, hmb.2.2.1, hmb.2.2.2.1⟩
+  exact
+    { cols := x1DecodeCols χ w'
+      uComp := x1DecodeComp χ wU'
+      wComp := x1DecodeComp χ wW'
+      commitment := hmb.1
+      reconstruct := hmb.2.1
+      reconstructU := hmb.2.2.1
+      reconstructW := hmb.2.2.2.1 }
+
+
+/-! ## The member-column constraint endpoint -/
+
+open Polynomial in
+set_option maxHeartbeats 1000000 in
+/-- The SNARK relation with the circuit side fed by decoded *member* columns — the actual queried
+column commitments' openings, selected per advice/instance index from their point sets. The witness
+chain is carried in full: `a` opens the statement, the opened `x₄` batch contains it, and each
+in-range batch position's decode triple is the `ch.x1`-power combination of its set's member
+triples, each opening its member commitment in augmented form. The gate check runs on the member
+polynomials. -/
+structure SnarkRelationWithMemberColumns [DecidableEq G] [Inhabited G] {shape : Shape}
+    (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
+    (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
+    (P : G) (b : Fin (2 ^ urs.k) → Fp) (v : Fp)
+    {numAdvice numInstance : ℕ}
+    (adviceSet : Fin numAdvice → ℕ)
+    (hadviceSet : ∀ j, adviceSet j < deployedX4PairCount vk ps ch)
+    (adviceMem : ∀ j : Fin numAdvice, Fin (deployedSetQueries vk ps ch (adviceSet j)).length)
+    (instanceSet : Fin numInstance → ℕ)
+    (hinstanceSet : ∀ j, instanceSet j < deployedX4PairCount vk ps ch)
+    (instanceMem : ∀ j : Fin numInstance,
+      Fin (deployedSetQueries vk ps ch (instanceSet j)).length)
+    (fixedCols : ℕ → Polynomial Fp) (y : Fp) {ng : ℕ} (gates : Fin ng → Expr Fp)
+    (hpoly : Polynomial Fp) (deg : ℕ) (pU pW : Fp)
+    (a : Fin (2 ^ urs.k) → Fp) where
+  opens : IpaRelation urs P b v a
+  batchOpenings : OpenedBatchOpenings urs b (x4BatchCommitments urs hk vk ps ch)
+    (x4BatchEvals vk ps ch) a pU pW
+  memberDecode : ∀ i (hi : i < deployedX4PairCount vk ps ch),
+    OpenedMemberDecode urs hk vk ps ch batchOpenings i hi
+  satisfiesCircuit :
+    circuitSatViaGates fixedCols
+      (fun _ => finFn fun j : Fin numAdvice =>
+        coeffsToPoly ((memberDecode (adviceSet j) (hadviceSet j)).cols (adviceMem j)))
+      (fun _ => finFn fun j : Fin numInstance =>
+        coeffsToPoly ((memberDecode (instanceSet j) (hinstanceSet j)).cols (instanceMem j)))
+      y gates hpoly deg a
+
+open Polynomial in
+set_option maxHeartbeats 1000000 in
+/-- Turn a final opened relation, its batch family, and per-set member decodes into the
+member-column SNARK relation: the gate check is stated once, on the member polynomials of the
+supplied decodes — the satisfiable pinned shape. Its truth for the deployed verifier — the claimed
+evaluations at the rotated points and the gate/`x`→`x₃` transport — is the fingerprint-delegated
+half (`Soundness.Multiopen.Decode`, the deployed-status section). -/
+theorem member_constraint_of_relation_and_batch [DecidableEq G] [Inhabited G] {shape : Shape}
+    (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
+    (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
+    {P : G} {b : Fin (2 ^ urs.k) → Fp} {v : Fp}
+    {numAdvice numInstance : ℕ}
+    (adviceSet : Fin numAdvice → ℕ)
+    (hadviceSet : ∀ j, adviceSet j < deployedX4PairCount vk ps ch)
+    (adviceMem : ∀ j : Fin numAdvice, Fin (deployedSetQueries vk ps ch (adviceSet j)).length)
+    (instanceSet : Fin numInstance → ℕ)
+    (hinstanceSet : ∀ j, instanceSet j < deployedX4PairCount vk ps ch)
+    (instanceMem : ∀ j : Fin numInstance,
+      Fin (deployedSetQueries vk ps ch (instanceSet j)).length)
+    (fixedCols : ℕ → Polynomial Fp) (y : Fp) {ng : ℕ} (gates : Fin ng → Expr Fp)
+    (hpoly : Polynomial Fp) (deg : ℕ) (x : Fp)
+    {pU pW : Fp} {a : Fin (2 ^ urs.k) → Fp}
+    (hrel : IpaRelation urs P b v a)
+    (pbatch : OpenedBatchOpenings urs b (x4BatchCommitments urs hk vk ps ch)
+      (x4BatchEvals vk ps ch) a pU pW)
+    (mdec : ∀ i (hi : i < deployedX4PairCount vk ps ch),
+      OpenedMemberDecode urs hk vk ps ch pbatch i hi)
+    (hquot : quotientCheck
+      (combineGates fixedCols
+        (finFn fun j : Fin numAdvice =>
+          coeffsToPoly ((mdec (adviceSet j) (hadviceSet j)).cols (adviceMem j)))
+        (finFn fun j : Fin numInstance =>
+          coeffsToPoly ((mdec (instanceSet j) (hinstanceSet j)).cols (instanceMem j)))
+        y gates) hpoly deg x)
+    (hgood :
+      combineGates fixedCols
+        (finFn fun j : Fin numAdvice =>
+          coeffsToPoly ((mdec (adviceSet j) (hadviceSet j)).cols (adviceMem j)))
+        (finFn fun j : Fin numInstance =>
+          coeffsToPoly ((mdec (instanceSet j) (hinstanceSet j)).cols (instanceMem j)))
+        y gates ≠ hpoly * (X ^ deg - 1) →
+      (combineGates fixedCols
+        (finFn fun j : Fin numAdvice =>
+          coeffsToPoly ((mdec (adviceSet j) (hadviceSet j)).cols (adviceMem j)))
+        (finFn fun j : Fin numInstance =>
+          coeffsToPoly ((mdec (instanceSet j) (hinstanceSet j)).cols (instanceMem j)))
+        y gates - hpoly * (X ^ deg - 1)).eval x ≠ 0)
+    {S : Prop}
+    (hencodes : ∀ a,
+      SnarkRelationWithMemberColumns urs hk vk ps ch P b v adviceSet hadviceSet adviceMem
+        instanceSet hinstanceSet instanceMem fixedCols y gates hpoly deg pU pW a → S) :
+    S := by
+  have hsat := circuitSatViaGates_of_check fixedCols
+    (fun _ => finFn fun j : Fin numAdvice =>
+      coeffsToPoly ((mdec (adviceSet j) (hadviceSet j)).cols (adviceMem j)))
+    (fun _ => finFn fun j : Fin numInstance =>
+      coeffsToPoly ((mdec (instanceSet j) (hinstanceSet j)).cols (instanceMem j)))
+    y gates hpoly deg a x hquot hgood
+  exact hencodes a
+    { opens := hrel
+      batchOpenings := pbatch
+      memberDecode := mdec
+      satisfiesCircuit := hsat }
 
 end Opened
 

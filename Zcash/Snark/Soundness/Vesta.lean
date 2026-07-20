@@ -783,4 +783,105 @@ theorem orchard_verifier_vesta_forking_constraint_deployed_x4 [DecidableEq Vesta
     · exact Or.inr (hasNontrivialRelation_of_two_openings urs hae (hrel'.1.trans hrel₀.1.symm))
   · exact Or.inr (HasNontrivialRelation.of_nontrivialRelation hrel)
 
+
+open Polynomial in
+open scoped ENNReal in
+open Classical in
+set_option maxHeartbeats 1000000 in
+/-- **Deployed member-column constraint capstone: the gate check on the real circuit columns.**
+*Either* the SNARK relation holds with the circuit checked on the decoded *member* columns — the
+actual queried column commitments' openings, selected per advice/instance index — *or* a
+nontrivial `(g, u, w)` relation exists. The member decodes are produced, not assumed: per point
+set, `openedMemberDecode_of_x1Prob` spends the `x₁` accept measure `hprob1`, the honest slot
+rebuilt from the designated batch `pbatch`; the opening and witness tie are as in
+`orchard_verifier_vesta_forking_constraint_deployed_x4` (`hprob` plus the mismatch-to-DLR split).
+`hquot`/`hgood` state the gate check once, on the produced member polynomials — deriving them from
+the verifier's accepted `assemble.eval = 0` (the claimed-evaluation binding at the rotated points
+and the gate/`x`→`x₃` transport) is the remaining constraint-side work, tracked on the decode
+module's deployed-status section. All measure hypotheses carry the random-oracle uniformity axiom
+(`Soundness.Forking.Oracle`). -/
+theorem orchard_verifier_vesta_member_constraint_deployed_x4 [DecidableEq VestaG]
+    [Inhabited VestaG] {shape : Shape} (urs : URS VestaG) (hk : shape.k = urs.k)
+    (vk : VerifyingKey shape Fp VestaG) (ps : ProofString shape Fp VestaG)
+    (ch : Challenges shape.k Fp)
+    (s aMulti : Fin (2 ^ urs.k) → Fp) (pU pW sU sW : Fp)
+    {numAdvice numInstance : ℕ}
+    (adviceSet : Fin numAdvice → ℕ)
+    (hadviceSet : ∀ j, adviceSet j < deployedX4PairCount vk ps ch)
+    (adviceMem : ∀ j : Fin numAdvice, Fin (deployedSetQueries vk ps ch (adviceSet j)).length)
+    (instanceSet : Fin numInstance → ℕ)
+    (hinstanceSet : ∀ j, instanceSet j < deployedX4PairCount vk ps ch)
+    (instanceMem : ∀ j : Fin numInstance,
+      Fin (deployedSetQueries vk ps ch (instanceSet j)).length)
+    (fixedCols : ℕ → Polynomial Fp)
+    (y : Fp) {ng : ℕ} (gates : Fin ng → Expr Fp) (hpoly : Polynomial Fp) (deg : ℕ) (x : Fp)
+    (hz : ch.z ≠ 0)
+    (hU : pU + ch.xi * sU = 0)
+    (hcommit : commit urs aMulti = deployedCommitment urs hk vk ps ch - pU • urs.u - pW • urs.w)
+    (hs : commit urs s = ps.ipaS - sU • urs.u - sW • urs.w)
+    (hξ : ch.xi * innerProduct s (evalVector urs.k ch.x3) = 0)
+    {a₀ : Fin (2 ^ urs.k) → Fp}
+    (pbatch : OpenedBatchOpenings urs (evalVector urs.k ch.x3)
+      (x4BatchCommitments urs hk vk ps ch) (x4BatchEvals vk ps ch) a₀ pU pW)
+    (hξcur : pbatch.batchChallenge pbatch.current = ch.x4)
+    (hlen : ∀ i, i < deployedX4PairCount vk ps ch
+      → 0 < (deployedSetQueries vk ps ch i).length)
+    (hprob1 : ∀ i, i < deployedX4PairCount vk ps ch →
+      (((deployedSetQueries vk ps ch i).length - 1 : ℕ) : ℝ≥0∞) / Fintype.card Fp
+        < (PMF.uniformOfFintype Fp).toOuterMeasure (Finset.univ.filter
+            (OpenedX1Accept urs hk vk ps ch)))
+    (hquot : quotientCheck
+      (combineGates fixedCols
+        (finFn fun j : Fin numAdvice =>
+          coeffsToPoly ((openedMemberDecode_of_x1Prob urs hk vk ps ch pbatch (adviceSet j)
+            (hadviceSet j) (hlen _ (hadviceSet j)) (hprob1 _ (hadviceSet j))).cols (adviceMem j)))
+        (finFn fun j : Fin numInstance =>
+          coeffsToPoly ((openedMemberDecode_of_x1Prob urs hk vk ps ch pbatch (instanceSet j)
+            (hinstanceSet j) (hlen _ (hinstanceSet j))
+            (hprob1 _ (hinstanceSet j))).cols (instanceMem j)))
+        y gates) hpoly deg x)
+    (hgood :
+      combineGates fixedCols
+        (finFn fun j : Fin numAdvice =>
+          coeffsToPoly ((openedMemberDecode_of_x1Prob urs hk vk ps ch pbatch (adviceSet j)
+            (hadviceSet j) (hlen _ (hadviceSet j)) (hprob1 _ (hadviceSet j))).cols (adviceMem j)))
+        (finFn fun j : Fin numInstance =>
+          coeffsToPoly ((openedMemberDecode_of_x1Prob urs hk vk ps ch pbatch (instanceSet j)
+            (hinstanceSet j) (hlen _ (hinstanceSet j))
+            (hprob1 _ (hinstanceSet j))).cols (instanceMem j)))
+        y gates ≠ hpoly * (X ^ deg - 1) →
+      (combineGates fixedCols
+        (finFn fun j : Fin numAdvice =>
+          coeffsToPoly ((openedMemberDecode_of_x1Prob urs hk vk ps ch pbatch (adviceSet j)
+            (hadviceSet j) (hlen _ (hadviceSet j)) (hprob1 _ (hadviceSet j))).cols (adviceMem j)))
+        (finFn fun j : Fin numInstance =>
+          coeffsToPoly ((openedMemberDecode_of_x1Prob urs hk vk ps ch pbatch (instanceSet j)
+            (hinstanceSet j) (hlen _ (hinstanceSet j))
+            (hprob1 _ (hinstanceSet j))).cols (instanceMem j)))
+        y gates - hpoly * (X ^ deg - 1)).eval x ≠ 0)
+    {S : Prop}
+    (hencodes : ∀ a,
+      SnarkRelationWithMemberColumns urs hk vk ps ch
+        (deployedCommitment urs hk vk ps ch - pU • urs.u - pW • urs.w)
+        (evalVector urs.k ch.x3) (multiopenValue vk ps ch) adviceSet hadviceSet adviceMem
+        instanceSet hinstanceSet instanceMem fixedCols y gates hpoly deg pU pW a → S)
+    (hprob : (kerr (Fintype.card Fp) shape.k : ℝ≥0∞) / Fintype.card (Fin shape.k → Fp)
+        < (PMF.uniformOfFintype (Fin shape.k → Fp)).toOuterMeasure
+            (Finset.univ.filter (fun χ => DeployedIpaVerifierEq (hk ▸ urs.g) urs.w urs.u vk ps
+              {ch with ipaRound := χ}))) :
+    S ∨ HasNontrivialRelation (F := Fp) urs.g urs.u urs.w := by
+  have hrel₀ := pbatch.ipaRelation_of_x4Current hξcur
+  rcases legacy_orchard_verifier_vesta_forking_opening_deployed urs hk vk ps ch s aMulti pU pW
+      sU sW hz hU hcommit hs hprob with hopen | hrel
+  · rw [hξ, sub_zero] at hopen
+    obtain ⟨aX, hrelX⟩ := hopen
+    by_cases hae : aX = a₀
+    · exact Or.inl (member_constraint_of_relation_and_batch urs hk vk ps ch adviceSet hadviceSet
+        adviceMem instanceSet hinstanceSet instanceMem fixedCols y gates hpoly deg x hrel₀ pbatch
+        (fun i hi => openedMemberDecode_of_x1Prob urs hk vk ps ch pbatch i hi (hlen i hi)
+          (hprob1 i hi))
+        hquot hgood hencodes)
+    · exact Or.inr (hasNontrivialRelation_of_two_openings urs hae (hrelX.1.trans hrel₀.1.symm))
+  · exact Or.inr (HasNontrivialRelation.of_nontrivialRelation hrel)
+
 end Zcash.Snark

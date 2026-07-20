@@ -97,8 +97,15 @@ record are now theorems, and the `x₁` layer beneath them is closed down to the
    witnesses — glued over all point sets by `deployed_witness_two_level`. The honest run sits
    inside every family by structure eta (`honestX1Run`); the per-run aggregate witnesses are each
    run's own `x₄`-level decode (the same stacked floors, per run), produced from the `x₁` accept
-   measure through the opened chain (`opened_witness_member_binding`/`openedMemberBinding_of_x1Prob`,
+   measure through the opened chain (`opened_witness_member_binding`/`openedMemberDecode_of_x1Prob`,
    `Soundness.Multiopen.Opened`).
+
+**The member-column gate shape.** The gate check is stated on the real circuit columns by
+`SnarkRelationWithMemberColumns`/`orchard_verifier_vesta_member_constraint_deployed_x4`
+(`Soundness.Multiopen.Opened`, `Soundness.Vesta`), the member decodes produced from the `x₁` accept
+measure. Its `hquot`/`hgood` remain hypotheses: deriving them from the verifier's accepted
+`assemble.eval = 0` — the claimed-evaluation binding at the rotated points (the `x₂`/`x₃`
+`r`-polynomial layer) and the gate/`x`→`x₃` transport — is the remaining constraint-side work.
 
 **Delegated to the equivalence fingerprint — unchanged.** Per the principle raised in
 zcash/ironwood#21 (the `PermutationConstruction.lean:243` review thread, comment `r3493240277`:

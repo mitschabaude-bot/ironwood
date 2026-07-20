@@ -857,7 +857,7 @@ Per-member claimed evaluations at the original rotated points and the gate/`x`�
 the fingerprint-delegated half (`Soundness.Multiopen.Decode`, the deployed-status section). On this
 base each run's aggregate witness arrives in augmented `(g, u, w)` representation, so the live form
 is the opened mirror `opened_witness_member_binding`, its inputs produced from the `x₁` accept
-measure by `openedMemberBinding_of_x1Prob` (`Soundness.Multiopen.Opened`). The per-set decodes are
+measure by `openedMemberDecode_of_x1Prob` (`Soundness.Multiopen.Opened`). The per-set decodes are
 glued into the full two-level combination by `deployed_witness_two_level`. -/
 theorem deployed_witness_member_binding [DecidableEq G] [Inhabited G] {shape : Shape}
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
@@ -932,7 +932,7 @@ theorem deployed_witness_two_level [DecidableEq G] [Inhabited G] {shape : Shape}
         ⟨deployedX4PairCount vk ps ch - 1 - i, by omega⟩) :
     a = ∑ j : Fin (deployedX4PairCount vk ps ch + 1),
       hbatch.batchChallenge hbatch.current ^ (j : ℕ) •
-        (if hj : (j : ℕ) < deployedX4PairCount vk ps ch then
+        (if _hj : (j : ℕ) < deployedX4PairCount vk ps ch then
           ∑ m : Fin (deployedSetQueries vk ps ch
               (deployedX4PairCount vk ps ch - 1 - (j : ℕ))).length,
             ch.x1 ^ (m : ℕ) •
