@@ -1,4 +1,5 @@
 import Zcash.Circuits.Integration.ResolverQueryEnvironment
+import Zcash.Circuits.Integration.ListChunks
 import Zcash.Snark.Keygen.Pipeline
 
 /-!
@@ -19,39 +20,6 @@ namespace Zcash.Snark
 open Halo2
 
 set_option maxHeartbeats 20000
-
-/-- Flattening the accumulator implementation of `List.toChunks` preserves its
-processed prefix and unprocessed suffix. -/
-theorem listToChunksGo_flatten {α : Type} (n : ℕ)
-    (xs : List α) (current : Array α) (chunks : Array (List α)) :
-    (List.toChunks.go n xs current chunks).flatten =
-      chunks.toList.flatten ++ current.toList ++ xs := by
-  induction xs generalizing current chunks with
-  | nil =>
-      simp [List.toChunks.go]
-  | cons x xs ih =>
-      simp only [List.toChunks.go]
-      split
-      · rw [ih]
-        simp [List.flatten_append, List.append_assoc]
-      · rw [ih]
-        simp [List.append_assoc]
-
-/-- Splitting a list into chunks and flattening it is the identity, including
-the `chunkSize = 0` convention. -/
-theorem listToChunks_flatten {α : Type} (chunkSize : ℕ) (xs : List α) :
-    (xs.toChunks chunkSize).flatten = xs := by
-  cases chunkSize with
-  | zero =>
-      cases xs <;> simp [List.toChunks]
-  | succ chunkSize =>
-      cases xs with
-      | nil => simp [List.toChunks]
-      | cons x xs =>
-          rw [List.toChunks]
-          rw [listToChunksGo_flatten]
-          simp_all
-          all_goals omega
 
 /-- An in-range `findIdx` decodes to the element it searched for. -/
 theorem getD_findIdx_eq_target
@@ -169,6 +137,141 @@ theorem verifierCS_permutationChunks_flatten
   funext column
   rcases column with ⟨kind, index⟩
   cases kind <;> rfl
+
+/-- Halo2's permutation chunk width is positive for every constraint system:
+`csDegree` is at least the permutation argument's baseline degree three. -/
+theorem constraintSystem_chunkLen_pos (cs : ConstraintSystem Fp) :
+    0 < cs.chunkLen := by
+  unfold ConstraintSystem.chunkLen csDegree
+  dsimp only
+  have hdegree :
+      3 ≤
+        max 3
+          (max
+            (List.foldl
+              (fun m lookup => max m lookup.requiredDegree)
+              1 cs.lookups)
+            (List.foldl
+              (fun m expression => max m expression.degree)
+              0 (flatGates cs))) :=
+    le_max_left _ _
+  omega
+
+/-- The verifier CS emits exactly the circuit-owned ceiling number of chunks. -/
+theorem verifierCS_permutationChunks_length
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput) :
+    top.verifierCS.permutationChunks.length =
+      top.permutationSetCount := by
+  unfold TopLevelCircuit.verifierCS TopLevelCircuit.permutationSetCount
+    TopLevelCircuit.permutationColumnCount TopLevelCircuit.chunkLen
+  rw [listToChunks_length _ _
+    (constraintSystem_chunkLen_pos top.constraintSystem)]
+  simp
+
+/-- A circuit-derived verifying key has exactly the circuit-owned number of
+permutation sets. -/
+@[simp] theorem _root_.Halo2.TopLevelCircuit.toVerifierKey_permutationChunks_length
+    {G : Type} [AddCommGroup G] [Inhabited G]
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (urs : URS G) :
+    (top.toVerifierKey urs).permutationChunks.length =
+      top.shape.numPermutationSets := by
+  rw [top.toVerifierKey_permutationChunks,
+    top.shape_numPermutationSets]
+  exact verifierCS_permutationChunks_length top
+
+/-- Each compiler chunk has the standard full-or-final-remainder width. -/
+theorem verifierCS_permutationChunks_getD_length
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (i : ℕ) (hi : i < top.verifierCS.permutationChunks.length) :
+    (top.verifierCS.permutationChunks.getD i []).length =
+      min top.chunkLen
+        (top.permutationColumnCount - i * top.chunkLen) := by
+  simp only [TopLevelCircuit.verifierCS] at hi ⊢
+  have hchunkLen : 0 < top.chunkLen := by
+    exact constraintSystem_chunkLen_pos top.constraintSystem
+  rw [listToChunks_getD_length top.chunkLen _ hchunkLen i hi]
+  simp only [List.length_zipIdx, List.length_map,
+    TopLevelCircuit.permutationColumnCount,
+    TopLevelCircuit.chunkLen]
+
+/-- Every circuit-derived verifier chunk has the compiler-prescribed width. -/
+theorem _root_.Halo2.TopLevelCircuit.toVerifierKey_permutationChunks_getD_length
+    {G : Type} [AddCommGroup G] [Inhabited G]
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (urs : URS G) (i : ℕ)
+    (hi : i < (top.toVerifierKey urs).permutationChunks.length) :
+    ((top.toVerifierKey urs).permutationChunks.getD i []).length =
+      min top.chunkLen
+        (top.permutationColumnCount - i * top.chunkLen) := by
+  rw [top.toVerifierKey_permutationChunks] at hi ⊢
+  exact verifierCS_permutationChunks_getD_length top i hi
+
+/-- Every prefix ending before a valid compiler chunk contains `i * chunkLen`
+permutation columns. -/
+theorem verifierCS_permutationChunks_take_flatten_length
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (i : ℕ) (hi : i < top.verifierCS.permutationChunks.length) :
+    (top.verifierCS.permutationChunks.take i).flatten.length =
+      i * top.chunkLen := by
+  unfold TopLevelCircuit.verifierCS at hi ⊢
+  apply take_flatten_length_of_dropLast_full
+  · exact listToChunks_dropLast_full _ _
+      (constraintSystem_chunkLen_pos top.constraintSystem)
+  · exact hi
+
+/-- Top-level keygen exposes the compiler prefix law without requiring downstream
+proofs to unfold a concrete circuit or verifying-key constructor. -/
+theorem _root_.Halo2.TopLevelCircuit.toVerifierKey_permutationChunks_take_flatten_length
+    {G : Type} [AddCommGroup G] [Inhabited G]
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (urs : URS G)
+    (i : ℕ) (hi : i < (top.toVerifierKey urs).permutationChunks.length) :
+    (((top.toVerifierKey urs).permutationChunks.take i).flatten.length) =
+      i * (top.toVerifierKey urs).chunkLen := by
+  rw [top.toVerifierKey_permutationChunks] at hi ⊢
+  rw [top.toVerifierKey_chunkLen]
+  exact verifierCS_permutationChunks_take_flatten_length top i hi
+
+/-- The compiler's chunk family has enough total slots for every permutation
+column, without requiring the family itself to be nonempty. -/
+theorem permutationColumns_length_le_chunks_mul
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput) :
+    top.permutationColumnCount ≤
+      top.verifierCS.permutationChunks.length * top.chunkLen := by
+  let source :=
+    (top.permutationColumns.map
+      (permutationQueryReference top.adviceQueryLayout
+        top.fixedQueryLayout top.instanceQueryLayout)).zipIdx
+  have hall :
+      (source.toChunks top.chunkLen).Forall
+        fun chunk => chunk.length ≤ top.chunkLen :=
+    listToChunks_all_le top.chunkLen source
+      (constraintSystem_chunkLen_pos top.constraintSystem)
+  have hbound :=
+    flatten_length_le_mul_of_forall
+      (source.toChunks top.chunkLen) top.chunkLen hall
+  rw [listToChunks_flatten] at hbound
+  have hchunks :
+      top.verifierCS.permutationChunks =
+        source.toChunks top.chunkLen := by
+    unfold TopLevelCircuit.verifierCS
+    dsimp only
+    apply congrArg (List.toChunks top.chunkLen)
+    congr 2
+    funext column
+    rcases column with ⟨kind, index⟩
+    cases kind <;> rfl
+  rw [hchunks]
+  simpa only [source, List.length_zipIdx, List.length_map,
+    TopLevelCircuit.permutationColumnCount] using hbound
 
 /-- A coherent compiled query reference decodes to the concrete column from
 which the compiler created it. -/

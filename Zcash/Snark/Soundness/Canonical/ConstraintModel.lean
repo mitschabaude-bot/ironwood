@@ -191,7 +191,6 @@ theorem ResolverPermutationDomain.ofCanonicalConstraintModel
     (hrows : Function.Injective fun i : Fin vk.n =>
       vk.omega ^ (i : ℕ))
     (hroot : vk.omega ^ vk.n = 1)
-    (hnonempty : 0 < shape.numPermutationSets)
     (hchunkCount :
       vk.permutationChunks.length = shape.numPermutationSets) :
     let model := vk.constraintModel (numProofs := numProofs) ch poly hblinding
@@ -210,7 +209,7 @@ theorem ResolverPermutationDomain.ofCanonicalConstraintModel
   simpa [VerifyingKey.constraintModel,
     canonicalLagrangePolynomials, lastUsableDomainRow] using
       ResolverPermutationDomain.ofCanonicalSelectors vk hn hm hrows
-        hnonempty hchunkCount hlastRotation hroot
+        hchunkCount hlastRotation hroot
 
 /--
 The canonical row-selector polynomials satisfy the lookup-domain interface

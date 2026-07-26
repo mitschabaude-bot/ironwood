@@ -319,7 +319,6 @@ structure ResolverPermutationDomain
     {shape : CircuitShape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (l0 lLast lBlind : CPoly) (n m : ℕ) : Prop where
-  nonempty : 0 < shape.numPermutationSets
   chunkCount : vk.permutationChunks.length = shape.numPermutationSets
   lastRotation :
     vk.omega ^ m = vk.omega ^ (-((vk.blindingFactors : ℤ) + 1))
@@ -339,7 +338,6 @@ theorem ResolverPermutationDomain.ofCanonicalSelectors
     (vk : VerifyingKey shape Fp G) {n m : ℕ}
     (hn : 0 < n) (hm : m < n)
     (hrows : Function.Injective fun i : Fin n => vk.omega ^ (i : ℕ))
-    (hnonempty : 0 < shape.numPermutationSets)
     (hchunkCount : vk.permutationChunks.length = shape.numPermutationSets)
     (hlastRotation :
       vk.omega ^ m = vk.omega ^ (-((vk.blindingFactors : ℤ) + 1)))
@@ -348,7 +346,6 @@ theorem ResolverPermutationDomain.ofCanonicalSelectors
       (rowSelectorPolynomial vk.omega ⟨0, hn⟩)
       (rowSelectorPolynomial vk.omega ⟨m, hm⟩)
       (blindSelectorPolynomial vk.omega ⟨m, hm⟩) n m where
-  nonempty := hnonempty
   chunkCount := hchunkCount
   lastRotation := hlastRotation
   root := hroot
@@ -590,29 +587,33 @@ theorem ConstraintSatisfaction.resolverPermutationCopyConstraints
         c.1 c.2.1 c.2.2 =
       chunkRowValue vk.omega (ResolverPermutationPairs vk poly p)
         d.1 d.2.1 d.2.2 := by
-  have hconstraints :=
-    h.resolverPermutationConstraints vk ch poly l0 lLast lBlind p
-      hdom.nonempty hdom.chunkCount hdom.lastRotation
-  have hresult := deployed_perm_copy_constraints_all_chunks
-    vk.omega ch.beta ch.gamma vk.delta vk.chunkLen
-    (fun chunk => poly (.permProduct p chunk))
-    (ResolverPermutationPairs vk poly p)
-    l0 lLast lBlind hdom.nonempty hcycle.sigma
-    hconstraints.step hconstraints.chain hconstraints.start hconstraints.finish
-    (by
-      intro i
-      rw [← pow_mul, Nat.mul_comm, pow_mul, hdom.root, one_pow])
-    hdom.active hdom.firstSelector hdom.lastSelector
-    hcycle.mapsNames hcycle.namesInjective
-    (fun hmem => hgood.gamma (Finset.mem_union_left _ hmem)) hgood.beta hcd
-  rcases hresult with heq | hzero
-  · exact heq
-  · apply False.elim
-    apply hgood.gamma
-    apply Finset.mem_union_right
-    rw [mem_resolverPermutationZeroFactorBadSet_iff]
-    rcases hzero with ⟨chunk, hchunk, i, hi, j, hj, hfactor⟩
-    exact ⟨⟨⟨chunk, Finset.mem_range.mp hchunk⟩,
-      ⟨⟨i, Finset.mem_range.mp hi⟩, ⟨j, Finset.mem_range.mp hj⟩⟩⟩, hfactor⟩
+  by_cases hnonempty : 0 < shape.numPermutationSets
+  · have hconstraints :=
+      h.resolverPermutationConstraints vk ch poly l0 lLast lBlind p
+        hnonempty hdom.chunkCount hdom.lastRotation
+    have hresult := deployed_perm_copy_constraints_all_chunks
+      vk.omega ch.beta ch.gamma vk.delta vk.chunkLen
+      (fun chunk => poly (.permProduct p chunk))
+      (ResolverPermutationPairs vk poly p)
+      l0 lLast lBlind hnonempty hcycle.sigma
+      hconstraints.step hconstraints.chain hconstraints.start hconstraints.finish
+      (by
+        intro i
+        rw [← pow_mul, Nat.mul_comm, pow_mul, hdom.root, one_pow])
+      hdom.active hdom.firstSelector hdom.lastSelector
+      hcycle.mapsNames hcycle.namesInjective
+      (fun hmem => hgood.gamma (Finset.mem_union_left _ hmem)) hgood.beta hcd
+    rcases hresult with heq | hzero
+    · exact heq
+    · apply False.elim
+      apply hgood.gamma
+      apply Finset.mem_union_right
+      rw [mem_resolverPermutationZeroFactorBadSet_iff]
+      rcases hzero with ⟨chunk, hchunk, i, hi, j, hj, hfactor⟩
+      exact ⟨⟨⟨chunk, Finset.mem_range.mp hchunk⟩,
+        ⟨⟨i, Finset.mem_range.mp hi⟩, ⟨j, Finset.mem_range.mp hj⟩⟩⟩, hfactor⟩
+  · exact False.elim (by
+      have hc := c.1.isLt
+      omega)
 
 end Zcash.Snark

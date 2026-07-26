@@ -56,13 +56,6 @@ def topLevelPermutationCommitment
     (urs : URS G) (column : ℕ) : G :=
   (top.permutationCommitments urs).getD column 0
 
-/-- Number of permutation columns emitted by the keygen compiler. -/
-def topLevelPermutationColumnCount
-    {Config : Type} {PublicInput : TypeMap}
-    [ProvableType PublicInput]
-    (top : TopLevelCircuit Fp Config PublicInput) : ℕ :=
-  (Keygen.permColsOf top.constraintSystem).length
-
 /-- Total natural-number projection of a common-permutation commitment.
 The in-range theorem below reconnects it to the verifier's `Fin`-indexed
 interface without making every circuit-coherence record reduce its derived
@@ -145,20 +138,23 @@ theorem commitment_ofKeygen
     (hk : top.domainExponent = urs.k)
     (setup : LagrangePrefixSetup urs)
     (column : ℕ)
-    (hcolumn : column < topLevelPermutationColumnCount top) :
+    (hcolumn : column < top.permutationColumnCount) :
     topLevelPermutationCommitment top urs column =
       (LagrangeCommitmentKey.ofPrefix urs
         (omegaOf urs.k)
         (derivedUrsGLagrange urs)
         setup.generator_eq).commitInstance
           (topLevelPermutationRows top column) 1 := by
-  unfold topLevelPermutationColumnCount at hcolumn
   unfold topLevelPermutationCommitment
+  have hcolumn' :
+      column < (Keygen.permColsOf top.constraintSystem).length := by
+    simpa [TopLevelCircuit.permutationColumnCount,
+      TopLevelCircuit.permutationColumns, Keygen.permColsOf] using hcolumn
   have hcommit :=
     Keygen.permutationCommitmentsOf_getD_eq_commitInstance
       urs top.constraintSystem (top.operations)
       setup.length_eq setup.generator_eq
-      column hcolumn
+      column hcolumn'
   unfold TopLevelCircuit.permutationCommitments topLevelPermutationRows
   rw [hk]
   exact hcommit

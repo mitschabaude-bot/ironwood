@@ -29,18 +29,6 @@ theorem domainExponent_eq :
     actionCircuit.domainExponent = 11 := by
   native_decide
 
-/-- The derived Action permutation columns form two full chunks and one singleton. -/
-theorem chunks_eq :
-    actionCircuit.verifierCS.permutationChunks =
-      [[(.instance 0, 0), (.advice 0, 1), (.advice 1, 2),
-          (.advice 2, 3), (.advice 3, 4), (.advice 4, 5),
-          (.advice 5, 6)],
-        [(.advice 6, 7), (.advice 7, 8), (.advice 8, 9),
-          (.advice 9, 10), (.fixed 0, 11), (.fixed 7, 12),
-          (.fixed 8, 13)],
-        [(.fixed 9, 14)]] := by
-  native_decide
-
 /-- The Action permutation argument has 15 columns and verifier chunk width 7. -/
 theorem columnCount_chunkLen_eq :
     (actionCircuit.permutationColumnCount,
@@ -59,6 +47,44 @@ def ColumnRefCoherent : ColumnRef → Prop
       i < actionCircuit.instanceQueryLayout.length ∧
         (actionCircuit.instanceQueryLayout.getD i (0, 0)).2 = 0
 
+/-- Executable form of one reference's L-classified routing obligations. -/
+def routingCoherentBool (ref : ColumnRef × ℕ) : Bool :=
+  match ref.1 with
+  | .advice i =>
+      decide (i < actionCircuit.adviceQueryLayout.length) &&
+      decide
+        ((actionCircuit.adviceQueryLayout.getD
+          i (0, 0)).2 = 0) &&
+      decide (ref.2 < actionCircuit.permutationColumnCount)
+  | .fixed i =>
+      decide (i < actionCircuit.fixedQueryLayout.length) &&
+      decide
+        ((actionCircuit.fixedQueryLayout.getD
+          i (0, 0)).2 = 0) &&
+      decide (ref.2 < actionCircuit.permutationColumnCount)
+  | .instance i =>
+      decide (i < actionCircuit.instanceQueryLayout.length) &&
+      decide
+        ((actionCircuit.instanceQueryLayout.getD
+          i (0, 0)).2 = 0) &&
+      decide (ref.2 < actionCircuit.permutationColumnCount)
+
+theorem routingCoherentBool_eq_true_iff (ref : ColumnRef × ℕ) :
+    routingCoherentBool ref = true ↔
+      ColumnRefCoherent ref.1 ∧
+        ref.2 < actionCircuit.permutationColumnCount := by
+  rcases ref with ⟨ref, common⟩
+  cases ref <;> simp [routingCoherentBool, ColumnRefCoherent]
+
+/-- Compiled Action references that fail either query routing or global-index
+bounds. This remains the L-classified routing diagnostic. -/
+def routingFailures : List (ColumnRef × ℕ) :=
+  actionCircuit.verifierCS.permutationChunks.flatten.filter fun ref =>
+      !routingCoherentBool ref
+
+theorem routingFailures_eq_nil : routingFailures = [] := by
+  native_decide
+
 /-- Every Action permutation reference selects an in-range rotation-zero query and
 every accompanying common-permutation index is in range. -/
 theorem routingCoherent :
@@ -68,26 +94,19 @@ theorem routingCoherent :
         ColumnRefCoherent ref.1 ∧
           ref.2 <
             actionCircuit.permutationColumnCount := by
-  rw [chunks_eq]
-  let chunks : List (List (ColumnRef × ℕ)) :=
-    [[(.instance 0, 0), (.advice 0, 1), (.advice 1, 2),
-        (.advice 2, 3), (.advice 3, 4), (.advice 4, 5),
-        (.advice 5, 6)],
-      [(.advice 6, 7), (.advice 7, 8), (.advice 8, 9),
-        (.advice 9, 10), (.fixed 0, 11), (.fixed 7, 12),
-        (.fixed 8, 13)],
-      [(.fixed 9, 14)]]
-  have hall :
-      chunks.flatten.Forall fun ref =>
-        ColumnRefCoherent ref.1 ∧
-          ref.2 <
-            actionCircuit.permutationColumnCount := by
-    simp [chunks, ColumnRefCoherent]
-    native_decide
   intro chunk hchunk ref href
-  apply List.forall_iff_forall_mem.mp hall
-  apply List.mem_flatten.mpr
-  exact ⟨chunk, by simpa only [chunks] using hchunk, href⟩
+  by_contra hfailure
+  have hmem :
+      ref ∈ routingFailures := by
+    rw [routingFailures, List.mem_filter]
+    refine ⟨List.mem_flatten.mpr ⟨chunk, hchunk, href⟩, ?_⟩
+    have hfalse : routingCoherentBool ref = false := by
+      apply Bool.eq_false_of_not_eq_true
+      exact fun htrue =>
+        hfailure ((routingCoherentBool_eq_true_iff ref).mp htrue)
+    simp [hfalse]
+  rw [routingFailures_eq_nil] at hmem
+  simp at hmem
 
 /-- The first 21 powers of Pasta's permutation coset generator are distinct.
 Twenty-one is `3 * 7`, the padded Action permutation-column range. -/
@@ -97,8 +116,8 @@ theorem deltaPowers_injective :
 
 assert_no_sorry domainExponent_lt
 assert_no_sorry domainExponent_eq
-assert_no_sorry chunks_eq
 assert_no_sorry columnCount_chunkLen_eq
+assert_no_sorry routingFailures_eq_nil
 assert_no_sorry routingCoherent
 assert_no_sorry deltaPowers_injective
 

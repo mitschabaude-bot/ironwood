@@ -31,59 +31,11 @@ variable {G : Type} [AddCommGroup G] [Inhabited G]
 abbrev actionShape (pp : ProofParams) : Shape :=
   actionCircuit.shape.withProofParams pp
 
-/-- The Action circuit's verifier permutation chunks are `[7, 7, 1]`, with
-the exact query-layout and common-column indices. -/
-theorem permutationChunks_eq :
-    actionCircuit.verifierCS.permutationChunks =
-      [[(.instance 0, 0), (.advice 0, 1), (.advice 1, 2),
-          (.advice 2, 3), (.advice 3, 4), (.advice 4, 5),
-          (.advice 5, 6)],
-        [(.advice 6, 7), (.advice 7, 8), (.advice 8, 9),
-          (.advice 9, 10), (.fixed 0, 11), (.fixed 7, 12),
-          (.fixed 8, 13)],
-        [(.fixed 9, 14)]] := by
-  exact chunks_eq
-
-set_option maxRecDepth 100000 in
-/-- The Action circuit has one verifier permutation set per chunk. -/
+/-- The derived Action VK has one verifier permutation set per chunk. -/
 theorem chunkCount :
     actionCircuit.verifierCS.permutationChunks.length =
-      actionCircuit.permutationSetCount := by
-  rw [permutationChunks_eq]
-  change 3 =
-    (actionCircuit.permutationColumnCount +
-      actionCircuit.chunkLen - 1) /
-      actionCircuit.chunkLen
-  have hcolumns :
-      actionCircuit.permutationColumnCount = 15 :=
-    congrArg Prod.fst columnCount_chunkLen_eq
-  have hchunkLen :
-      actionCircuit.chunkLen = 7 :=
-    congrArg Prod.snd columnCount_chunkLen_eq
-  rw [hcolumns, hchunkLen]
-
-set_option maxRecDepth 100000 in
-/-- The Action verifier's permutation chunk family is nonempty. -/
-theorem nonempty :
-    0 < actionCircuit.permutationSetCount := by
-  change 0 <
-    (actionCircuit.permutationColumnCount +
-      actionCircuit.chunkLen - 1) /
-      actionCircuit.chunkLen
-  have hcolumns :
-      actionCircuit.permutationColumnCount = 15 :=
-    congrArg Prod.fst columnCount_chunkLen_eq
-  have hchunkLen :
-      actionCircuit.chunkLen = 7 :=
-    congrArg Prod.snd columnCount_chunkLen_eq
-  rw [hcolumns, hchunkLen]
-  decide
-
-/-- The concrete chunk widths retained for consumers that need their exact values. -/
-theorem chunkLengths :
-    actionCircuit.verifierCS.permutationChunks.map List.length = [7, 7, 1] := by
-  rw [permutationChunks_eq]
-  decide
+      actionCircuit.permutationSetCount :=
+  verifierCS_permutationChunks_length actionCircuit
 
 set_option maxRecDepth 100000 in
 /-- Every Action permutation chunk has width at most the circuit's chunk width. -/
@@ -92,17 +44,13 @@ theorem chunkLength_le :
       (actionCircuit.verifierCS.permutationChunks.getD i []).length ≤
         actionCircuit.chunkLen := by
   intro i hi
-  rw [permutationChunks_eq]
-  have hdata := columnCount_chunkLen_eq
-  have hsets : actionCircuit.permutationSetCount = 3 := by
-    rw [← chunkCount, permutationChunks_eq]
-    decide
-  rw [hsets] at hi
-  have hlen :
-      actionCircuit.chunkLen = 7 :=
-    congrArg Prod.snd hdata
-  rw [hlen]
-  interval_cases i <;> decide
+  have hiChunks :
+      i <
+        actionCircuit.verifierCS.permutationChunks.length := by
+    rw [verifierCS_permutationChunks_length]
+    exact hi
+  rw [verifierCS_permutationChunks_getD_length actionCircuit i hiChunks]
+  exact min_le_left _ _
 
 /-- Resolver pairing preserves each concrete VK chunk's width. -/
 theorem resolverPairsLength_le
@@ -279,7 +227,7 @@ theorem domain
         (top := actionCircuit) domainExponent_lt)
       (TopLevelAssignment.domainRoot
         (top := actionCircuit) domainExponent_lt)
-      nonempty chunkCount
+      chunkCount
 
 set_option maxRecDepth 100000 in
 /-- Action chunk names are injective on any active prefix of the derived
@@ -434,7 +382,6 @@ def cycleOfKeygenColumns
   cycleOfKeygenColumnsAt pp urs poly p activeRows_le
     fullSigma sigma hcolumns hrestrict
 
-assert_no_sorry permutationChunks_eq
 assert_no_sorry routingCoherent_of_derived
 assert_no_sorry deltaFp_actionCosets
 assert_no_sorry domain

@@ -377,38 +377,6 @@ theorem actionLookupInputArity_le :
       ((operationEnabledLookups actionCircuit.operations 0).get i).argument.inputs.length ≤ 4 := by
   native_decide
 
-private theorem resolverPermutationCell_card_le
-    (pp : ProofParams) (urs : URS VestaG)
-    (poly : CommitmentId → CPoly)
-    (p : Fin pp.numProofs) :
-    Fintype.card
-        (ResolverPermutationCell (actionCircuit.toVerifierKey urs) poly p actionActiveRows) ≤
-      2 ^ 16 := by
-  rw [resolverPermutationCell_card]
-  rw [actionCircuit.shape_numPermutationSets]
-  calc
-    ∑ c : Fin actionCircuit.permutationSetCount,
-          actionActiveRows *
-            (actionCircuit.verifierCS.permutationChunks.getD c []).length
-        ≤ ∑ _c : Fin actionCircuit.permutationSetCount,
-            actionActiveRows * 7 := by
-          apply Finset.sum_le_sum
-          intro c _hc
-          gcongr
-          simpa only [actionChunkLen_eq] using
-            ActionPermutationDomain.chunkLength_le c c.isLt
-    _ = actionCircuit.permutationSetCount * (actionActiveRows * 7) := by
-          simp
-    _ = 3 * (actionActiveRows * 7) := by
-          rw [actionNumPermutationSets_eq]
-    _ ≤ 2 ^ 16 := by
-          have hrows : actionActiveRows ≤ actionCircuit.n := by
-            simpa only [actionDomainSize] using actionActiveRows_le_domainSize
-          rw [actionCircuit.n_eq_two_pow_domainExponent,
-            ActionPermutationDomain.domainExponent_eq] at hrows
-          norm_num at hrows ⊢
-          omega
-
 /-- The exact per-Action permutation-cell count.  Unlike the old `2^16` envelope, this
 tight value keeps the consensus-maximum β budget below `2^46`. -/
 theorem resolverPermutationCell_card_eq
@@ -421,9 +389,23 @@ theorem resolverPermutationCell_card_eq
   rw [resolverPermutationCell_card]
   rw [actionCircuit.shape_numPermutationSets]
   rw [actionCircuit.toVerifierKey_permutationChunks,
-    ActionPermutationDomain.permutationChunks_eq]
+    derived_scalars.2.2.2.2.2.2]
+  rw [show actionCircuit.permutationSetCount = shape.numPermutationSets by
+    simpa only [actionCircuit.shape_numPermutationSets] using
+      congrArg CircuitShape.numPermutationSets
+        actionCircuitShape_eq_fixtureCircuitShape]
   clear p poly urs pp
   native_decide
+
+private theorem resolverPermutationCell_card_le
+    (pp : ProofParams) (urs : URS VestaG)
+    (poly : CommitmentId → CPoly)
+    (p : Fin pp.numProofs) :
+    Fintype.card
+        (ResolverPermutationCell (actionCircuit.toVerifierKey urs) poly p actionActiveRows) ≤
+      2 ^ 16 := by
+  rw [resolverPermutationCell_card_eq pp urs poly p]
+  norm_num
 
 /-- The θ budget is linear in the number of Actions. -/
 private theorem cap_theta_for (numProofs : ℕ) :
