@@ -1,5 +1,5 @@
 import Zcash.Snark.Core.Msm
-import Zcash.Vendor.CompElliptic.Msm
+import CompElliptic.Curves.Pasta.Fast.Msm
 
 /-!
 # Fast compiled evaluation for the fingerprint MSM

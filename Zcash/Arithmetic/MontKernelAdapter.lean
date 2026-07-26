@@ -1,19 +1,15 @@
-import Zcash.Vendor.CompElliptic.ProjectiveMontEquiv
-import Zcash.Arithmetic.NatKernelAdapter
+import CompElliptic.Curves.Pasta.Fast.ProjectiveMontEquiv
 
 /-!
 # Native-lane adapters: the eight-limb Montgomery kernel behind the keygen spellings
 
-`Zcash.Vendor.CompElliptic.ProjectiveMontDefs` is the core-only twin of the group kernels (RCB addition,
-double-and-add, scatter Pippenger, radix-2 FFT) over the **proven eight-limb Montgomery
+`CompElliptic.Curves.Pasta.Fast.ProjectiveMontDefs` is the core-only twin of the group kernels
+(RCB addition, double-and-add, scatter Pippenger) over the **proven eight-limb Montgomery
 field**, compiled to native code through the `FastFieldNative` `precompileModules` leaf.
 This module (mathlib-side, NOT in that leaf's glob) provides the `ZMod`-typed entry points
 the certificate evaluates — coordinates into Montgomery form, kernel, affine reading back —
 and the PROVEN equalities to the statement-surface functions, chaining the kernel's
 simulation theorem `msmM_spec` into the existing `_eq` ladder.
-
-It is the Montgomery twin of `Zcash.Arithmetic.NatKernelAdapter`, mirroring it
-declaration for declaration.
 -/
 
 namespace Zcash.Snark.Keygen.Fast
@@ -25,8 +21,16 @@ open CompElliptic.Curves.Pasta.Fast.ProjectiveMont (PM)
 open Montgomery.Native64x8
 open CompElliptic.Curves.Pasta.Fast.Projective
 open CompElliptic.Curves.Pasta.Fast.Projective.PVes
+-- The vendored `Msm` imported ironwood's `Zcash.Snark.Core.Field`, so `Fp` used to arrive here
+-- through `open Zcash.Snark`. Upstream's `Msm` is standalone and carries its own (reducibly
+-- equal) `Fp := CompElliptic.Fields.Pasta.VestaScalarField`.
+open CompElliptic.Curves.Pasta.Fast.Msm (Fp)
 
 local instance : Inhabited G := ⟨0⟩
+
+/-- Every `Fp` value's canonical representative is a 256-bit scalar. -/
+theorem val_lt_two_pow_256 (a : Fp) : a.val < 2 ^ 256 :=
+  lt_of_lt_of_le (ZMod.val_lt a) (by decide)
 
 /-- `PVes → PM`: each coordinate's canonical representative, entered into Montgomery form. -/
 def ofPVesM (P : PVes) : PM :=

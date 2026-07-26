@@ -3,7 +3,7 @@ Copyright (c) 2026 Ironwood Contributors.
 Released under the Apache License, Version 2.0.
 -/
 import Zcash.Vendor.CompPoly.ScalarFftDefs
-import Zcash.Vendor.CompPoly.Montgomery.Pasta
+import CompElliptic.Vendor.CompPoly.Montgomery.Pasta
 import Zcash.Arithmetic.Fft
 
 /-!

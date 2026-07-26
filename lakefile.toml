@@ -14,8 +14,8 @@ rev = "fca63dc777ca9de7f533a50196cdd1357d569f4f"
 
 [[require]]
 name = "CompElliptic"
-git = "https://github.com/daira/CompElliptic"
-rev = "a549e4555b17bbbe3c8d48aa7d5b493912ccfbe9"
+git = "https://github.com/mitschabaude-bot/CompElliptic.git"
+rev = "53b35333cb00b664e3cccabd0bc7f50700ff7929"
 
 # mathlib last, so that its pinned versions of the common transitive dependencies
 # (batteries, aesop, Qq, proofwidgets, ...) take precedence over CompPoly's.
@@ -40,33 +40,40 @@ name = "Zcash"
 name = "FixtureCheck"
 globs = ["Zcash.Snark.Fixtures.+"]
 
-# The fast Pasta arithmetic: `Zcash/Arithmetic/` (ironwood-permanent, mathlib-side) and the two
-# temporary vendorings `Zcash/Vendor/CompPoly/` and `Zcash/Vendor/CompElliptic/`, whose READMEs
-# state their deletion criteria. Only part of these trees is reachable from the `Zcash` library
-# (`Zcash.Arithmetic.MontKernelAdapter` and `Zcash.Arithmetic.ScalarFftEquiv` have no importer
-# at all), so without a target of their own the unreached modules would silently stop being
-# compiled and warning-checked. In `defaultTargets`
+# The fast Pasta arithmetic: `Zcash/Arithmetic/` (ironwood-permanent, mathlib-side) and the
+# remaining temporary vendoring `Zcash/Vendor/CompPoly/` (the scalar FFT definitions), whose
+# README states its deletion criteria. Only part of these trees is reachable from the `Zcash`
+# library (`Zcash.Arithmetic.MontKernelAdapter` and `Zcash.Arithmetic.ScalarFftEquiv` have no
+# importer at all), so without a target of their own the unreached modules would silently stop
+# being compiled and warning-checked. In `defaultTargets`
 # so plain `lake build` -- what CI runs -- keeps every module honest.
 [[lean_lib]]
 name = "Arithmetic"
-globs = ["Zcash.Arithmetic.+", "Zcash.Vendor.CompPoly.+", "Zcash.Vendor.CompElliptic.+"]
+globs = ["Zcash.Arithmetic.+", "Zcash.Vendor.CompPoly.+"]
 
 # The ONLY library in this repo with `precompileModules`. It is a core-only leaf: its modules
-# import nothing beyond Lean core, so native compilation covers ~4 files rather than a mathlib
-# import closure -- the latter is what OOM-crashed a 16 GB box on 2026-07-24. Everything
-# mathlib-side about these definitions lives in `Zcash.Vendor.CompPoly.Montgomery.Native64x8*`
-# and `Zcash/Arithmetic/`, which are NOT in this lane.
+# import nothing beyond Lean core, so native compilation covers a couple of files rather than a
+# mathlib import closure -- the latter is what OOM-crashed a 16 GB box on 2026-07-24. The field
+# and Vesta-point definitions now come from the CompElliptic pin's own precompiled
+# `FastFieldNative` lane; only the scalar FFT is still local. Everything mathlib-side about
+# these definitions lives in `Zcash/Arithmetic/`, which is NOT in this lane.
 #
-# `FastFieldNative` must keep a root module of the same name (`FastFieldNative.lean`): Lean
-# derives the dynlib's expected `initialize_…` symbol from the shared object's file name, and
-# without a matching module every importer fails with `error loading plugin, initializer not
-# found`.
+# `Zcash.FastFieldNative` must keep a root module of the same name
+# (`Zcash/FastFieldNative.lean`): Lean derives the dynlib's expected `initialize_…` symbol from
+# the shared object's file name, and without a matching module every importer fails with
+# `error loading plugin, initializer not found`.
+#
+# The name may NOT be a bare `FastFieldNative`, which is what the CompElliptic pin calls its own
+# precompiled lane. Lean module names are global across the build, so two `FastFieldNative.lean`
+# roots collide -- and they collide *silently*: `lake build` stays green, but Lake never emits
+# ironwood's shared object and `Zcash.Arithmetic.ScalarFftEquiv` is handed only the pin's
+# plugin, so `ScalarFftDefs` runs interpreted. A dotted `lean_lib` name is enough to keep them
+# apart; it yields `libZcash_Zcash_FastFieldNative.so`. Note this module is NOT in the `Zcash`
+# library: that lib's default glob is its root module alone, so the native lane stays a leaf.
 [[lean_lib]]
-name = "FastFieldNative"
+name = "Zcash.FastFieldNative"
 precompileModules = true
 globs = [
-  "FastFieldNative",
-  "Zcash.Vendor.CompPoly.Montgomery.Native64x8Defs",
-  "Zcash.Vendor.CompElliptic.ProjectiveMontDefs",
+  "Zcash.FastFieldNative",
   "Zcash.Vendor.CompPoly.ScalarFftDefs",
 ]

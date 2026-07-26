@@ -2,7 +2,7 @@
 Copyright (c) 2026 Ironwood Contributors.
 Released under the Apache License, Version 2.0.
 -/
-import Zcash.Vendor.CompElliptic.Projective
+import CompElliptic.Curves.Pasta.Fast.Projective
 import Zcash.Snark.Core.Field
 import CompElliptic.Curves.PastaOrder
 
