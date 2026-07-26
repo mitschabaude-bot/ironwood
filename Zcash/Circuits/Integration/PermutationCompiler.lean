@@ -132,6 +132,17 @@ theorem closeWithOperations_permutationColumns
   rw [fold_registerQueriedCells_permutationColumns,
     fold_registerQueriedCells_permutationColumns]
 
+/-- Closing a top-level circuit under its synthesis operations leaves the
+permutation columns computed by `configure` unchanged. -/
+theorem _root_.Halo2.TopLevelCircuit.constraintSystem_permutationColumns
+    {F ConfigInput Config : Type} [FiniteField F]
+    {Output : TypeMap} [CircuitType Output]
+    (top : TopLevelCircuit F ConfigInput Config Output) :
+    top.constraintSystem.permutationColumns =
+      (top.formalCircuit.configure
+        top.configInput {}).2.permutationColumns :=
+  closeWithOperations_permutationColumns _ _
+
 namespace Configure
 
 /-- A configure program only appends to the equality-enabled column list, and
@@ -311,6 +322,145 @@ theorem lookup {F : Type}
     omega
 
 end PermutationGrowthAtMost
+
+/-- A typeclass-facing wrapper around `PermutationGrowthAtMost`. Its output
+parameter lets instance synthesis calculate a configure program's syntactic
+append budget while constructing the compositional proof. -/
+class HasPermutationGrowthAtMost
+    {F A : Type} (program : Configure F A)
+    (bound : outParam ℕ) : Prop where
+  law : PermutationGrowthAtMost program bound
+
+namespace HasPermutationGrowthAtMost
+
+open PermutationGrowthAtMost
+
+instance pure {F A : Type} (value : A) :
+    HasPermutationGrowthAtMost
+      (pure value : Configure F A) 0 :=
+  ⟨PermutationGrowthAtMost.pure value⟩
+
+instance bind
+    {F A B : Type} {first : Configure F A}
+    {next : A → Configure F B} {left right : ℕ}
+    [hfirst : HasPermutationGrowthAtMost first left]
+    [hnext : ∀ value, HasPermutationGrowthAtMost (next value) right] :
+    HasPermutationGrowthAtMost (first >>= next) (left + right) :=
+  ⟨PermutationGrowthAtMost.bind hfirst.law
+    fun value => (hnext value).law⟩
+
+instance adviceColumn {F : Type} :
+    HasPermutationGrowthAtMost
+      (Halo2.adviceColumn : Configure F _) 0 :=
+  ⟨PermutationGrowthAtMost.adviceColumn⟩
+
+instance fixedColumn {F : Type} :
+    HasPermutationGrowthAtMost
+      (Halo2.fixedColumn : Configure F _) 0 :=
+  ⟨PermutationGrowthAtMost.fixedColumn⟩
+
+instance instanceColumn {F : Type} :
+    HasPermutationGrowthAtMost
+      (Halo2.instanceColumn : Configure F _) 0 :=
+  ⟨PermutationGrowthAtMost.instanceColumn⟩
+
+instance selector {F : Type} :
+    HasPermutationGrowthAtMost
+      (Halo2.selector : Configure F _) 0 :=
+  ⟨PermutationGrowthAtMost.selector⟩
+
+instance complexSelector {F : Type} :
+    HasPermutationGrowthAtMost
+      (Halo2.complexSelector : Configure F _) 0 :=
+  ⟨PermutationGrowthAtMost.complexSelector⟩
+
+instance enableEquality {F : Type} (column : AnyColumn) :
+    HasPermutationGrowthAtMost
+      (Halo2.enableEquality (F := F) column) 1 :=
+  ⟨PermutationGrowthAtMost.enableEquality column⟩
+
+instance enableConstant {F : Type} (column : Column .fixed) :
+    HasPermutationGrowthAtMost
+      (Halo2.enableConstant (F := F) column) 1 :=
+  ⟨PermutationGrowthAtMost.enableConstant column⟩
+
+instance lookupTableColumn {F : Type} :
+    HasPermutationGrowthAtMost
+      (Halo2.lookupTableColumn : Configure F _) 0 :=
+  ⟨PermutationGrowthAtMost.lookupTableColumn⟩
+
+instance createGate {F : Type} (gate : Gate F) :
+    HasPermutationGrowthAtMost
+      (Halo2.createGate gate) 0 :=
+  ⟨PermutationGrowthAtMost.createGate gate⟩
+
+instance lookup {F : Type}
+    (queriedCells : List (Expression F Query))
+    (tableMap : List (Expression F Query × TableColumn)) :
+    HasPermutationGrowthAtMost
+      (Halo2.lookup queriedCells tableMap) 0 :=
+  ⟨PermutationGrowthAtMost.lookup queriedCells tableMap⟩
+
+end HasPermutationGrowthAtMost
+
+/-- A configure program is guaranteed to leave a nonempty permutation-column
+list. Instance synthesis finds an equality/constant enablement in the program
+and uses the compositional prefix invariant for everything that follows it. -/
+class GuaranteesPermutationNonempty
+    {F A : Type} (program : Configure F A) : Prop where
+  nonempty : ∀ cs,
+    (program cs).2.permutationColumns ≠ []
+
+namespace GuaranteesPermutationNonempty
+
+instance enableEquality {F : Type} (column : AnyColumn) :
+    GuaranteesPermutationNonempty
+      (Halo2.enableEquality (F := F) column) :=
+  ⟨PermutationGrowthAtMost.enableEquality_nonempty column⟩
+
+instance enableConstant {F : Type} (column : Column .fixed) :
+    GuaranteesPermutationNonempty
+      (Halo2.enableConstant (F := F) column) := by
+  constructor
+  intro cs
+  simp only [Halo2.enableConstant]
+  rw [queryFixedIndex_permutationColumns]
+  split
+  · intro hempty
+    rw [hempty] at ‹column.toAny ∈ cs.permutationColumns›
+    simp_all
+  · simp
+
+/-- Once the first action has produced a column, the continuation's prefix
+property prevents it from being erased. -/
+instance (priority := 100) bindOfFirst
+    {F A B : Type} {first : Configure F A}
+    {next : A → Configure F B} {right : ℕ}
+    [hfirst : GuaranteesPermutationNonempty first]
+    [hnext : ∀ value,
+      HasPermutationGrowthAtMost (next value) right] :
+    GuaranteesPermutationNonempty (first >>= next) := by
+  constructor
+  intro cs
+  have hsource := hfirst.nonempty cs
+  have hprefix :=
+    (hnext (first cs).1).law.preservesPrefix (first cs).2
+  apply List.ne_nil_of_length_pos
+  exact lt_of_lt_of_le
+    (List.length_pos_iff_ne_nil.mpr hsource)
+    hprefix.length_le
+
+/-- Otherwise instance synthesis may find the first guaranteed enablement in
+the continuation. -/
+instance (priority := 90) bindOfNext
+    {F A B : Type} {first : Configure F A}
+    {next : A → Configure F B}
+    [hnext : ∀ value,
+      GuaranteesPermutationNonempty (next value)] :
+    GuaranteesPermutationNonempty (first >>= next) :=
+  ⟨fun cs => (hnext (first cs).1).nonempty (first cs).2⟩
+
+end GuaranteesPermutationNonempty
 
 end Configure
 

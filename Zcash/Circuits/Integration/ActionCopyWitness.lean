@@ -25,7 +25,7 @@ set_option maxRecDepth 100000
 def actionPermCols : List ColRef :=
   permColsOf orchardActionTopLevelCircuit.constraintSystem
 
-/-- The permutation-column count (15 for the deployed Action circuit). -/
+/-- The permutation-column count derived from the Action circuit. -/
 def actionNumPermCols : ℕ := actionPermCols.length
 
 /-- The evaluation-domain size at the derived exponent. -/
@@ -50,11 +50,8 @@ def actionActiveRows : ℕ :=
 theorem actionNumPermCols_pos : 0 < actionNumPermCols := by
   rw [actionNumPermCols, actionPermCols, Keygen.permColsOf,
     List.length_map]
-  have hcolumns :
-      orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length =
-        15 :=
-    ActionPermutationDomain.permutationColumnCount_eq
-  omega
+  exact List.length_pos_iff_ne_nil.mpr
+    ActionPermutationDomain.permutationColumns_nonempty
 
 theorem actionDomainSize_pos : 0 < actionDomainSize :=
   Nat.two_pow_pos _

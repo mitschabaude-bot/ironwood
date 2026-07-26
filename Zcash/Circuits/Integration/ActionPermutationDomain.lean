@@ -1,4 +1,5 @@
 import Zcash.Circuits.Integration.ActionPermutationDomainCompute
+import Zcash.Circuits.Integration.ActionPermutationColumns
 import Zcash.Circuits.Integration.PermutationCompiler
 import Zcash.Snark.Soundness.CanonicalConstraintModel
 import Zcash.Circuits.Integration.TopLevelAssignment
@@ -397,16 +398,10 @@ theorem namesInjective
               (j'.2 : ℕ) <
             orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length := by
         omega
-      have hcolumns :
-          orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length =
-            15 :=
-        permutationColumnCount_eq
       have hsupported :
           orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length ≤
-            pastaOddFactor := by
-        rw [hcolumns]
-        norm_num [pastaOddFactor, deltaFpOrder, scalarFieldOrder,
-          CompElliptic.Fields.Pasta.PALLAS_BASE_CARD]
+            pastaOddFactor :=
+        permutationColumns_le_delta
       have hglobal :
           (⟨(j.1 : ℕ) *
                 orchardActionTopLevelCircuit.constraintSystem.chunkLen +

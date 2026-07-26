@@ -21,14 +21,6 @@ theorem domainExponent_lt :
     orchardActionTopLevelCircuit.domainExponent < 33 :=
   ActionGateCoherence.domainExponent_lt
 
-/-- The Action permutation-column prefix fits easily inside `deltaFp`'s
-certified order. This residual concrete count awaits a configure law bounding the
-derived equality-enabled column list. -/
-theorem permutationColumnCount_eq :
-    orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length =
-      15 := by
-  native_decide
-
 def ColumnRefCoherent : ColumnRef → Prop
   | .advice i =>
       i < orchardActionTopLevelCircuit.pinnedCS.adviceQueryLayout.length ∧
@@ -111,7 +103,6 @@ theorem routingCoherent :
   simp at hmem
 
 assert_no_sorry domainExponent_lt
-assert_no_sorry permutationColumnCount_eq
 assert_no_sorry routingFailures_eq_nil
 assert_no_sorry routingCoherent
 

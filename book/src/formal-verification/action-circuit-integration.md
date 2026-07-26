@@ -43,6 +43,10 @@ and keep it out of foundational interfaces where it could silently become perman
 
 The follow-on design for eliminating the Action-specific certificates is
 [`lawfulness-and-certificate-elimination.md`](../../../Zcash/Circuits/Integration/lawfulness-and-certificate-elimination.md).
+Its first implementation pass is complete: every item classified `R` (remove the
+Action-specific demand) or `G` (derive from existing generic guarantees) has been
+closed without changing any `L`-classified lawfulness decision. The remaining
+certificate work is exactly the local-law design arc recorded in that document.
 It includes correctness obligations currently hidden by `closeWithOperations`: the
 canonical keygen pipeline should reject configure/synthesis mismatch rather than
 repair it and rely on the concrete VK comparison to make the repair appear harmless.
