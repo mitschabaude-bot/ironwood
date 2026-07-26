@@ -79,34 +79,26 @@ theorem actionPermutationRows_eq_chunkRowName
     (actionVk pp urs).chunkLen
     (Zcash.Snark.actionChunkFlatten pp urs poly proofIndex)
   · intro rc
-    let hcl : 0 < (actionVk pp urs).chunkLen := by
-      rw [Zcash.Snark.actionChunkLen_eq]
-      decide
+    let hcl : 0 < (actionVk pp urs).chunkLen :=
+      Zcash.Snark.actionChunkLen_pos pp urs
     let hcover :
         Zcash.Snark.actionNumPermCols ≤
           (actionShape pp).numPermutationSets *
-            (actionVk pp urs).chunkLen := by
-      rw [Zcash.Snark.actionNumPermCols_eq,
-        Zcash.Snark.actionNumPermutationSets_eq,
-        Zcash.Snark.actionChunkLen_eq]
-      decide
+            (actionVk pp urs).chunkLen :=
+      Zcash.Snark.actionPermutationChunks_cover pp urs
     let hw := Zcash.Snark.actionResolverChunkWidth
       pp urs poly proofIndex
     exact congrArg Fin.val
       (Zcash.Snark.Layout.Asm.chunkFlatten_symm_apply_row
         hcl hcover hw rc)
   · intro rc
-    let hcl : 0 < (actionVk pp urs).chunkLen := by
-      rw [Zcash.Snark.actionChunkLen_eq]
-      decide
+    let hcl : 0 < (actionVk pp urs).chunkLen :=
+      Zcash.Snark.actionChunkLen_pos pp urs
     let hcover :
         Zcash.Snark.actionNumPermCols ≤
           (actionShape pp).numPermutationSets *
-            (actionVk pp urs).chunkLen := by
-      rw [Zcash.Snark.actionNumPermCols_eq,
-        Zcash.Snark.actionNumPermutationSets_eq,
-        Zcash.Snark.actionChunkLen_eq]
-      decide
+            (actionVk pp urs).chunkLen :=
+      Zcash.Snark.actionPermutationChunks_cover pp urs
     let hw := Zcash.Snark.actionResolverChunkWidth
       pp urs poly proofIndex
     exact Zcash.Snark.Layout.Asm.chunkFlatten_symm_apply_column
@@ -137,8 +129,10 @@ theorem actionChunkCommonIndex
   let vk := actionVk pp urs
   let flatten := Zcash.Snark.actionChunkFlatten pp urs poly proofIndex
   let global : ℕ := (flatten ⟨chunk, row, column⟩).2
-  have hchunk : (chunk : ℕ) < 3 := by
-    simpa only [Zcash.Snark.actionNumPermutationSets_eq] using chunk.isLt
+  have hchunk :
+      (chunk : ℕ) < vk.permutationChunks.length := by
+    rw [chunkCount]
+    exact chunk.isLt
   have hcolumn :
       (column : ℕ) <
         (vk.permutationChunks.getD chunk []).length := by
@@ -147,16 +141,8 @@ theorem actionChunkCommonIndex
   have hprefix :
       (vk.permutationChunks.take chunk).flatten.length =
         (chunk : ℕ) * vk.chunkLen := by
-    rw [permutationChunks_eq, Zcash.Snark.actionChunkLen_eq]
-    have hcases :
-        (chunk : ℕ) = 0 ∨ (chunk : ℕ) = 1 ∨
-          (chunk : ℕ) = 2 := by
-      omega
-    rcases hcases with hzero | hone | htwo
-    · simp only [hzero, List.take_zero, List.flatten_nil,
-        List.length_nil, Nat.zero_mul]
-    · norm_num [hone]
-    · norm_num [htwo]
+    exact topLevelPermutationChunks_take_flatten_length
+      orchardActionTopLevelCircuit pp urs chunk hchunk
   have hglobal :
       global <
         orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length := by

@@ -19,6 +19,8 @@ namespace Zcash.Snark
 open Halo2 Halo2.Layout Zcash.Circuits Zcash.Circuits.Action
 open Keygen
 
+set_option maxRecDepth 100000
+
 /-- Action's permutation columns, in verifying-key order. -/
 def actionPermCols : List ColRef :=
   permColsOf orchardActionTopLevelCircuit.constraintSystem
@@ -123,41 +125,13 @@ theorem actionReplayPreservesActive
     exact actionCopyRowsActive pair hpair
   · exact hcell
 
-set_option maxRecDepth 100000 in
-/-- The Action permutation argument has three chunks. -/
-theorem actionNumPermutationSets_eq
-    (pp : ProofParams) :
-    (ActionPermutationDomain.actionShape pp).numPermutationSets = 3 := by
-  change
-    (orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length +
-        orchardActionTopLevelCircuit.constraintSystem.chunkLen - 1) /
-      orchardActionTopLevelCircuit.constraintSystem.chunkLen = 3
-  have hdata := ActionPermutationDomain.columnCount_chunkLen_eq
-  have hcolumns :
-      orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length =
-        15 :=
-    congrArg Prod.fst hdata
-  have hchunkLen :
-      orchardActionTopLevelCircuit.constraintSystem.chunkLen = 7 :=
-    congrArg Prod.snd hdata
-  rw [hcolumns, hchunkLen]
+/-- The replay's flat column count is the circuit-derived permutation-column count. -/
+theorem actionNumPermCols_eq_derived :
+    actionNumPermCols =
+      orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length := by
+  simp [actionNumPermCols, actionPermCols, Keygen.permColsOf]
 
-/-- The Action permutation argument has 15 columns. -/
-theorem actionNumPermCols_eq : actionNumPermCols = 15 := by
-  native_decide
-
-set_option maxRecDepth 100000 in
-/-- The Action permutation chunk width is seven. -/
-theorem actionChunkLen_eq
-    {G : Type} [AddCommGroup G] [Inhabited G]
-    (pp : ProofParams) (urs : URS G) :
-    (ActionPermutationDomain.actionVk pp urs).chunkLen = 7 := by
-  change orchardActionTopLevelCircuit.constraintSystem.chunkLen = 7
-  exact congrArg Prod.snd
-    ActionPermutationDomain.columnCount_chunkLen_eq
-
-set_option maxRecDepth 100000 in
-/-- Resolver-backed Action permutation chunks have the exact `[7,7,1]` widths. -/
+/-- Resolver-backed Action permutation chunks have the compiler-derived width. -/
 theorem actionResolverChunkWidth
     {G : Type} [AddCommGroup G] [Inhabited G]
     (pp : ProofParams) (urs : URS G)
@@ -175,19 +149,49 @@ theorem actionResolverChunkWidth
             (ActionPermutationDomain.actionVk pp urs).chunkLen) := by
   simp only [ResolverPermutationPairs,
     permutationChunkPairsOfResolver, List.length_map]
-  rw [ActionPermutationDomain.permutationChunks_eq,
-    actionChunkLen_eq, actionNumPermCols_eq]
-  have hchunk : (chunk : ℕ) < 3 := by
-    simpa only [actionNumPermutationSets_eq] using chunk.isLt
-  have hcases :
-      (chunk : ℕ) = 0 ∨ (chunk : ℕ) = 1 ∨ (chunk : ℕ) = 2 := by
-    omega
-  rcases hcases with hzero | hone | htwo
-  · simp [hzero]
-  · simp [hone]
-  · simp [htwo]
+  have hi :
+      (chunk : ℕ) <
+        (Keygen.permutationChunksOf
+          orchardActionTopLevelCircuit.selectorMap
+          orchardActionTopLevelCircuit.constraintSystem).length := by
+    rw [permutationChunksOf_length]
+    exact chunk.isLt
+  change
+    ((Keygen.permutationChunksOf
+      orchardActionTopLevelCircuit.selectorMap
+      orchardActionTopLevelCircuit.constraintSystem).getD chunk []).length =
+      min orchardActionTopLevelCircuit.constraintSystem.chunkLen
+        (actionNumPermCols -
+          (chunk : ℕ) *
+            orchardActionTopLevelCircuit.constraintSystem.chunkLen)
+  rw [actionNumPermCols_eq_derived]
+  exact permutationChunksOf_getD_length _ _ chunk hi
 
-/-- Flatten the derived `[7,7,1]` Action chunks to `(row, global column)`. -/
+/-- The circuit-derived Action permutation chunk width is positive. -/
+theorem actionChunkLen_pos
+    {G : Type} [AddCommGroup G] [Inhabited G]
+    (pp : ProofParams) (urs : URS G) :
+    0 < (ActionPermutationDomain.actionVk pp urs).chunkLen :=
+  constraintSystem_chunkLen_pos
+    orchardActionTopLevelCircuit.constraintSystem
+
+/-- The derived chunk family has enough total slots for every Action
+permutation column. -/
+theorem actionPermutationChunks_cover
+    {G : Type} [AddCommGroup G] [Inhabited G]
+    (pp : ProofParams) (urs : URS G) :
+    actionNumPermCols ≤
+      (ActionPermutationDomain.actionShape pp).numPermutationSets *
+        (ActionPermutationDomain.actionVk pp urs).chunkLen := by
+  rw [actionNumPermCols_eq_derived]
+  have hcover :=
+    permutationColumns_length_le_chunks_mul
+      orchardActionTopLevelCircuit.selectorMap
+      orchardActionTopLevelCircuit.constraintSystem
+  rw [permutationChunksOf_length] at hcover
+  exact hcover
+
+/-- Flatten the compiler-derived Action chunks to `(row, global column)`. -/
 noncomputable def actionChunkFlatten
     {G : Type} [AddCommGroup G] [Inhabited G]
     (pp : ProofParams) (urs : URS G)
@@ -207,11 +211,8 @@ noncomputable def actionChunkFlatten
       (ResolverPermutationPairs
         (ActionPermutationDomain.actionVk pp urs)
         poly proofIndex chunk).length)
-    (by rw [actionChunkLen_eq]; decide)
-    (by
-      rw [actionNumPermCols_eq, actionNumPermutationSets_eq,
-        actionChunkLen_eq]
-      decide)
+    (actionChunkLen_pos pp urs)
+    (actionPermutationChunks_cover pp urs)
     (actionResolverChunkWidth pp urs poly proofIndex)
 
 /-- The full-domain Action keygen permutation in resolver chunk coordinates. -/
@@ -394,7 +395,8 @@ theorem actionActiveChunkCell_columnAddress
         (actionPermCols.map ColRef.toAny).length := by
     simpa only [List.length_map] using flat.1.isLt
   have hcoordinate :
-      (cell.1 : ℕ) * 7 + (cell.2.2 : ℕ) = (flat.1 : ℕ) := by
+      (cell.1 : ℕ) * vk.chunkLen + (cell.2.2 : ℕ) =
+        (flat.1 : ℕ) := by
     have hflatten :=
       actionActiveChunkCell_flatten
         pp urs poly proofIndex flat hrow
@@ -402,31 +404,24 @@ theorem actionActiveChunkCell_columnAddress
       congrArg (fun coordinate => (coordinate.2 : ℕ)) hflatten
     simpa only [actionChunkFlatten,
       _root_.Zcash.Snark.Layout.Asm.chunkFlatten,
-      actionChunkLen_eq, cell] using hsecond
+      cell, vk] using hsecond
   have hindex :
       (vk.permutationChunks.take cell.1).flatten.length +
           (cell.2.2 : ℕ) =
         (flat.1 : ℕ) := by
-    have hcellChunk : (cell.1 : ℕ) < 3 := by
-      simpa only [cell, actionNumPermutationSets_eq] using cell.1.isLt
-    have hcases :
-        (cell.1 : ℕ) = 0 ∨ (cell.1 : ℕ) = 1 ∨
-          (cell.1 : ℕ) = 2 := by
-      omega
-    rw [ActionPermutationDomain.permutationChunks_eq]
-    rcases hcases with hzero | hone | htwo
-    · simp only [hzero, List.take_zero, List.flatten_nil,
-        List.length_nil, Nat.zero_add]
-      simpa only [hzero, Nat.zero_mul, Nat.zero_add] using hcoordinate
-    · simp only [hone, List.take_succ_cons, List.take_zero,
-        List.flatten_cons, List.flatten_nil, List.append_nil,
-        List.length_cons, List.length_nil, Nat.reduceAdd]
-      simpa only [hone, Nat.one_mul] using hcoordinate
-    · simp only [htwo, List.take_succ_cons, List.take_zero,
-        List.flatten_cons, List.flatten_nil, List.append_nil,
-        List.length_append, List.length_cons, List.length_nil,
-        Nat.reduceAdd]
-      simpa only [htwo, Nat.reduceMul] using hcoordinate
+    have hprefix :
+        (vk.permutationChunks.take cell.1).flatten.length =
+          (cell.1 : ℕ) * vk.chunkLen := by
+      change
+        ((Keygen.permutationChunksOf
+          orchardActionTopLevelCircuit.selectorMap
+          orchardActionTopLevelCircuit.constraintSystem).take
+            cell.1).flatten.length =
+          (cell.1 : ℕ) *
+            orchardActionTopLevelCircuit.constraintSystem.chunkLen
+      exact permutationChunksOf_take_flatten_length _ _ cell.1 hchunk
+    rw [hprefix]
+    exact hcoordinate
   have hdecoded := decodedChunkAddress_eq_sourceColumn
     (fun reference =>
       permutationColumnAddress vk reference.1)

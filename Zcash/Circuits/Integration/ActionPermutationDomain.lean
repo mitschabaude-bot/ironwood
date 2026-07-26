@@ -33,62 +33,19 @@ abbrev actionVk (pp : Keygen.ProofParams) (urs : URS G) :
   Halo2.TopLevelCircuit.toVerifierKey
     orchardActionTopLevelCircuit pp urs
 
-/-- The permutation chunks of every derived Action VK are `[7, 7, 1]`, with
-the verifier's exact query-layout and common-column indices. -/
-theorem permutationChunks_eq (pp : Keygen.ProofParams) (urs : URS G) :
-    (actionVk pp urs).permutationChunks =
-      [[(.instance 0, 0), (.advice 0, 1), (.advice 1, 2),
-          (.advice 2, 3), (.advice 3, 4), (.advice 4, 5),
-          (.advice 5, 6)],
-        [(.advice 6, 7), (.advice 7, 8), (.advice 8, 9),
-          (.advice 9, 10), (.fixed 0, 11), (.fixed 7, 12),
-          (.fixed 8, 13)],
-        [(.fixed 9, 14)]] := by
-  change
-    Keygen.permutationChunksOf orchardActionTopLevelCircuit.selectorMap
-        orchardActionTopLevelCircuit.constraintSystem = _
-  exact chunks_eq
-
 set_option maxRecDepth 100000 in
 /-- The derived Action VK has one verifier permutation set per chunk. -/
 theorem chunkCount (pp : Keygen.ProofParams) (urs : URS G) :
     (actionVk pp urs).permutationChunks.length =
       (actionShape pp).numPermutationSets := by
-  rw [permutationChunks_eq]
-  change 3 =
+  change
+    (Keygen.permutationChunksOf
+      orchardActionTopLevelCircuit.selectorMap
+      orchardActionTopLevelCircuit.constraintSystem).length =
     (orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length +
       orchardActionTopLevelCircuit.constraintSystem.chunkLen - 1) /
       orchardActionTopLevelCircuit.constraintSystem.chunkLen
-  have hcolumns :
-      orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length = 15 :=
-    congrArg Prod.fst columnCount_chunkLen_eq
-  have hchunkLen :
-      orchardActionTopLevelCircuit.constraintSystem.chunkLen = 7 :=
-    congrArg Prod.snd columnCount_chunkLen_eq
-  rw [hcolumns, hchunkLen]
-
-set_option maxRecDepth 100000 in
-/-- The Action verifier's permutation chunk family is nonempty. -/
-theorem nonempty (pp : Keygen.ProofParams) :
-    0 < (actionShape pp).numPermutationSets := by
-  change 0 <
-    (orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length +
-      orchardActionTopLevelCircuit.constraintSystem.chunkLen - 1) /
-      orchardActionTopLevelCircuit.constraintSystem.chunkLen
-  have hcolumns :
-      orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length = 15 :=
-    congrArg Prod.fst columnCount_chunkLen_eq
-  have hchunkLen :
-      orchardActionTopLevelCircuit.constraintSystem.chunkLen = 7 :=
-    congrArg Prod.snd columnCount_chunkLen_eq
-  rw [hcolumns, hchunkLen]
-  decide
-
-/-- The concrete chunk widths retained for consumers that need their exact values. -/
-theorem chunkLengths (pp : Keygen.ProofParams) (urs : URS G) :
-    (actionVk pp urs).permutationChunks.map List.length = [7, 7, 1] := by
-  rw [permutationChunks_eq]
-  decide
+  exact permutationChunksOf_length _ _
 
 set_option maxRecDepth 100000 in
 /-- Every derived Action permutation chunk has width at most `vk.chunkLen`. -/
@@ -97,25 +54,20 @@ theorem chunkLength_le (pp : Keygen.ProofParams) (urs : URS G) :
       ((actionVk pp urs).permutationChunks.getD i []).length ≤
         (actionVk pp urs).chunkLen := by
   intro i hi
-  rw [permutationChunks_eq]
   change
-    ([[((.instance 0, 0) : ColumnRef × ℕ), (.advice 0, 1), (.advice 1, 2),
-          (.advice 2, 3), (.advice 3, 4), (.advice 4, 5),
-          (.advice 5, 6)],
-        [(.advice 6, 7), (.advice 7, 8), (.advice 8, 9),
-          (.advice 9, 10), (.fixed 0, 11), (.fixed 7, 12),
-          (.fixed 8, 13)],
-        [(.fixed 9, 14)]].getD i []).length ≤
+    ((Keygen.permutationChunksOf
+      orchardActionTopLevelCircuit.selectorMap
+      orchardActionTopLevelCircuit.constraintSystem).getD i []).length ≤
       orchardActionTopLevelCircuit.constraintSystem.chunkLen
-  have hdata := columnCount_chunkLen_eq
-  have hsets : (actionShape pp).numPermutationSets = 3 := by
-    simpa using (chunkCount pp urs).symm.trans (by simp [permutationChunks_eq])
-  rw [hsets] at hi
-  have hlen :
-      orchardActionTopLevelCircuit.constraintSystem.chunkLen = 7 :=
-    congrArg Prod.snd hdata
-  rw [hlen]
-  interval_cases i <;> decide
+  have hiChunks :
+      i <
+        (Keygen.permutationChunksOf
+          orchardActionTopLevelCircuit.selectorMap
+          orchardActionTopLevelCircuit.constraintSystem).length := by
+    rw [permutationChunksOf_length]
+    exact hi
+  rw [permutationChunksOf_getD_length _ _ i hiChunks]
+  exact min_le_left _ _
 
 /-- Resolver pairing preserves each concrete VK chunk's width. -/
 theorem resolverPairsLength_le
@@ -308,7 +260,7 @@ theorem domain
       ((actionVk pp urs).n - (actionVk pp urs).blindingFactors - 1) := by
   exact ResolverPermutationDomain.ofCanonicalConstraintModel
     (actionVk pp urs) ch poly (blindingFactors_lt pp urs)
-      (rowsInjective pp urs) (root pp urs) (nonempty pp)
+      (rowsInjective pp urs) (root pp urs)
       (chunkCount pp urs)
 
 /-- The last usable Action row is exactly the verifier's negative rotation. -/
@@ -485,7 +437,6 @@ noncomputable def cycleOfKeygenColumns
   cycleOfKeygenColumnsAt pp urs poly p (activeRows_le pp urs)
     fullSigma sigma hcolumns hrestrict
 
-assert_no_sorry permutationChunks_eq
 assert_no_sorry routingCoherent_of_derived
 assert_no_sorry deltaFp_actionCosets
 assert_no_sorry domain

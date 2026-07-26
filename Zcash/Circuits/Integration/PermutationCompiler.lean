@@ -1,4 +1,5 @@
 import Zcash.Circuits.Integration.ResolverQueryEnvironment
+import Zcash.Circuits.Integration.ListChunks
 import Zcash.Snark.Keygen.Pipeline
 
 /-!
@@ -19,39 +20,6 @@ namespace Zcash.Snark
 open Halo2
 
 set_option maxHeartbeats 20000
-
-/-- Flattening the accumulator implementation of `List.toChunks` preserves its
-processed prefix and unprocessed suffix. -/
-theorem listToChunksGo_flatten {α : Type} (n : ℕ)
-    (xs : List α) (current : Array α) (chunks : Array (List α)) :
-    (List.toChunks.go n xs current chunks).flatten =
-      chunks.toList.flatten ++ current.toList ++ xs := by
-  induction xs generalizing current chunks with
-  | nil =>
-      simp [List.toChunks.go]
-  | cons x xs ih =>
-      simp only [List.toChunks.go]
-      split
-      · rw [ih]
-        simp [List.flatten_append, List.append_assoc]
-      · rw [ih]
-        simp [List.append_assoc]
-
-/-- Splitting a list into chunks and flattening it is the identity, including
-the `chunkSize = 0` convention. -/
-theorem listToChunks_flatten {α : Type} (chunkSize : ℕ) (xs : List α) :
-    (xs.toChunks chunkSize).flatten = xs := by
-  cases chunkSize with
-  | zero =>
-      cases xs <;> simp [List.toChunks]
-  | succ chunkSize =>
-      cases xs with
-      | nil => simp [List.toChunks]
-      | cons x xs =>
-          rw [List.toChunks]
-          rw [listToChunksGo_flatten]
-          simp_all
-          all_goals omega
 
 /-- An in-range `findIdx` decodes to the element it searched for. -/
 theorem getD_findIdx_eq_target
@@ -165,6 +133,102 @@ theorem permutationChunksOf_flatten
   funext column
   rcases column with ⟨kind, index⟩
   cases kind <;> rfl
+
+/-- Halo2's permutation chunk width is positive for every constraint system:
+`csDegree` is at least the permutation argument's baseline degree three. -/
+theorem constraintSystem_chunkLen_pos (cs : ConstraintSystem Fp) :
+    0 < cs.chunkLen := by
+  unfold ConstraintSystem.chunkLen csDegree
+  dsimp only
+  have hdegree :
+      3 ≤
+        max 3
+          (max
+            (List.foldl
+              (fun m lookup => max m lookup.requiredDegree)
+              1 cs.lookups)
+            (List.foldl
+              (fun m expression => max m expression.degree)
+              0 (flatGates cs))) :=
+    le_max_left _ _
+  omega
+
+/-- The compiler emits exactly the ceiling number of chunks recorded in `Shape`. -/
+theorem permutationChunksOf_length
+    (map : SelCompressMap) (cs : ConstraintSystem Fp) :
+    (Keygen.permutationChunksOf map cs).length =
+      (cs.permutationColumns.length + cs.chunkLen - 1) / cs.chunkLen := by
+  unfold Keygen.permutationChunksOf
+  rw [listToChunks_length _ _ (constraintSystem_chunkLen_pos cs)]
+  simp
+
+/-- Each compiler chunk has the standard full-or-final-remainder width. -/
+theorem permutationChunksOf_getD_length
+    (map : SelCompressMap) (cs : ConstraintSystem Fp)
+    (i : ℕ) (hi : i < (Keygen.permutationChunksOf map cs).length) :
+    ((Keygen.permutationChunksOf map cs).getD i []).length =
+      min cs.chunkLen
+        (cs.permutationColumns.length - i * cs.chunkLen) := by
+  unfold Keygen.permutationChunksOf at hi ⊢
+  rw [listToChunks_getD_length _ _
+    (constraintSystem_chunkLen_pos cs) i hi]
+  simp
+
+/-- Every prefix ending before a valid compiler chunk contains `i * chunkLen`
+permutation columns. -/
+theorem permutationChunksOf_take_flatten_length
+    (map : SelCompressMap) (cs : ConstraintSystem Fp)
+    (i : ℕ) (hi : i < (Keygen.permutationChunksOf map cs).length) :
+    ((Keygen.permutationChunksOf map cs).take i).flatten.length =
+      i * cs.chunkLen := by
+  unfold Keygen.permutationChunksOf at hi ⊢
+  apply take_flatten_length_of_dropLast_full
+  · exact listToChunks_dropLast_full _ _
+      (constraintSystem_chunkLen_pos cs)
+  · exact hi
+
+/-- Top-level keygen exposes the compiler prefix law without requiring downstream
+proofs to unfold a concrete circuit or verifying-key constructor. -/
+theorem topLevelPermutationChunks_take_flatten_length
+    {G : Type} [AddCommGroup G] [Inhabited G]
+    {ConfigInput Config : Type} {Output : TypeMap} [CircuitType Output]
+    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    (pp : Keygen.ProofParams) (urs : URS G)
+    (i : ℕ) (hi : i < (top.toVerifierKey pp urs).permutationChunks.length) :
+    (((top.toVerifierKey pp urs).permutationChunks.take i).flatten.length) =
+      i * (top.toVerifierKey pp urs).chunkLen := by
+  exact permutationChunksOf_take_flatten_length
+    top.selectorMap top.constraintSystem i hi
+
+/-- The compiler's chunk family has enough total slots for every permutation
+column, without requiring the family itself to be nonempty. -/
+theorem permutationColumns_length_le_chunks_mul
+    (map : SelCompressMap) (cs : ConstraintSystem Fp) :
+    cs.permutationColumns.length ≤
+      (Keygen.permutationChunksOf map cs).length * cs.chunkLen := by
+  let source :=
+    (cs.permutationColumns.map
+      (permutationQueryReference (projectCS map cs))).zipIdx
+  have hall :
+      (source.toChunks cs.chunkLen).Forall
+        fun chunk => chunk.length ≤ cs.chunkLen :=
+    listToChunks_all_le cs.chunkLen source
+      (constraintSystem_chunkLen_pos cs)
+  have hbound :=
+    flatten_length_le_mul_of_forall
+      (source.toChunks cs.chunkLen) cs.chunkLen hall
+  rw [listToChunks_flatten] at hbound
+  have hchunks :
+      Keygen.permutationChunksOf map cs =
+        source.toChunks cs.chunkLen := by
+    simp only [Keygen.permutationChunksOf, source]
+    apply congrArg (List.toChunks cs.chunkLen)
+    congr 2
+    funext column
+    rcases column with ⟨kind, index⟩
+    cases kind <;> rfl
+  rw [hchunks]
+  simpa only [source, List.length_zipIdx, List.length_map] using hbound
 
 /-- A coherent compiled query reference decodes to the concrete column from
 which the compiler created it. -/
