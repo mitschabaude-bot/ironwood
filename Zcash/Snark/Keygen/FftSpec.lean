@@ -8,7 +8,7 @@ import Zcash.Snark.Soundness.InnerProduct
 /-!
 # The DFT specification of `bestFftG`
 
-`bestFftG` (`Zcash.Snark.Keygen.Pipeline`) is the Rust-mirroring radix-2 DIT group FFT —
+`bestFftG` (`Zcash.Arithmetic.Fft`) is the Rust-mirroring radix-2 DIT group FFT —
 bit-reversal permutation, twiddle table, `logN` rounds of imperative butterflies. This module
 proves its full mathematical specification: for an input of size `2^logN` and a primitive
 `2^logN`-th root of unity `ω`, the output is the group-valued discrete Fourier transform
@@ -27,9 +27,9 @@ generic in an `Fp`-module `G`. The `Module Fp G` premise is what lets the algori
 * `bestFftG` is split — definitionally, `bestFftG_decompose` is `rfl` — into its three
   verbatim phases `brPermImp`/`twImp`/`roundsImp`, and each imperative phase is converted to a
   pure `List.foldl` through the core `forIn`-to-`foldl` lemmas (the same route as
-  `Fast/FastFftPar.lean`).
+  `Arithmetic/FastFftPar.lean`).
 * A round of butterflies is characterized by the written/fresh fold invariant `InvG` — the
-  generic-`G` port of `Fast/FastFftPar.lean`'s disjointness argument: each butterfly reads only
+  generic-`G` port of `Arithmetic/FastFftPar.lean`'s disjointness argument: each butterfly reads only
   the two cells it writes, so after the round every cell holds its gathered value `gOutG`.
 * The heart is `ct_step`, the Cooley–Tukey butterfly identity for the bit-reversed DFT sums,
   and `rounds_dft`, the induction over rounds with the invariant "after round `r`, each
@@ -415,7 +415,7 @@ private theorem brFold_inv (a0 : Array G) (logN : ℕ) (hsize : a0.size = 2 ^ lo
 
 /-! ## The round invariant: written cells hold their gathered value
 
-The generic-`G` port of `Fast/FastFftPar.lean`'s disjointness argument, with the butterfly
+The generic-`G` port of `Arithmetic/FastFftPar.lean`'s disjointness argument, with the butterfly
 scalar action `tw.val • ·` of the transparent `bestFftG`. -/
 
 private def Written (half c jc i : ℕ) : Prop :=

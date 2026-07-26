@@ -2,13 +2,13 @@
 Copyright (c) 2026 Ironwood Contributors.
 Released under the Apache License, Version 2.0.
 -/
-import Zcash.Snark.Keygen.Pipeline
-import Zcash.Snark.Keygen.Fast.Projective
+import Zcash.Arithmetic.Fft
+import Zcash.Vendor.CompElliptic.Projective
 
 /-!
 # Vesta-specialized fast Lagrange-basis group FFT
 
-`bestFftG` (`Zcash.Snark.Keygen.Pipeline`) is the Rust-mirroring, group-generic radix-2 DIT FFT
+`bestFftG` (`Zcash.Arithmetic.Fft`) is the Rust-mirroring, group-generic radix-2 DIT FFT
 used to derive the Lagrange basis. Every butterfly evaluates `twiddle.val • point`, which for the
 affine group `G = SWPoint Vesta.curve` is a binary double-and-add over affine points — each affine
 add pays one field inversion (~255 field muls). At domain size `2^k` the FFT does `Θ(k·2^k)`

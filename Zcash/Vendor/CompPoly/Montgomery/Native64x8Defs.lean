@@ -16,8 +16,8 @@ the single module in the `FastFieldNative` precompiled lane: `precompileModules`
 the whole import closure, and a mathlib closure OOMs the build machine.
 
 All correctness statements about these definitions live in the sibling modules
-`Zcash.Vendor.Montgomery.Native64x8` (raw operations) and
-`Zcash.Vendor.Montgomery.Native64x8Mul` (CIOS multiplication), which import this one.
+`Zcash.Vendor.CompPoly.Montgomery.Native64x8` (raw operations) and
+`Zcash.Vendor.CompPoly.Montgomery.Native64x8Mul` (CIOS multiplication), which import this one.
 -/
 
 namespace Montgomery
@@ -247,7 +247,7 @@ subtraction. -/
 The two Pasta base fields, as plain data plus monomorphic wrappers.  Everything in this
 section is core-only so that it can live in the `FastFieldNative` precompiled lane; the
 `Mont64x8Field` instances that carry the correctness side conditions live in
-`Zcash.Vendor.Montgomery.Pasta`. -/
+`Zcash.Vendor.CompPoly.Montgomery.Pasta`. -/
 
 namespace VestaFq
 

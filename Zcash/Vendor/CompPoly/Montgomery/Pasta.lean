@@ -2,7 +2,7 @@
 Copyright (c) 2026 Ironwood Contributors.
 Released under the Apache License, Version 2.0.
 -/
-import Zcash.Vendor.Montgomery.Native64x8Field
+import Zcash.Vendor.CompPoly.Montgomery.Native64x8Field
 import CompElliptic.Fields.Pasta
 
 /-!
@@ -13,7 +13,7 @@ upstream CompPoly branch, which is self-contained and therefore carries its own 
 certificates, this vendored copy reuses the primes and certificates that ironwood already
 depends on through `CompElliptic.Fields.Pasta`, so that there is exactly one
 `Field (ZMod PALLAS_SCALAR_CARD)` instance in the repository and the Montgomery carrier
-bridges directly into the `Fq` of `Zcash.Snark.Keygen.Fast.Projective`.
+bridges directly into the `Fq` of `Zcash.Vendor.CompElliptic.Projective`.
 
 Note the Pasta naming: `PALLAS_SCALAR_CARD` is the **Vesta base** field size and
 `PALLAS_BASE_CARD` is the **Vesta scalar** field size.

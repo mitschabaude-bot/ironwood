@@ -2,10 +2,10 @@
 Copyright (c) 2026 Ironwood Contributors.
 Released under the Apache License, Version 2.0.
 -/
-import Zcash.Vendor.ScalarFftEquiv
+import Zcash.Arithmetic.ScalarFftEquiv
 import Zcash.Snark.Keygen.InvDft
-import Zcash.Snark.Keygen.Fast.MontKernelAdapter
-import Zcash.Snark.Keygen.Fast.VestaModule
+import Zcash.Arithmetic.MontKernelAdapter
+import Zcash.Arithmetic.VestaModule
 
 /-!
 # Native-lane adapters: committing through the scalar inverse DFT

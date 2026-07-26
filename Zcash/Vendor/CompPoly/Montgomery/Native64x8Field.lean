@@ -5,7 +5,7 @@ Authors: Gregor Mitscha-Baude
 -/
 
 import CompPoly.Fields.Basic
-import Zcash.Vendor.Montgomery.Native64x8Mul
+import Zcash.Vendor.CompPoly.Montgomery.Native64x8Mul
 import Mathlib.Algebra.Field.TransferInstance
 import Mathlib.FieldTheory.Finite.Basic
 

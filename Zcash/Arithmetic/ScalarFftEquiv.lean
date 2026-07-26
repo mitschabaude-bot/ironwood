@@ -2,14 +2,14 @@
 Copyright (c) 2026 Ironwood Contributors.
 Released under the Apache License, Version 2.0.
 -/
-import Zcash.Vendor.ScalarFftDefs
-import Zcash.Vendor.Montgomery.Pasta
-import Zcash.Vendor.NatKernelEquiv
+import Zcash.Vendor.CompPoly.ScalarFftDefs
+import Zcash.Vendor.CompPoly.Montgomery.Pasta
+import Zcash.Vendor.CompElliptic.NatKernelEquiv
 
 /-!
 # The scalar Montgomery FFT is the proven group FFT at `G := Fp`
 
-`Zcash.Vendor.ScalarFftDefs` is a zero-import transplant of the radix-2 DIT FFT onto the
+`Zcash.Vendor.CompPoly.ScalarFftDefs` is a zero-import transplant of the radix-2 DIT FFT onto the
 eight-limb Montgomery representation of the Vesta **scalar** field, so that it can sit in the
 `FastFieldNative` `precompileModules` leaf.  This module — mathlib-side, and therefore *not*
 in that lane — proves that the transplant computes `Keygen.bestFftG` instantiated at the

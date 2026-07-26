@@ -1,5 +1,5 @@
 import Zcash.Snark.Core.Msm
-import Zcash.Snark.Keygen.Fast.Msm
+import Zcash.Vendor.CompElliptic.Msm
 
 /-!
 # Fast compiled evaluation for the fingerprint MSM

@@ -1,5 +1,5 @@
 import Zcash.Snark.Keygen.Derivation
-import Zcash.Snark.Keygen.Fast.InvDftMont
+import Zcash.Snark.Keygen.InvDftMont
 import Zcash.Snark.Fixtures.SingleAction.Fixture
 
 /-!

@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Gregor Mitscha-Baude
 -/
 
-import Zcash.Vendor.Montgomery.Native64x8
+import Zcash.Vendor.CompPoly.Montgomery.Native64x8
 import Mathlib.Tactic.Linarith
 
 /-!

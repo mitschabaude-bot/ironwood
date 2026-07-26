@@ -2,12 +2,12 @@
 Copyright (c) 2026 Ironwood Contributors.
 Released under the Apache License, Version 2.0.
 -/
-import Zcash.Vendor.Montgomery.Native64x8Defs
+import Zcash.Vendor.CompPoly.Montgomery.Native64x8Defs
 
 /-!
 # The radix-2 DIT FFT over the scalar field: runtime definitions (core-only)
 
-The **scalar** twin of `Zcash.Vendor.ProjectiveMontDefs`' group FFT: the very same
+The **scalar** twin of `Zcash.Vendor.CompElliptic.ProjectiveMontDefs`' group FFT: the very same
 bit-reversal-plus-butterflies loop nest, with the group operations replaced by the field
 operations of the Vesta scalar field (`= PALLAS_BASE_CARD`, the Pallas *base* field in the
 Pasta naming) over eight-limb Montgomery residues — a twiddle multiply where the group
@@ -19,8 +19,8 @@ basis for a scalar-side one on the commitment coefficients
 (`Zcash.Snark.Keygen.commitLagrangeSpec_derivedUrsGLagrange`).
 
 Like its group sibling this module is core-only: it is part of the `FastFieldNative`
-precompiled lane, so it must import nothing beyond Lean core.  All proofs live in the
-sibling module `Zcash.Vendor.ScalarFftEquiv`.
+precompiled lane, so it must import nothing beyond Lean core.  All proofs live in
+`Zcash.Arithmetic.ScalarFftEquiv`.
 -/
 
 namespace Zcash.Vendor.ScalarMont

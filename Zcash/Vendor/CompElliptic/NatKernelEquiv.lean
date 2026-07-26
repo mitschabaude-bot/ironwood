@@ -2,20 +2,20 @@
 Copyright (c) 2026 Ironwood Contributors.
 Released under the Apache License, Version 2.0.
 -/
-import Zcash.Vendor.NatKernel
-import Zcash.Snark.Keygen.Fast.Projective
-import Zcash.Snark.Keygen.Fast.MsmProj
-import Zcash.Snark.Keygen.Fast.FastFft
+import Zcash.Vendor.CompElliptic.NatKernel
+import Zcash.Vendor.CompElliptic.Projective
+import Zcash.Vendor.CompElliptic.MsmProj
+import Zcash.Arithmetic.FastFft
 
 /-!
 # The `Nat` kernel is the proven projective arithmetic
 
-`Zcash.Vendor.NatKernel` is a zero-import transplant of the projective Vesta arithmetic.
+`Zcash.Vendor.CompElliptic.NatKernel` is a zero-import transplant of the projective Vesta arithmetic.
 This module — which is mathlib-side — proves that the transplant computes the
-statement-surface functions of `Zcash.Snark.Keygen.Fast.Projective`.  The certificate no
+statement-surface functions of `Zcash.Vendor.CompElliptic.Projective`.  The certificate no
 longer *evaluates* the `Nat` kernel (the Montgomery lane does the work), but these specs
 are load-bearing: the Montgomery kernels are proven correct by transport through the
-`Nat` kernel's shared schedules (`Zcash.Vendor.ProjectiveMontEquiv`).
+`Nat` kernel's shared schedules (`Zcash.Vendor.CompElliptic.ProjectiveMontEquiv`).
 
 The bridge is the coordinatewise cast `toPVes : P3 → PVes`, `⟨x, y, z⟩ ↦ (x : 𝔽_q, y, z)`.  It
 is a *representation* map, not an isomorphism: many `P3`s denote the same `PVes` (the kernel
@@ -350,7 +350,7 @@ theorem msm_spec (c : ℕ) (hc : 0 < c) (terms : List (ℕ × P3))
 
 /-! ## The radix-2 DIT FFT
 
-`fft` is the butterfly-for-butterfly transplant of `bestFftG` (`Zcash/Snark/Keygen/Pipeline.lean`)
+`fft` is the butterfly-for-butterfly transplant of `bestFftG` (`Zcash/Arithmetic/Fft.lean`)
 onto `P3`, with the twiddle table supplied by the caller as canonical `Nat` scalars (the kernel has
 no field type of its own).  The equality is an **Array simulation**: `Sim a b` says every cell of
 the kernel array is a valid projective point whose affine reading is the corresponding cell of the
@@ -361,7 +361,7 @@ only bridges used, exactly as in the ladder above.
 Both FFTs are recognized as instances of one generic loop nest `fftGen` (`rfl` on both sides, the
 twiddle table of `bestFftG` factored out as `twArr`), which is then converted to pure `List.foldl`s
 by the core `forIn`-to-`foldl` route — the same decomposition `Keygen/FftSpec.lean` and
-`Fast/FastFftPar.lean` use. -/
+`Arithmetic/FastFftPar.lean` use. -/
 
 /-- The Vesta scalar field, over which the FFT twiddles live. -/
 local notation "Fp" => Zcash.Snark.Fp

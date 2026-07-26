@@ -58,10 +58,19 @@ globs = ["Zcash.Circuits.Tests.+"]
 # In `defaultTargets` since the certificate dropped to ~45 s
 # (it once took hours, which is why this lane used to be quarantined behind a
 # separate CI workflow).
+#
+# The fast-arithmetic trees it runs on are swept here too: `Zcash/Arithmetic/` (permanent),
+# `Zcash/Vendor/CompPoly/` and `Zcash/Vendor/CompElliptic/` (temporary vendorings, see the
+# READMEs there). They used to live under `Zcash/Snark/Keygen/Fast/`, i.e. inside the first
+# glob; listing them keeps every module in a target even when nothing imports it
+# (`Zcash.Arithmetic.FastFftPar` is the one with no importer).
 [[lean_lib]]
 name = "ZcashKeygen"
 globs = [
   "Zcash.Snark.Keygen.+",
+  "Zcash.Arithmetic.+",
+  "Zcash.Vendor.CompPoly.+",
+  "Zcash.Vendor.CompElliptic.+",
   "Zcash.Snark.Soundness.Deployed.ActionVk",
   "Zcash.Snark.Soundness.Deployed.ActionVesta",
 ]
@@ -70,13 +79,13 @@ globs = [
 # module imports nothing beyond Lean core, so native compilation covers ~1 file rather than a
 # mathlib import closure -- the latter is what OOM-crashed this box on 2026-07-24 (see the
 # rationale in `/root/bin/lake-capped`). Everything mathlib-side about these definitions lives
-# in `Zcash.Vendor.Montgomery.Native64x8*`, which are NOT in this lane.
+# in `Zcash.Vendor.CompPoly.Montgomery.Native64x8*`, which are NOT in this lane.
 [[lean_lib]]
 name = "FastFieldNative"
 precompileModules = true
 globs = [
   "FastFieldNative",
-  "Zcash.Vendor.Montgomery.Native64x8Defs",
-  "Zcash.Vendor.ProjectiveMontDefs",
-  "Zcash.Vendor.ScalarFftDefs",
+  "Zcash.Vendor.CompPoly.Montgomery.Native64x8Defs",
+  "Zcash.Vendor.CompElliptic.ProjectiveMontDefs",
+  "Zcash.Vendor.CompPoly.ScalarFftDefs",
 ]

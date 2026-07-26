@@ -1,11 +1,11 @@
-import Zcash.Vendor.NatKernelEquiv
-import Zcash.Snark.Keygen.Fast.MsmProj
-import Zcash.Snark.Keygen.Fast.FastFft
+import Zcash.Vendor.CompElliptic.NatKernelEquiv
+import Zcash.Vendor.CompElliptic.MsmProj
+import Zcash.Arithmetic.FastFft
 
 /-!
 # Native-lane adapters: the zero-import `NatKernel` behind the keygen spellings
 
-`Zcash.Vendor.NatKernel` is the core-only twin of the group kernels (RCB addition,
+`Zcash.Vendor.CompElliptic.NatKernel` is the core-only twin of the group kernels (RCB addition,
 double-and-add, scatter Pippenger, radix-2 FFT over canonical `ℕ` representatives).
 This module provides its `ZMod`-typed entry points — coordinates out via `ZMod.val`,
 kernel, cast back — and the PROVEN equalities to the statement-surface functions,

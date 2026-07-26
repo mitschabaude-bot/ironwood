@@ -2,18 +2,18 @@
 Copyright (c) 2026 Ironwood Contributors.
 Released under the Apache License, Version 2.0.
 -/
-import Zcash.Vendor.Montgomery.Native64x8Defs
+import Zcash.Vendor.CompPoly.Montgomery.Native64x8Defs
 
 /-!
 # Vesta projective point arithmetic over Montgomery limbs: runtime definitions (core-only)
 
 The Renes–Costello–Batina complete addition formulas of
-`Zcash.Snark.Keygen.Fast.Projective`, transcribed operation-for-operation onto the eight-limb
+`Zcash.Vendor.CompElliptic.Projective`, transcribed operation-for-operation onto the eight-limb
 Montgomery representation of the Vesta base field.  The expression trees mirror the `𝔽_q`
-source exactly, so the equivalence proof in `Zcash.Snark.Keygen.Fast.ProjectiveMont` is a
+source exactly, so the equivalence proof in `Zcash.Vendor.CompElliptic.ProjectiveMontEquiv` is a
 per-coordinate push of the ring isomorphism.
 
-Like `Zcash.Vendor.Montgomery.Native64x8Defs`, this module is core-only: it is part of the
+Like `Zcash.Vendor.CompPoly.Montgomery.Native64x8Defs`, this module is core-only: it is part of the
 `FastFieldNative` precompiled lane.  All proofs live in the sibling module.
 -/
 
@@ -72,8 +72,8 @@ def pid : PM := ⟨zero, one, zero⟩
 
 /-! ## Group kernels
 
-Spelled to mirror `Zcash.Vendor.NatKernel`'s ladder, Pippenger and FFT **operation for
-operation**, so that the simulation proofs of `Zcash.Vendor.NatKernelEquiv` transfer to this
+Spelled to mirror `Zcash.Vendor.CompElliptic.NatKernel`'s ladder, Pippenger and FFT **operation for
+operation**, so that the simulation proofs of `Zcash.Vendor.CompElliptic.NatKernelEquiv` transfer to this
 tier structurally: only the interpretation of a coordinate changes (a Montgomery residue
 instead of a canonical `Nat`), never the schedule. -/
 

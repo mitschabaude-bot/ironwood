@@ -3,14 +3,14 @@ Copyright (c) 2026 CompPoly Contributors. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Gregor Mitscha-Baude
 -/
-import Zcash.Vendor.Montgomery.Basic
-import Zcash.Vendor.Montgomery.Native64x8Defs
+import Zcash.Vendor.CompPoly.Montgomery.Basic
+import Zcash.Vendor.CompPoly.Montgomery.Native64x8Defs
 
 /-!
 # Eight-limb Montgomery arithmetic: correctness of the raw operations
 
 Vendored from CompPoly branch `fast_multilimb_fields`; see `README.md` in this directory.
-The runtime definitions live in `Zcash.Vendor.Montgomery.Native64x8Defs`.
+The runtime definitions live in `Zcash.Vendor.CompPoly.Montgomery.Native64x8Defs`.
 -/
 
 namespace Montgomery

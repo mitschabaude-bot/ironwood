@@ -2,8 +2,8 @@
 Copyright (c) 2026 Ironwood Contributors.
 Released under the Apache License, Version 2.0.
 -/
-import Zcash.Snark.Keygen.Fast.Msm
-import Zcash.Snark.Keygen.Fast.Projective
+import Zcash.Vendor.CompElliptic.Msm
+import Zcash.Vendor.CompElliptic.Projective
 
 /-!
 # The windowed Pippenger MSM run entirely in projective coordinates

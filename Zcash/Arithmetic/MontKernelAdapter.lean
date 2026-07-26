@@ -1,10 +1,10 @@
-import Zcash.Vendor.ProjectiveMontEquiv
-import Zcash.Snark.Keygen.Fast.NatKernelAdapter
+import Zcash.Vendor.CompElliptic.ProjectiveMontEquiv
+import Zcash.Arithmetic.NatKernelAdapter
 
 /-!
 # Native-lane adapters: the eight-limb Montgomery kernel behind the keygen spellings
 
-`Zcash.Vendor.ProjectiveMontDefs` is the core-only twin of the group kernels (RCB addition,
+`Zcash.Vendor.CompElliptic.ProjectiveMontDefs` is the core-only twin of the group kernels (RCB addition,
 double-and-add, scatter Pippenger, radix-2 FFT) over the **proven eight-limb Montgomery
 field**, compiled to native code through the `FastFieldNative` `precompileModules` leaf.
 This module (mathlib-side, NOT in that leaf's glob) provides the `ZMod`-typed entry points
@@ -12,7 +12,7 @@ the certificate evaluates — coordinates into Montgomery form, kernel, affine r
 and the PROVEN equalities to the statement-surface functions, chaining the kernel's
 simulation theorems (`msmM_spec`, `fftM_spec`) into the existing `_eq` ladders.
 
-It is the Montgomery twin of `Zcash.Snark.Keygen.Fast.NatKernelAdapter`, mirroring it
+It is the Montgomery twin of `Zcash.Arithmetic.NatKernelAdapter`, mirroring it
 declaration for declaration.
 -/
 

@@ -2,18 +2,18 @@
 Copyright (c) 2026 Ironwood Contributors.
 Released under the Apache License, Version 2.0.
 -/
-import Zcash.Vendor.ProjectiveMontDefs
-import Zcash.Vendor.Montgomery.Pasta
-import Zcash.Vendor.NatKernelEquiv
+import Zcash.Vendor.CompElliptic.ProjectiveMontDefs
+import Zcash.Vendor.CompPoly.Montgomery.Pasta
+import Zcash.Vendor.CompElliptic.NatKernelEquiv
 
 /-!
 # The Montgomery kernel is the proven projective arithmetic
 
-`Zcash.Vendor.ProjectiveMontDefs` is a zero-import transplant of the projective Vesta
+`Zcash.Vendor.CompElliptic.ProjectiveMontDefs` is a zero-import transplant of the projective Vesta
 arithmetic onto the eight-limb Montgomery representation of `𝔽_q`, so that it can sit in the
 `FastFieldNative` `precompileModules` leaf.  This module — which is mathlib-side and therefore
 *not* in that lane — proves that the transplant computes the statement-surface functions of
-`Zcash.Snark.Keygen.Fast.Projective`.
+`Zcash.Vendor.CompElliptic.Projective`.
 
 The bridge is the coordinatewise value map `montVal : Limbs8 → 𝔽_q`, `x ↦ x.toNat / 2 ^ 256`,
 which is exactly `Montgomery.Native64x8.FastField.toField` read off a raw limb vector; it is
@@ -32,7 +32,7 @@ operation.
 * `msmM_spec` — the kernel's windowed Pippenger MSM is `Fast.Msm.pippenger`
 * `fftM_spec` — the kernel's radix-2 DIT FFT is `Keygen.bestFftG`
 
-Because `ProjectiveMontDefs` was transcribed from `Zcash.Vendor.NatKernel` **operation for
+Because `ProjectiveMontDefs` was transcribed from `Zcash.Vendor.CompElliptic.NatKernel` **operation for
 operation**, the three kernel-level results are obtained by *transporting along the `Nat`
 kernel* rather than by redoing its group theory: `RM p n` says a Montgomery triple is
 well-formed and denotes the same projective point as a `Nat` triple, `RM` is preserved by
@@ -234,7 +234,7 @@ theorem toPVesM_pneg {p : PM} (h : WFP p) :
 
 /-! ## Transport to the `Nat` kernel
 
-`ProjectiveMontDefs` mirrors `Zcash.Vendor.NatKernel` operation for operation, so the group
+`ProjectiveMontDefs` mirrors `Zcash.Vendor.CompElliptic.NatKernel` operation for operation, so the group
 kernels are transported wholesale: `RM p n` relates a well-formed Montgomery triple to the `Nat`
 triple denoting the same projective point, and the shared schedules preserve it. -/
 
