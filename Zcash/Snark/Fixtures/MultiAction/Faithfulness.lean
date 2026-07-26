@@ -39,6 +39,14 @@ private theorem castVk_permutationChunks
   cases h
   rfl
 
+/-- Chunk-width projection commutes with transport between circuit shapes. -/
+private theorem castVk_chunkLen
+    {s₁ s₂ : CircuitShape} (h : s₁ = s₂)
+    (key : VerifyingKey s₁ Fp G) :
+    key.chunkLen = (h ▸ key : VerifyingKey s₂ Fp G).chunkLen := by
+  cases h
+  rfl
+
 def capturedInstanceCommitmentPrefix : List (TranscriptElt Fp G) :=
   (List.ofFn (fun p : Fin shape.numProofs =>
     (List.ofFn (fun i : Fin capturedNumInstanceColumns =>
@@ -154,9 +162,18 @@ theorem vk_chunkLen_and_chunks_derived :
     vk.chunkLen = actionCircuit.chunkLen
       ∧ vk.permutationChunks = actionCircuit.verifierCS.permutationChunks := by
   refine ⟨?_, ?_⟩
-  · rw [show actionCircuit.chunkLen = 7 from
-      congrArg Prod.snd ActionPermutationDomain.columnCount_chunkLen_eq]
-    rfl
+  · have hchunkLen := congrArg VerifyingKey.chunkLen
+        Zcash.Snark.Keygen.vk_eq_toVerifierKey
+    have hcast := castVk_chunkLen
+      Zcash.Snark.Keygen.actionCircuitShape_eq_fixtureCircuitShape
+      (actionCircuit.toVerifierKey Zcash.Snark.Fixture.capturedURS)
+    have hsingle :
+        Zcash.Snark.Fixture.vk.chunkLen = actionCircuit.chunkLen := by
+      simpa only [actionCircuit.toVerifierKey_chunkLen] using
+        hchunkLen.trans hcast.symm
+    have hfixtures : vk.chunkLen = Zcash.Snark.Fixture.vk.chunkLen := by
+      decide
+    exact hfixtures.trans hsingle
   · have hchunks := congrArg VerifyingKey.permutationChunks
         Zcash.Snark.Keygen.vk_eq_toVerifierKey
     have hcast := castVk_permutationChunks

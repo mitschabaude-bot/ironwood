@@ -121,11 +121,12 @@ the proof system. -/
 
 /-- **Name distinctness.** With `ω` of order `u` and the column names in distinct cosets of `⟨ω⟩`,
 the cell names `ωⁱ·colName j` separate the cells. -/
-theorem name_injective_of_coset {omega : Fp} {u k : ℕ} (colName : Fin k → Fp)
+theorem name_injective_of_coset {omega : Fp} {u : ℕ} {ι : Type}
+    (colName : ι → Fp)
     (hne : ∀ j, colName j ≠ 0) (homega : omega ^ u = 1)
     (horder : ∀ i i' : ℕ, i < u → i' < u → omega ^ i = omega ^ i' → i = i')
-    (hcoset : ∀ (j j' : Fin k) (t : ℕ), colName j = omega ^ t * colName j' → j = j') :
-    Function.Injective fun c : Fin u × Fin k => omega ^ (c.1 : ℕ) * colName c.2 := by
+    (hcoset : ∀ (j j' : ι) (t : ℕ), colName j = omega ^ t * colName j' → j = j') :
+    Function.Injective fun c : Fin u × ι => omega ^ (c.1 : ℕ) * colName c.2 := by
   rintro ⟨i, j⟩ ⟨i', j'⟩ h
   simp only at h
   -- multiply by `ω^{u−i}` to clear the row factor without dividing

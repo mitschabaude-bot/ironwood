@@ -130,7 +130,7 @@ and should normally be discharged by default tactics and compositional theorems.
 | 15 | permutation `domainExponent_lt` | R | Share the generic top-level supported-domain fact; remove the duplicate Action computation. | Easy |
 | 16 | `domainExponent_eq` | R | Reason over the abstract derived exponent. Keep exact `K = 11` only as part of deployment identity. | Medium |
 | 17 | `chunks_eq` | R | Prove generic chunking order/index facts over the derived permutation columns; remove literal `[7, 7, 1]`. | Medium |
-| 18 | `columnCount_chunkLen_eq` | R | Consume derived lengths and chunk width; remove literal `(15, 7)`. | Easy–medium |
+| 18 | `permutationColumnCount_eq` | R | Bound the derived permutation-column count without fixing it to the literal `15`; chunk width and variable-width chunks are already structural. | Medium |
 | 19 | `queryLayouts_eq` | G | Both sides project the same pinned CS. Prove the projection equality with behavioral simp lemmas, not reduction through the concrete circuit. | Medium |
 | 20 | `routingCoherent` | L | Configure permutation law: every permutation column has the required zero-rotation query; derive routing from generic chunk indices. | Medium |
 | 21 | `deltaPowers_injective` | G | Pure field/group-order argument for the supported permutation-column range. | Medium |
@@ -141,7 +141,7 @@ still corresponds to the original 22 theorem rows.
 
 ## Elimination progress
 
-The `certificate-elimination-rg` branch currently closes seven R/G rows without changing any L-classified interface or premise:
+The `certificate-elimination-rg` branch currently closes eight R/G rows without changing any L-classified interface or premise:
 
 * **#10 (G), constant values:** generic traversal lemmas prove that the semantic constant-site collector and V1 planner collect the same ordered value stream, and that positional allocation preserves those values whenever the existing allocation-completeness premise holds. The Action-wide failure list and its `native_decide` theorem have been deleted. Rows 8 and 9 remain deliberately untouched.
 * **#15 (R), duplicate domain bound:** the permutation bridge now reuses the gate bridge's existing supported-domain fact instead of evaluating the same Action property a second time. The underlying supported-domain law remains row 14 (L).
@@ -150,12 +150,11 @@ The `certificate-elimination-rg` branch currently closes seven R/G rows without 
 * **#19 (G), query layouts:** `mergeDerived` and `toVerifierKey` now expose the `TopLevelCircuit`'s own `pinnedCS` layouts directly. The separate Action projection, whole-circuit comparison, three projection corollaries, and `native_decide` theorem have been deleted. A small generic `Fp` instance-irrelevance lemma connects legacy projection call sites without computing Action.
 * **#16 (R), exact domain exponent:** the permutation coset argument now quantifies over the circuit-derived exponent and uses only the existing supported-domain bound. The public-row adapter derives its ten-row capacity from keygen's generic fit theorem and Action's structurally present 1024-row generator-table load. The standalone `K = 11` computation has been deleted.
 * **#21 (G), delta powers:** the Pasta Pratt witness proves that `5` generates `Fpˣ`; consequently `deltaFp = 5^(2^32)` has the full odd order and its powers are injective on every supported prefix. The first-21-powers `native_decide` theorem has been deleted, and the coset theorem is generic in both domain exponent and prefix length.
+* **#3 (R), nonempty permutation family:** the generic permutation semantics handles an empty derived chunk family and proves any attempted cell consumption impossible from its `Fin 0` index. The Action-only total coordinate encoder derives positivity from the one remaining column-count fact instead of carrying an independent whole-circuit computation.
 
-Row **#3 (R)** is partially closed: the generic permutation semantics no longer requires a nonempty chunk family, and derives a contradiction from a consumed `Fin 0` cell in the empty case. The Action endpoint adapter still has one local positivity theorem because its current total `Nat → Fin actionNumPermCols` encoding must return a cell even for arbitrary coordinates; that helper remains to be made conditional on actually consuming a copy endpoint.
+Row **#18 (R)** is partially closed: all replay and cycle consumers use the derived chunk width, and name injectivity now ranges over the actual variable-width chunks instead of the padded `numSets * chunkLen` rectangle. The remaining exact computation supplies only `permutationColumns.length = 15`, used to show that the circuit's column-name prefix fits inside the certified order of `deltaFp` and, transitively, that Action's total endpoint encoder has an inhabitant. The current circuit interfaces do not bound `permutationColumns.length`: columns carry unbounded `Nat` indices and `Configure` is an arbitrary state function. Eliminating this final fact therefore needs either a configure law ensuring a duplicate-free in-range column list or an explicit supported-column-count law on the top-level keygen interface. That is a new design decision and is not being smuggled into this R/G-only branch.
 
-Row **#18 (R)** is also partially closed: all replay and cycle consumers use the derived chunk width, but the old `(15, 7)` computation is still used by the G-classified delta-power proof. It will disappear with row #21 rather than being renamed as a narrower concrete certificate.
-
-The remaining R/G work is the adapter tail of #3 and row #18. All L rows remain design inputs rather than implementation targets on this branch.
+The only remaining R/G work is this law-dependent tail of row #18. All listed L rows remain design inputs rather than implementation targets on this branch.
 
 ## Additional correctness obligations
 
