@@ -154,6 +154,48 @@ theorem chunkRowName_injective_of_coset
     (name_injective_of_coset (fun j : Fin (nc * chunkLen) => delta ^ (j : ℕ))
       hne homega horder hcoset)
 
+/-- The standard root-of-unity/coset conditions, stated over the actual
+variable-width chunk columns rather than the padded `nc * chunkLen` rectangle,
+imply injectivity for all chunked cell names. -/
+theorem chunkRowName_injective_of_actual_coset
+    {omega delta : Fp} {nc m chunkLen : ℕ} {width : ℕ → ℕ}
+    (hne : ∀ c : (Σ chunk : Fin nc, Fin (width chunk)),
+      delta ^ ((c.1 : ℕ) * chunkLen + (c.2 : ℕ)) ≠ 0)
+    (homega : omega ^ m = 1)
+    (horder : ∀ i i' : ℕ, i < m → i' < m →
+      omega ^ i = omega ^ i' → i = i')
+    (hcoset : ∀
+      (c d : (Σ chunk : Fin nc, Fin (width chunk))) (t : ℕ),
+      delta ^ ((c.1 : ℕ) * chunkLen + (c.2 : ℕ)) =
+          omega ^ t *
+            delta ^ ((d.1 : ℕ) * chunkLen + (d.2 : ℕ)) →
+        c = d) :
+    Function.Injective fun c : ChunkCell nc m width =>
+      chunkRowName omega delta chunkLen c.1 c.2.1 c.2.2 := by
+  have hnames :=
+    name_injective_of_coset
+      (omega := omega) (u := m)
+      (fun c : (Σ chunk : Fin nc, Fin (width chunk)) =>
+        delta ^ ((c.1 : ℕ) * chunkLen + (c.2 : ℕ)))
+      hne homega horder hcoset
+  rintro ⟨chunk, row, column⟩ ⟨chunk', row', column'⟩ heq
+  have hpair :
+      (row, (⟨chunk, column⟩ :
+          Σ current : Fin nc, Fin (width current))) =
+        (row', (⟨chunk', column'⟩ :
+          Σ current : Fin nc, Fin (width current))) := by
+    apply hnames
+    simpa [chunkRowName, rowName, Nat.add_comm] using heq
+  have hrow : row = row' := congrArg Prod.fst hpair
+  have hcolumn :
+      (⟨chunk, column⟩ :
+          Σ current : Fin nc, Fin (width current)) =
+        ⟨chunk', column'⟩ :=
+    congrArg Prod.snd hpair
+  cases hrow
+  cases hcolumn
+  rfl
+
 /-- Replay the mathematical keygen permutation in the source copy-list order.
 
 `PermConstruction.build` consumes its list from right to left, so reversing here makes the first

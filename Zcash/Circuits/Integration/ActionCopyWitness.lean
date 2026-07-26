@@ -48,7 +48,13 @@ def actionActiveRows : ℕ :=
     orchardActionTopLevelCircuit.domainExponent
 
 theorem actionNumPermCols_pos : 0 < actionNumPermCols := by
-  native_decide
+  rw [actionNumPermCols, actionPermCols, Keygen.permColsOf,
+    List.length_map]
+  have hcolumns :
+      orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length =
+        15 :=
+    ActionPermutationDomain.permutationColumnCount_eq
+  omega
 
 theorem actionDomainSize_pos : 0 < actionDomainSize :=
   Nat.two_pow_pos _

@@ -21,11 +21,12 @@ theorem domainExponent_lt :
     orchardActionTopLevelCircuit.domainExponent < 33 :=
   ActionGateCoherence.domainExponent_lt
 
-/-- The Action permutation argument has 15 columns and verifier chunk width 7. -/
-theorem columnCount_chunkLen_eq :
-    (orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length,
-        orchardActionTopLevelCircuit.constraintSystem.chunkLen) =
-      (15, 7) := by
+/-- The Action permutation-column prefix fits easily inside `deltaFp`'s
+certified order. This residual concrete count awaits a configure law bounding the
+derived equality-enabled column list. -/
+theorem permutationColumnCount_eq :
+    orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length =
+      15 := by
   native_decide
 
 def ColumnRefCoherent : ColumnRef → Prop
@@ -110,7 +111,7 @@ theorem routingCoherent :
   simp at hmem
 
 assert_no_sorry domainExponent_lt
-assert_no_sorry columnCount_chunkLen_eq
+assert_no_sorry permutationColumnCount_eq
 assert_no_sorry routingFailures_eq_nil
 assert_no_sorry routingCoherent
 
