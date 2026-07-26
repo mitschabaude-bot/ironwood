@@ -109,9 +109,15 @@ theorem resolverInterpretsGates
     (pinnedQueryState
       (PinnedConstraintSystem.derive
         top.constraintSystem top.selectorMap))
-    (by rfl)
-    (by rfl)
-    (by rfl)
+    (by
+      simpa [pinnedQueryState, top.pinnedCS_eq_derive_fp] using
+        (top.toVerifierKey_adviceQueryLayout_derived pp urs).symm)
+    (by
+      simpa [pinnedQueryState, top.pinnedCS_eq_derive_fp] using
+        (top.toVerifierKey_fixedQueryLayout_derived pp urs).symm)
+    (by
+      simpa [pinnedQueryState, top.pinnedCS_eq_derive_fp] using
+        (top.toVerifierKey_instanceQueryLayout_derived pp urs).symm)
     coherence.adviceQueryCount
     coherence.fixedQueryCount
     coherence.instanceQueryCount
@@ -205,7 +211,8 @@ noncomputable def polynomialWitness
         (PinnedConstraintSystem.derive
           top.constraintSystem top.selectorMap).gates.map
             RichExpression.toExpr := by
-    rfl
+    simpa only [top.pinnedCS_eq_derive_fp] using
+      top.toVerifierKey_gates_derived pp urs
   have hinterpret := coherence.resolverInterpretsGates
     poly proofIndex usableRows
     (top.placement enabled.region + enabled.row)

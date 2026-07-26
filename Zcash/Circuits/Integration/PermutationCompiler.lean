@@ -280,9 +280,18 @@ theorem topLevelPermutationColumnAddresses_eq
         column :=
     permutationColumnAddress_queryReference
       (top.toVerifierKey pp urs) projected
-      (top.toVerifierKey_adviceQueryLayout_derived pp urs)
-      (top.toVerifierKey_fixedQueryLayout_derived pp urs)
-      (top.toVerifierKey_instanceQueryLayout_derived pp urs)
+      (by
+        simpa only [projected, top.pinnedCS_eq_derive_fp,
+          PinnedConstraintSystem.derive] using
+          top.toVerifierKey_adviceQueryLayout_derived pp urs)
+      (by
+        simpa only [projected, top.pinnedCS_eq_derive_fp,
+          PinnedConstraintSystem.derive] using
+          top.toVerifierKey_fixedQueryLayout_derived pp urs)
+      (by
+        simpa only [projected, top.pinnedCS_eq_derive_fp,
+          PinnedConstraintSystem.derive] using
+          top.toVerifierKey_instanceQueryLayout_derived pp urs)
       column hreferenceCoherent
   rcases column with ⟨kind, index⟩
   cases kind <;>

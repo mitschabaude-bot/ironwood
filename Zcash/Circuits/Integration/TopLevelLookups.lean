@@ -310,7 +310,15 @@ theorem resolverInterpretsPinned
     (pinnedQueryState
       (PinnedConstraintSystem.derive
         top.constraintSystem top.selectorMap))
-    (by rfl) (by rfl) (by rfl)
+    (by
+      simpa [pinnedQueryState, top.pinnedCS_eq_derive_fp] using
+        (top.toVerifierKey_adviceQueryLayout_derived pp urs).symm)
+    (by
+      simpa [pinnedQueryState, top.pinnedCS_eq_derive_fp] using
+        (top.toVerifierKey_fixedQueryLayout_derived pp urs).symm)
+    (by
+      simpa [pinnedQueryState, top.pinnedCS_eq_derive_fp] using
+        (top.toVerifierKey_instanceQueryLayout_derived pp urs).symm)
     coherence.adviceQueryCount
     coherence.fixedQueryCount
     coherence.instanceQueryCount
@@ -322,8 +330,7 @@ end TopLevelGateCoherence
     (pp : ProofParams) (urs : URS G)
     (lookup : Fin (pp.mergeDerived top).numLookups) :
     (top.toVerifierKey pp urs).lookupInputExprs lookup =
-      ((PinnedConstraintSystem.derive
-          top.constraintSystem top.selectorMap).lookupInputExprs.getD
+      (top.pinnedCS.lookupInputExprs.getD
         lookup.val []).map RichExpression.toExpr := by
   rfl
 
@@ -332,8 +339,7 @@ end TopLevelGateCoherence
     (pp : ProofParams) (urs : URS G)
     (lookup : Fin (pp.mergeDerived top).numLookups) :
     (top.toVerifierKey pp urs).lookupTableExprs lookup =
-      ((PinnedConstraintSystem.derive
-          top.constraintSystem top.selectorMap).lookupTableExprs.getD
+      (top.pinnedCS.lookupTableExprs.getD
         lookup.val []).map RichExpression.toExpr := by
   rfl
 
@@ -505,7 +511,7 @@ theorem projectedValues
   constructor
   · rw [← selectors.input]
     rw [toVerifierKey_lookupInputExprs, map_eval_toExpr]
-    simpa only [route, Nat.cast_add] using
+    simpa only [route, Nat.cast_add, top.pinnedCS_eq_derive_fp] using
       inputProjected'
   · intro row hrow
     have tableProjectedRow :=
@@ -523,7 +529,7 @@ theorem projectedValues
           hargument)
     rw [← selectors.table row hrow]
     rw [toVerifierKey_lookupTableExprs, map_eval_toExpr]
-    simpa only [route] using tableProjectedRow
+    simpa only [route, top.pinnedCS_eq_derive_fp] using tableProjectedRow
 
 /--
 The resolver's compressed input and table polynomials evaluate to the concrete

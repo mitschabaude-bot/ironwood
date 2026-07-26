@@ -128,10 +128,8 @@ theorem instanceQueryLayout_of_constraintSystem
         top.constraintSystem.instanceQueries) :
     (column.index, rotation) ∈
       (top.toVerifierKey pp urs).instanceQueryLayout := by
-  change
-    (column.index, rotation) ∈
-      (PinnedConstraintSystem.derive
-        top.constraintSystem top.selectorMap).instanceQueryLayout
+  rw [top.toVerifierKey_instanceQueryLayout_derived,
+    top.pinnedCS_eq_derive_fp]
   exact
     PinnedConstraintSystem.mem_instanceQueryLayout_derive_of_mem
       top.constraintSystem top.selectorMap column rotation hquery

@@ -97,10 +97,6 @@ noncomputable def ofKeygen
     (by
       intro column hcolumn
       rw [orchardActionTopLevelCircuit.toVerifierKey_fixedQueryLayout_derived]
-      change ∃ rotation,
-        (column, rotation) ∈
-          ActionPermutationDomain.derivedPinnedCS.fixedQueryLayout
-      rw [ActionPermutationDomain.fixedQueryLayout_eq]
       exact queryLayout column hcolumn)
     (by
       intro column row value hentry

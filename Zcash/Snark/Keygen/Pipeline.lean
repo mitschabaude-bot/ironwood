@@ -711,6 +711,8 @@ exponent, gates/query layouts/lookups from the pinned CS (carried across the
 layout over the URS's Lagrange basis. -/
 def ofOperations (shape : Shape) (urs : URS G)
     (cs : ConstraintSystem Fp) (ops : Operations Fp) : VerifyingKey shape Fp G :=
+  letI : Field Fp := (inferInstance : FiniteField Fp).toField
+  letI : DecidableEq Fp := FiniteField.instDecidableEq
   let k := minimalK cs ops
   let selMap := deriveSelCompressMap cs (2 ^ k)
     (activations (FloorPlanner.V1.starts ops) (indexedRegions ops 0).1)
@@ -830,8 +832,7 @@ def ProofParams.mergeDerived (pp : ProofParams)
     {ConfigInput Config : Type} {Output : TypeMap} [CircuitType Output]
     (top : TopLevelCircuit Fp ConfigInput Config Output) : Shape :=
   let cs := top.constraintSystem
-  let pinned :=
-    PinnedConstraintSystem.derive top.constraintSystem top.selectorMap
+  let pinned := top.pinnedCS
   { k := top.domainExponent
     numProofs := pp.numProofs
     numAdviceColumns := cs.numAdviceColumns
@@ -980,8 +981,7 @@ theorem toVerifierKey_adviceQueryLayout_derived
     (top : TopLevelCircuit Fp ConfigInput Config Output)
     (pp : ProofParams) (urs : URS G) :
     (top.toVerifierKey pp urs).adviceQueryLayout =
-      (PinnedConstraintSystem.derive
-        top.constraintSystem top.selectorMap).adviceQueryLayout := by
+      top.pinnedCS.adviceQueryLayout := by
   rfl
 
 /-- The derived key exposes exactly the fixed-query layout of its selector-map
@@ -990,8 +990,7 @@ theorem toVerifierKey_fixedQueryLayout_derived
     (top : TopLevelCircuit Fp ConfigInput Config Output)
     (pp : ProofParams) (urs : URS G) :
     (top.toVerifierKey pp urs).fixedQueryLayout =
-      (PinnedConstraintSystem.derive
-        top.constraintSystem top.selectorMap).fixedQueryLayout := by
+      top.pinnedCS.fixedQueryLayout := by
   rfl
 
 /-- The derived key exposes exactly the instance-query layout of its selector-map
@@ -1000,9 +999,32 @@ theorem toVerifierKey_instanceQueryLayout_derived
     (top : TopLevelCircuit Fp ConfigInput Config Output)
     (pp : ProofParams) (urs : URS G) :
     (top.toVerifierKey pp urs).instanceQueryLayout =
-      (PinnedConstraintSystem.derive
-        top.constraintSystem top.selectorMap).instanceQueryLayout := by
+      top.pinnedCS.instanceQueryLayout := by
   rfl
+
+/-- The derived key exposes exactly the gate polynomials of its circuit-owned pinned
+constraint system. -/
+theorem toVerifierKey_gates_derived
+    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    (pp : ProofParams) (urs : URS G) :
+    (top.toVerifierKey pp urs).gates =
+      top.pinnedCS.gates.map RichExpression.toExpr := by
+  rfl
+
+/-- Over `Fp`, the finite-field and Pasta decidable-equality instances produce the
+same pinned projection. This keeps the circuit-owned `pinnedCS` API stable across
+the two existing instance entry points without recomputing a concrete circuit. -/
+theorem pinnedCS_eq_derive_fp
+    (top : TopLevelCircuit Fp ConfigInput Config Output) :
+    top.pinnedCS =
+      PinnedConstraintSystem.derive
+        top.constraintSystem top.selectorMap := by
+  rw [top.pinnedCS_eq_derive]
+  have hdec :
+      (FiniteField.instDecidableEq : DecidableEq Fp) =
+        (inferInstance : DecidableEq Fp) :=
+    Subsingleton.elim _ _
+  rw [hdec]
 
 /-- The derived key's advice-query layout has the shape count computed from the same
 top-level pinned constraint system. -/
@@ -1011,12 +1033,10 @@ theorem toVerifierKey_adviceQueryCount
     (pp : ProofParams) (urs : URS G) :
     (top.toVerifierKey pp urs).adviceQueryLayout.length =
       (pp.mergeDerived top).numAdviceQueries := by
-  change
-    (PinnedConstraintSystem.derive
-      top.constraintSystem top.selectorMap).adviceQueryLayout.length =
-    (PinnedConstraintSystem.derive
-      top.constraintSystem top.selectorMap).adviceQueryLayout.length
-  rw [show top.selectorMap = top.selectorMap by rfl]
+  rw [top.toVerifierKey_adviceQueryLayout_derived]
+  change top.pinnedCS.adviceQueryLayout.length =
+    top.pinnedCS.adviceQueryLayout.length
+  rfl
 
 /-- The derived key's fixed-query layout has the shape count computed from the same
 top-level pinned constraint system. -/
@@ -1025,12 +1045,10 @@ theorem toVerifierKey_fixedQueryCount
     (pp : ProofParams) (urs : URS G) :
     (top.toVerifierKey pp urs).fixedQueryLayout.length =
       (pp.mergeDerived top).numFixedQueries := by
-  change
-    (PinnedConstraintSystem.derive
-      top.constraintSystem top.selectorMap).fixedQueryLayout.length =
-    (PinnedConstraintSystem.derive
-      top.constraintSystem top.selectorMap).fixedQueryLayout.length
-  rw [show top.selectorMap = top.selectorMap by rfl]
+  rw [top.toVerifierKey_fixedQueryLayout_derived]
+  change top.pinnedCS.fixedQueryLayout.length =
+    top.pinnedCS.fixedQueryLayout.length
+  rfl
 
 /-- The derived key's instance-query layout has the shape count computed from the same
 top-level pinned constraint system. -/
@@ -1039,11 +1057,9 @@ theorem toVerifierKey_instanceQueryCount
     (pp : ProofParams) (urs : URS G) :
     (top.toVerifierKey pp urs).instanceQueryLayout.length =
       (pp.mergeDerived top).numInstanceQueries := by
-  change
-    (PinnedConstraintSystem.derive
-      top.constraintSystem top.selectorMap).instanceQueryLayout.length =
-    (PinnedConstraintSystem.derive
-      top.constraintSystem top.selectorMap).instanceQueryLayout.length
-  rw [show top.selectorMap = top.selectorMap by rfl]
+  rw [top.toVerifierKey_instanceQueryLayout_derived]
+  change top.pinnedCS.instanceQueryLayout.length =
+    top.pinnedCS.instanceQueryLayout.length
+  rfl
 
 end Halo2.TopLevelCircuit

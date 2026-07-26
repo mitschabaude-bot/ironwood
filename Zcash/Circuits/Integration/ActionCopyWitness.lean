@@ -713,12 +713,6 @@ def actionConstantAllocations :
   (operationConstSites (orchardActionTopLevelCircuit.operations 0)).zip
     actionConsts
 
-/-- Positional constant allocations whose stored natural value disagrees with the site. -/
-def actionConstantValueFailures :
-    List ((Cell × Fp) × (ℕ × ℕ × ℕ)) :=
-  actionConstantAllocations.filter fun allocation =>
-    decide (allocation.2.1 ≠ allocation.1.2.val)
-
 /-- Decode a raw Action permutation coordinate back to its concrete column and row. -/
 def actionRawCellAddress (coordinate : ℕ × ℕ) : AnyColumn × ℕ :=
   let cell := mkActionCell coordinate
@@ -756,11 +750,6 @@ theorem actionConstantSites_fit :
       actionConsts.length := by
   native_decide
 
-/-- The positional V1 allocation stores the value of every Action constant site. -/
-theorem actionConstantValueFailures_eq_nil :
-    actionConstantValueFailures = [] := by
-  native_decide
-
 /-- Every allocated Action constant cell survives permutation-coordinate encoding. -/
 theorem actionConstantCellAddressFailures_eq_nil :
     actionConstantCellAddressFailures = [] := by
@@ -771,12 +760,23 @@ theorem actionConstantAllocation_value
     {site : Cell × Fp} {entry : ℕ × ℕ × ℕ}
     (hallocation : (site, entry) ∈ actionConstantAllocations) :
     entry.1 = site.2.val := by
-  by_contra hne
-  have hfailure : (site, entry) ∈ actionConstantValueFailures := by
-    rw [actionConstantValueFailures, List.mem_filter]
-    exact ⟨hallocation, decide_eq_true hne⟩
-  rw [actionConstantValueFailures_eq_nil] at hfailure
-  simp at hfailure
+  have hfit :
+      (operationConstSites
+          (orchardActionTopLevelCircuit.operations 0)).length ≤
+        (FloorPlanner.V1.constants ZMod.val
+          (orchardActionTopLevelCircuit.operations 0)
+          (orchardActionTopLevelCircuit.constraintSystem.constants.map
+            (fun column => column.index))).length := by
+    simpa only [actionConsts, Keygen.constantsOf] using
+      actionConstantSites_fit
+  apply constantAllocation_value
+    (ops := orchardActionTopLevelCircuit.operations 0)
+    (constantColumns :=
+      orchardActionTopLevelCircuit.constraintSystem.constants.map
+        (fun column => column.index))
+    hfit
+  simpa only [actionConstantAllocations, actionConsts, Keygen.constantsOf] using
+    hallocation
 
 /-- An allocated Action constant cell has the expected concrete address. -/
 theorem actionConstantCellAddress

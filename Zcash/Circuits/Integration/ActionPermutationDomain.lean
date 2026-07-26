@@ -138,18 +138,15 @@ theorem routingCoherent_of_derived
   have hadviceLayout :
       (actionVk pp urs).adviceQueryLayout =
         orchardActionTopLevelCircuit.pinnedCS.adviceQueryLayout :=
-    (orchardActionTopLevelCircuit.toVerifierKey_adviceQueryLayout_derived
-      pp urs).trans adviceQueryLayout_eq
+    orchardActionTopLevelCircuit.toVerifierKey_adviceQueryLayout_derived pp urs
   have hfixedLayout :
       (actionVk pp urs).fixedQueryLayout =
         orchardActionTopLevelCircuit.pinnedCS.fixedQueryLayout :=
-    (orchardActionTopLevelCircuit.toVerifierKey_fixedQueryLayout_derived
-      pp urs).trans fixedQueryLayout_eq
+    orchardActionTopLevelCircuit.toVerifierKey_fixedQueryLayout_derived pp urs
   have hinstanceLayout :
       (actionVk pp urs).instanceQueryLayout =
         orchardActionTopLevelCircuit.pinnedCS.instanceQueryLayout :=
-    (orchardActionTopLevelCircuit.toVerifierKey_instanceQueryLayout_derived
-      pp urs).trans instanceQueryLayout_eq
+    orchardActionTopLevelCircuit.toVerifierKey_instanceQueryLayout_derived pp urs
   rintro chunk hchunk ⟨ref, common⟩ href
   have hroute := routingCoherent chunk hchunk (ref, common) href
   rcases hroute with ⟨hrefCoherent, hcommon⟩
