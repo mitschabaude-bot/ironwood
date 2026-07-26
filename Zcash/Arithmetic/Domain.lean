@@ -115,5 +115,61 @@ theorem domainSize_cast_ne_zero (k : ℕ) (hk : k ≤ 32) :
 /-- pasta `Fp::DELTA = GENERATOR^(2^S) = 5^(2^32)`. -/
 def deltaFp : Fp := powFast 5 (2 ^ 32)
 
+/-- The odd-order factor of `Fpˣ` occupied by Halo2's permutation coset
+generator `deltaFp`. -/
+def deltaFpOrder : ℕ := (scalarFieldOrder - 1) / 2 ^ 32
+
+private theorem five_prattPart :
+    PrattPartList scalarFieldOrder (5 : Fp) (scalarFieldOrder - 1) := by
+  refine .split
+    [2 ^ 32, 3, 463, 539204044132271846773,
+      8999194758858563409123804352480028797519453]
+    (fun r hr => ?_) ?_
+  · simp at hr
+    rcases hr with hr | hr | hr | hr | hr
+    all_goals subst r
+    · exact .prime 2 32 _ Nat.prime_two
+        (by reduce_mod_char; decide) (by norm_num)
+    · exact .prime 3 1 _ (by decide)
+        (by reduce_mod_char; decide) (by norm_num)
+    · exact .prime 463 1 _ (by
+        set_option maxRecDepth 10000 in
+        decide)
+        (by reduce_mod_char; decide) (by norm_num)
+    · exact .prime 539204044132271846773 1 _
+        (by pratt) (by reduce_mod_char; decide) (by norm_num)
+    · exact .prime 8999194758858563409123804352480028797519453 1 _
+        (by pratt) (by reduce_mod_char; decide) (by norm_num)
+  · norm_num [scalarFieldOrder,
+      CompElliptic.Fields.Pasta.PALLAS_BASE_CARD]
+
+private theorem five_isPrimitiveRoot :
+    IsPrimitiveRoot (5 : Fp) (scalarFieldOrder - 1) := by
+  rw [IsPrimitiveRoot.iff_orderOf]
+  apply orderOf_eq_of_pow_and_pow_div_prime
+  · norm_num [scalarFieldOrder,
+      CompElliptic.Fields.Pasta.PALLAS_BASE_CARD]
+  · exact ZMod.pow_card_sub_one_eq_one (by decide : (5 : Fp) ≠ 0)
+  · exact five_prattPart.out
+
+/-- Halo2's permutation coset generator has the full odd order obtained by
+removing Pasta's `2^32` evaluation subgroup from `Fpˣ`. -/
+theorem deltaFp_isPrimitiveRoot :
+    IsPrimitiveRoot deltaFp deltaFpOrder := by
+  rw [deltaFp, powFast_eq_pow]
+  apply five_isPrimitiveRoot.pow_of_dvd (by positivity)
+  exact dvd_mul_right (2 ^ 32) ((scalarFieldOrder - 1) / 2 ^ 32)
+
+/-- Powers of Halo2's permutation coset generator are distinct throughout
+every prefix supported by its certified group order. -/
+theorem deltaFp_powers_injective (n : ℕ) (hn : n ≤ deltaFpOrder) :
+    Function.Injective fun j : Fin n => deltaFp ^ (j : ℕ) := by
+  intro left right heq
+  apply Fin.ext
+  exact deltaFp_isPrimitiveRoot.pow_inj
+    (lt_of_lt_of_le left.isLt hn)
+    (lt_of_lt_of_le right.isLt hn)
+    heq
+
 
 end Zcash.Arithmetic

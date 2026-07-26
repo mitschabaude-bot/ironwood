@@ -14,7 +14,7 @@ open Circuit
 
 set_option maxHeartbeats 20000
 
-private theorem initialGeneratorTableIdx_mem
+theorem initialGeneratorTableIdx_mem
     (cfg : Config) (i : RegionIndex) :
     Operation.loadTable cfg.sinsemilla1.generatorTable.tableIdx
         ((List.range (2 ^ Specs.K)).map (Nat.cast : ℕ → Fp)) ∈

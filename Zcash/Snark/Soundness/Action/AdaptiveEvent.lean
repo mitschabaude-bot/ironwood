@@ -993,7 +993,7 @@ structure AdaptiveActionDlogProfile (B : VestaG) where
 profile, this charges all eight independently traversed adaptive slots after provenance caching. -/
 structure AdaptiveActionDirectDlogProfile (B : VestaG) (T : Nat)
     extends AdaptiveActionDlogProfile pp family inputs hvk hI hchar B where
-  targetAtLeastTwentyTwo : 22 ≤ T
+  scheduleOverheadBound : 11 + actionCircuit.domainExponent ≤ T
   queryBound : family.Q ≤ T
   proverWorkBound : toAdaptiveActionDlogProfile.proverGroupWork ≤ T
   reductionWorkBound : toAdaptiveActionDlogProfile.reductionGroupWork ≤ T
@@ -1011,10 +1011,10 @@ theorem AdaptiveActionDirectDlogProfile.solverCost_le
   constructor
   · unfold adaptiveActionDlogRandomOracleQueries
     rw [adaptiveActionDlogTraversalSlots_eq_eight]
-    rw [ActionPermutationDomain.domainExponent_eq]
-    have hT := profile.targetAtLeastTwentyTwo
+    have hT := profile.scheduleOverheadBound
     calc
-      8 * family.Q + 8 * (11 + 11) ≤ 8 * T + 8 * (11 + 11) := by
+      8 * family.Q + 8 * (11 + actionCircuit.domainExponent) ≤
+          8 * T + 8 * (11 + actionCircuit.domainExponent) := by
         gcongr
         exact profile.queryBound
       _ ≤ 16 * T := by omega

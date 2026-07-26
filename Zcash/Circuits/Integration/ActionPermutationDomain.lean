@@ -18,7 +18,9 @@ the restriction equation, and the common-column identification explicitly.
 
 namespace Zcash.Snark
 
-open Zcash.Arithmetic (deltaFp omegaOf omegaOf_isPrimitiveRoot powFast_eq_pow scalarFieldOrder)
+open Zcash.Arithmetic
+  (deltaFp deltaFpOrder deltaFp_isPrimitiveRoot deltaFp_powers_injective
+    omegaOf omegaOf_isPrimitiveRoot powFast_eq_pow scalarFieldOrder)
 
 open CompPoly.CPolynomial
 open Halo2
@@ -143,32 +145,33 @@ theorem permutationColumnAddresses_eq
 
 /-- The odd factor of `|Fpˣ|`, after removing Pasta's `2^32` root-of-unity
 subgroup. -/
-def pastaOddFactor : ℕ := (scalarFieldOrder - 1) / 2 ^ 32
+abbrev pastaOddFactor : ℕ := deltaFpOrder
 
 theorem scalarFieldOrder_sub_one_factorization :
     2 ^ 32 * pastaOddFactor = scalarFieldOrder - 1 := by
   norm_num [pastaOddFactor, scalarFieldOrder,
-    CompElliptic.Fields.Pasta.PALLAS_BASE_CARD]
+    deltaFpOrder, CompElliptic.Fields.Pasta.PALLAS_BASE_CARD]
 
 /-- `deltaFp = 5^(2^32)` lies in the odd-order factor of `Fpˣ`. -/
 theorem deltaFp_pow_pastaOddFactor :
     deltaFp ^ pastaOddFactor = 1 := by
-  rw [deltaFp, powFast_eq_pow, ← pow_mul,
-    scalarFieldOrder_sub_one_factorization]
-  exact ZMod.pow_card_sub_one_eq_one (by decide : (5 : Fp) ≠ 0)
+  exact deltaFp_isPrimitiveRoot.pow_eq_one
 
-theorem pastaOddFactor_coprime_actionDomain :
-    Nat.Coprime (2 ^ 11) pastaOddFactor := by
-  norm_num [pastaOddFactor, scalarFieldOrder,
-    CompElliptic.Fields.Pasta.PALLAS_BASE_CARD]
+theorem pastaOddFactor_coprime_domain (k : ℕ) :
+    Nat.Coprime (2 ^ k) pastaOddFactor := by
+  apply Nat.Coprime.pow_left
+  exact Odd.coprime_two_left (by
+    norm_num [pastaOddFactor, deltaFpOrder, scalarFieldOrder,
+      CompElliptic.Fields.Pasta.PALLAS_BASE_CARD])
 
-/-- The 21 padded Action column names `deltaFp^j` occupy distinct cosets of
-the size-2048 evaluation subgroup. -/
-theorem deltaFp_actionCosets
-    (j j' : Fin 21) (t : ℕ)
+/-- Every supported prefix of the permutation-column names `deltaFp^j`
+occupies distinct cosets of a supported Pasta evaluation subgroup. -/
+theorem deltaFp_domainCosets
+    {k n : ℕ} (hk : k ≤ 32) (hn : n ≤ pastaOddFactor)
+    (j j' : Fin n) (t : ℕ)
     (h :
       deltaFp ^ (j : ℕ) =
-        omegaOf 11 ^ t * deltaFp ^ (j' : ℕ)) :
+        omegaOf k ^ t * deltaFp ^ (j' : ℕ)) :
     j = j' := by
   have hj :
       (deltaFp ^ (j : ℕ)) ^ pastaOddFactor = 1 := by
@@ -180,21 +183,21 @@ theorem deltaFp_actionCosets
       deltaFp_pow_pastaOddFactor, one_pow]
   have hpow := congrArg (fun x : Fp => x ^ pastaOddFactor) h
   change (deltaFp ^ (j : ℕ)) ^ pastaOddFactor =
-    (omegaOf 11 ^ t * deltaFp ^ (j' : ℕ)) ^ pastaOddFactor at hpow
+    (omegaOf k ^ t * deltaFp ^ (j' : ℕ)) ^ pastaOddFactor at hpow
   rw [hj, mul_pow, hj', _root_.mul_one] at hpow
-  have htMul : omegaOf 11 ^ (t * pastaOddFactor) = 1 := by
+  have htMul : omegaOf k ^ (t * pastaOddFactor) = 1 := by
     rw [pow_mul]
     exact hpow.symm
-  have hprimitive : IsPrimitiveRoot (omegaOf 11) (2 ^ 11) :=
-    omegaOf_isPrimitiveRoot 11 (by omega)
-  have hdvdMul : 2 ^ 11 ∣ t * pastaOddFactor :=
+  have hprimitive : IsPrimitiveRoot (omegaOf k) (2 ^ k) :=
+    omegaOf_isPrimitiveRoot k hk
+  have hdvdMul : 2 ^ k ∣ t * pastaOddFactor :=
     (hprimitive.pow_eq_one_iff_dvd _).mp htMul
-  have hdvd : 2 ^ 11 ∣ t :=
-    pastaOddFactor_coprime_actionDomain.dvd_of_dvd_mul_right hdvdMul
-  have ht : omegaOf 11 ^ t = 1 :=
+  have hdvd : 2 ^ k ∣ t :=
+    (pastaOddFactor_coprime_domain k).dvd_of_dvd_mul_right hdvdMul
+  have ht : omegaOf k ^ t = 1 :=
     (hprimitive.pow_eq_one_iff_dvd _).mpr hdvd
   rw [ht, _root_.one_mul] at h
-  exact deltaPowers_injective h
+  exact deltaFp_powers_injective n hn h
 
 /-! ## Derived evaluation-domain facts -/
 
@@ -265,7 +268,10 @@ theorem namesInjective
           (top := actionCircuit) domainExponent_lt heq
       exact Fin.ext_iff.mp hfin
     · intro j j' t hcoset
-      simp only [TopLevelCircuit.omega, domainExponent_eq] at hcoset
+      change
+        deltaFp ^ (j : ℕ) =
+          omegaOf actionCircuit.domainExponent ^ t *
+            deltaFp ^ (j' : ℕ) at hcoset
       have hsize :
           actionCircuit.permutationSetCount *
               actionCircuit.chunkLen = 21 := by
@@ -286,7 +292,13 @@ theorem namesInjective
       apply Fin.ext
       have heq21 :
           (⟨j, hj⟩ : Fin 21) = ⟨j', hj'⟩ :=
-        deltaFp_actionCosets ⟨j, hj⟩ ⟨j', hj'⟩ t hcoset
+        deltaFp_domainCosets
+          (k := actionCircuit.domainExponent)
+          (n := 21) (Nat.le_of_lt_succ domainExponent_lt)
+          (by
+            norm_num [pastaOddFactor, deltaFpOrder, scalarFieldOrder,
+              CompElliptic.Fields.Pasta.PALLAS_BASE_CARD])
+          ⟨j, hj⟩ ⟨j', hj'⟩ t hcoset
       exact congrArg (fun x : Fin 21 => x.val) heq21
   intro c d hname
   have hwiden := widenPermutationChunkCell_injective
@@ -383,7 +395,7 @@ def cycleOfKeygenColumns
     fullSigma sigma hcolumns hrestrict
 
 assert_no_sorry routingCoherent_of_derived
-assert_no_sorry deltaFp_actionCosets
+assert_no_sorry deltaFp_domainCosets
 assert_no_sorry domain
 assert_no_sorry namesInjective
 assert_no_sorry cycleOfKeygenColumnsAt

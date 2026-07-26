@@ -506,7 +506,7 @@ structure StraightLineActionDlogProfile (B : VestaG) where
 /-- Direct-route profile covering prover, postprocessing, and both possible decoder executions. -/
 structure StraightLineActionDirectDlogProfile (B : VestaG) (T : Nat)
     extends StraightLineActionDlogProfile pp family static inputs hvk hI hchar B where
-  targetAtLeastSixtySix : 66 <= T
+  scheduleOverheadBound : 3 * (11 + actionCircuit.domainExponent) <= T
   queryBound : family.Q <= T
   proverWorkBound : toStraightLineActionDlogProfile.proverGroupWork <= T
   reductionWorkBound : toStraightLineActionDlogProfile.reductionGroupWork <= T
@@ -524,10 +524,10 @@ theorem StraightLineActionDirectDlogProfile.solverCost_le
       forall basis O, 2 * family.straightLineDirectDecodeOps basis O <= T := by
   constructor
   · unfold actionDlogRandomOracleQueries
-    rw [ActionPermutationDomain.domainExponent_eq]
-    have hT := profile.targetAtLeastSixtySix
+    have hT := profile.scheduleOverheadBound
     calc
-      6 * family.Q + 6 * (11 + 11) <= 6 * T + 6 * (11 + 11) := by
+      6 * family.Q + 6 * (11 + actionCircuit.domainExponent) <=
+          6 * T + 6 * (11 + actionCircuit.domainExponent) := by
         gcongr
         exact profile.queryBound
       _ <= 8 * T := by omega

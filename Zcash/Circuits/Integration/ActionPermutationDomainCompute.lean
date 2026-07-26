@@ -25,10 +25,6 @@ theorem domainExponent_lt :
     actionCircuit.domainExponent < 33 :=
   ActionGateCoherence.domainExponent_lt
 
-theorem domainExponent_eq :
-    actionCircuit.domainExponent = 11 := by
-  native_decide
-
 /-- The Action permutation argument has 15 columns and verifier chunk width 7. -/
 theorem columnCount_chunkLen_eq :
     (actionCircuit.permutationColumnCount,
@@ -108,18 +104,10 @@ theorem routingCoherent :
   rw [routingFailures_eq_nil] at hmem
   simp at hmem
 
-/-- The first 21 powers of Pasta's permutation coset generator are distinct.
-Twenty-one is `3 * 7`, the padded Action permutation-column range. -/
-theorem deltaPowers_injective :
-    Function.Injective fun j : Fin 21 => deltaFp ^ (j : ℕ) := by
-  native_decide
-
 assert_no_sorry domainExponent_lt
-assert_no_sorry domainExponent_eq
 assert_no_sorry columnCount_chunkLen_eq
 assert_no_sorry routingFailures_eq_nil
 assert_no_sorry routingCoherent
-assert_no_sorry deltaPowers_injective
 
 end ActionPermutationDomain
 
