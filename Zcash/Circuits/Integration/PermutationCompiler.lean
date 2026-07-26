@@ -21,6 +21,299 @@ open Halo2
 
 set_option maxHeartbeats 20000
 
+/-- Query registration cannot change the equality-enabled column list. -/
+theorem registerQueriedCell_permutationColumns
+    {F : Type} (cs : ConstraintSystem F) (owner : String)
+    (cell : Expression F Query) :
+    (cs.registerQueriedCell owner cell).permutationColumns =
+      cs.permutationColumns := by
+  cases cell with
+  | var query =>
+      cases query with
+      | selector => rfl
+      | fixed column rotation =>
+          by_cases h : (column, 0) ∈ cs.fixedQueries <;>
+            simp [ConstraintSystem.registerQueriedCell,
+              ConstraintSystem.queryFixedIndex, h]
+      | advice column rotation =>
+          by_cases h : (column, rotation) ∈ cs.adviceQueries <;>
+            simp [ConstraintSystem.registerQueriedCell,
+              ConstraintSystem.queryAdviceIndex, h]
+      | «instance» column rotation =>
+          by_cases h : (column, rotation) ∈ cs.instanceQueries <;>
+            simp [ConstraintSystem.registerQueriedCell,
+              ConstraintSystem.queryInstanceIndex, h]
+  | const => rfl
+  | add => rfl
+  | mul => rfl
+
+/-- Registering a list of query atoms cannot change the equality-enabled
+column list. -/
+theorem registerQueriedCells_permutationColumns
+    {F : Type} (cs : ConstraintSystem F) (owner : String)
+    (cells : List (Expression F Query)) :
+    (cs.registerQueriedCells owner cells).permutationColumns =
+      cs.permutationColumns := by
+  induction cells generalizing cs with
+  | nil => rfl
+  | cons cell cells ih =>
+      unfold ConstraintSystem.registerQueriedCells
+      rw [List.foldl_cons]
+      change
+        (List.foldl
+          (fun current cell => current.registerQueriedCell owner cell)
+          (cs.registerQueriedCell owner cell) cells).permutationColumns =
+        cs.permutationColumns
+      rw [← ConstraintSystem.registerQueriedCells, ih,
+        registerQueriedCell_permutationColumns]
+
+theorem queryFixedIndex_permutationColumns
+    {F : Type} (cs : ConstraintSystem F)
+    (column : Column .fixed) :
+    (cs.queryFixedIndex column).permutationColumns =
+      cs.permutationColumns := by
+  unfold ConstraintSystem.queryFixedIndex
+  split <;> rfl
+
+theorem queryAdviceIndex_permutationColumns
+    {F : Type} (cs : ConstraintSystem F)
+    (column : Column .advice) (rotation : Rotation) :
+    (cs.queryAdviceIndex column rotation).permutationColumns =
+      cs.permutationColumns := by
+  unfold ConstraintSystem.queryAdviceIndex
+  split <;> rfl
+
+theorem queryInstanceIndex_permutationColumns
+    {F : Type} (cs : ConstraintSystem F)
+    (column : Column .instance) (rotation : Rotation) :
+    (cs.queryInstanceIndex column rotation).permutationColumns =
+      cs.permutationColumns := by
+  unfold ConstraintSystem.queryInstanceIndex
+  split <;> rfl
+
+theorem queryAnyIndex_permutationColumns
+    {F : Type} (cs : ConstraintSystem F)
+    (column : AnyColumn) :
+    (cs.queryAnyIndex column).permutationColumns =
+      cs.permutationColumns := by
+  rcases column with ⟨kind, index⟩
+  cases kind with
+  | advice =>
+      exact queryAdviceIndex_permutationColumns cs ⟨index⟩ 0
+  | fixed =>
+      exact queryFixedIndex_permutationColumns cs ⟨index⟩
+  | «instance» =>
+      exact queryInstanceIndex_permutationColumns cs ⟨index⟩ 0
+
+/-- Folding query registration over compiler-discovered arguments preserves
+the equality-enabled column list. -/
+private theorem fold_registerQueriedCells_permutationColumns
+    {F α : Type} (cs : ConstraintSystem F) (items : List α)
+    (owner : α → String) (cells : α → List (Expression F Query)) :
+    (items.foldl (fun current item =>
+      current.registerQueriedCells (owner item) (cells item))
+      cs).permutationColumns = cs.permutationColumns := by
+  induction items generalizing cs with
+  | nil => rfl
+  | cons item items ih =>
+      rw [List.foldl_cons, ih, registerQueriedCells_permutationColumns]
+
+/-- Synthesis closure only registers queries and appends gates/lookups; it
+cannot alter the permutation columns established by `configure`. -/
+theorem closeWithOperations_permutationColumns
+    {F : Type} [FiniteField F]
+    (cs : ConstraintSystem F) (ops : Operations F) :
+    (cs.closeWithOperations ops).permutationColumns =
+      cs.permutationColumns := by
+  unfold ConstraintSystem.closeWithOperations
+  change
+    (List.foldl _ (List.foldl _ cs _) _).permutationColumns =
+      cs.permutationColumns
+  rw [fold_registerQueriedCells_permutationColumns,
+    fold_registerQueriedCells_permutationColumns]
+
+namespace Configure
+
+/-- A configure program only appends to the equality-enabled column list, and
+appends at most `bound` entries. This syntactic compiler invariant is
+deliberately weaker than column lawfulness: it counts possible appends without
+deciding whether duplicate suppression makes them inert. -/
+structure PermutationGrowthAtMost
+    {F A : Type} (program : Configure F A) (bound : ℕ) : Prop where
+  preservesPrefix : ∀ cs,
+    List.IsPrefix cs.permutationColumns
+      (program cs).2.permutationColumns
+  upper : ∀ cs,
+    (program cs).2.permutationColumns.length ≤
+      cs.permutationColumns.length + bound
+
+namespace PermutationGrowthAtMost
+
+theorem weaken
+    {F A : Type} {program : Configure F A} {small large : ℕ}
+    (hprogram : PermutationGrowthAtMost program small)
+    (hbound : small ≤ large) :
+    PermutationGrowthAtMost program large := by
+  constructor
+  · exact hprogram.preservesPrefix
+  · intro cs
+    exact (hprogram.upper cs).trans
+      (Nat.add_le_add_left hbound _)
+
+theorem pure {F A : Type} (value : A) :
+    PermutationGrowthAtMost
+      (pure value : Configure F A) 0 := by
+  constructor <;> intro cs
+  · exact List.prefix_refl _
+  · rfl
+
+theorem bind
+    {F A B : Type} {first : Configure F A}
+    {next : A → Configure F B} {left right : ℕ}
+    (hfirst : PermutationGrowthAtMost first left)
+    (hnext : ∀ value, PermutationGrowthAtMost (next value) right) :
+    PermutationGrowthAtMost (first >>= next) (left + right) := by
+  constructor
+  · intro cs
+    exact (hfirst.preservesPrefix cs).trans
+      ((hnext (first cs).1).preservesPrefix (first cs).2)
+  · intro cs
+    have hleft := hfirst.upper cs
+    have hright :=
+      (hnext (first cs).1).upper (first cs).2
+    change
+      (next (first cs).1 (first cs).2).2.permutationColumns.length ≤
+        cs.permutationColumns.length + (left + right)
+    omega
+
+theorem adviceColumn {F : Type} :
+    PermutationGrowthAtMost (Halo2.adviceColumn : Configure F _) 0 := by
+  constructor <;> intro cs
+  · exact List.prefix_refl _
+  · rfl
+
+theorem fixedColumn {F : Type} :
+    PermutationGrowthAtMost (Halo2.fixedColumn : Configure F _) 0 := by
+  constructor <;> intro cs
+  · exact List.prefix_refl _
+  · rfl
+
+theorem instanceColumn {F : Type} :
+    PermutationGrowthAtMost (Halo2.instanceColumn : Configure F _) 0 := by
+  constructor <;> intro cs
+  · exact List.prefix_refl _
+  · rfl
+
+theorem selector {F : Type} :
+    PermutationGrowthAtMost (Halo2.selector : Configure F _) 0 := by
+  constructor <;> intro cs
+  · exact List.prefix_refl _
+  · rfl
+
+theorem complexSelector {F : Type} :
+    PermutationGrowthAtMost (Halo2.complexSelector : Configure F _) 0 := by
+  constructor <;> intro cs
+  · exact List.prefix_refl _
+  · rfl
+
+theorem enableEquality {F : Type} (column : AnyColumn) :
+    PermutationGrowthAtMost
+      (Halo2.enableEquality (F := F) column) 1 := by
+  constructor <;> intro cs
+  · simp only [Halo2.enableEquality]
+    rw [queryAnyIndex_permutationColumns]
+    split
+    · exact List.prefix_refl _
+    · exact List.prefix_append _ _
+  · simp only [Halo2.enableEquality]
+    rw [queryAnyIndex_permutationColumns]
+    split <;> simp_all
+
+/-- Enabling equality leaves at least its requested column in the permutation
+list, whether it was already present or has just been appended. -/
+theorem enableEquality_nonempty
+    {F : Type} (column : AnyColumn) (cs : ConstraintSystem F) :
+    ((Halo2.enableEquality (F := F) column) cs).2.permutationColumns ≠ [] := by
+  simp only [Halo2.enableEquality]
+  rw [queryAnyIndex_permutationColumns]
+  split
+  · intro hempty
+    rw [hempty] at ‹column ∈ cs.permutationColumns›
+    simp_all
+  · simp
+
+theorem enableConstant {F : Type} (column : Column .fixed) :
+    PermutationGrowthAtMost
+      (Halo2.enableConstant (F := F) column) 1 := by
+  constructor <;> intro cs
+  · simp only [Halo2.enableConstant]
+    rw [queryFixedIndex_permutationColumns]
+    split
+    · exact List.prefix_refl _
+    · exact List.prefix_append _ _
+  · simp only [Halo2.enableConstant]
+    rw [queryFixedIndex_permutationColumns]
+    split <;> simp_all
+
+theorem lookupTableColumn {F : Type} :
+    PermutationGrowthAtMost
+      (Halo2.lookupTableColumn : Configure F _) 0 := by
+  simpa only [Halo2.lookupTableColumn] using
+    (bind (F := F) fixedColumn
+      (fun column => pure ({ inner := column } : TableColumn)))
+
+theorem createGate {F : Type} (gate : Gate F) :
+    PermutationGrowthAtMost
+      (Halo2.createGate gate) 0 := by
+  constructor <;> intro cs
+  · simp only [Halo2.createGate]
+    rw [registerQueriedCells_permutationColumns]
+  · simp only [Halo2.createGate]
+    rw [registerQueriedCells_permutationColumns]
+    omega
+
+theorem lookup {F : Type}
+    (queriedCells : List (Expression F Query))
+    (tableMap : List (Expression F Query × TableColumn)) :
+    PermutationGrowthAtMost
+      (Halo2.lookup queriedCells tableMap) 0 := by
+  have heq (cs : ConstraintSystem F) :
+      ((Halo2.lookup queriedCells tableMap) cs).2.permutationColumns =
+        cs.permutationColumns := by
+    simp only [Halo2.lookup]
+    let registered := cs.registerQueriedCells "lookup" queriedCells
+    have hregistered :
+        registered.permutationColumns = cs.permutationColumns :=
+      registerQueriedCells_permutationColumns _ _ _
+    have hfold :
+        ∀ (items : List (Expression F Query × TableColumn))
+          (current : ConstraintSystem F),
+          (items.foldl
+            (fun state item => state.queryFixedIndex item.2.inner)
+            current).permutationColumns =
+              current.permutationColumns := by
+      intro items
+      induction items with
+      | nil => intro current; rfl
+      | cons item items ih =>
+          intro current
+          rw [List.foldl_cons, ih,
+            queryFixedIndex_permutationColumns]
+    change
+      (tableMap.foldl
+        (fun state item => state.queryFixedIndex item.2.inner)
+        registered).permutationColumns =
+          cs.permutationColumns
+    rw [hfold, hregistered]
+  constructor <;> intro cs
+  · rw [heq]
+  · rw [heq]
+    omega
+
+end PermutationGrowthAtMost
+
+end Configure
+
 /-- An in-range `findIdx` decodes to the element it searched for. -/
 theorem getD_findIdx_eq_target
     {α : Type} [DecidableEq α]
