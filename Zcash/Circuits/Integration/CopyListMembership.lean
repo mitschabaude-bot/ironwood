@@ -159,6 +159,11 @@ def constSites : RegionOperations Fp → List (Cell × Fp)
   | .constrainConstant cell value :: rest => (cell, value) :: constSites rest
   | _ :: rest => constSites rest
 
+/-- The value contribution of one region operation to V1's constant stream. -/
+def regionConstantValue? : RegionOperation Fp → Option Fp
+  | .constrainConstant _ value => some value
+  | _ => none
+
 /-- The constants half of a region's copy extraction, in closed zipped form: each
 constant site pairs with the next allocation-map entry — the constants cell on the
 left, the site's resolved cell on the right — and the tail of the map is returned. -/
@@ -229,6 +234,146 @@ def operationConstSites : Operations Fp → List (Cell × Fp)
   | .region _ body :: rest => constSites body ++ operationConstSites rest
   | .constrainInstance _ _ _ :: rest => operationConstSites rest
   | .loadTable _ _ :: rest => operationConstSites rest
+
+/-- The values retained by `constSites` are exactly the region operations'
+`constrainConstant` values, in the same order. -/
+theorem constSites_map_snd (body : RegionOperations Fp) :
+    (constSites body).map Prod.snd =
+      body.filterMap regionConstantValue? := by
+  induction body with
+  | nil => rfl
+  | cons operation rest ih =>
+      cases operation <;> simp [constSites, regionConstantValue?, ih]
+
+/-- Walking indexed regions and walking the operation stream directly collect the
+same constant values in the same order. Region indices do not affect this stream. -/
+theorem indexedRegions_constantValues
+    (ops : Operations Fp) (nextRegion : ℕ) :
+    ((indexedRegions ops nextRegion).1.flatMap fun (_, body) =>
+      body.filterMap regionConstantValue?) =
+      (operationConstSites ops).map Prod.snd := by
+  induction ops generalizing nextRegion with
+  | nil => rfl
+  | cons operation rest ih =>
+      cases operation with
+      | region name body =>
+          simp only [indexedRegions, operationConstSites, List.map_append,
+            List.flatMap_cons]
+          rw [ih, constSites_map_snd]
+      | constrainInstance cell column row =>
+          simpa only [indexedRegions, operationConstSites] using ih nextRegion
+      | loadTable table values =>
+          simpa only [indexedRegions, operationConstSites] using ih nextRegion
+
+/-- V1's planner value stream is the value projection of the semantic bridge's
+constant-site stream. This is an algorithmic identity, independent of any circuit. -/
+theorem operationConstSites_map_snd (ops : Operations Fp) :
+    (operationConstSites ops).map Prod.snd =
+      FloorPlanner.V1.constantValues ops := by
+  unfold FloorPlanner.V1.constantValues
+  symm
+  trans
+    ((indexedRegions ops 0).1.flatMap fun (_, body) =>
+      body.filterMap regionConstantValue?)
+  · apply List.flatMap_congr
+    intro indexed hindexed
+    rcases indexed with ⟨region, body⟩
+    apply List.filterMap_congr
+    intro operation hoperation
+    cases operation <;> rfl
+  · exact indexedRegions_constantValues ops 0
+
+/-- If V1 found enough positions for every collected value, projecting the value
+field from its allocation output recovers the original value stream. -/
+theorem V1_constantAssignments_map_fst
+    (ops : Operations Fp) (constantColumns : List ℕ)
+    (hfull :
+      (FloorPlanner.V1.constantValues ops).length ≤
+        (FloorPlanner.V1.constantAssignments ops constantColumns).length) :
+    (FloorPlanner.V1.constantAssignments ops constantColumns).map Prod.fst =
+      FloorPlanner.V1.constantValues ops := by
+  let allocations := (FloorPlanner.V1.planOperations ops).2
+  let endRow := FloorPlanner.V1.firstUnassignedRow allocations
+  let positions : List (ℕ × ℕ) := constantColumns.flatMap fun column =>
+    (FloorPlanner.V1.freeRows allocations column endRow).map fun row =>
+      (column, row)
+  have hpositions :
+      (FloorPlanner.V1.constantValues ops).length ≤ positions.length := by
+    have hlength :
+        (FloorPlanner.V1.constantValues ops).length ≤
+          min positions.length
+            (FloorPlanner.V1.constantValues ops).length := by
+      simpa only [FloorPlanner.V1.constantAssignments,
+        List.length_map, List.length_zip] using hfull
+    omega
+  unfold FloorPlanner.V1.constantAssignments
+  simp only [List.map_map]
+  simpa only [Function.comp_apply] using
+    List.map_snd_zip hpositions
+
+/-- Positional V1 allocation preserves each constant site's value. The only premise
+is allocation completeness; no concrete circuit computation is involved. -/
+theorem constantAllocation_value
+    (ops : Operations Fp) (constantColumns : List ℕ)
+    {site : Cell × Fp} {entry : ℕ × ℕ × ℕ}
+    (hfit :
+      (operationConstSites ops).length ≤
+        (FloorPlanner.V1.constantAssignments ops constantColumns).length)
+    (hallocation :
+      (site, entry) ∈
+        (operationConstSites ops).zip
+          ((FloorPlanner.V1.constantAssignments ops constantColumns).map
+            fun (value, column, row) => (value.val, column, row))) :
+    entry.1 = site.2.val := by
+  have hvalues := operationConstSites_map_snd ops
+  have hfull :
+      (FloorPlanner.V1.constantValues ops).length ≤
+        (FloorPlanner.V1.constantAssignments ops constantColumns).length := by
+    rw [← hvalues]
+    simpa only [List.length_map] using hfit
+  have hallocations :=
+    V1_constantAssignments_map_fst ops constantColumns hfull
+  have hallocationValues :
+      ((FloorPlanner.V1.constantAssignments ops constantColumns).map
+        fun (value, column, row) => (value.val, column, row)).map Prod.fst =
+          (FloorPlanner.V1.constantValues ops).map ZMod.val := by
+    simpa only [List.map_map, Function.comp_apply] using
+      congrArg (List.map ZMod.val) hallocations
+  have hmapped :
+      (site.2, entry.1) ∈
+        ((operationConstSites ops).zip
+          ((FloorPlanner.V1.constantAssignments ops constantColumns).map
+            fun (value, column, row) => (value.val, column, row))).map
+            (fun allocation => (allocation.1.2, allocation.2.1)) :=
+    List.mem_map.mpr ⟨(site, entry), hallocation, rfl⟩
+  have hmapped' :
+      (site.2, entry.1) ∈
+        ((operationConstSites ops).map Prod.snd).zip
+          (((FloorPlanner.V1.constantAssignments ops constantColumns).map
+            fun (value, column, row) => (value.val, column, row)).map
+              Prod.fst) := by
+    simpa only [List.zip_map] using hmapped
+  rw [hvalues, hallocationValues] at hmapped'
+  have hzipped :
+      (FloorPlanner.V1.constantValues ops).zip
+          ((FloorPlanner.V1.constantValues ops).map ZMod.val) =
+        (FloorPlanner.V1.constantValues ops).map fun value =>
+          (value, ZMod.val value) := by
+    have hmap :
+        ((FloorPlanner.V1.constantValues ops).map id).zip
+            ((FloorPlanner.V1.constantValues ops).map ZMod.val) =
+          (FloorPlanner.V1.constantValues ops).map fun value =>
+            (id value, ZMod.val value) :=
+      List.zip_map'
+    simpa only [List.map_id, id_eq] using hmap
+  rw [hzipped] at hmapped'
+  rcases List.mem_map.mp hmapped' with ⟨value, -, hvalue⟩
+  have hsite : value = site.2 :=
+    congrArg Prod.fst hvalue
+  have hentry : value.val = entry.1 :=
+    congrArg Prod.snd hvalue
+  rw [← hsite]
+  exact hentry.symm
 
 /-- A declared region constant copy occurs in the region's positional constants stream. -/
 theorem mem_constSites_of_declared_constant

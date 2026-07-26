@@ -1,5 +1,6 @@
 import Zcash.Snark.Keygen.Pipeline
 import Zcash.Circuits.Action.TopLevel
+import Zcash.Circuits.Integration.ActionGateCoherenceCompute
 import Mathlib.Util.AssertNoSorry
 import Zcash.Snark.Soundness.Canonical.PermutationInstantiation
 
@@ -21,8 +22,8 @@ namespace ActionPermutationDomain
 
 /-- The circuit-derived Action domain exponent is within Pasta's supported range. -/
 theorem domainExponent_lt :
-    actionCircuit.domainExponent < 33 := by
-  native_decide
+    actionCircuit.domainExponent < 33 :=
+  ActionGateCoherence.domainExponent_lt
 
 theorem domainExponent_eq :
     actionCircuit.domainExponent = 11 := by
@@ -45,13 +46,6 @@ theorem columnCount_chunkLen_eq :
     (actionCircuit.permutationColumnCount,
         actionCircuit.chunkLen) =
       (15, 7) := by
-  native_decide
-
-/-- Every advice query in the Action circuit's pinned layout names an
-allocated advice column. -/
-theorem adviceQueryLayout_columns_lt :
-    ∀ entry ∈ actionCircuit.adviceQueryLayout,
-      entry.1 < actionCircuit.adviceColumnCount := by
   native_decide
 
 def ColumnRefCoherent : ColumnRef → Prop
@@ -105,7 +99,6 @@ assert_no_sorry domainExponent_lt
 assert_no_sorry domainExponent_eq
 assert_no_sorry chunks_eq
 assert_no_sorry columnCount_chunkLen_eq
-assert_no_sorry adviceQueryLayout_columns_lt
 assert_no_sorry routingCoherent
 assert_no_sorry deltaPowers_injective
 

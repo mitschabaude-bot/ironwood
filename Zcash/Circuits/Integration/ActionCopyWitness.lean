@@ -765,12 +765,6 @@ def actionConstantAllocations :
   (operationConstSites (actionCircuit.operations)).zip
     actionConsts
 
-/-- Positional constant allocations whose stored natural value disagrees with the site. -/
-def actionConstantValueFailures :
-    List ((Cell × Fp) × (ℕ × ℕ × ℕ)) :=
-  actionConstantAllocations.filter fun allocation =>
-    decide (allocation.2.1 ≠ allocation.1.2.val)
-
 /-- Decode a raw Action permutation coordinate back to its concrete column and row. -/
 def actionRawCellAddress (coordinate : ℕ × ℕ) : AnyColumn × ℕ :=
   let cell := mkActionCell coordinate
@@ -808,11 +802,6 @@ theorem actionConstantSites_fit :
       actionConsts.length := by
   native_decide
 
-/-- The positional V1 allocation stores the value of every Action constant site. -/
-theorem actionConstantValueFailures_eq_nil :
-    actionConstantValueFailures = [] := by
-  native_decide
-
 /-- Every allocated Action constant cell survives permutation-coordinate encoding. -/
 theorem actionConstantCellAddressFailures_eq_nil :
     actionConstantCellAddressFailures = [] := by
@@ -823,12 +812,24 @@ theorem actionConstantAllocation_value
     {site : Cell × Fp} {entry : ℕ × ℕ × ℕ}
     (hallocation : (site, entry) ∈ actionConstantAllocations) :
     entry.1 = site.2.val := by
-  by_contra hne
-  have hfailure : (site, entry) ∈ actionConstantValueFailures := by
-    rw [actionConstantValueFailures, List.mem_filter]
-    exact ⟨hallocation, decide_eq_true hne⟩
-  rw [actionConstantValueFailures_eq_nil] at hfailure
-  simp at hfailure
+  have hfit :
+      (operationConstSites
+          (actionCircuit.operations)).length ≤
+        (FloorPlanner.V1.constantAssignments
+          (actionCircuit.operations)
+          (actionCircuit.constraintSystem.constants.map
+            (fun column => column.index))).length := by
+    simpa only [actionConsts, Keygen.constantCopyEntries,
+      List.length_map] using
+      actionConstantSites_fit
+  apply constantAllocation_value
+    (ops := actionCircuit.operations)
+    (constantColumns :=
+      actionCircuit.constraintSystem.constants.map
+        (fun column => column.index))
+    hfit
+  simpa only [actionConstantAllocations, actionConsts,
+    Keygen.constantCopyEntries] using hallocation
 
 /-- An allocated Action constant cell has the expected concrete address. -/
 theorem actionConstantCellAddress

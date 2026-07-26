@@ -139,6 +139,16 @@ and should normally be discharged by default tactics and compositional theorems.
 The split of row 12 makes this table contain 23 atomic obligations even though it
 still corresponds to the original 22 theorem rows.
 
+## Elimination progress
+
+The `certificate-elimination-rg` branch currently closes three R/G rows without changing any L-classified interface or premise:
+
+* **#10 (G), constant values:** generic traversal lemmas prove that the semantic constant-site collector and V1 planner collect the same ordered value stream, and that positional allocation preserves those values whenever the existing allocation-completeness premise holds. The Action-wide failure list and its `native_decide` theorem have been deleted. Rows 8 and 9 remain deliberately untouched.
+* **#15 (R), duplicate domain bound:** the permutation bridge now reuses the gate bridge's existing supported-domain fact instead of evaluating the same Action property a second time. The underlying supported-domain law remains row 14 (L).
+* **#19 (G), query layouts:** `mergeDerived` and `toVerifierKey` now expose the `TopLevelCircuit`'s own `pinnedCS` layouts directly. The separate Action projection, whole-circuit comparison, three projection corollaries, and `native_decide` theorem have been deleted. A small generic `Fp` instance-irrelevance lemma connects legacy projection call sites without computing Action.
+
+The remaining R/G rows are #3, #6, #16, #17, #18, and #21. All L rows remain design inputs rather than implementation targets on this branch.
+
 ## Additional correctness obligations
 
 | # | Current location or hidden behavior | Class | Structural replacement | Expected difficulty |
