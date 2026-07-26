@@ -60,6 +60,26 @@ variable
     {top : TopLevelCircuit Fp ConfigInput Config Output}
     {numProofs : ℕ} {proofIndex : Fin numProofs}
 
+/-- A table-load operation contributes its full value-list length to the
+compiler's used-row footprint. -/
+theorem loadTable_length_le_usedRows
+    {F : Type} (operations : Operations F)
+    (table : TableColumn) (values : List F)
+    (hload : Operation.loadTable table values ∈ operations) :
+    values.length ≤ Halo2.usedRows operations := by
+  let tableLengths := operations.filterMap fun operation =>
+    match operation with
+    | .loadTable _ loaded => some loaded.length
+    | _ => none
+  have hlength : values.length ∈ tableLengths := by
+    apply List.mem_filterMap.mpr
+    exact ⟨.loadTable table values, hload, rfl⟩
+  have htable : values.length ≤ tableLengths.foldl max 0 :=
+    FloorPlanner.value_le_foldl_max_of_mem
+      tableLengths id 0 values.length hlength
+  unfold Halo2.usedRows
+  exact htable.trans (Nat.le_max_right _ _)
+
 /-- The circuit-derived domain generator has exact order `2^k`. -/
 theorem domainRoot
     (hbound : top.domainExponent < 33) :

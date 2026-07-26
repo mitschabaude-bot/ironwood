@@ -92,6 +92,7 @@ theorem commitment_primary_eq_commit
 
 assert_no_sorry commitment_primary_eq_commit
 
+set_option maxRecDepth 100000 in
 /--
 The Action endpoint with public-instance provenance closed.
 
@@ -154,8 +155,38 @@ theorem actionBundleStatement_or_relation_of_canonicalRelation
       HasNontrivialRelation (F := Fp) urs.g urs.u urs.w := by
   have hsize :
       10 ≤ 2 ^ orchardActionTopLevelCircuit.domainExponent := by
-    rw [ActionPermutationDomain.domainExponent_eq]
-    norm_num
+    have hload :=
+      Zcash.Circuits.Action.initialGeneratorTableIdx_mem
+        Specs.Sinsemilla.orchardGenerators orchardBases
+        orchardActionTopLevelCircuit.config 0
+    have hload' :
+        Operation.loadTable
+            orchardActionTopLevelCircuit.config.sinsemilla1.generatorTable.tableIdx
+            ((List.range (2 ^ Specs.K)).map
+              (Nat.cast : ℕ → Fp)) ∈
+          orchardActionTopLevelCircuit.operations 0 := by
+      simpa [TopLevelCircuit.operations,
+        Zcash.Circuits.Action.orchardActionTopLevelCircuit,
+        Zcash.Circuits.Action.topLevelCircuit,
+        TopLevelCircuit.config] using hload
+    have htable :
+        ((List.range (2 ^ Specs.K)).map
+          (Nat.cast : ℕ → Fp)).length ≤
+          orchardActionTopLevelCircuit.usedRows :=
+      TopLevelAssignment.loadTable_length_le_usedRows
+        (orchardActionTopLevelCircuit.operations 0) _ _ hload'
+    have hused : 10 ≤ orchardActionTopLevelCircuit.usedRows := by
+      have hten :
+          10 ≤
+            ((List.range (2 ^ Specs.K)).map
+              (Nat.cast : ℕ → Fp)).length := by
+        norm_num [Specs.K]
+      exact hten.trans htable
+    have hfit :=
+      orchardActionTopLevelCircuit.fitsAt_domainExponent
+        ActionPermutationDomain.domainExponent_lt
+    unfold TopLevelCircuit.FitsAt at hfit
+    omega
   exact
     Zcash.Snark.actionBundleStatement_or_relation_of_canonicalRelation
       pp urs hk (commitment pp urs inputs) ps ch vk hvk pU pW a
