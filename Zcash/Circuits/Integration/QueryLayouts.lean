@@ -117,6 +117,23 @@ variable
     {ConfigInput Config : Type} {Output : TypeMap}
     [CircuitType Output]
 
+/-- An instance query registered by a top-level circuit's own configure run is still
+registered in the constraint system key generation consumes.
+
+Closure is the only step in between, and it never removes a registration. Stating this
+generically keeps the circuit's operation stream abstract: unfolding it at the Action
+instance is what makes the same step unaffordable. -/
+theorem mem_instanceQueries_constraintSystem {F : Type} [FiniteField F]
+    (top : TopLevelCircuit F ConfigInput Config Output)
+    (query : Column .instance × Rotation)
+    (hquery :
+      query ∈ (top.formalCircuit.configure top.configInput {}).2.instanceQueries) :
+    query ∈ top.constraintSystem.instanceQueries := by
+  -- Name the closure by unfolding rather than leaving it to unification, which otherwise
+  -- searches through the whole `TopLevelCircuit` bundle.
+  unfold TopLevelCircuit.constraintSystem Halo2.FormalCircuit.toConstraintSystem
+  exact mem_instanceQueries_closeWithOperations_of_mem _ _ _ hquery
+
 /-- A query present in the synthesis-closed top-level constraint system remains in
 its derived verifying key's instance-query layout. -/
 theorem instanceQueryLayout_of_constraintSystem

@@ -1,3 +1,4 @@
+import Zcash.Circuits.ConfigureAppendOnly
 import Zcash.Circuits.Ecc.MulFixed
 import Zcash.Circuits.Ecc.MulFixed.ShortTheorems
 import Zcash.Circuits.Ecc.MulFixed.BaseFieldElemTheorems
@@ -65,6 +66,12 @@ def configure (superConfig : MulFixed.Config) : Configure Fp Config := do
   let cfg : Config := { qMulFixedShort, superConfig }
   createGate (shortGate cfg)
   return cfg
+
+/-- `configure` only appends to the constraint system's registration lists. -/
+theorem configure_appendOnly (superConfig : MulFixed.Config) :
+    Configure.AppendOnly (configure superConfig) := by
+  unfold configure
+  append_only
 
 structure Inputs (F : Type) where
   -- The unsigned magnitude, already assigned.

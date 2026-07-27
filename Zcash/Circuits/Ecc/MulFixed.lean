@@ -1,5 +1,6 @@
 import Clean.Halo2
 import Clean.Halo2.Subcircuit
+import Zcash.Circuits.ConfigureAppendOnly
 import Zcash.Circuits.Specs.Pallas
 import Zcash.Circuits.Ecc.MulFixed.Theorems
 import Zcash.Circuits.Ecc.Basic
@@ -179,6 +180,20 @@ def configure (lagrangeCoeffs : Fin 8 → Column .fixed) (window u : Column .adv
     { runningSumConfig, lagrangeCoeffs, fixedZ, window, u, addConfig, addIncompleteConfig }
   createGate (coordsGate cfg)
   return cfg
+
+/-- `configure` only appends to the constraint system's registration lists, given the same
+for the running-sum child it calls. -/
+theorem configure_appendOnly (lagrangeCoeffs : Fin 8 → Column .fixed) (window u : Column .advice)
+    (addConfig : Add.Config) (addIncompleteConfig : AddIncomplete.Config) :
+    Configure.AppendOnly
+      (configure lagrangeCoeffs window u addConfig addIncompleteConfig) := by
+  have hrunningSum : ∀ q, Configure.AppendOnly (DecomposeRunningSum.configure 3 q window) :=
+    fun q => DecomposeRunningSum.configure_appendOnly 3 q window
+  unfold configure
+  append_only
+  -- `append_only`'s `assumption` step cannot instantiate the selector `hrunningSum` quantifies
+  -- over — that selector is bound inside the `do` block — so the child step is closed by hand.
+  exact hrunningSum _ _
 
 /-! ## Region-relative synthesize pieces
 

@@ -1,6 +1,7 @@
 import Clean.Halo2
 import Clean.Halo2.Subcircuit
 import Clean.Halo2.Tactics.SubcircuitRw
+import Zcash.Circuits.ConfigureAppendOnly
 import Zcash.Circuits.Specs.Pallas
 import Zcash.Circuits.Ecc.MulTheorems
 import Zcash.Circuits.Ecc.MulAssignTheorems
@@ -108,6 +109,21 @@ def configure (addConfig : Add.Config) (lookupConfig : LookupRangeCheck.Config 1
     { qMulLsb, addConfig, hiConfig, loConfig, completeConfig, overflowConfig }
   createGate (lsbGate cfg)
   return cfg
+
+/-- `configure` only appends to the constraint system's registration lists, given the same
+for the four children it calls (the `hi` and `lo` incomplete rounds, complete, overflow). -/
+theorem configure_appendOnly (addConfig : Add.Config) (lookupConfig : LookupRangeCheck.Config 10)
+    (advices : Fin 10 → Column .advice) :
+    Configure.AppendOnly (configure addConfig lookupConfig advices) := by
+  have hhi := MulIncomplete.configure_appendOnly (advices 9) (advices 3) (advices 0) (advices 1)
+    (advices 4) (advices 5)
+  have hlo := MulIncomplete.configure_appendOnly (advices 6) (advices 7) (advices 0) (advices 1)
+    (advices 8) (advices 2)
+  have hcomplete := MulComplete.configure_appendOnly (advices 9) addConfig
+  have hoverflow :=
+    MulOverflow.configure_appendOnly 10 lookupConfig (advices 6) (advices 7) (advices 8)
+  unfold configure
+  append_only
 
 /-! ## Inputs / Output -/
 

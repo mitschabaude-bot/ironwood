@@ -1,4 +1,5 @@
 import Clean.Halo2
+import Zcash.Circuits.ConfigureAppendOnly
 import Zcash.Circuits.Specs.Pallas
 import Zcash.Circuits.Specs.Sinsemilla
 import Zcash.Circuits.Ecc.DoubleAndAdd
@@ -202,6 +203,15 @@ def configure (G : Generators) (xA xP bits lambda1 lambda2 : Column .advice)
   createGate (initialYQGate cfg)
   createGate (sinsemillaGate cfg)
   return cfg
+
+/-- `configure` only appends to the constraint system's registration lists. -/
+theorem configure_appendOnly (G : Generators) (xA xP bits lambda1 lambda2 : Column .advice)
+    (witnessPieces : Column .advice) (fixedYQ : Column .fixed)
+    (genTable : GeneratorTableConfig) :
+    Configure.AppendOnly
+      (configure G xA xP bits lambda1 lambda2 witnessPieces fixedYQ genTable) := by
+  unfold configure
+  append_only
 
 /-- The boundary `q_s2` value: `0` between pieces, `2` on the message's final piece
 (`hash_to_point.rs::hash_piece`, `final_piece`). Deliberately NOT `@[simp]`: proofs keep it

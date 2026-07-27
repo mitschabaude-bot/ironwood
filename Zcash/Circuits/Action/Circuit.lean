@@ -1,4 +1,5 @@
 import Clean.Halo2.CircuitTypeDeriving
+import Zcash.Circuits.ConfigureAppendOnly
 import Zcash.Circuits.Ecc.Chip
 import Zcash.Circuits.Poseidon.Hash
 import Zcash.Circuits.Utilities.AddChip
@@ -125,6 +126,26 @@ def configure (G : Generators) : Configure Fp Config := do
   return { primary, qOrchard, advices, addChipConfig, eccConfig, poseidonConfig,
            sinsemilla1, merkle1, sinsemilla2, merkle2, commitIvkConfig,
            noteCommitOld, noteCommitNew, lookupConfig }
+
+-- The walk introduces one nested tactic frame per configure operation, and this circuit has
+-- more than the default depth allows.
+set_option maxRecDepth 4000 in
+/-- The configured public-input column carries a rotation-zero instance query
+(`circuit.rs:343-344`: `enable_equality(primary)` registers one before appending `primary` to
+the permutation columns).
+
+Proved from the registration order alone: `enableEquality` establishes the query, and every
+chip configured afterwards is append-only, so nothing can remove it. The column's index never
+enters the argument — inserting configure operations on either side of `primary` leaves the
+proof standing. -/
+theorem configure_primaryRegistered (G : Generators) (cs : ConstraintSystem Fp) :
+    ((configure G cs).1.primary, (0 : Rotation)) ∈ (configure G cs).2.instanceQueries := by
+  unfold configure
+  chase_registration (fun config : Config => (config.primary, (0 : Rotation))) using
+    [LookupRangeCheck.configure_appendOnly, Ecc.configure_appendOnly,
+      Poseidon.configure_appendOnly, Sinsemilla.HashPiece.configure_appendOnly,
+      Sinsemilla.Merkle.configure_appendOnly, CommitIvk.configure_appendOnly,
+      NoteCommit.configure_appendOnly]
 
 /-! ## Synthesize -/
 

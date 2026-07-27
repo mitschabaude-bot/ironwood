@@ -1,5 +1,6 @@
 import Clean.Halo2
 import Clean.Halo2.Subcircuit
+import Zcash.Circuits.ConfigureAppendOnly
 import Zcash.Circuits.Ecc.Basic
 import Zcash.Circuits.Poseidon.HashTheorems
 
@@ -132,5 +133,12 @@ def configure (state : Fin 3 → Column .advice) (partialSbox : Column .advice)
   createGate (partialRoundsGate cfg)
   createGate (padAndAddGate cfg)
   return cfg
+
+/-- `configure` only appends to the constraint system's registration lists. -/
+theorem configure_appendOnly (state : Fin 3 → Column .advice) (partialSbox : Column .advice)
+    (rcA rcB : Fin 3 → Column .fixed) :
+    Configure.AppendOnly (configure state partialSbox rcA rcB) := by
+  unfold configure
+  append_only
 
 end Zcash.Circuits.Poseidon

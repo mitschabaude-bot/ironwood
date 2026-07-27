@@ -1,4 +1,5 @@
 import Clean.Halo2
+import Zcash.Circuits.ConfigureAppendOnly
 import Zcash.Circuits.Specs.Pallas
 import Zcash.Circuits.Ecc.Basic
 
@@ -129,6 +130,12 @@ def add : FormalRegionCircuit Fp
     obtain ⟨-, -, hxne⟩ := assumptions
     simp_all only
     grind
+
+/-- `add.configure` only appends to the constraint system's registration lists. -/
+theorem add_configure_appendOnly (xP yP xQR yQR : Column .advice) :
+    Configure.AppendOnly (add.configure (xP, yP, xQR, yQR)) := by
+  unfold add
+  append_only
 
 end AddIncomplete
 

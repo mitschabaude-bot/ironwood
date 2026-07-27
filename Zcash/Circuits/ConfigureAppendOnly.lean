@@ -277,4 +277,119 @@ theorem mem_instanceQueries_enableEquality (cs : ConstraintSystem F)
   dsimp only
   exact mem_instanceQueries_queryInstanceIndex cs column 0
 
+/-!
+## Walking a configure run
+
+Running a `do` block on a state is definitionally a nested application:
+
+  `(program >>= rest) cs = rest (program cs).1 (program cs).2`
+
+but that identity is useless as a rewrite for a whole circuit, because its right-hand side
+names `program cs` twice. Rewriting with it at every bind doubles the term each time, and the
+Action circuit's thirty-odd operations do not fit in any heartbeat budget.
+
+These rules walk the run instead. Each consumes one operation and hands the rest of the run
+fresh variables for what that operation returned, so the goal stays the size of the suffix
+still to be walked. `step` is for the operations before the query is registered,
+`step_enableEquality` for the one that registers it, and `step_preserving` for every
+append-only operation after.
+
+`select` says how to read the query out of the run's final configuration — for the Action
+circuit, `fun config => (config.primary, 0)`. Carrying it as an ordinary parameter, rather
+than leaving the conclusion's shape to a higher-order metavariable, is what keeps each step
+cheap: the state is matched structurally against a term the goal already contains.
+-/
+
+theorem Configure.run_bind {program : Configure F α} {rest : α → Configure F β}
+    (cs : ConstraintSystem F) :
+    (program >>= rest) cs = rest (program cs).1 (program cs).2 := rfl
+
+theorem Configure.run_pure (a : α) (cs : ConstraintSystem F) :
+    (Pure.pure a : Configure F α) cs = (a, cs) := rfl
+
+/-- Walk over one configure operation, generalizing its result and the state it produced. -/
+theorem Configure.step {program : Configure F α} {rest : α → Configure F β}
+    {select : β → Column .instance × Rotation} (cs : ConstraintSystem F)
+    (hrest : ∀ a cs', select (rest a cs').1 ∈ (rest a cs').2.instanceQueries) :
+    select ((program >>= rest) cs).1 ∈ ((program >>= rest) cs).2.instanceQueries :=
+  hrest (program cs).1 (program cs).2
+
+/-- Walk over the `enableEquality` that registers an instance column, handing the rest of the
+run its registration.
+
+Naming `enableEquality` in the conclusion, rather than leaving the operation open and pinning
+it through a hypothesis, is what lets a walk recognise this step by shape — and skip past it
+cheaply at every other step, without unfolding the chip it is looking at. -/
+theorem Configure.step_enableEquality {rest : Unit → Configure F β}
+    {select : β → Column .instance × Rotation} (cs : ConstraintSystem F)
+    (column : Column .instance)
+    (hrest : ∀ a cs', (column, (0 : Rotation)) ∈ cs'.instanceQueries →
+      select (rest a cs').1 ∈ (rest a cs').2.instanceQueries) :
+    select ((Halo2.enableEquality column.toAny >>= rest) cs).1 ∈
+      ((Halo2.enableEquality column.toAny >>= rest) cs).2.instanceQueries :=
+  hrest () ((Halo2.enableEquality column.toAny : Configure F Unit) cs).2
+    (mem_instanceQueries_enableEquality cs column)
+
+/-- Walk over an append-only operation, carrying an already-registered query forward. -/
+theorem Configure.step_preserving {program : Configure F α} {rest : α → Configure F β}
+    {select : β → Column .instance × Rotation} {query : Column .instance × Rotation}
+    (cs : ConstraintSystem F) (hprogram : Configure.AppendOnly program)
+    (hquery : query ∈ cs.instanceQueries)
+    (hrest : ∀ a cs', query ∈ cs'.instanceQueries →
+      select (rest a cs').1 ∈ (rest a cs').2.instanceQueries) :
+    select ((program >>= rest) cs).1 ∈ ((program >>= rest) cs).2.instanceQueries :=
+  hrest (program cs).1 (program cs).2 ((hprogram cs).mem_instanceQueries hquery)
+
+/-- Discharge the append-only obligation of a single walked configure step, for the
+primitives. A chip step is handled by the lemmas passed to `chase_registration`. -/
+macro "append_only_step" : tactic =>
+  `(tactic|
+      first
+        | with_reducible assumption
+        | with_reducible apply Configure.AppendOnly.adviceColumn
+        | with_reducible apply Configure.AppendOnly.fixedColumn
+        | with_reducible apply Configure.AppendOnly.instanceColumn
+        | with_reducible apply Configure.AppendOnly.selector
+        | with_reducible apply Configure.AppendOnly.complexSelector
+        | with_reducible apply Configure.AppendOnly.lookupTableColumn
+        | with_reducible apply Configure.AppendOnly.enableEquality
+        | with_reducible apply Configure.AppendOnly.enableConstant
+        | with_reducible apply Configure.AppendOnly.createGate
+        | with_reducible apply Configure.AppendOnly.lookup)
+
+/-- Prove that the rotation-zero instance query `enableEquality` registers on a column is
+present in the constraint system the whole configure run ends in.
+
+Walk the run one operation at a time: generalize what each operation returned, pick up the
+registration at the `enableEquality`, and carry it through every operation after.
+
+The first argument is `select` (see the section note above); it has to be given rather than
+inferred, since the goal fixes it only up to a higher-order unification Lean declines to
+guess. After `using` come the `AppendOnly` facts of the chips the circuit configures, which
+the walk applies at their own interface.
+
+Chip facts are `apply`ed one named lemma at a time rather than searched for: a hypothesis
+search runs at default transparency, so a rule that does not match the step at hand sends the
+unifier into the chip bodies and the walk stops fitting in any heartbeat budget.
+
+Run it on the goal with the circuit unfolded but nothing reduced — the walk does its own
+stepping, and rewriting the run into applied form first is what makes it blow up. -/
+syntax "chase_registration" ppSpace term " using " "[" term,* "]" : tactic
+
+macro_rules
+  | `(tactic| chase_registration $select using [$chips,*]) =>
+    `(tactic|
+        ((repeat' first
+            | (with_reducible (refine Configure.step_enableEquality (select := $select) _ _ ?_)
+               intro _ _ _)
+            | (refine Configure.step_preserving (select := $select) _
+                        (by first
+                              | append_only_step
+                              $[| with_reducible apply $chips]*)
+                        (by assumption) ?_
+               intro _ _ _)
+            | (refine Configure.step (select := $select) _ ?_
+               intro _ _))
+         all_goals (simp only [Configure.run_pure]; assumption)))
+
 end Halo2

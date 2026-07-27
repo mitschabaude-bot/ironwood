@@ -1,3 +1,4 @@
+import Zcash.Circuits.ConfigureAppendOnly
 import Zcash.Circuits.Ecc.WitnessPoint
 import Zcash.Circuits.Ecc.AddIncomplete
 import Zcash.Circuits.Ecc.Add
@@ -65,5 +66,44 @@ def configure (advices : Fin 10 → Column .advice)
     ![advices 6, advices 7, advices 8] rangeCheck mulFixed
   return { witnessPoint, addIncomplete, add, mul, mulFixedFull, mulFixedShort,
            mulFixedBaseField }
+
+/-- The whole ECC `configure` only appends to the constraint system's registration lists.
+
+Five children take a config bound earlier in the `do` block, so their facts are named
+quantified over that config and applied by hand at the end; the body says where. -/
+theorem configure_appendOnly (advices : Fin 10 → Column .advice)
+    (lagrangeCoeffs : Fin 8 → Column .fixed)
+    (rangeCheck : LookupRangeCheck.Config 10) :
+    Configure.AppendOnly (configure advices lagrangeCoeffs rangeCheck) := by
+  have hwitnessPoint := WitnessPoint.configure_appendOnly (advices 0) (advices 1)
+  have haddIncomplete := AddIncomplete.add_configure_appendOnly
+    (advices 0) (advices 1) (advices 2) (advices 3)
+  have hadd := Add.add_configure_appendOnly
+    (advices 0) (advices 1) (advices 2) (advices 3) (advices 4) (advices 5)
+    (advices 6) (advices 7) (advices 8)
+  have hmul : ∀ addConfig, Configure.AppendOnly (Mul.configure addConfig rangeCheck advices) :=
+    fun addConfig => Mul.configure_appendOnly addConfig rangeCheck advices
+  have hmulFixed : ∀ addConfig addIncompleteConfig,
+      Configure.AppendOnly (MulFixed.configure lagrangeCoeffs (advices 4) (advices 5)
+        addConfig addIncompleteConfig) :=
+    fun addConfig addIncompleteConfig => MulFixed.configure_appendOnly lagrangeCoeffs
+      (advices 4) (advices 5) addConfig addIncompleteConfig
+  have hmulFixedFull : ∀ cfg, Configure.AppendOnly (MulFixed.FullWidth.configure cfg) :=
+    MulFixed.FullWidth.configure_appendOnly
+  have hmulFixedShort : ∀ cfg, Configure.AppendOnly (MulFixed.Short.configure cfg) :=
+    MulFixed.Short.configure_appendOnly
+  have hmulFixedBaseField : ∀ cfg, Configure.AppendOnly
+      (MulFixed.BaseFieldElem.configure ![advices 6, advices 7, advices 8] rangeCheck cfg) :=
+    fun cfg => MulFixed.BaseFieldElem.configure_appendOnly
+      ![advices 6, advices 7, advices 8] rangeCheck cfg
+  unfold configure
+  append_only
+  -- `append_only`'s `assumption` step matches only the fully-applied facts, so the five
+  -- children taking a config bound earlier in the `do` block are instantiated by hand.
+  · exact hmul _ _
+  · exact hmulFixed _ _ _
+  · exact hmulFixedFull _ _
+  · exact hmulFixedShort _ _
+  · exact hmulFixedBaseField _ _
 
 end Zcash.Circuits.Ecc

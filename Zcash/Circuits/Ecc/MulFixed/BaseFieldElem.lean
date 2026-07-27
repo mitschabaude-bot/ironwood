@@ -1,3 +1,4 @@
+import Zcash.Circuits.ConfigureAppendOnly
 import Zcash.Circuits.Ecc.MulFixed
 import Zcash.Circuits.Utilities.LookupRangeCheck
 import Zcash.Circuits.Ecc.MulFixed.BaseFieldElemTheorems
@@ -101,6 +102,13 @@ def configure (canonAdvices : Fin 3 → Column .advice)
   let cfg : Config := { qMulFixedBaseField, canonAdvices, lookupConfig, superConfig }
   createGate (canonGate cfg)
   return cfg
+
+/-- `configure` only appends to the constraint system's registration lists. -/
+theorem configure_appendOnly (canonAdvices : Fin 3 → Column .advice)
+    (lookupConfig : LookupRangeCheck.Config 10) (superConfig : MulFixed.Config) :
+    Configure.AppendOnly (configure canonAdvices lookupConfig superConfig) := by
+  unfold configure
+  append_only
 
 /-! ## Synthesize -/
 
