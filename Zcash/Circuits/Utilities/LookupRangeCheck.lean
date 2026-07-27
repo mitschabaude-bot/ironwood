@@ -1,4 +1,5 @@
 import Clean.Halo2
+import Zcash.Circuits.ConfigureAppendOnly
 import Zcash.Circuits.Ecc.Basic
 import Zcash.Circuits.Specs.Pallas
 
@@ -102,6 +103,11 @@ def configure (K : ℕ) (runningSum : Column .advice) (tableIdx : TableColumn) :
   -- register the bitshift gate
   createGate (bitshiftGate K cfg)
   return cfg
+
+theorem configure_appendOnly (K : ℕ) (runningSum : Column .advice) (tableIdx : TableColumn) :
+    Configure.AppendOnly (configure K runningSum tableIdx) := by
+  unfold configure
+  append_only
 
 /-! ## The table loader
 

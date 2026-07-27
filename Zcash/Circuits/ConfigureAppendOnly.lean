@@ -226,6 +226,32 @@ theorem lookup (queriedCells : List (Expression F Query))
 
 end Configure.AppendOnly
 
+/-- Discharge a `Configure.AppendOnly` goal for a straight-line configure body by applying
+the monad and primitive rules repeatedly.
+
+A chip that composes other chips puts their `AppendOnly` facts in context first
+(`have := Child.configure_appendOnly …`); the tactic reaches for those before it tries to
+decompose the call, which keeps the proof at the child's interface instead of unfolding
+its body. -/
+macro "append_only" : tactic =>
+  `(tactic|
+      repeat' first
+        | with_reducible assumption
+        | with_reducible apply Configure.AppendOnly.bind
+        | with_reducible apply Configure.AppendOnly.pure
+        | with_reducible apply Configure.AppendOnly.adviceColumn
+        | with_reducible apply Configure.AppendOnly.fixedColumn
+        | with_reducible apply Configure.AppendOnly.instanceColumn
+        | with_reducible apply Configure.AppendOnly.selector
+        | with_reducible apply Configure.AppendOnly.complexSelector
+        | with_reducible apply Configure.AppendOnly.lookupTableColumn
+        | with_reducible apply Configure.AppendOnly.enableEquality
+        | with_reducible apply Configure.AppendOnly.enableConstant
+        | with_reducible apply Configure.AppendOnly.createGate
+        | with_reducible apply Configure.AppendOnly.lookup
+        | with_reducible apply Configure.AppendOnly.map
+        | intro _)
+
 /-!
 ## Establishing an instance query
 
