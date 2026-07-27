@@ -1,6 +1,5 @@
 import Zcash.Circuits.Integration.ActionEncoding
 import Zcash.Circuits.Integration.ActionGateCoherence
-import Zcash.Circuits.Integration.ActionInstanceCommitmentCompute
 import Mathlib.Util.AssertNoSorry
 
 /-!
@@ -22,6 +21,24 @@ namespace ActionInstanceCommitment
 
 variable {G : Type} [AddCommGroup G] [Module Fp G]
   [DecidableEq G] [Inhabited G]
+
+/-- The configured primary Action instance column is present at rotation zero in the
+synthesis-closed constraint system.
+
+Both halves of the argument are structural. `Action.Circuit.configure_primaryRegistered`
+establishes the query at the `enableEquality` that registers it (`circuit.rs:343-344`) and
+carries it over the chips configured afterwards; `mem_instanceQueries_constraintSystem`
+transports it through synthesis closure. Neither evaluates the completed constraint
+system. -/
+theorem primaryRegistered :
+    ((Action.Circuit.configure
+          Specs.Sinsemilla.orchardGenerators {}).1.primary,
+        (0 : Rotation)) ∈
+      orchardActionTopLevelCircuit.constraintSystem.instanceQueries :=
+  QueryLayouts.mem_instanceQueries_constraintSystem _ _
+    (Action.Circuit.configure_primaryRegistered _ _)
+
+assert_no_sorry primaryRegistered
 
 /-- The canonical Lagrange commitment key derived from a monomial URS and domain
 generator. Each row generator is, by construction, the monomial commitment to the

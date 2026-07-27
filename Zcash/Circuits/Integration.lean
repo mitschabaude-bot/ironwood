@@ -4,7 +4,6 @@ import Zcash.Circuits.Integration.ActionFixedCoherenceCompute
 import Zcash.Circuits.Integration.ActionGateCoherence
 import Zcash.Circuits.Integration.ActionGateCoherenceCompute
 import Zcash.Circuits.Integration.ActionInstanceCommitment
-import Zcash.Circuits.Integration.ActionInstanceCommitmentCompute
 import Zcash.Circuits.Integration.ActionPermutationDomain
 import Zcash.Circuits.Integration.ActionPermutationCycle
 import Zcash.Circuits.Integration.ActionCopyReplay
