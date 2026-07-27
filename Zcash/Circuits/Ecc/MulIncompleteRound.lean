@@ -1,4 +1,5 @@
 import Clean.Halo2
+import Zcash.Circuits.ConfigureAppendOnly
 import Zcash.Circuits.Specs.Pallas
 import Zcash.Circuits.Ecc.Basic
 import Zcash.Circuits.Ecc.DoubleAndAdd
@@ -177,6 +178,12 @@ def configure (z xA xP yP lambda1 lambda2 : Column .advice) : Configure Fp Confi
   createGate (qMul2Gate cfg)
   createGate (qMul3Gate cfg)
   return cfg
+
+/-- `configure` only appends to the constraint system's registration lists. -/
+theorem configure_appendOnly (z xA xP yP lambda1 lambda2 : Column .advice) :
+    Configure.AppendOnly (configure z xA xP yP lambda1 lambda2) := by
+  unfold configure
+  append_only
 
 /-! ## Inputs / Output
 

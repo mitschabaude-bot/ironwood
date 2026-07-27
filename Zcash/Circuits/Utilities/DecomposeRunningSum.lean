@@ -1,4 +1,5 @@
 import Clean.Halo2
+import Zcash.Circuits.ConfigureAppendOnly
 import Zcash.Circuits.Ecc.Basic
 import Zcash.Circuits.Specs.Pallas
 import Zcash.Circuits.Utilities.RunningSum
@@ -125,6 +126,12 @@ def configure (W : ℕ) (qRangeCheck : Selector) (z : Column .advice) :
   let cfg : Config := { qRangeCheck, z }
   createGate (rangeCheckGate W cfg)
   return cfg
+
+/-- `configure` only appends to the constraint system's registration lists. -/
+theorem configure_appendOnly (W : ℕ) (qRangeCheck : Selector) (z : Column .advice) :
+    Configure.AppendOnly (configure W qRangeCheck z) := by
+  unfold configure
+  append_only
 
 /-! ## The `copy_decompose` gadget (strict) -/
 

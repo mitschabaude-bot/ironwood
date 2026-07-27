@@ -2,6 +2,7 @@ import Clean.Halo2
 import Clean.Halo2.Subcircuit
 import Clean.Halo2.Tactics.SubcircuitRw
 import Clean.Halo2.Tactics.AbstractOutputs
+import Zcash.Circuits.ConfigureAppendOnly
 import Zcash.Circuits.Specs.Pallas
 import Zcash.Circuits.Ecc.MulCompleteTheorems
 import Zcash.Circuits.Ecc.Basic
@@ -72,6 +73,12 @@ def configure (zComplete : Column .advice) (addConfig : Add.Config) : Configure 
   let cfg : Config := { qDecompose, zComplete, addConfig }
   createGate (decomposeGate cfg)
   return cfg
+
+/-- `configure` only appends to the constraint system's registration lists. -/
+theorem configure_appendOnly (zComplete : Column .advice) (addConfig : Add.Config) :
+    Configure.AppendOnly (configure zComplete addConfig) := by
+  unfold configure
+  append_only
 
 /-! ## Inputs / Output -/
 

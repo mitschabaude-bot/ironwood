@@ -1,6 +1,7 @@
 import Clean.Halo2
 import Clean.Halo2.Subcircuit
 import Clean.Halo2.Tactics.SubcircuitRw
+import Zcash.Circuits.ConfigureAppendOnly
 import Zcash.Circuits.Specs.Pallas
 import Zcash.Circuits.Ecc.Defs
 import Zcash.Circuits.Ecc.MulOverflowTheorems
@@ -104,6 +105,13 @@ def configure (K : ℕ) (lookupConfig : LookupRangeCheck.Config K)
   let cfg : Config K := { qOverflow, lookupConfig, adv0, adv1, adv2 }
   createGate (overflowGate K cfg)
   return cfg
+
+/-- `configure` only appends to the constraint system's registration lists. -/
+theorem configure_appendOnly (K : ℕ) (lookupConfig : LookupRangeCheck.Config K)
+    (adv0 adv1 adv2 : Column .advice) :
+    Configure.AppendOnly (configure K lookupConfig adv0 adv1 adv2) := by
+  unfold configure
+  append_only
 
 /-! ## Inputs / Output -/
 

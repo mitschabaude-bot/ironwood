@@ -156,6 +156,13 @@ def configure (aWhole bWhole cWhole leftNode rightNode z1A z1B b1 b2 lWhole : Co
   createGate (decomposeGate cfg)
   return cfg
 
+theorem configure_appendOnly
+    (aWhole bWhole cWhole leftNode rightNode z1A z1B b1 b2 lWhole : Column .advice) :
+    Configure.AppendOnly
+      (configure aWhole bWhole cWhole leftNode rightNode z1A z1B b1 b2 lWhole) := by
+  unfold configure
+  append_only
+
 /-! ### The gate gadget (pure region-level assertion)
 
 Verifier-visible inputs are the ten already-assigned cells; no output (`unit`), like
@@ -271,6 +278,16 @@ def configure (scfg : HashPiece.Config) : Configure Fp Config := do
   let gate ← Gate.configure scfg.xA scfg.xP scfg.bits scfg.lambda1 scfg.lambda2
     scfg.xA scfg.xP scfg.bits scfg.lambda1 scfg.lambda2
   return { condSwap, gate, sinsemilla := scfg }
+
+theorem configure_appendOnly (scfg : HashPiece.Config) :
+    Configure.AppendOnly (configure scfg) := by
+  have hcondSwap := CondSwap.configure_appendOnly
+    scfg.xA scfg.xP scfg.bits scfg.lambda1 scfg.lambda2
+  have hgate := Gate.configure_appendOnly
+    scfg.xA scfg.xP scfg.bits scfg.lambda1 scfg.lambda2
+    scfg.xA scfg.xP scfg.bits scfg.lambda1 scfg.lambda2
+  unfold configure
+  append_only
 
 /-! ### Digit toolkit
 

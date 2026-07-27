@@ -1,4 +1,5 @@
 import Clean.Halo2
+import Zcash.Circuits.ConfigureAppendOnly
 import Zcash.Circuits.Ecc.Basic
 import Zcash.Circuits.Specs.Pallas
 
@@ -30,6 +31,12 @@ open Halo2
 @[selector_free]
 def boolCheck (v : Expression Fp Query) : Expression Fp Query :=
   v * ((1 : Fp) - v)
+
+/-! ## Append-only registration
+
+Each `configure` below is followed by its `configure_appendOnly`. All eleven leaves have the
+same shape — allocate a selector, register one gate — so all eleven proofs are the same two
+lines and are left bare; the combined `configure` at the end of the file composes them. -/
 
 /-! ## The five MessagePiece decomposition gates -/
 
@@ -63,6 +70,11 @@ def configure (colL colM colR : Column .advice) : Configure Fp Config := do
   createGate (gate cfg)
   return cfg
 
+theorem configure_appendOnly (colL colM colR : Column .advice) :
+    Configure.AppendOnly (configure colL colM colR) := by
+  unfold configure
+  append_only
+
 end DecomposeB
 
 namespace DecomposeD
@@ -95,6 +107,11 @@ def configure (colL colM colR : Column .advice) : Configure Fp Config := do
   createGate (gate cfg)
   return cfg
 
+theorem configure_appendOnly (colL colM colR : Column .advice) :
+    Configure.AppendOnly (configure colL colM colR) := by
+  unfold configure
+  append_only
+
 end DecomposeD
 
 namespace DecomposeE
@@ -120,6 +137,11 @@ def configure (colL colM colR : Column .advice) : Configure Fp Config := do
   let cfg : Config := { qNotecommitE, colL, colM, colR }
   createGate (gate cfg)
   return cfg
+
+theorem configure_appendOnly (colL colM colR : Column .advice) :
+    Configure.AppendOnly (configure colL colM colR) := by
+  unfold configure
+  append_only
 
 end DecomposeE
 
@@ -149,6 +171,11 @@ def configure (colL colM : Column .advice) : Configure Fp Config := do
   createGate (gate cfg)
   return cfg
 
+theorem configure_appendOnly (colL colM : Column .advice) :
+    Configure.AppendOnly (configure colL colM) := by
+  unfold configure
+  append_only
+
 end DecomposeG
 
 namespace DecomposeH
@@ -176,6 +203,11 @@ def configure (colL colM colR : Column .advice) : Configure Fp Config := do
   let cfg : Config := { qNotecommitH, colL, colM, colR }
   createGate (gate cfg)
   return cfg
+
+theorem configure_appendOnly (colL colM colR : Column .advice) :
+    Configure.AppendOnly (configure colL colM colR) := by
+  unfold configure
+  append_only
 
 end DecomposeH
 
@@ -216,6 +248,11 @@ def configure (colL colM colR colZ : Column .advice) : Configure Fp Config := do
   createGate (gate cfg)
   return cfg
 
+theorem configure_appendOnly (colL colM colR colZ : Column .advice) :
+    Configure.AppendOnly (configure colL colM colR colZ) := by
+  unfold configure
+  append_only
+
 end GdCanonicity
 
 namespace PkdCanonicity
@@ -253,6 +290,11 @@ def configure (colL colM colR colZ : Column .advice) : Configure Fp Config := do
   createGate (gate cfg)
   return cfg
 
+theorem configure_appendOnly (colL colM colR colZ : Column .advice) :
+    Configure.AppendOnly (configure colL colM colR colZ) := by
+  unfold configure
+  append_only
+
 end PkdCanonicity
 
 namespace ValueCanonicity
@@ -281,6 +323,11 @@ def configure (colL colM colR colZ : Column .advice) : Configure Fp Config := do
   let cfg : Config := { qNotecommitValue, colL, colM, colR, colZ }
   createGate (gate cfg)
   return cfg
+
+theorem configure_appendOnly (colL colM colR colZ : Column .advice) :
+    Configure.AppendOnly (configure colL colM colR colZ) := by
+  unfold configure
+  append_only
 
 end ValueCanonicity
 
@@ -318,6 +365,11 @@ def configure (colL colM colR colZ : Column .advice) : Configure Fp Config := do
   let cfg : Config := { qNotecommitRho, colL, colM, colR, colZ }
   createGate (gate cfg)
   return cfg
+
+theorem configure_appendOnly (colL colM colR colZ : Column .advice) :
+    Configure.AppendOnly (configure colL colM colR colZ) := by
+  unfold configure
+  append_only
 
 end RhoCanonicity
 
@@ -359,6 +411,11 @@ def configure (colL colM colR colZ : Column .advice) : Configure Fp Config := do
   createGate (gate cfg)
   return cfg
 
+theorem configure_appendOnly (colL colM colR colZ : Column .advice) :
+    Configure.AppendOnly (configure colL colM colR colZ) := by
+  unfold configure
+  append_only
+
 end PsiCanonicity
 
 namespace YCanonicity
@@ -398,6 +455,11 @@ def configure (advices : Fin 10 → Column .advice) : Configure Fp Config := do
   createGate (gate cfg)
   return cfg
 
+theorem configure_appendOnly (advices : Fin 10 → Column .advice) :
+    Configure.AppendOnly (configure advices) := by
+  unfold configure
+  append_only
+
 end YCanonicity
 
 /-! ## The combined configure (`NoteCommitConfig::configure`, `note_commit.rs:1456-1560`) -/
@@ -435,5 +497,27 @@ def configure (advices : Fin 10 → Column .advice) : Configure Fp Config := do
   let psi ← PsiCanonicity.configure colL colM colR colZ
   let y ← YCanonicity.configure advices
   return { b, d, e, g, h, gd, pkd, value, rho, psi, y }
+
+/-- The combined configure is append-only, since each of the eleven sub-configures is. -/
+theorem configure_appendOnly (advices : Fin 10 → Column .advice) :
+    Configure.AppendOnly (configure advices) := by
+  have hb := DecomposeB.configure_appendOnly (advices 6) (advices 7) (advices 8)
+  have hd := DecomposeD.configure_appendOnly (advices 6) (advices 7) (advices 8)
+  have he := DecomposeE.configure_appendOnly (advices 6) (advices 7) (advices 8)
+  have hg := DecomposeG.configure_appendOnly (advices 6) (advices 7)
+  have hh := DecomposeH.configure_appendOnly (advices 6) (advices 7) (advices 8)
+  have hgd := GdCanonicity.configure_appendOnly
+    (advices 6) (advices 7) (advices 8) (advices 9)
+  have hpkd := PkdCanonicity.configure_appendOnly
+    (advices 6) (advices 7) (advices 8) (advices 9)
+  have hvalue := ValueCanonicity.configure_appendOnly
+    (advices 6) (advices 7) (advices 8) (advices 9)
+  have hrho := RhoCanonicity.configure_appendOnly
+    (advices 6) (advices 7) (advices 8) (advices 9)
+  have hpsi := PsiCanonicity.configure_appendOnly
+    (advices 6) (advices 7) (advices 8) (advices 9)
+  have hy := YCanonicity.configure_appendOnly advices
+  unfold configure
+  append_only
 
 end Zcash.Circuits.NoteCommit

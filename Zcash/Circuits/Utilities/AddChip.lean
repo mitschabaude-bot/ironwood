@@ -1,4 +1,5 @@
 import Clean.Halo2
+import Zcash.Circuits.ConfigureAppendOnly
 import Zcash.Circuits.Ecc.Basic
 
 /-!
@@ -42,6 +43,11 @@ def configure (a b c : Column .advice) : Configure Fp Config := do
   let cfg : Config := { a, b, c, qAdd }
   createGate (addGate cfg)
   return cfg
+
+theorem configure_appendOnly (a b c : Column .advice) :
+    Configure.AppendOnly (configure a b c) := by
+  unfold configure
+  append_only
 
 /-- The two summand cells (copied in). -/
 structure Inputs (F : Type) where

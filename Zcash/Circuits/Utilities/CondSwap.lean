@@ -1,4 +1,5 @@
 import Clean.Halo2
+import Zcash.Circuits.ConfigureAppendOnly
 import Zcash.Circuits.Ecc.Basic
 import Zcash.Circuits.Specs.Pallas
 
@@ -65,6 +66,11 @@ def configure (a b aSwapped bSwapped swap : Column .advice) : Configure Fp Confi
   let cfg : Config := { qSwap, a, b, aSwapped, bSwapped, swap }
   createGate (swapGate cfg)
   return cfg
+
+theorem configure_appendOnly (a b aSwapped bSwapped swap : Column .advice) :
+    Configure.AppendOnly (configure a b aSwapped bSwapped swap) := by
+  unfold configure
+  append_only
 
 /-! ## The `swap` gadget (Rust `CondSwapInstructions::swap`, `cond_swap.rs:88-134`)
 

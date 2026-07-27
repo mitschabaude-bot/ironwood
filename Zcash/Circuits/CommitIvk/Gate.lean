@@ -1,4 +1,5 @@
 import Clean.Halo2
+import Zcash.Circuits.ConfigureAppendOnly
 import Zcash.Circuits.Ecc.Basic
 import Zcash.Circuits.Specs.Pallas
 
@@ -74,5 +75,11 @@ def configure (advices : Fin 10 → Column .advice) : Configure Fp Config := do
   let cfg : Config := { qCommitIvk, advices }
   createGate (gate cfg)
   return cfg
+
+/-- `configure` only appends to the constraint system's registration lists. -/
+theorem configure_appendOnly (advices : Fin 10 → Column .advice) :
+    Configure.AppendOnly (configure advices) := by
+  unfold configure
+  append_only
 
 end Zcash.Circuits.CommitIvk

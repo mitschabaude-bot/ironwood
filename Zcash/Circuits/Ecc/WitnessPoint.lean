@@ -1,4 +1,5 @@
 import Clean.Halo2
+import Zcash.Circuits.ConfigureAppendOnly
 import Zcash.Circuits.Specs.Pallas
 import Zcash.Circuits.Ecc.Basic
 
@@ -78,6 +79,12 @@ def configure (x y : Column .advice) : Configure Fp Config := do
   createGate (pointGate qPoint x y)
   createGate (pointNonIdGate qPointNonId x y)
   return { qPoint, qPointNonId, x, y }
+
+/-- `configure` only appends to the constraint system's registration lists. -/
+theorem configure_appendOnly (x y : Column .advice) :
+    Configure.AppendOnly (configure x y) := by
+  unfold configure
+  append_only
 
 def point : FormalRegionCircuit Fp (Column .advice × Column .advice) Config
     (Unconstrained Point) Point where
