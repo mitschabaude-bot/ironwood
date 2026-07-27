@@ -886,3 +886,34 @@ assert_axioms Zcash.Security.Ledger.Bridge.breakCoeffs_nontrivial
 assert_axioms Zcash.Security.Ledger.Bridge.classify_query_inr +native
 assert_axioms Zcash.Security.Ledger.Bridge.classifyRelation_isSome_iff +native
 assert_axioms Zcash.Security.Ledger.Bridge.classifyRelation_site +native
+
+/-! ## Action configure-time query registration
+
+That the Action circuit's public-input column carries a rotation-zero instance query is now a
+structural fact rather than a computed one: `enableEquality` registers the query, every chip
+configured afterwards only appends to the registration lists, and synthesis closure removes
+nothing.
+
+The reusable half sits at the standard tier — no `native_decide` anywhere in the append-only
+machinery, the establishing lemma, the closure transport, or the chip facts built on them.
+That is the substance of the elimination: the argument itself computes nothing.
+
+The two Action-level statements need `+native` for their *statements*, not their proofs. Both
+mention the deployed circuit, whose definition carries the fixed-base generator certificates
+(`MulFixed.Certs`), the window-scalar facts, and the Pallas curve constants — the retained
+cryptographic-constant tier. Writing either statement down already commits to those; neither
+proof adds an axiom. `+native` is a blunter bound than that claim deserves, since it would also
+admit a fresh `native_decide` here; the sharper statement is that these two declarations'
+axioms are exactly those of `orchardActionTopLevelCircuit`, which the census cannot currently
+express. -/
+
+assert_axioms Halo2.mem_instanceQueries_enableEquality
+assert_axioms Halo2.Configure.AppendOnly.enableEquality
+assert_axioms Halo2.Configure.AppendOnly.createGate
+assert_axioms Halo2.Configure.step_enableEquality
+assert_axioms Halo2.Configure.step_preserving
+assert_axioms Zcash.Snark.QueryLayouts.mem_instanceQueries_constraintSystem
+assert_axioms Zcash.Circuits.LookupRangeCheck.configure_appendOnly
+assert_axioms Zcash.Circuits.NoteCommit.configure_appendOnly
+assert_axioms Zcash.Circuits.Action.Circuit.configure_primaryRegistered +native
+assert_axioms Zcash.Snark.ActionInstanceCommitment.primaryRegistered +native

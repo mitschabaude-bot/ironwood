@@ -38,8 +38,6 @@ theorem primaryRegistered :
   QueryLayouts.mem_instanceQueries_constraintSystem _ _
     (Action.Circuit.configure_primaryRegistered _ _)
 
-assert_no_sorry primaryRegistered
-
 /-- The canonical Lagrange commitment key derived from a monomial URS and domain
 generator. Each row generator is, by construction, the monomial commitment to the
 corresponding interpolating basis polynomial. -/
