@@ -20,9 +20,9 @@ namespace FullCircuitBridge
 
 variable
     {G : Type} [AddCommGroup G] [Inhabited G]
-    {ConfigInput Config : Type} {Output : TypeMap}
-    [CircuitType Output]
-    {top : TopLevelCircuit Fp ConfigInput Config Output}
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
+    {top : TopLevelCircuit Fp Config PublicInput}
     {pp : Keygen.ProofParams} {urs : URS G}
     {cell : Type} [DecidableEq cell] [Fintype cell]
     {Bad : Prop}
@@ -70,13 +70,13 @@ noncomputable def ofTopLevelCanonical
         (resolverEnvironment
           (top.toVerifierKey pp urs) poly proofIndex
           (top.usableRowsAt top.domainExponent))
-        (top.operations 0) 0)
+        (top.operations) 0)
     (copies :
       CopyReplayWitness top.placement
         (resolverEnvironment
           (top.toVerifierKey pp urs) poly proofIndex
           (top.usableRowsAt top.domainExponent))
-        (top.operations 0) cell Bad)
+        (top.operations) cell Bad)
     (lookupConditions :
       TopLevelLookupCoherence.TopLevelLookupWitnessConditions
         top pp urs ch poly proofIndex) :
@@ -84,7 +84,7 @@ noncomputable def ofTopLevelCanonical
       (resolverEnvironment
         (top.toVerifierKey pp urs) poly proofIndex
         (top.usableRowsAt top.domainExponent))
-      (top.operations 0) 0 cell Bad := by
+      (top.operations) 0 cell Bad := by
   let lookupCoherence : TopLevelLookupCoherence top :=
     TopLevelLookupCoherence.ofTopLevel
   refine
@@ -109,18 +109,17 @@ This is the generic finite-family join used by the Action adapter: the proof doe
 not inspect the circuit statement and does not introduce an `hencodes` predicate.
 -/
 theorem bundleTopLevelSoundness_or_bad
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
-    (i : RegionIndex) {numProofs : ℕ}
-    (environment : Fin numProofs → Placed Environment Fp)
-    (hwellFormed : ∀ proofIndex,
-      SynthesisWellFormed (environment proofIndex).env
-        (top.operations i))
+    (top : TopLevelCircuit Fp Config PublicInput)
+    {numProofs : ℕ}
+    (assignment : Fin numProofs → ProofAssignment Fp)
     (bridge : ∀ proofIndex,
       FullCircuitBridge
-        (environment proofIndex).place
-        (environment proofIndex).env
-        (top.operations i) i cell Bad) :
-    (∀ proofIndex, top.Statement i (environment proofIndex)) ∨ Bad := by
+        top.placement
+        (top.environment (assignment proofIndex))
+        top.operations 0 cell Bad) :
+    (∀ proofIndex,
+      top.Statement
+        (top.extractPublicInput (top.environment (assignment proofIndex)))) ∨ Bad := by
   classical
   by_cases hbad : Bad
   · exact Or.inr hbad
@@ -128,8 +127,7 @@ theorem bundleTopLevelSoundness_or_bad
     intro proofIndex
     exact
       (FullCircuitBridge.topLevelSoundness_or_bad
-        top i (environment proofIndex)
-        (hwellFormed proofIndex) (bridge proofIndex)).resolve_right hbad
+        top (assignment proofIndex) (bridge proofIndex)).resolve_right hbad
 
 end FullCircuitBridge
 

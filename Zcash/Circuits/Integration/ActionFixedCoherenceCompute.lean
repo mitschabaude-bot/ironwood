@@ -26,7 +26,7 @@ namespace Zcash.Snark
 open Zcash.Arithmetic (derivedUrsGLagrange derivedUrsGLagrange_length omegaOf)
 
 open Halo2
-open Zcash.Circuits.Action (orchardActionTopLevelCircuit)
+open Zcash.Circuits.Action (actionCircuit)
 
 namespace ActionFixedCoherence
 
@@ -37,39 +37,48 @@ open Zcash.Snark.Keygen Polynomial
 `TopLevelFixedCoherence` occurs in its compiler-derived fixed-query layout.
 -/
 theorem queryCoverageFailures_eq_nil :
-    interimFixedQueryCoverageFailures orchardActionTopLevelCircuit = [] := by
+    interimFixedQueryCoverageFailures actionCircuit = [] := by
   native_decide
 
 /-- Query coverage extracted from the finite interim diagnostic. -/
 theorem queryLayout :
     ∀ column,
-      column < orchardActionTopLevelCircuit.pinnedCS.numFixedColumns →
+      column < actionCircuit.pinnedCS.numFixedColumns →
         ∃ rotation,
           (column, rotation) ∈
-            orchardActionTopLevelCircuit.pinnedCS.fixedQueryLayout :=
+            actionCircuit.pinnedCS.fixedQueryLayout :=
   fixedQueryCoverage_of_interimFailures_eq_nil
-    orchardActionTopLevelCircuit queryCoverageFailures_eq_nil
+    actionCircuit queryCoverageFailures_eq_nil
+
+/-- The same interim diagnostic rules out out-of-range fixed-query entries. -/
+theorem queryLayoutBounded :
+    ∀ column rotation,
+      (column, rotation) ∈
+          actionCircuit.pinnedCS.fixedQueryLayout →
+        column < actionCircuit.pinnedCS.numFixedColumns :=
+  fixedQueryBounded_of_interimFailures_eq_nil
+    actionCircuit queryCoverageFailures_eq_nil
 
 /--
 **INTERIM:** the final dense Action fixed rows realize every table, region-fixed,
 and packed-selector entry consumed by Clean constraint semantics.
 -/
 theorem realizationFailures_eq_nil :
-    interimFixedRealizationFailures orchardActionTopLevelCircuit = [] := by
+    interimFixedRealizationFailures actionCircuit = [] := by
   native_decide
 
 /-- Sparse-to-dense realization extracted from the finite interim diagnostic. -/
 theorem realizes :
     ∀ column row value,
       (column, row, value) ∈
-          topLevelRequiredFixedEntries orchardActionTopLevelCircuit →
-        row < 2 ^ orchardActionTopLevelCircuit.domainExponent ∧
+          topLevelRequiredFixedEntries actionCircuit →
+        row < 2 ^ actionCircuit.domainExponent ∧
           column <
-            orchardActionTopLevelCircuit.pinnedCS.numFixedColumns ∧
-          (orchardActionTopLevelCircuit.fixedRows.getD column []).getD row 0 =
+            actionCircuit.pinnedCS.numFixedColumns ∧
+          (actionCircuit.fixedRows.getD column []).getD row 0 =
             (value : Fp) :=
   fixedRowsRealize_of_interimFailures_eq_nil
-    orchardActionTopLevelCircuit realizationFailures_eq_nil
+    actionCircuit realizationFailures_eq_nil
 
 variable {G : Type} [AddCommGroup G] [Module Fp G]
   [DecidableEq G] [Inhabited G]
@@ -85,25 +94,33 @@ circuit layout.
 -/
 noncomputable def ofKeygen
     (pp : ProofParams) (urs : URS G)
-    (hk : orchardActionTopLevelCircuit.domainExponent = urs.k)
+    (hk : actionCircuit.domainExponent = urs.k)
     (hlen : (derivedUrsGLagrange urs).length = 2 ^ urs.k)
     (hgenerators : ∀ i : Fin (2 ^ urs.k),
       (derivedUrsGLagrange urs).getD (i : ℕ) 0 =
         commit urs (polynomialCoefficients (2 ^ urs.k)
           (rowPolynomial
-            (orchardActionTopLevelCircuit.toVerifierKey pp urs).omega
+            (actionCircuit.toVerifierKey pp urs).omega
             (Pi.single i (1 : Fp))))) :
-    TopLevelFixedCoherence orchardActionTopLevelCircuit pp urs :=
+    TopLevelFixedCoherence actionCircuit pp urs :=
   TopLevelFixedCoherence.ofKeygen
-    orchardActionTopLevelCircuit pp urs hk hlen hgenerators
+    actionCircuit pp urs hk hlen hgenerators
     (by
       intro column hcolumn
-      rw [orchardActionTopLevelCircuit.toVerifierKey_fixedQueryLayout_derived]
+      rw [actionCircuit.toVerifierKey_fixedQueryLayout_derived]
       change ∃ rotation,
         (column, rotation) ∈
           ActionPermutationDomain.derivedPinnedCS.fixedQueryLayout
       rw [ActionPermutationDomain.fixedQueryLayout_eq]
       exact queryLayout column hcolumn)
+    (by
+      intro column rotation hentry
+      rw [actionCircuit.toVerifierKey_fixedQueryLayout_derived] at hentry
+      change
+        (column, rotation) ∈
+          ActionPermutationDomain.derivedPinnedCS.fixedQueryLayout at hentry
+      rw [ActionPermutationDomain.fixedQueryLayout_eq] at hentry
+      exact queryLayoutBounded column rotation hentry)
     (by
       intro column row value hentry
       exact realizes column row value hentry)
@@ -115,16 +132,16 @@ prominently interim layout failure lists above.
 -/
 noncomputable def ofDerived
     (pp : ProofParams) (urs : URS G)
-    (hk : orchardActionTopLevelCircuit.domainExponent = urs.k) :
-    TopLevelFixedCoherence orchardActionTopLevelCircuit pp urs := by
+    (hk : actionCircuit.domainExponent = urs.k) :
+    TopLevelFixedCoherence actionCircuit pp urs := by
   have hkUrs : urs.k ≤ 32 := by
     rw [← hk]
     exact Nat.le_of_lt_succ ActionPermutationDomain.domainExponent_lt
   have homega :
-      (orchardActionTopLevelCircuit.toVerifierKey pp urs).omega =
+      (actionCircuit.toVerifierKey pp urs).omega =
         omegaOf urs.k := by
     change
-      omegaOf orchardActionTopLevelCircuit.domainExponent =
+      omegaOf actionCircuit.domainExponent =
         omegaOf urs.k
     rw [hk]
   apply ofKeygen pp urs hk (derivedUrsGLagrange_length urs)

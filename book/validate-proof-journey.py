@@ -11,6 +11,7 @@ from pathlib import Path
 BOOK_DIR = Path(__file__).resolve().parent
 REPO_DIR = BOOK_DIR.parent
 FV_DIR = BOOK_DIR / "src" / "formal-verification"
+SOURCE_REMOTE = "https://github.com/zcash/ironwood.git"
 SOURCE_CACHE = {}
 FETCHED_SOURCES = set()
 
@@ -86,7 +87,7 @@ def fetch_source_if_missing(source):
     # the pin sits outside the truncated history, which surfaces later as an unreadable source file
     # rather than as the fetch failure it is. Report a failure here for the same reason.
     fetched = subprocess.run(
-        ["git", "fetch", "--no-tags", "origin", source["fetch"]],
+        ["git", "fetch", "--no-tags", SOURCE_REMOTE, source["fetch"]],
         cwd=REPO_DIR,
         check=False,
         capture_output=True,

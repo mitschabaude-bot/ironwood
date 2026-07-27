@@ -1,14 +1,15 @@
 import Zcash.Arithmetic.Domain
 import Clean.Halo2.TopLevelKeygen
 import Zcash.Circuits.Integration.PolynomialEnvironment
+import Zcash.Snark.Keygen.Pipeline
 
 /-!
 # Generic assignments for closed top-level circuits
 
-A decoded verifier witness supplies commitment-ID-indexed column polynomials. A
-`TopLevelCircuit` supplies the operation stream, V1 placement, blinding rows, and
-table-fit proof. This module joins those two circuit-independent views without
-accepting an arbitrary verifying key.
+A decoded verifier witness supplies commitment-ID-indexed advice and instance
+polynomials. A `TopLevelCircuit` supplies the operation stream, V1 placement, fixed
+rows, blinding rows, and table-fit proof. This module joins those two
+circuit-independent views without accepting an arbitrary verifying key.
 
 The domain exponent comes from the top-level circuit's own keygen inputs. One
 top-level circuit is reused for every proof in a bundle, and indexing the assignment
@@ -32,9 +33,9 @@ caller-supplied domain exponent or `VerifyingKey`: decoded constructors use the 
 derived from `top.formalCircuit`.
 -/
 structure TopLevelAssignment
-    {ConfigInput Config : Type} {Output : TypeMap}
-    [CircuitType Output]
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
     (numProofs : ℕ) (proofIndex : Fin numProofs) where
   polynomial : CommitmentId → Polynomial Fp
 
@@ -47,17 +48,17 @@ The dependent member index ensures that the assignment at `proofIndex` resolves
 exactly that member's advice and instance columns.
 -/
 abbrev Bundle
-    {ConfigInput Config : Type} {Output : TypeMap}
-    [CircuitType Output]
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
     (numProofs : ℕ) :=
   (proofIndex : Fin numProofs) →
     TopLevelAssignment top numProofs proofIndex
 
 variable
-    {ConfigInput Config : Type} {Output : TypeMap}
-    [CircuitType Output]
-    {top : TopLevelCircuit Fp ConfigInput Config Output}
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
+    {top : TopLevelCircuit Fp Config PublicInput}
     {numProofs : ℕ} {proofIndex : Fin numProofs}
 
 /-- The circuit-derived domain generator has exact order `2^k`. -/
@@ -85,38 +86,78 @@ theorem domainSizeCastNeZero
 
 /-- A fitting top-level circuit has fewer blinding rows than domain rows. -/
 theorem blindingFactors_lt_domainSize
-    (hbound : top.domainExponent < 33) :
-    top.blindingFactors < 2 ^ top.domainExponent :=
+    : top.blindingFactors < 2 ^ top.domainExponent :=
   top.blindingFactors_lt_domainSize top.domainExponent
-    (top.fitsAt_domainExponent hbound)
+    top.fitsAt_domainExponent
 
 /--
 A top-level circuit with a nonempty operation footprint has a nonempty active
 prefix before its final usable row.
 -/
 theorem blindingFactors_succ_lt_domainSize
-    (hbound : top.domainExponent < 33)
     (hused : 0 < top.usedRows) :
     top.blindingFactors + 1 < 2 ^ top.domainExponent :=
   top.blindingFactors_succ_lt_domainSize top.domainExponent
-    (top.fitsAt_domainExponent hbound) hused
+    top.fitsAt_domainExponent hused
 
-/-- The row-indexed Clean environment for this bundle member. -/
+/--
+The Clean proof-varying assignment decoded from this bundle member.
+
+Fixed columns are intentionally absent: `TopLevelCircuit.environment` compiles them
+from `top.fixedRows`.
+-/
+def proofAssignment
+    (assignment : TopLevelAssignment top numProofs proofIndex) :
+    ProofAssignment Fp :=
+  resolverAssignment
+    (Zcash.Arithmetic.omegaOf top.domainExponent)
+    assignment.polynomial proofIndex
+
+/-- The circuit-owned semantic environment for this bundle member. -/
 def environment
     (assignment : TopLevelAssignment top numProofs proofIndex) : Environment Fp :=
-  polynomialEnvironment (Zcash.Arithmetic.omegaOf top.domainExponent)
-    (top.usableRowsAt top.domainExponent)
-    (fun column => assignment.polynomial (.fixedCol column))
-    (fun column => assignment.polynomial
-      (.adviceCol proofIndex column))
-    (fun column => assignment.polynomial
-      (.instanceCol proofIndex column))
+  top.environment assignment.proofAssignment
 
-/-- The assignment placed by the circuit's own V1 floor-plan. -/
-def placedEnvironment
-    (assignment : TopLevelAssignment top numProofs proofIndex) :
-    Placed Environment Fp :=
-  ⟨top.placement, assignment.environment⟩
+/--
+The verifier-decoded fixed polynomials encode the fixed rows compiled by the
+top-level circuit.
+
+Unlike advice and instance columns, fixed columns are not part of
+`ProofAssignment`: this is the representation boundary that identifies their
+verifier-side polynomial values with the circuit-owned keygen data.
+-/
+def FixedColumnEncoding
+    {G : Type} [AddCommGroup G] [Inhabited G]
+    (assignment : TopLevelAssignment top numProofs proofIndex)
+    (pp : Keygen.ProofParams) (urs : URS G) : Prop :=
+  ∀ column row,
+    (assignment.polynomial (.fixedCol column.index)).eval
+        ((top.toVerifierKey pp urs).omega ^ row) =
+      top.fixedValue column row
+
+/--
+Fixed-column encoding makes the verifier resolver environment exactly the
+circuit-owned environment built from the corresponding proof assignment.
+-/
+theorem resolverEnvironment_eq_environment
+    {G : Type} [AddCommGroup G] [Inhabited G]
+    (pp : Keygen.ProofParams) (urs : URS G)
+    {proofIndex : Fin (pp.mergeDerived top).numProofs}
+    (assignment :
+      TopLevelAssignment top (pp.mergeDerived top).numProofs proofIndex)
+    (hfixed : assignment.FixedColumnEncoding pp urs) :
+    resolverEnvironment
+        (top.toVerifierKey pp urs) assignment.polynomial proofIndex
+        (top.usableRowsAt top.domainExponent) =
+      assignment.environment := by
+  apply congrArg₂ Environment.mk
+  · funext column row
+    cases column.kind with
+    | advice => rfl
+    | fixed =>
+        exact hfixed ⟨column.index⟩ row
+    | «instance» => rfl
+  · rfl
 
 @[simp] theorem environment_usableRows
     (assignment : TopLevelAssignment top numProofs proofIndex) :
@@ -128,9 +169,8 @@ def placedEnvironment
     (assignment : TopLevelAssignment top numProofs proofIndex)
     (column : Column .fixed) (row : ℤ) :
     assignment.environment.fixed column row =
-      (assignment.polynomial (.fixedCol column.index)).eval
-        (Zcash.Arithmetic.omegaOf top.domainExponent ^ row) :=
-  rfl
+      top.fixedValue column row :=
+  by exact top.environment_fixed assignment.proofAssignment column row
 
 @[simp] theorem environment_advice
     (assignment : TopLevelAssignment top numProofs proofIndex)
@@ -151,16 +191,109 @@ def placedEnvironment
   rfl
 
 /--
-A fitting circuit domain supplies the synthesis well-formedness premise for this
-assignment's environment.
+The assignment's instance reads agree with the public-input elements at every cell
+declared by the top-level circuit.
 -/
-theorem synthesisWellFormed
+def PublicInputEncoding
     (assignment : TopLevelAssignment top numProofs proofIndex)
-    (hbound : top.domainExponent < 33) :
-    SynthesisWellFormed assignment.environment (top.operations 0) := by
-  apply top.synthesisWellFormed top.domainExponent assignment.environment
-  · rfl
-  · exact top.fitsAt_domainExponent hbound
+    (input : PublicInput Fp) : Prop :=
+  ∀ index,
+    assignment.environment.inst
+        (top.publicInputLayout.cells top.config index).1
+        (top.publicInputLayout.cells top.config index).2 =
+      (toElements input)[index]
+
+/-- A public-input encoding determines the value extracted through the circuit's
+declared instance-cell layout. -/
+theorem extractPublicInput_eq
+    (assignment : TopLevelAssignment top numProofs proofIndex)
+    (input : PublicInput Fp)
+    (hencoding : assignment.PublicInputEncoding input) :
+    top.extractPublicInput assignment.environment = input := by
+  unfold TopLevelCircuit.extractPublicInput
+  apply top.publicInputLayout.extract_eq
+  exact hencoding
+
+/--
+Derive the public-input encoding from canonical row polynomials, for an arbitrary
+multi-column public-input layout.
+
+`rows column` is the verifier serialization of that instance column. Only columns
+actually named by the layout need a polynomial identity.
+-/
+theorem publicInputEncoding_of_rowPolynomials
+    (assignment : TopLevelAssignment top numProofs proofIndex)
+    (input : PublicInput Fp)
+    (rows : ℕ → List Fp)
+    (hfit : ∀ index,
+      (top.publicInputLayout.cells top.config index).2 <
+        2 ^ top.domainExponent)
+    (hpoly : ∀ index,
+      assignment.polynomial
+          (.instanceCol proofIndex
+            (top.publicInputLayout.cells top.config index).1.index) =
+        instanceRowPolynomial (2 ^ top.domainExponent)
+          (Zcash.Arithmetic.omegaOf top.domainExponent)
+          (rows (top.publicInputLayout.cells top.config index).1.index))
+    (hencoded : ∀ index,
+      (rows (top.publicInputLayout.cells top.config index).1.index).getD
+          (top.publicInputLayout.cells top.config index).2 0 =
+        (toElements input)[index])
+    (hinjective : Function.Injective
+      fun row : Fin (2 ^ top.domainExponent) =>
+        Zcash.Arithmetic.omegaOf top.domainExponent ^ (row : ℕ)) :
+    assignment.PublicInputEncoding input := by
+  intro index
+  let cell := top.publicInputLayout.cells top.config index
+  let domainRow : Fin (2 ^ top.domainExponent) :=
+    ⟨cell.2, hfit index⟩
+  rw [environment_instance, hpoly index]
+  have hrow := instanceRowPolynomial_eval
+    (values := rows cell.1.index) hinjective domainRow
+  rw [show
+    (instanceRowPolynomial (2 ^ top.domainExponent)
+      (Zcash.Arithmetic.omegaOf top.domainExponent)
+      (rows cell.1.index)).eval
+        (Zcash.Arithmetic.omegaOf top.domainExponent ^ (cell.2 : ℤ)) =
+      (rows cell.1.index).getD cell.2 0 by
+    simpa only [cell, domainRow] using hrow]
+  exact hencoded index
+
+/--
+Derive public-input encoding when all elements occupy one instance column in their
+`ProvableType` order.
+-/
+theorem publicInputEncoding_of_contiguousRowPolynomial
+    (assignment : TopLevelAssignment top numProofs proofIndex)
+    (input : PublicInput Fp)
+    (column : Column .instance)
+    (hcells : ∀ index,
+      top.publicInputLayout.cells top.config index =
+        (column, (index : ℕ)))
+    (hfit : size PublicInput ≤ 2 ^ top.domainExponent)
+    (hpoly :
+      assignment.polynomial (.instanceCol proofIndex column.index) =
+        instanceRowPolynomial (2 ^ top.domainExponent)
+          (Zcash.Arithmetic.omegaOf top.domainExponent)
+          (toElements input).toList)
+    (hinjective : Function.Injective
+      fun row : Fin (2 ^ top.domainExponent) =>
+        Zcash.Arithmetic.omegaOf top.domainExponent ^ (row : ℕ)) :
+    assignment.PublicInputEncoding input := by
+  apply assignment.publicInputEncoding_of_rowPolynomials
+    input (fun _ => (toElements input).toList)
+  · intro index
+    rw [hcells index]
+    exact index.isLt.trans_le hfit
+  · intro index
+    rw [hcells index]
+    exact hpoly
+  · intro index
+    rw [hcells index]
+    rw [List.getD_eq_getElem _ _ (by
+      simpa only [Vector.length_toList] using index.isLt)]
+    simp
+  · exact hinjective
 
 end TopLevelAssignment
 

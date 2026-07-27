@@ -23,8 +23,8 @@ variable {G : Type} [AddCommGroup G] [Module Fp G]
   [DecidableEq G] [Inhabited G]
 
 variable
-    {ConfigInput Config : Type} {Output : TypeMap}
-    [CircuitType Output]
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
 
 /-- A structural predicate over exactly the selector leaves of an expression. -/
 def ExpressionSelectorLeavesSatisfy
@@ -194,7 +194,7 @@ rows. Until those compiler laws are exposed, a concrete circuit may certify this
 finite property directly.
 -/
 def EnabledLookup.InputSelectorLeafRowsExact
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    (top : TopLevelCircuit Fp Config PublicInput)
     (rows : ℕ → List Fp) (lookup : EnabledLookup Fp) : Prop :=
   lookup.argument.inputs.Forall fun expression =>
     ExpressionSelectorLeavesSatisfy (fun selector =>
@@ -234,10 +234,10 @@ separate concrete-circuit premise. The structural replacement proves singleton
 packing and disabled-row zero directly from compiler invariants.
 -/
 theorem EnabledLookup.inputSelectorLeafRowsExact_of_realizes
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    (top : TopLevelCircuit Fp Config PublicInput)
     (rows : ℕ → List Fp) (lookup : EnabledLookup Fp)
     (henabled :
-      lookup ∈ operationEnabledLookups (top.operations 0) 0)
+      lookup ∈ operationEnabledLookups (top.operations) 0)
     (realizes : ∀ column row value,
       (column, row, value) ∈ topLevelRequiredFixedEntries top →
         column < top.pinnedCS.numFixedColumns ∧
@@ -358,7 +358,7 @@ theorem EnabledLookup.inputSelectorLeafRowsExact_of_realizes
         exact False.elim (Nat.lt_irrefl _ hbound)
 
 instance EnabledLookup.inputSelectorLeafRowsExactDecidable
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    (top : TopLevelCircuit Fp Config PublicInput)
     (rows : ℕ → List Fp) (lookup : EnabledLookup Fp) :
     Decidable (lookup.InputSelectorLeafRowsExact top rows) := by
   let predicate : Selector → Prop := fun selector =>
@@ -406,7 +406,7 @@ Relevant exact packed rows and fixed-polynomial binding recover precisely the
 expression-level selector boundary consumed by lookup projection.
 -/
 theorem EnabledLookup.inputSelectorValuesRealized_or_bad
-    {top : TopLevelCircuit Fp ConfigInput Config Output}
+    {top : TopLevelCircuit Fp Config PublicInput}
     {pp : Keygen.ProofParams} {urs : URS G}
     (poly : CommitmentId → Polynomial Fp)
     (rows : ℕ → List Fp)

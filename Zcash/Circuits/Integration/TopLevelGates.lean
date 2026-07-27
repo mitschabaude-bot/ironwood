@@ -37,9 +37,9 @@ construction.
 -/
 structure TopLevelGateCoherence
     {G : Type} [AddCommGroup G] [Inhabited G]
-    {ConfigInput Config : Type} {Output : TypeMap}
-    [CircuitType Output]
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G) : Prop where
   gateSelectorsAllocated :
     top.constraintSystem.GateSelectorsAllocated
@@ -60,9 +60,9 @@ namespace TopLevelGateCoherence
 
 variable
     {G : Type} [AddCommGroup G] [Inhabited G]
-    {ConfigInput Config : Type} {Output : TypeMap}
-    [CircuitType Output]
-    {top : TopLevelCircuit Fp ConfigInput Config Output}
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
+    {top : TopLevelCircuit Fp Config PublicInput}
     {pp : ProofParams} {urs : URS G}
 
 /--
@@ -143,7 +143,7 @@ noncomputable def polynomialWitness
         (top.toVerifierKey pp urs) poly proofIndex usableRows))
     (enabled : EnabledGate Fp)
     (henabled :
-      enabled ∈ operationEnabledGates (top.operations 0) 0)
+      enabled ∈ operationEnabledGates (top.operations) 0)
     (constraint : Constraint Fp)
     (hconstraint : constraint ∈ enabled.gate.constraints) :
     EnabledGate.PolynomialWitness
@@ -218,7 +218,7 @@ noncomputable def polynomialWitness
           (fun _ => 0)
           (top.placement enabled.region + enabled.row)) ≠ 0 := by
     apply selectorScale_ne_zero_of_enabledGate
-      top.selectorMap top.regionStarts (top.operations 0) 0
+      top.selectorMap top.regionStarts (top.operations) 0
       (resolverEnvironment
         (top.toVerifierKey pp urs) poly proofIndex usableRows)
       (fun _ => 0) hroots
@@ -263,7 +263,7 @@ theorem constraints
     CircuitConstraintFamily.constraints .gate top.placement
       (resolverEnvironment
         (top.toVerifierKey pp urs) poly proofIndex usableRows)
-      (top.operations 0) 0 := by
+      (top.operations) 0 := by
   apply gate_constraints_of_polynomial_witnesses
     (constraintModelOfResolver
       (top.toVerifierKey pp urs) ch poly sets chunks
@@ -271,7 +271,7 @@ theorem constraints
     proofIndex (top.toVerifierKey pp urs).omega top.placement
     (resolverEnvironment
       (top.toVerifierKey pp urs) poly proofIndex usableRows)
-    (top.operations 0) 0 satisfaction domain
+    (top.operations) 0 satisfaction domain
   intro enabled henabled constraint hconstraint
   exact coherence.polynomialWitness
     ch poly sets chunks l0 lLast lBlind proofIndex usableRows
@@ -309,7 +309,7 @@ theorem canonicalConstraints
       (resolverEnvironment
         (top.toVerifierKey pp urs) poly proofIndex
         (top.usableRowsAt top.domainExponent))
-      (top.operations 0) 0 := by
+      (top.operations) 0 := by
   let selectors :=
     canonicalLagrangePolynomials
       (top.toVerifierKey pp urs).omega hblinding

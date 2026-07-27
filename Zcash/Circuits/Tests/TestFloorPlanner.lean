@@ -14,8 +14,8 @@ floor planners (`Clean.Halo2.Keygen.FloorPlanner`), and checked EQUAL to the fix
 * `SimpleFloorPlanner.starts` == the Add/Mul layout fixtures' per-region starts;
 * `V1.starts` == the Action / Action-base layout fixtures' per-region starts (the legacy
   pdqsort tie-order reproduced — see `FloorPlanner.Pdqsort`);
-* `V1.constants` == the Action fixtures' `constants` allocation (rows derived from the
-  planner's column allocations, no longer read from the fixture).
+* `V1.constantAssignments` == the Action fixtures' `constants` allocation (rows derived
+  from the planner's column allocations, no longer read from the fixture).
 
 `TestSelMapDerivation` consumes these derived starts (see its header).
 -/
@@ -47,7 +47,8 @@ constants column is fixed column 3 (`enable_constant`; the only constants column
     ("V1 derived starts = actionLayout placements",
       V1.starts ops == fixtureStarts),
     ("V1 derived constants allocation = actionLayout constants",
-      V1.constants (ZMod.val : Fp → ℕ) ops [3] == fx.constants)]
+      (V1.constantAssignments ops [3]).map
+        (fun (value, column, row) => (value.val, column, row)) == fx.constants)]
 
 #eval show IO Unit from do
   let fx ← Json.loadLayoutFixture "actionBaseLayout.json"
@@ -57,6 +58,7 @@ constants column is fixed column 3 (`enable_constant`; the only constants column
     ("V1 derived starts = actionBaseLayout placements",
       V1.starts ops == fixtureStarts),
     ("V1 derived constants allocation = actionBaseLayout constants",
-      V1.constants (ZMod.val : Fp → ℕ) ops [3] == fx.constants)]
+      (V1.constantAssignments ops [3]).map
+        (fun (value, column, row) => (value.val, column, row)) == fx.constants)]
 
 end Zcash.Circuits.Fixtures.Test.FloorPlannerDeriv

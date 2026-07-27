@@ -115,17 +115,20 @@ Correspondingly, `Bridge.actionOperations` is synthesized from the real
 `orchardActionCircuit` at unit input. The separate synthetic
 `Bridge.keygenWitnesses` value has been removed.
 
-The intended final adapter is small once the remaining premises are available:
+The final adapter is now:
 
 ```text
 placed Clean environment satisfying `mainPost`
-  -> ActionStatement public
-  -> the hencodes conclusion expected by SnarkRelation.
+  -> TopLevelCircuit.Spec extractedPublic extractedPrivate
+  -> Action.actionCircuit.Statement extractedPublic.
 ```
 
-The final implementation should define the high-level public input/statement types and
-the direct `soundnessPost` adapter alongside the concrete decoded-member-to-Clean
-construction. The following work items decompose that construction.
+`TopLevelCircuit` owns the public/private boundary. It declares the instance cells
+encoding its public input, derives environment extraction from that layout, separately
+extracts the private witness, and proves that recombining the two agrees with the
+formal circuit's native extractor. The Action instance specializes this interface with
+ten public field elements and a private witness containing only the remaining
+`ActionData` fields.
 
 ### 1. Recover the committed columns from multiopen
 
@@ -167,9 +170,12 @@ independent.
 `PolynomialEnvironment` is the canonical decoder from those polynomials to values on
 the size-`2^k` evaluation domain. It evaluates column `c` at row `r` as
 `c(ω^r)` and proves that Clean's rotated advice, fixed, and instance queries agree
-with the verifier's rotated polynomials. `resolverEnvironment` selects fixed,
-per-proof advice, and per-proof instance columns from the shared `CommitmentId`
-resolver.
+with the verifier's rotated polynomials. `resolverEnvironment` remains the
+verifier-side polynomial interpretation. At the top-level circuit boundary,
+`resolverAssignment` retains only per-proof advice and instance columns, while
+`TopLevelCircuit.environment` supplies circuit-compiled fixed columns and usable
+rows. `TopLevelAssignment.FixedColumnEncoding` is the named representation fact
+that proves these two environments equal.
 
 Public-instance row provenance now has a canonical target as well.
 `instanceRowPolynomial` Lagrange-interpolates a zero-padded list of public values over
@@ -194,9 +200,14 @@ with the statement-derived commitment, and
 `deployedMemberRef_eq_instanceCommitment` composes those facts for any deployed
 member slot. None of these theorems mentions Action placement or operations.
 
-`actionPublicInputs_of_instanceRowPolynomial` then performs the only Action-specific
-row mapping: the first ten reads of the configured primary column are exactly the
-structured `Action.PublicInputs`.
+`TopLevelAssignment.PublicInputEncoding` now expresses this row mapping generically
+through the cells declared by `TopLevelCircuit.publicInputLayout`.
+`publicInputEncoding_of_rowPolynomials` derives it from canonical per-column row
+polynomials, and `extractPublicInput_eq` identifies the extracted public input.
+The Action specialization supplies only the intrinsic facts that its layout is the
+primary column at rows 0–9 and that `PublicInputs.rows` is its `ProvableType`
+serialization; the former `Integration/ActionStatement.lean` side layer has been
+deleted.
 `CanonicalMemberConstraintRelation.instanceColumn_eq_rowPolynomial_or_relation`
 now performs the deployed representation step generically. It follows an assembled
 instance query through the canonical grouped-member route, identifies that member's
@@ -204,10 +215,11 @@ commitment with the verifier-supplied instance commitment, and concludes that th
 decoded polynomial is the canonical row polynomial or computes the shared nontrivial
 relation. The binding-aware Action endpoint invokes this theorem internally; it no
 longer accepts the decoded-polynomial equality as a premise.
-`ActionInstanceCommitment.action_bundleStatement_or_relation_of_canonicalMemberConstraintRelation`
+`ActionInstanceCommitment.action_bundleStatement_or_relation_of_accepted_topLevelBundleStatement`
 constructs the Lagrange key from the monomial URS, derives the commitment from the
-ten supplied rows, and discharges primary-column registration. The generic query
-compiler proves that configure-registered layouts survive
+ten supplied rows, and binds the verifier-supplied instance polynomial to the
+generic top-level statement. The generic query compiler proves that
+configure-registered layouts survive
 packed-selector insertion and the gate/lookup erasure walks, and then the generic
 layout-to-assembly lemma supplies the actual proof- and challenge-dependent query.
 The endpoint also derives evaluation-domain injectivity and size equalities from
@@ -345,17 +357,16 @@ That endpoint now has a canonical, bundle-wide type.
 from the decoded members and the deployed assembled-query route, then constructs the
 entire constraint model from the accepted VK. Fixed columns, permutation sets/chunks,
 lookups, and selector polynomials are no longer free relation parameters.
-`action_bundleStatement_of_canonicalMemberConstraintRelation` consumes this relation and concludes
-the concrete `Action.BundleStatement`, with no abstract `S` or `hencodes` premise and
-with the key locked to `orchardActionTopLevelCircuit.toVerifierKey`. It now derives
-the complete gate family internally from canonical constraint satisfaction and the
-circuit-owned gate/selector coherence package. The binding-aware endpoint additionally
-constructs the fixed and copy families; exact lookup-selector projection is the last
-deterministic family input.
-The binding-aware
-`action_bundleStatement_or_relation_of_canonicalMemberConstraintRelation` constructs
-`TopLevelFixedCoherence` from the Action circuit, its derived key, and the symbolic
-Lagrange-basis theorem, then derives the selector-activation and fixed/table families.
+`actionTopLevelCircuitCorrectness` packages the Action circuit's gate, fixed, copy,
+lookup, and query-representation laws as a generic `TopLevelCircuitCorrectness`
+record. The generic
+`topLevelBundleStatement_or_bad_of_constraintSatisfaction` theorem consumes that
+record and concludes the top-level circuit statement, with no abstract `S` or
+`hencodes` premise and with the key locked to
+`actionCircuit.toVerifierKey`. The binding-aware Action endpoint
+constructs `TopLevelFixedCoherence` from the Action circuit, its derived key, and the
+symbolic Lagrange-basis theorem, then derives the selector-activation and fixed/table
+families.
 It also constructs copy replay from the canonical permutation semantics, preserving
 the commitment-relation branch, and derives lookup satisfaction from exact
 packed-selector values and one
@@ -655,21 +666,17 @@ The generic boundary now quantifies only selector leaves that actually occur in 
 selected lookup's input expressions; unrelated gate selectors may legitimately be
 active at the same absolute row. `LookupSelectorRows` transports exact dense packed
 rows through fixed-polynomial binding into that expression-level projection.
-The within-synthesis half of the remaining compiler argument is now closed.
-`TopLevelCircuit` carries two generic operation-stream laws:
-`lookupRelevantSelectorActivationsExact` says that every selector leaf used by a
+`TopLevelCircuit` briefly carried two generic operation-stream laws for this seam:
+`lookupRelevantSelectorActivationsExact`, saying that every selector leaf used by a
 lookup input is activated at the lookup row exactly when it appears in that
-operation's enabled-selector list, while `lookupInputsNoSimpleSelectors` rules out
+operation's enabled-selector list, and `lookupInputsNoSimpleSelectors`, ruling out
 the simple-selector overlap case that selector packing cannot represent exactly.
-
-The concrete Action proofs are compositional rather than computational.
-`Action/SynthesisLaws.lean` proves reusable laws for the range-check, Sinsemilla,
-Merkle, ECC, fixed-base, CommitIvk, and Action check stages;
-`NoteCommit/SynthesisLaws.lean` proves the corresponding old/new NoteCommit
-decomposition; and `Action/TopLevelSynthesisLaws.lean` combines them for the complete
-unit-input synthesis. The resulting proofs are installed directly in
-`Action.topLevelCircuit`, so downstream generic bridges consume the law through the
-single `TopLevelCircuit` interface rather than an Action sidecar certificate.
+Neither field was ever read by a keygen or verifier theorem — lookup projection
+coverage is obtained by counting selector indices instead — so both fields and the
+compositional Action proofs that discharged them have been withdrawn. Halo 2's
+rejection of simple selectors in lookup arguments is consequently not modelled; see
+`Zcash/Circuits/Integration/lawfulness-and-certificate-elimination.md` for the shape
+a future keygen-fidelity theorem would need to restore.
 
 The remaining placement half is deliberately narrower: transport this exact
 operation-level accounting through V1's concrete region starts and the derived
@@ -849,8 +856,11 @@ prominently **interim** finite diagnostics.
 final dense cell has the wrong bounds or value, and its generic soundness theorem
 turns an empty list into the exact realization fact.
 `ActionFixedCoherence.realizationFailures_eq_nil` certifies the Action list is empty.
-The companion query-coverage diagnostic closes the current all-fixed-columns
-coverage field.
+The companion query diagnostic closes both directions of the current
+all-fixed-columns boundary: every allocated fixed column is queried and every queried
+fixed column is allocated. The latter makes out-of-range commitment identities
+provably absent from the verifier resolver. Both directions remain interim compiler
+lawfulness debt.
 
 For the current lookup-selector milestone, the required set also contains the exact
 singleton packed-selector cell at every lookup input leaf: the assigned root when the
@@ -959,21 +969,21 @@ data.**
 
 From the recovered per-column row values, build:
 
-- `Environment.get` for advice, fixed, and instance columns;
-- `Environment.usableRows` from `n` and the VK blinding factor;
-- the post-NU6.3 floor-planner placement;
-- the concrete `Config` returned by `Action.Circuit.configure`;
+- a `ProofAssignment` containing only advice and instance reads;
+- the circuit-owned environment, which compiles fixed rows and usable rows;
+- the circuit-owned post-NU6.3 floor-planner placement and configuration;
 - the unit input of the closed Action circuit.
 
 The generic top-level boundary and the Action-side closure are now implemented.
-`TopLevelCircuit` holds a unit-input `FormalCircuit`, requires its public
-`Assumptions` predicate to be exactly `True`, fixes the result of its own `configure`
-run, and provides verifier- and prover-side theorems with no exposed
-`EnvAssumptions` premise. `SynthesisWellFormed` currently records the generic layout
-fact needed by table loaders: every declared table block fits in `usableRows`.
-`TopLevelCircuit.Statement` names the semantic proposition extracted from a placed
-environment, so the SNARK bridge can target an arbitrary closed formal circuit
-without mentioning its circuit-specific `Spec`.
+`TopLevelCircuit` holds a `FormalCircuit` with unit configuration input, synthesis
+input, and output; requires its public `Assumptions` predicate to be exactly `True`;
+and provides verifier- and prover-side theorems with no exposed `EnvAssumptions`
+premise. Its single `closesEnvironment` law states only the residual environment
+facts that cannot be derived from both constraints and witness extension.
+`TopLevelCircuit.Statement` receives the circuit's explicit public-input value and
+existentially hides only its private witness. The generic SNARK bridge extracts that
+public value through the circuit-declared instance-cell layout; the Action adapter
+then identifies it with the ten values committed by the verifier.
 
 The generic keygen layer now derives from the top-level circuit itself:
 
@@ -984,14 +994,8 @@ The generic keygen layer now derives from the top-level circuit itself:
 - `domainExponent` runs `minimalK` on the same configured CS and operation stream;
   `usedRows`, `blindingFactors`, `usableRowsAt`, and `FitsAt` state the keygen domain
 fit entirely in circuit-owned terms;
-- `TopLevelCircuit.synthesisWellFormed` proves that a fitting domain supplies the
-  table-fit contract required by top-level soundness.
-
-`TopLevelCircuit.fitsAt_domainExponent` closes the remaining generic arithmetic:
-`minimalK` searches exponents `0` through `32` and uses `33` only as its failure
-sentinel, so any derived exponent below `33` satisfies the operation-footprint and
-blinding-row fit inequality. `TopLevelAssignment.synthesisWellFormed` therefore needs
-only this standard supported-domain bound, not a separately reconstructed row proof.
+- `TopLevelCircuit.environment` combines the compiled fixed rows and usable-row
+  bound with a proof-varying advice/instance assignment.
 
 The fixed-data bridge now reaches the keygen layout compiler as well.
 `FixedLayout.mem_tableFixed_of_loadTable_of_lt` and `_of_fill` cover both the explicit
@@ -1021,12 +1025,13 @@ different member's advice or instance columns. The top-level circuit supplies it
 operations, V1 placement, derived domain exponent, blinding rows, and usable-row fit;
 `Bridge.omegaOf top.domainExponent` supplies the protocol domain root. Consequently
 the type has neither an arbitrary domain nor a `VerifyingKey` argument, and
-`TopLevelAssignment.synthesisWellFormed` discharges the layout premise directly from
-`TopLevelCircuit.FitsAt k`.
+`TopLevelAssignment.proofAssignment` exposes only the proof-varying advice and
+instance reads. `TopLevelCircuit.environment` adds the circuit-derived fixed rows and
+usable-row bound.
 
 The deployed capstone constructs this shell internally through the canonical
 accepted-member route, so the decoder never accepts an arbitrary verifying key: it
-uses `orchardActionTopLevelCircuit.toVerifierKey pp urs`, whose shape, scalar, gates,
+uses `actionCircuit.toVerifierKey pp urs`, whose shape, scalar, gates,
 query layouts, fixed commitments, permutation commitments and lookup data are all
 derived from the configured Action circuit and supplied URS, with no separate shape
 or shape/domain coherence premise. (The former standalone constructor,
@@ -1041,17 +1046,14 @@ gate/copy/lookup/fixed satisfaction with that generic top-level endpoint.
 preserving the bridge's shared exceptional event. Neither theorem mentions the
 Action circuit, an Action-specific placement, or Action-specific operations.
 
-The small Action-specific semantic adapter is also complete.
-`Action.PublicInputs` names the ten instance-column rows in protocol order and
-`Action.Statement` says that some extracted `ActionData` has exactly those public
-fields and satisfies the complete `SpecPost`. The theorem
-`Action.statement_of_topLevelStatement` specializes the generic top-level conclusion
-to that external statement. It is parameterized by a top-level circuit and the
-identity of its underlying Action `FormalCircuit`, rather than mentioning the
-concrete proof-carrying `Action.topLevelCircuit` record in its type. It does not
-repeat any circuit proof; the remaining public-input obligation is solely to
-identify the decoded instance polynomial's first ten domain values with the values
-supplied to the verifier.
+The Action-specific public boundary is intentionally small.
+`Action.PublicInputs` names the ten instance-column rows in protocol order, and the
+single concrete `Action.actionCircuit` owns the complete post-NU6.3 specification at
+the real generators and bases. There is no separate Action statement wrapper:
+capstones conclude `actionCircuit.Statement` directly, while
+`Action.BundleStatement` merely quantifies that statement over every proof index.
+The remaining public-input obligation is to identify each decoded instance
+polynomial with the values supplied to the verifier.
 
 That row-identification lemma now consumes `TopLevelAssignment` directly. Its domain
 root is `Bridge.omegaOf k`, its instance column is selected by the assignment's proof
@@ -1059,7 +1061,7 @@ index, and it no longer accepts an arbitrary verifier key. This is the intention
 small Action-specific part: it only maps the first ten rows into `Action.PublicInputs`;
 assignment construction and domain/layout choices remain generic.
 
-`Action.topLevelCircuit` instantiates that boundary. It projects the initial
+`Action.actionCircuit` instantiates that boundary. It projects the initial
 Sinsemilla generator-table load from the real `mainPost` operation stream and derives:
 
 - exact generator-table contents and all four shared Sinsemilla table-loaded facts;
@@ -1069,14 +1071,14 @@ Sinsemilla generator-table load from the real `mainPost` operation stream and de
 
 The prover-side closure projects the same load from `ExtendsWitnesses` and converts
 its fixed-table clauses to the corresponding constraints. The deployed
-`orchardActionTopLevelCircuit` specializes this generic Action construction to the
+`actionCircuit` specializes this generic Action construction to the
 real generators and certified bases. Clean constraints remain on the generic
 integration side of the boundary: the security-layer bridge begins with the
 Action-native `SpecPost` and refines it to the ledger statement, rather than
 repeating the generic constraint-to-specification argument.
 
 The legacy `ActionAssignment` has been deleted. Its decoded constructor now returns
-the generic `TopLevelAssignment` indexed by `orchardActionTopLevelCircuit`, so
+the generic `TopLevelAssignment` indexed by `actionCircuit`, so
 placement, operations, domain exponent, blinding factors, and usable rows all come
 from the top-level circuit. The only Action-specific work left in this layer is the
 deployed decoder routing; the verifier key itself is now obtained generically from
@@ -1085,13 +1087,12 @@ the top-level circuit.
 The compositional base and post-Ironwood `FormalCircuit`s intentionally retain their
 `EnvAssumptions`: child circuits may state contracts that a parent fulfills.
 `TopLevelCircuit` is the separate deployment boundary that closes those contracts.
-The generic `SynthesisWellFormed` and full-satisfaction-to-statement steps are now
-complete. The circuit-derived decoded assignment and rotated resolver environment are
-now connected generically. Gate and lookup witness construction are generic; the
-remaining representation work is to instantiate their compact fixed/selector
-coherence inputs, construct `CopyReplayWitness`, supply the lookup challenge
-conditions, and feed the resulting families to
-`FullCircuitBridge.topLevelSoundness_or_bad`.
+The full-satisfaction-to-statement step now consumes the canonical
+`top.environment assignment`. Fixed-column commitment binding proves
+`FixedColumnEncoding`, which identifies the verifier resolver environment with that
+canonical environment before the generic soundness terminal is invoked. Gate,
+fixed, copy, lookup, and public-instance reconstruction are all instantiated in the
+Action endpoint.
 
 After #79's merge, the generic circuit-integration declarations are checked in the
 single `Zcash/TrustBoundary.lean` census with explicit standard or Vesta-native axiom
@@ -1116,19 +1117,20 @@ canonical relation, public-instance commitment, Action endpoint, lookup challeng
 packaging, generic full-bridge join, concrete copy replay, and fixed-row lookup
 selector realization are bundle-indexed.**
 
-A deployed proof covers `shape.numProofs` Actions. Generalize `PublicInputs`,
-`Assignment`, and `ActionStatement` to a `Fin shape.numProofs` family and decode one
-Clean assignment per sub-proof. The shared fixed columns and VK are common, while
-advice/instance columns and protocol statements are per Action. The final conclusion
-should quantify over or return the high-level statement for every supplied Action.
+A deployed proof covers `shape.numProofs` Actions. Generalize the public-input family,
+`TopLevelAssignment`, and `Action.BundleStatement` to a `Fin shape.numProofs` family
+and decode one Clean assignment per sub-proof. The shared fixed columns and VK are
+common, while advice/instance columns and protocol statements are per Action. The
+final conclusion should quantify over or return the high-level statement for every
+supplied Action.
 
 `TopLevelAssignment.Bundle top numProofs` is the dependent family
 `∀ p, TopLevelAssignment top numProofs p`, so each member is forced to resolve the
-columns named by its own index. `Action.BundleStatement G B inputs` is the matching
-external conclusion `∀ p, Action.Statement G B (inputs p)`. No separate monolithic
-bundle witness is required: fixed columns and the circuit-derived VK remain shared,
-while decoded advice/instance polynomials and extracted `ActionData` remain
-per-member.
+columns named by its own index. `Action.BundleStatement inputs` is the matching
+external conclusion `∀ p, Action.actionCircuit.Statement (inputs p)`. No separate
+monolithic bundle witness is required: fixed columns and the circuit-derived VK
+remain shared, while decoded advice/instance polynomials and extracted `ActionData`
+remain per-member.
 
 #85's multi-Action fixture derives each proof's instance commitment and proves that
 sub-proof commitment slots remain disjoint. The accepted-route selector and Vesta
@@ -1186,16 +1188,13 @@ duplicate-query rejection directly from `DeployedAccepts`.
 `CanonicalMemberConstraintRelation.ofAcceptedCircuitSat` uses those facts to turn
 satisfaction of the accepted run's canonical decoded-member model into the exact
 relation consumed by circuit integration.
-`Soundness/Deployed/ActionVk` now transports that closed terminal to the captured
-Action proof shape and verifying key using the keygen certificate. It no longer
-accepts lookup-selector realization: fixed coherence constructs those values inside
-the terminal. The module is imported by the root `Zcash` module, so `lake build Zcash` checks
-this deployed seam rather than leaving the capstone outside the build graph.
-The same module now also exports the captured-artifact
-`action_bundleStatement_or_relation_of_acceptedModel_circuitSat_deployed`. This is the
-entry point for the Vesta constraint-carrying relation: when the upstream capstone
-already supplies satisfaction of the canonical accepted model, it bypasses the
-node-binding reconstruction and consumes that satisfaction directly.
+`Soundness/Deployed/ActionVesta` carries the transport ingredients for the deployed
+seam — the fixture `k`-match and blinding-factor facts (`shape_k_eq_capturedURS_k`,
+`vk_blindingFactors_lt`); the public-instance commitment is the circuit-native
+`ActionInstanceCommitment.commitment`, used directly at the captured shape. They carry
+the generic Action/Vesta statements to the captured artifacts along
+the keygen certificate. The deployed capstone in `Soundness/Deployed/ActionVesta`
+consumes satisfaction of the canonical accepted model through that transport.
 `AcceptedModelClaimedEvaluations` is the corresponding verifier-native node-binding
 fingerprint: it states once that the canonical model's fixed/advice/instance,
 permutation, lookup, and row-selector polynomials evaluate to the accepted proof
@@ -1231,17 +1230,17 @@ That substitution is now expressed directly, without preserving the abstract
 argument.
 `ActionInstanceCommitment.action_bundleStatement_or_relation_of_decodedMemberPolynomial_eq`
 specializes the canonical terminal to
-`orchardActionTopLevelCircuit.toVerifierKey`, derives all query-layout, permutation,
+`actionCircuit.toVerifierKey`, derives all query-layout, permutation,
 and domain facts from that circuit-owned key, and feeds canonical satisfaction into
 the Action endpoint. Its conclusion is exactly the concrete `Action.BundleStatement`
 or the shared augmented-basis relation. The theorem has no arbitrary key, decoder,
 constraint model, `S`, or `hencodes`; only explicitly priced good-challenge facts
 remain.
 
-At the captured artifacts,
-`action_bundleStatement_or_relation_of_acceptedModel_circuitSat_deployed` is the
-corresponding direct receiver for a `CircuitSat` proof over the canonical accepted
-model. `Soundness/Multiopen/CanonicalSelection` now constructs the advice and
+At the captured artifacts, the deployed capstone is the corresponding direct
+receiver for a `CircuitSat` proof over the canonical accepted model, obtained by
+transporting the generic Action/Vesta capstone.
+`Soundness/Multiopen/CanonicalSelection` now constructs the advice and
 instance slots forced by `CanonicalMemberConstraintRelation.acceptedRoute` and proves
 that their full polynomial feeds equal the canonical accepted model's feeds.
 `Soundness/Canonical/Vesta` specializes the verifier-native terminal's former free
@@ -1294,8 +1293,8 @@ whose public inputs were committed by the verifier.
 4. **Generic join complete:** `FullCircuitBridge.ofTopLevelCanonical` assembles one
    proof index and `bundleTopLevelSoundness_or_bad` quantifies it over every
    `Fin shape.numProofs`. Instantiate those constructors with the incoming
-   fixed-selector and copy records. The external `Action.Statement` and
-   `Action.BundleStatement` adapters are already implemented.
+   fixed-selector and copy records. The external `Action.BundleStatement` endpoint
+   is already implemented directly over `Action.actionCircuit.Statement`.
 5. **Complete:** construct
    `AcceptedModelClaimedEvaluations` from accepted decoded-member node binding, the
    circuit-derived query-layout counts, and standard permutation/domain facts; then
@@ -1320,6 +1319,7 @@ append-only merge flow.
 
 | Marker | Work package | Current state | Delivers / unblocks |
 |---|---|---|---|
+| **[DONE: ProofAssignment]** | Separate proof-varying advice/instance data from circuit-derived placement, fixed rows, and usable rows. | `TopLevelAssignment.proofAssignment` uses `resolverAssignment`; `TopLevelCircuit.environment` supplies the circuit-fixed data. `FixedColumnEncoding` derives exact equality with the verifier polynomial environment, and the generic terminal now invokes top-level soundness only in that canonical environment. | Removes arbitrary synthesis environments and obsolete `SynthesisWellFormed` premises from the final semantic path. |
 | **[ME] fixed compiler** | Replace the interim Action fixed-write and query-coverage diagnostics with compiler-derived laws: use region cell-disjointness to remove cross-region collisions, decompose the remainder across region-local writes, tables, constants, and selector packing, finish generic last-write/dedup/scatter semantics, and minimize query coverage to consumed columns. | Dense-row shape, full-list Lagrange commitment provenance, fixed-query count, and `TopLevelFixedCoherence.ofKeygen` are generic. Two prominently interim finite failure lists now certify Action sparse-to-dense realization and query coverage; `ActionFixedCoherence.ofKeygen` assembles them with the generic constructor. | A usable Action fixed-coherence constructor now; ultimately a compiler-derived replacement for its two interim certificates. |
 | **[DONE: FFT correctness]** | Prove `bestFftG`'s DFT specification symbolically — `output[i] = Σ_k ω^{i·k} • input[k]`, by induction over the butterfly rounds (invariant: after round `r`, each `2^r` block holds the DFT of its stride-subsampled slice). | `Keygen/FftSpec.lean` proves `bestFftG_dft`, `derivedUrsGLagrange_generator_eq`, and `derivedUrsGLagrange_length`. `ActionFixedCoherence.ofDerived` now consumes those results through `ofPrefix_setup_of_closed`; no Lagrange setup premise reaches the Action endpoint. | The URS setup equations consumed by both fixed and σ commitment identification, for every supported URS. |
 | **[DONE: lookup join]** | Derive exact packed-selector zero/one values for only the selector leaves occurring in each lookup input. | The guarded V1 packing path emits either the exact singleton selector row or an out-of-bounds sentinel. Shared fixed realization rules out the sentinel, and `EnabledLookup.inputSelectorLeafRowsExact_of_realizes` supplies the generic exact-row result. `ActionLookupSelectorRows` is only the thin circuit instantiation; no Action-specific planner theorem or free selector-value premise remains. | The lookup field of `FullCircuitBridge` for every Action proof index is internal to the terminal. |

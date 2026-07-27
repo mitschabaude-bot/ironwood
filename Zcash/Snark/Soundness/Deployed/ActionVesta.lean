@@ -1,4 +1,6 @@
-import Zcash.Snark.Soundness.Deployed.ActionVk
+import Zcash.Snark.Soundness.ActionVesta
+import Zcash.Circuits.Integration.ActionTerminal
+import Zcash.Snark.Keygen.Certificate
 import Zcash.Snark.Soundness.Canonical.Vesta
 import Zcash.Snark.Soundness.Multiopen.CanonicalSelection
 
@@ -6,14 +8,20 @@ import Zcash.Snark.Soundness.Multiopen.CanonicalSelection
 # Deployed Action soundness capstone
 
 This module is the Action-specific deployed capstone of the Vesta
-constraint-soundness bridge. It selects the deployed Action proof's advice and
-instance members from the accepted canonical route, invokes the verifier-native
-canonical Vesta adapter, and hands the resulting circuit satisfaction fact to the
-Action formal-circuit terminal at the Clean/Ironwood boundary.
+constraint-soundness bridge, stated at the captured fixture artifacts: the
+captured verifying key `Fixture.vk`, the fixture `shape`, the captured URS, and
+the deployed instance commitment. It is the generic Action/Vesta capstone
+`action_bundleStatement_or_relation_of_deployedAccepts` transported to those
+artifacts along the keygen certificate equalities (`shape_eq_mergeDerived`,
+`vk_eq_derived`).
 
-The public capstone has no free proposition, encoding callback, or member
-decoder. Its circuit model and decoder are both determined by deployed
-acceptance.
+The capstone has no free proposition, encoding callback, or member decoder. Its
+circuit model and decoder are both determined by deployed acceptance.
+
+The transport ingredients are local: the fixture `k`-match and blinding-factor
+side conditions. The public-instance commitment is the circuit-native
+`ActionInstanceCommitment.commitment actionProofParams capturedURS`, used
+directly at both the circuit-derived and captured fixture shapes.
 -/
 
 namespace Zcash.Snark
@@ -27,286 +35,207 @@ open Zcash.Circuits.Action
 open Zcash.Snark.Fixture
 open ActionInstanceCommitment
 
-set_option maxHeartbeats 20000
+/-- The captured `Shape`'s IPA depth matches the captured URS: both record the
+literal deployed `k = 11`. -/
+theorem shape_k_eq_capturedURS_k : Fixture.shape.k = capturedURS.k := rfl
+
+set_option maxRecDepth 100000 in
+/-- The deployed verifying key's blinding factors are below its domain size
+(`5 < 2048` on the captured record). -/
+theorem vk_blindingFactors_lt : Fixture.vk.blindingFactors < Fixture.vk.n := by
+  decide
 
 namespace Deployed
 
 set_option maxRecDepth 1000000 in
-private theorem actionCapturedQueryCounts_transport
-    (s : Shape)
-    (hs : actionProofParams.mergeDerived orchardActionTopLevelCircuit = s)
-    (K : VerifyingKey s Fp Fixture.G)
-    (hK : K = derivedActionVk s capturedURS) :
-    K.adviceQueryLayout.length = s.numAdviceQueries ∧
-      K.instanceQueryLayout.length = s.numInstanceQueries := by
-  subst hs
-  rw [← Keygen.toVerifierKey_action actionProofParams capturedURS] at hK
-  subst hK
-  exact
-    ⟨orchardActionTopLevelCircuit.toVerifierKey_adviceQueryCount
-      actionProofParams capturedURS,
-    orchardActionTopLevelCircuit.toVerifierKey_instanceQueryCount
-      actionProofParams capturedURS⟩
-
-private theorem actionCapturedAdviceQueryCount :
-    Fixture.vk.adviceQueryLayout.length = Fixture.shape.numAdviceQueries :=
-  (actionCapturedQueryCounts_transport
-    Fixture.shape Keygen.shape_eq_mergeDerived
-    Fixture.vk Keygen.vk_eq_derived).1
-
-private theorem actionCapturedInstanceQueryCount :
-    Fixture.vk.instanceQueryLayout.length = Fixture.shape.numInstanceQueries :=
-  (actionCapturedQueryCounts_transport
-    Fixture.shape Keygen.shape_eq_mergeDerived
-    Fixture.vk Keygen.vk_eq_derived).2
-
-attribute [local irreducible] deployedSetQueries deployedSetCommIds
-  deployedX4PairCount x4BatchCommitments x4BatchEvals
-  Fixture.vk Fixture.shape capturedURS deployedInstanceCommitment
-
-set_option maxRecDepth 1000000 in
 /--
-The deployed Action instance of the canonical Vesta terminal.
-
-The advice and instance member choices are constructed from the accepted route;
-the resulting exact feed equalities replace the terminal's independently
-selected feeds. The result is canonical Action-model circuit satisfaction or
-the standard discrete-log-relation alternative.
+Transport of the generic Action/Vesta capstone to a shape/key pair identified
+with the captured circuit-derived artifacts. `subst` on the certificate
+equalities `shape_eq_mergeDerived` and `vk_eq_derived` reduces the goal to the
+generic capstone at `(actionProofParams, capturedURS)`; both equalities are
+ordinary `Eq`s, so no cast appears in the statement or proof.
 -/
-theorem acceptedModel_circuitSat_or_relation_of_deployedAccepts
-    (inputs : Fin Fixture.shape.numProofs → PublicInputs)
-    (ps : ProofString Fixture.shape Fp Fixture.G)
-    (ch : Challenges Fixture.shape.k Fp)
+private theorem action_bundleStatement_or_relation_of_deployedAccepts_transport
+    (s : Shape)
+    (hs : actionProofParams.mergeDerived actionCircuit = s)
+    (K : VerifyingKey s Fp G)
+    (hK : K = derivedActionVk s capturedURS)
+    (hk : s.k = capturedURS.k)
+    (hbl : K.blindingFactors < K.n)
+    (inputs : Fin s.numProofs → PublicInputs Fp)
+    (ps : ProofString s Fp G)
+    (ch : Challenges s.k Fp)
     (pU pW : Fp)
     (hpoly : Polynomial Fp)
     {a₀ : Fin (2 ^ capturedURS.k) → Fp}
     (pbatch :
       OpenedBatchOpenings capturedURS (evalVector capturedURS.k ch.x3)
         (x4BatchCommitments
-          (instanceCommitment := deployedInstanceCommitment Fixture.shape inputs)
-          capturedURS shape_k_eq_capturedURS_k Fixture.vk ps ch)
+          (instanceCommitment := commitment actionProofParams capturedURS inputs)
+          capturedURS hk K ps ch)
         (x4BatchEvals
-          (instanceCommitment := deployedInstanceCommitment Fixture.shape inputs)
-          Fixture.vk ps ch)
+          (instanceCommitment := commitment actionProofParams capturedURS inputs)
+          K ps ch)
         a₀ pU pW)
     (hξcur : pbatch.batchChallenge pbatch.current = ch.x4)
-    (hlen : ∀ i, i < deployedX4PairCount Fixture.vk
-        (deployedInstanceCommitment Fixture.shape inputs) ps ch →
-      0 < (deployedSetQueries Fixture.vk
-        (deployedInstanceCommitment Fixture.shape inputs) ps ch i).length)
-    (hprob1 : ∀ i, i < deployedX4PairCount Fixture.vk
-        (deployedInstanceCommitment Fixture.shape inputs) ps ch →
-      (((deployedSetQueries Fixture.vk
-          (deployedInstanceCommitment Fixture.shape inputs) ps ch i).length - 1 :
+    (hlen : ∀ i, i < deployedX4PairCount K
+        (commitment actionProofParams capturedURS inputs) ps ch →
+      0 < (deployedSetQueries K
+        (commitment actionProofParams capturedURS inputs) ps ch i).length)
+    (hprob1 : ∀ i, i < deployedX4PairCount K
+        (commitment actionProofParams capturedURS inputs) ps ch →
+      (((deployedSetQueries K
+          (commitment actionProofParams capturedURS inputs) ps ch i).length - 1 :
           ℕ) : ℝ≥0∞) / Fintype.card Fp
         < (PMF.uniformOfFintype Fp).toOuterMeasure
           (Finset.univ.filter
-            (OpenedX1Accept capturedURS shape_k_eq_capturedURS_k Fixture.vk
-              (deployedInstanceCommitment Fixture.shape inputs) ps ch)))
+            (OpenedX1Accept capturedURS hk K
+              (commitment actionProofParams capturedURS inputs) ps ch)))
     (haccepts :
-      DeployedAccepts capturedURS shape_k_eq_capturedURS_k Fixture.vk
-        (deployedInstanceCommitment Fixture.shape inputs) ps ch)
+      DeployedAccepts capturedURS hk K
+        (commitment actionProofParams capturedURS inputs) ps ch)
     (i m : ℕ)
-    (hm : m < (deployedSetQueries Fixture.vk
-      (deployedInstanceCommitment Fixture.shape inputs) ps ch i).length)
-    (colPoly : Fin (deployedSetQueries Fixture.vk
-      (deployedInstanceCommitment Fixture.shape inputs) ps ch i).length →
+    (hm : m < (deployedSetQueries K
+      (commitment actionProofParams capturedURS inputs) ps ch i).length)
+    (colPoly : Fin (deployedSetQueries K
+      (commitment actionProofParams capturedURS inputs) ps ch i).length →
         Polynomial Fp)
     (hbindAll : ∀ (idx : Fin ((constructIntermediateSets
-          (assembleQueries Fixture.vk
-            (deployedInstanceCommitment Fixture.shape inputs) ps ch)).points.getD
+          (assembleQueries K
+            (commitment actionProofParams capturedURS inputs) ps ch)).points.getD
               i []).length)
-        (m₀ : Fin (deployedSetQueries Fixture.vk
-          (deployedInstanceCommitment Fixture.shape inputs) ps ch i).length),
+        (m₀ : Fin (deployedSetQueries K
+          (commitment actionProofParams capturedURS inputs) ps ch i).length),
       (colPoly m₀).eval
           (((constructIntermediateSets
-            (assembleQueries Fixture.vk
-              (deployedInstanceCommitment Fixture.shape inputs) ps ch)).points.getD
+            (assembleQueries K
+              (commitment actionProofParams capturedURS inputs) ps ch)).points.getD
                 i [])[idx]) =
-        ((deployedSetQueries Fixture.vk
-          (deployedInstanceCommitment Fixture.shape inputs) ps ch i).getD
+        ((deployedSetQueries K
+          (commitment actionProofParams capturedURS inputs) ps ch i).getD
             (m₀ : ℕ) (.point 0, [])).2.getD (idx : ℕ) 0
         ∨ HasNontrivialRelation (F := Fp)
           capturedURS.g capturedURS.u capturedURS.w)
     (hquot : hpoly = colPoly ⟨m, hm⟩)
     (hroute : (constructIntermediateSets
-      (assembleQueries Fixture.vk
-        (deployedInstanceCommitment Fixture.shape inputs) ps ch)).points.getD
+      (assembleQueries K
+        (commitment actionProofParams capturedURS inputs) ps ch)).points.getD
           i [] = [ch.x])
     (hevals : ∀ d₀,
-      ((deployedSetQueries Fixture.vk
-        (deployedInstanceCommitment Fixture.shape inputs) ps ch i).getD
+      ((deployedSetQueries K
+        (commitment actionProofParams capturedURS inputs) ps ch i).getD
           m d₀).2 =
         [expectedHEval
-          (allExpressions Fixture.vk ps ch
-            (lagrangeBasis Fixture.vk.omega Fixture.vk.n
-              Fixture.vk.blindingFactors (ch.x ^ Fixture.vk.n) ch.x).1
-            (lagrangeBasis Fixture.vk.omega Fixture.vk.n
-              Fixture.vk.blindingFactors
-              (ch.x ^ Fixture.vk.n) ch.x).2.1
-            (lagrangeBasis Fixture.vk.omega Fixture.vk.n
-              Fixture.vk.blindingFactors
-              (ch.x ^ Fixture.vk.n) ch.x).2.2)
-          ch.y (ch.x ^ Fixture.vk.n)])
+          (allExpressions K ps ch
+            (lagrangeBasis K.omega K.n
+              K.blindingFactors (ch.x ^ K.n) ch.x).1
+            (lagrangeBasis K.omega K.n
+              K.blindingFactors
+              (ch.x ^ K.n) ch.x).2.1
+            (lagrangeBasis K.omega K.n
+              K.blindingFactors
+              (ch.x ^ K.n) ch.x).2.2)
+          ch.y (ch.x ^ K.n)])
     (claimed :
       AcceptedModelClaimedEvaluations
         (memberDecode :=
-          vestaExtractedMemberDecode capturedURS shape_k_eq_capturedURS_k
-            Fixture.vk (deployedInstanceCommitment Fixture.shape inputs) ps ch
+          vestaExtractedMemberDecode capturedURS hk
+            K (commitment actionProofParams capturedURS inputs) ps ch
             pbatch hlen hprob1 haccepts)
-        (hblinding := vk_blindingFactors_lt) haccepts)
+        (hblinding := hbl) haccepts)
     (hxgood :
       ch.x ∉ szBadSet
         (let model :=
           CanonicalMemberConstraintRelation.acceptedModel
             (memberDecode :=
-              vestaExtractedMemberDecode capturedURS shape_k_eq_capturedURS_k
-                Fixture.vk (deployedInstanceCommitment Fixture.shape inputs) ps ch
+              vestaExtractedMemberDecode capturedURS hk
+                K (commitment actionProofParams capturedURS inputs) ps ch
                 pbatch hlen hprob1 haccepts)
-            (hblinding := vk_blindingFactors_lt) haccepts
+            (hblinding := hbl) haccepts
         combineConstraints model.fixedCols model.adviceCols model.instanceCols
           model.gates model.sets model.chunks model.lookups
           model.beta model.gamma model.delta model.theta ch.y model.chunkLen
           model.l0 model.lLast model.lBlind -
-            hpoly * (X ^ Fixture.vk.n - 1))) :
-    (CanonicalMemberConstraintRelation.acceptedModel
-        (memberDecode :=
-          vestaExtractedMemberDecode capturedURS shape_k_eq_capturedURS_k
-            Fixture.vk (deployedInstanceCommitment Fixture.shape inputs) ps ch
-            pbatch hlen hprob1 haccepts)
-        (hblinding := vk_blindingFactors_lt) haccepts).CircuitSat
-          ch.y hpoly Fixture.vk.n a₀ ∨
-      HasNontrivialRelation (F := Fp)
-        capturedURS.g capturedURS.u capturedURS.w := by
-  exact
-    acceptedModel_circuitSat_or_relation_of_acceptedSelections
-      capturedURS shape_k_eq_capturedURS_k Fixture.vk
-      (deployedInstanceCommitment Fixture.shape inputs) ps ch pU pW hpoly
-      pbatch hξcur hlen hprob1 haccepts vk_blindingFactors_lt
-      actionCapturedAdviceQueryCount actionCapturedInstanceQueryCount
-      i m hm colPoly hbindAll hquot hroute hevals claimed hxgood
-
-assert_no_sorry acceptedModel_circuitSat_or_relation_of_deployedAccepts
-
-set_option maxRecDepth 1000000 in
-private theorem action_bundleStatement_or_relation_of_acceptedModel_circuitSat_or_relation
-    (inputs : Fin Fixture.shape.numProofs → PublicInputs)
-    (ps : ProofString Fixture.shape Fp Fixture.G)
-    (ch : Challenges Fixture.shape.k Fp)
-    (pU pW : Fp)
-    (hpoly : Polynomial Fp)
-    {a₀ : Fin (2 ^ capturedURS.k) → Fp}
-    (pbatch :
-      OpenedBatchOpenings capturedURS (evalVector capturedURS.k ch.x3)
-        (x4BatchCommitments
-          (instanceCommitment := deployedInstanceCommitment Fixture.shape inputs)
-          capturedURS shape_k_eq_capturedURS_k Fixture.vk ps ch)
-        (x4BatchEvals
-          (instanceCommitment := deployedInstanceCommitment Fixture.shape inputs)
-          Fixture.vk ps ch)
-        a₀ pU pW)
-    (hlen : ∀ i, i < deployedX4PairCount Fixture.vk
-        (deployedInstanceCommitment Fixture.shape inputs) ps ch →
-      0 < (deployedSetQueries Fixture.vk
-        (deployedInstanceCommitment Fixture.shape inputs) ps ch i).length)
-    (hprob1 : ∀ i, i < deployedX4PairCount Fixture.vk
-        (deployedInstanceCommitment Fixture.shape inputs) ps ch →
-      (((deployedSetQueries Fixture.vk
-          (deployedInstanceCommitment Fixture.shape inputs) ps ch i).length - 1 :
-          ℕ) : ℝ≥0∞) / Fintype.card Fp
-        < (PMF.uniformOfFintype Fp).toOuterMeasure
-          (Finset.univ.filter
-            (OpenedX1Accept capturedURS shape_k_eq_capturedURS_k Fixture.vk
-              (deployedInstanceCommitment Fixture.shape inputs) ps ch)))
-    (haccepts :
-      DeployedAccepts capturedURS shape_k_eq_capturedURS_k Fixture.vk
-        (deployedInstanceCommitment Fixture.shape inputs) ps ch)
-    (hterminal :
-      (CanonicalMemberConstraintRelation.acceptedModel
-        (memberDecode :=
-          vestaExtractedMemberDecode capturedURS shape_k_eq_capturedURS_k
-            Fixture.vk (deployedInstanceCommitment Fixture.shape inputs) ps ch
-            pbatch hlen hprob1 haccepts)
-        (hblinding := vk_blindingFactors_lt) haccepts).CircuitSat
-          ch.y hpoly Fixture.vk.n a₀ ∨
-        HasNontrivialRelation (F := Fp)
-          capturedURS.g capturedURS.u capturedURS.w)
+            hpoly * (X ^ K.n - 1)))
     (hgoodY : ∀ j,
       ch.y ∉ szBadSet
         (foldSplitWitness
           (CanonicalMemberConstraintRelation.acceptedModel
             (memberDecode :=
-              vestaExtractedMemberDecode capturedURS shape_k_eq_capturedURS_k
-                Fixture.vk (deployedInstanceCommitment Fixture.shape inputs)
+              vestaExtractedMemberDecode capturedURS hk
+                K (commitment actionProofParams capturedURS inputs)
                 ps ch pbatch hlen hprob1 haccepts)
-            (hblinding := vk_blindingFactors_lt) haccepts).constraints
-          Fixture.vk.n j))
+            (hblinding := hbl) haccepts).constraints
+          K.n j))
     (permGamma :
-      ch.gamma ∉ allResolverPermutationGammaBadSet Fixture.vk ch
+      ch.gamma ∉ allResolverPermutationGammaBadSet K ch
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode :=
-            vestaExtractedMemberDecode capturedURS shape_k_eq_capturedURS_k
-              Fixture.vk (deployedInstanceCommitment Fixture.shape inputs)
+            vestaExtractedMemberDecode capturedURS hk
+              K (commitment actionProofParams capturedURS inputs)
               ps ch pbatch hlen hprob1 haccepts) haccepts)
         actionActiveRows)
     (permBeta :
-      ch.beta ∉ allResolverPermutationBetaBadSet Fixture.vk
+      ch.beta ∉ allResolverPermutationBetaBadSet K
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode :=
-            vestaExtractedMemberDecode capturedURS shape_k_eq_capturedURS_k
-              Fixture.vk (deployedInstanceCommitment Fixture.shape inputs)
+            vestaExtractedMemberDecode capturedURS hk
+              K (commitment actionProofParams capturedURS inputs)
               ps ch pbatch hlen hprob1 haccepts) haccepts)
         actionActiveRows)
     (lookupGamma :
-      ch.gamma ∉ allResolverLookupGammaBadSet Fixture.vk ch
+      ch.gamma ∉ allResolverLookupGammaBadSet K ch
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode :=
-            vestaExtractedMemberDecode capturedURS shape_k_eq_capturedURS_k
-              Fixture.vk (deployedInstanceCommitment Fixture.shape inputs)
+            vestaExtractedMemberDecode capturedURS hk
+              K (commitment actionProofParams capturedURS inputs)
               ps ch pbatch hlen hprob1 haccepts) haccepts)
-        (Fixture.vk.n - Fixture.vk.blindingFactors - 2))
+        (K.n - K.blindingFactors - 2))
     (lookupBeta :
-      ch.beta ∉ allResolverLookupBetaBadSet Fixture.vk ch
+      ch.beta ∉ allResolverLookupBetaBadSet K ch
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode :=
-            vestaExtractedMemberDecode capturedURS shape_k_eq_capturedURS_k
-              Fixture.vk (deployedInstanceCommitment Fixture.shape inputs)
+            vestaExtractedMemberDecode capturedURS hk
+              K (commitment actionProofParams capturedURS inputs)
               ps ch pbatch hlen hprob1 haccepts) haccepts)
-        (Fixture.vk.n - Fixture.vk.blindingFactors - 2))
+        (K.n - K.blindingFactors - 2))
     (lookupTheta :
       ch.theta ∉ TopLevelLookupCoherence.allTopLevelLookupThetaBadSet
-        orchardActionTopLevelCircuit actionProofParams capturedURS
+        actionCircuit actionProofParams capturedURS
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode :=
-            vestaExtractedMemberDecode capturedURS shape_k_eq_capturedURS_k
-              Fixture.vk (deployedInstanceCommitment Fixture.shape inputs)
+            vestaExtractedMemberDecode capturedURS hk
+              K (commitment actionProofParams capturedURS inputs)
               ps ch pbatch hlen hprob1 haccepts) haccepts)) :
-    BundleStatement Specs.Sinsemilla.orchardGenerators orchardBases inputs ∨
+    BundleStatement inputs ∨
       HasNontrivialRelation (F := Fp)
         capturedURS.g capturedURS.u capturedURS.w := by
-  rcases hterminal with hsatisfied | hrelation
-  · exact
-      action_bundleStatement_or_relation_of_acceptedModel_circuitSat_deployed
-        inputs ps ch pU pW a₀ pbatch
-        (vestaExtractedMemberDecode capturedURS shape_k_eq_capturedURS_k
-          Fixture.vk (deployedInstanceCommitment Fixture.shape inputs) ps ch
-          pbatch hlen hprob1 haccepts)
-        haccepts hpoly hsatisfied hgoodY permGamma permBeta
-        lookupGamma lookupBeta lookupTheta
-  · exact Or.inr hrelation
+  subst hs
+  rw [← Keygen.toVerifierKey_action actionProofParams capturedURS] at hK
+  subst hK
+  exact
+    action_bundleStatement_or_relation_of_deployedAccepts
+      actionProofParams capturedURS hk inputs ps ch pU pW hpoly (a₀ := a₀)
+      pbatch hξcur hlen hprob1 haccepts i m hm colPoly hbindAll hquot
+      hroute hevals claimed hxgood hgoodY ⟨permGamma, permBeta⟩
+      ⟨lookupGamma, lookupBeta, lookupTheta⟩
+
+attribute [local irreducible] deployedSetQueries deployedSetCommIds
+  deployedX4PairCount x4BatchCommitments x4BatchEvals
+  Fixture.vk Fixture.shape capturedURS commitment
 
 set_option maxRecDepth 1000000 in
 /--
-The deployed Action soundness statement obtained directly from the
-constraint-carrying Vesta terminal.
+The deployed Action soundness capstone at the captured fixture, obtained by
+transporting the generic Action/Vesta capstone to the deployed artifacts.
 
-Unlike the underlying Vesta terminal, this capstone exposes no arbitrary
-proposition `S`, no encoding callback, and no freely chosen member decoder.
-Deployed acceptance determines the decoder and canonical constraint model;
-the accepted route determines the advice and instance member selections.
+This capstone exposes no arbitrary proposition `S`, no encoding callback, and no
+freely chosen member decoder. Deployed acceptance determines the decoder and
+canonical constraint model; the accepted route determines the advice and
+instance member selections.
 -/
 theorem action_bundleStatement_or_relation_of_deployedAccepts
-    (inputs : Fin Fixture.shape.numProofs → PublicInputs)
+    (inputs : Fin Fixture.shape.numProofs → PublicInputs Fp)
     (ps : ProofString Fixture.shape Fp Fixture.G)
     (ch : Challenges Fixture.shape.k Fp)
     (pU pW : Fp)
@@ -315,59 +244,59 @@ theorem action_bundleStatement_or_relation_of_deployedAccepts
     (pbatch :
       OpenedBatchOpenings capturedURS (evalVector capturedURS.k ch.x3)
         (x4BatchCommitments
-          (instanceCommitment := deployedInstanceCommitment Fixture.shape inputs)
+          (instanceCommitment := commitment actionProofParams capturedURS inputs)
           capturedURS shape_k_eq_capturedURS_k Fixture.vk ps ch)
         (x4BatchEvals
-          (instanceCommitment := deployedInstanceCommitment Fixture.shape inputs)
+          (instanceCommitment := commitment actionProofParams capturedURS inputs)
           Fixture.vk ps ch)
         a₀ pU pW)
     (hξcur : pbatch.batchChallenge pbatch.current = ch.x4)
     (hlen : ∀ i, i < deployedX4PairCount Fixture.vk
-        (deployedInstanceCommitment Fixture.shape inputs) ps ch →
+        (commitment actionProofParams capturedURS inputs) ps ch →
       0 < (deployedSetQueries Fixture.vk
-        (deployedInstanceCommitment Fixture.shape inputs) ps ch i).length)
+        (commitment actionProofParams capturedURS inputs) ps ch i).length)
     (hprob1 : ∀ i, i < deployedX4PairCount Fixture.vk
-        (deployedInstanceCommitment Fixture.shape inputs) ps ch →
+        (commitment actionProofParams capturedURS inputs) ps ch →
       (((deployedSetQueries Fixture.vk
-          (deployedInstanceCommitment Fixture.shape inputs) ps ch i).length - 1 :
+          (commitment actionProofParams capturedURS inputs) ps ch i).length - 1 :
           ℕ) : ℝ≥0∞) / Fintype.card Fp
         < (PMF.uniformOfFintype Fp).toOuterMeasure
           (Finset.univ.filter
             (OpenedX1Accept capturedURS shape_k_eq_capturedURS_k Fixture.vk
-              (deployedInstanceCommitment Fixture.shape inputs) ps ch)))
+              (commitment actionProofParams capturedURS inputs) ps ch)))
     (haccepts :
       DeployedAccepts capturedURS shape_k_eq_capturedURS_k Fixture.vk
-        (deployedInstanceCommitment Fixture.shape inputs) ps ch)
+        (commitment actionProofParams capturedURS inputs) ps ch)
     (i m : ℕ)
     (hm : m < (deployedSetQueries Fixture.vk
-      (deployedInstanceCommitment Fixture.shape inputs) ps ch i).length)
+      (commitment actionProofParams capturedURS inputs) ps ch i).length)
     (colPoly : Fin (deployedSetQueries Fixture.vk
-      (deployedInstanceCommitment Fixture.shape inputs) ps ch i).length →
+      (commitment actionProofParams capturedURS inputs) ps ch i).length →
         Polynomial Fp)
     (hbindAll : ∀ (idx : Fin ((constructIntermediateSets
           (assembleQueries Fixture.vk
-            (deployedInstanceCommitment Fixture.shape inputs) ps ch)).points.getD
+            (commitment actionProofParams capturedURS inputs) ps ch)).points.getD
               i []).length)
         (m₀ : Fin (deployedSetQueries Fixture.vk
-          (deployedInstanceCommitment Fixture.shape inputs) ps ch i).length),
+          (commitment actionProofParams capturedURS inputs) ps ch i).length),
       (colPoly m₀).eval
           (((constructIntermediateSets
             (assembleQueries Fixture.vk
-              (deployedInstanceCommitment Fixture.shape inputs) ps ch)).points.getD
+              (commitment actionProofParams capturedURS inputs) ps ch)).points.getD
                 i [])[idx]) =
         ((deployedSetQueries Fixture.vk
-          (deployedInstanceCommitment Fixture.shape inputs) ps ch i).getD
+          (commitment actionProofParams capturedURS inputs) ps ch i).getD
             (m₀ : ℕ) (.point 0, [])).2.getD (idx : ℕ) 0
         ∨ HasNontrivialRelation (F := Fp)
           capturedURS.g capturedURS.u capturedURS.w)
     (hquot : hpoly = colPoly ⟨m, hm⟩)
     (hroute : (constructIntermediateSets
       (assembleQueries Fixture.vk
-        (deployedInstanceCommitment Fixture.shape inputs) ps ch)).points.getD
+        (commitment actionProofParams capturedURS inputs) ps ch)).points.getD
           i [] = [ch.x])
     (hevals : ∀ d₀,
       ((deployedSetQueries Fixture.vk
-        (deployedInstanceCommitment Fixture.shape inputs) ps ch i).getD
+        (commitment actionProofParams capturedURS inputs) ps ch i).getD
           m d₀).2 =
         [expectedHEval
           (allExpressions Fixture.vk ps ch
@@ -384,7 +313,7 @@ theorem action_bundleStatement_or_relation_of_deployedAccepts
       AcceptedModelClaimedEvaluations
         (memberDecode :=
           vestaExtractedMemberDecode capturedURS shape_k_eq_capturedURS_k
-            Fixture.vk (deployedInstanceCommitment Fixture.shape inputs) ps ch
+            Fixture.vk (commitment actionProofParams capturedURS inputs) ps ch
             pbatch hlen hprob1 haccepts)
         (hblinding := vk_blindingFactors_lt) haccepts)
     (hxgood :
@@ -393,7 +322,7 @@ theorem action_bundleStatement_or_relation_of_deployedAccepts
           CanonicalMemberConstraintRelation.acceptedModel
             (memberDecode :=
               vestaExtractedMemberDecode capturedURS shape_k_eq_capturedURS_k
-                Fixture.vk (deployedInstanceCommitment Fixture.shape inputs) ps ch
+                Fixture.vk (commitment actionProofParams capturedURS inputs) ps ch
                 pbatch hlen hprob1 haccepts)
             (hblinding := vk_blindingFactors_lt) haccepts
         combineConstraints model.fixedCols model.adviceCols model.instanceCols
@@ -407,7 +336,7 @@ theorem action_bundleStatement_or_relation_of_deployedAccepts
           (CanonicalMemberConstraintRelation.acceptedModel
             (memberDecode :=
               vestaExtractedMemberDecode capturedURS shape_k_eq_capturedURS_k
-                Fixture.vk (deployedInstanceCommitment Fixture.shape inputs)
+                Fixture.vk (commitment actionProofParams capturedURS inputs)
                 ps ch pbatch hlen hprob1 haccepts)
             (hblinding := vk_blindingFactors_lt) haccepts).constraints
           Fixture.vk.n j))
@@ -416,7 +345,7 @@ theorem action_bundleStatement_or_relation_of_deployedAccepts
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode :=
             vestaExtractedMemberDecode capturedURS shape_k_eq_capturedURS_k
-              Fixture.vk (deployedInstanceCommitment Fixture.shape inputs)
+              Fixture.vk (commitment actionProofParams capturedURS inputs)
               ps ch pbatch hlen hprob1 haccepts) haccepts)
         actionActiveRows)
     (permBeta :
@@ -424,7 +353,7 @@ theorem action_bundleStatement_or_relation_of_deployedAccepts
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode :=
             vestaExtractedMemberDecode capturedURS shape_k_eq_capturedURS_k
-              Fixture.vk (deployedInstanceCommitment Fixture.shape inputs)
+              Fixture.vk (commitment actionProofParams capturedURS inputs)
               ps ch pbatch hlen hprob1 haccepts) haccepts)
         actionActiveRows)
     (lookupGamma :
@@ -432,7 +361,7 @@ theorem action_bundleStatement_or_relation_of_deployedAccepts
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode :=
             vestaExtractedMemberDecode capturedURS shape_k_eq_capturedURS_k
-              Fixture.vk (deployedInstanceCommitment Fixture.shape inputs)
+              Fixture.vk (commitment actionProofParams capturedURS inputs)
               ps ch pbatch hlen hprob1 haccepts) haccepts)
         (Fixture.vk.n - Fixture.vk.blindingFactors - 2))
     (lookupBeta :
@@ -440,28 +369,27 @@ theorem action_bundleStatement_or_relation_of_deployedAccepts
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode :=
             vestaExtractedMemberDecode capturedURS shape_k_eq_capturedURS_k
-              Fixture.vk (deployedInstanceCommitment Fixture.shape inputs)
+              Fixture.vk (commitment actionProofParams capturedURS inputs)
               ps ch pbatch hlen hprob1 haccepts) haccepts)
         (Fixture.vk.n - Fixture.vk.blindingFactors - 2))
     (lookupTheta :
       ch.theta ∉ TopLevelLookupCoherence.allTopLevelLookupThetaBadSet
-        orchardActionTopLevelCircuit actionProofParams capturedURS
+        actionCircuit actionProofParams capturedURS
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode :=
             vestaExtractedMemberDecode capturedURS shape_k_eq_capturedURS_k
-              Fixture.vk (deployedInstanceCommitment Fixture.shape inputs)
+              Fixture.vk (commitment actionProofParams capturedURS inputs)
               ps ch pbatch hlen hprob1 haccepts) haccepts)) :
-    BundleStatement Specs.Sinsemilla.orchardGenerators orchardBases inputs ∨
+    BundleStatement inputs ∨
       HasNontrivialRelation (F := Fp)
-        capturedURS.g capturedURS.u capturedURS.w := by
-  have hterminal :=
-    acceptedModel_circuitSat_or_relation_of_deployedAccepts
-      inputs ps ch pU pW hpoly pbatch hξcur hlen hprob1 haccepts
-      i m hm colPoly hbindAll hquot hroute hevals claimed hxgood
-  exact
-    action_bundleStatement_or_relation_of_acceptedModel_circuitSat_or_relation
-      inputs ps ch pU pW hpoly pbatch hlen hprob1 haccepts hterminal
-      hgoodY permGamma permBeta lookupGamma lookupBeta lookupTheta
+        capturedURS.g capturedURS.u capturedURS.w :=
+  action_bundleStatement_or_relation_of_deployedAccepts_transport
+    Fixture.shape Keygen.shape_eq_mergeDerived
+    Fixture.vk Keygen.vk_eq_derived
+    shape_k_eq_capturedURS_k vk_blindingFactors_lt
+    inputs ps ch pU pW hpoly pbatch hξcur hlen hprob1 haccepts
+    i m hm colPoly hbindAll hquot hroute hevals claimed hxgood hgoodY
+    permGamma permBeta lookupGamma lookupBeta lookupTheta
 
 assert_no_sorry action_bundleStatement_or_relation_of_deployedAccepts
 

@@ -904,7 +904,7 @@ mention the deployed circuit, whose definition carries the fixed-base generator 
 cryptographic-constant tier. Writing either statement down already commits to those; neither
 proof adds an axiom. `+native` is a blunter bound than that claim deserves, since it would also
 admit a fresh `native_decide` here; the sharper statement is that these two declarations'
-axioms are exactly those of `orchardActionTopLevelCircuit`, which the census cannot currently
+axioms are exactly those of `actionCircuit`, which the census cannot currently
 express. -/
 
 assert_axioms Halo2.mem_instanceQueries_enableEquality

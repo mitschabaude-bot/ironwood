@@ -210,8 +210,8 @@ compiler's column encoding a round trip.
 -/
 theorem topLevelPermutationColumnAddresses_eq
     {G : Type} [AddCommGroup G] [Inhabited G]
-    {ConfigInput Config : Type} {Output : TypeMap} [CircuitType Output]
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
     (pp : Keygen.ProofParams) (urs : URS G)
     (hcoherent :
       PermutationChunkRoutingCoherent (top.toVerifierKey pp urs)) :

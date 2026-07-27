@@ -1,5 +1,6 @@
 import Zcash.Circuits.Integration.ActionEncoding
 import Zcash.Circuits.Integration.ActionGateCoherence
+import Zcash.Snark.Soundness.TopLevelTerminal
 import Mathlib.Util.AssertNoSorry
 
 /-!
@@ -31,10 +32,8 @@ carries it over the chips configured afterwards; `mem_instanceQueries_constraint
 transports it through synthesis closure. Neither evaluates the completed constraint
 system. -/
 theorem primaryRegistered :
-    ((Action.Circuit.configure
-          Specs.Sinsemilla.orchardGenerators {}).1.primary,
-        (0 : Rotation)) ∈
-      orchardActionTopLevelCircuit.constraintSystem.instanceQueries :=
+    (actionCircuit.config.primary, (0 : Rotation)) ∈
+      actionCircuit.constraintSystem.instanceQueries :=
   QueryLayouts.mem_instanceQueries_constraintSystem _ _
     (Action.Circuit.configure_primaryRegistered _ _)
 
@@ -44,42 +43,34 @@ corresponding interpolating basis polynomial. -/
 noncomputable def instanceKey
     (pp : ProofParams) (urs : URS G) :
     LagrangeCommitmentKey urs
-      (orchardActionTopLevelCircuit.toVerifierKey pp urs).omega where
+      (actionCircuit.toVerifierKey pp urs).omega where
   generators := fun i =>
     commit urs
       (polynomialCoefficients (2 ^ urs.k)
         (rowPolynomial
-          (orchardActionTopLevelCircuit.toVerifierKey pp urs).omega
+          (actionCircuit.toVerifierKey pp urs).omega
           (Pi.single i (1 : Fp))))
   generator_eq := fun _ => rfl
 
 /-- The verifier-derived commitment family for Action public inputs. The Action
 circuit has one public instance column; unused column indices are mapped to zero. -/
 noncomputable def commitment
-    (pp : ProofParams) (urs : URS G)
-    (inputs :
-      Fin (pp.mergeDerived orchardActionTopLevelCircuit).numProofs →
-        PublicInputs) :
-    Fin (pp.mergeDerived orchardActionTopLevelCircuit).numProofs →
-      ℕ → G :=
+    (pp : ProofParams) (urs : URS G) {numProofs : ℕ}
+    (inputs : Fin numProofs → PublicInputs Fp) :
+    Fin numProofs → ℕ → G :=
   fun proofIndex column =>
     if column =
-        (Action.Circuit.configure
-          Specs.Sinsemilla.orchardGenerators {}).1.primary.index then
+        actionCircuit.config.primary.index then
       (instanceKey pp urs).commitInstance (inputs proofIndex).rows 1
     else 0
 
 omit [DecidableEq G] in
 @[simp] theorem commitment_primary
-    (pp : ProofParams) (urs : URS G)
-    (inputs :
-      Fin (pp.mergeDerived orchardActionTopLevelCircuit).numProofs →
-        PublicInputs)
-    (proofIndex :
-      Fin (pp.mergeDerived orchardActionTopLevelCircuit).numProofs) :
+    (pp : ProofParams) (urs : URS G) {numProofs : ℕ}
+    (inputs : Fin numProofs → PublicInputs Fp)
+    (proofIndex : Fin numProofs) :
     commitment pp urs inputs proofIndex
-        (Action.Circuit.configure
-          Specs.Sinsemilla.orchardGenerators {}).1.primary.index =
+        actionCircuit.config.primary.index =
       (instanceKey pp urs).commitInstance (inputs proofIndex).rows 1 := by
   simp [commitment]
 
@@ -89,18 +80,14 @@ omit [DecidableEq G] in
 /-- On the primary column, the verifier commitment is the monomial-URS commitment
 to the zero-padded public-row polynomial, with Halo 2's default blind. -/
 theorem commitment_primary_eq_commit
-    (pp : ProofParams) (urs : URS G)
-    (inputs :
-      Fin (pp.mergeDerived orchardActionTopLevelCircuit).numProofs →
-        PublicInputs)
-    (proofIndex :
-      Fin (pp.mergeDerived orchardActionTopLevelCircuit).numProofs) :
+    (pp : ProofParams) (urs : URS G) {numProofs : ℕ}
+    (inputs : Fin numProofs → PublicInputs Fp)
+    (proofIndex : Fin numProofs) :
     commitment pp urs inputs proofIndex
-        (Action.Circuit.configure
-          Specs.Sinsemilla.orchardGenerators {}).1.primary.index =
+        actionCircuit.config.primary.index =
       commit urs
           (instanceCoefficients (2 ^ urs.k)
-            (orchardActionTopLevelCircuit.toVerifierKey pp urs).omega
+            (actionCircuit.toVerifierKey pp urs).omega
             (inputs proofIndex).rows) +
         urs.w := by
   rw [commitment_primary, LagrangeCommitmentKey.commitInstance_eq, one_smul]
@@ -118,35 +105,35 @@ statement.
 noncomputable def topLevelCorrectnessOfAcceptedCircuitSat
     (pp : ProofParams) (urs : URS G)
     (hk :
-      (pp.mergeDerived orchardActionTopLevelCircuit).k = urs.k)
+      (pp.mergeDerived actionCircuit).k = urs.k)
     (inputs :
-      Fin (pp.mergeDerived orchardActionTopLevelCircuit).numProofs →
-        PublicInputs)
+      Fin (pp.mergeDerived actionCircuit).numProofs →
+        PublicInputs Fp)
     (ps : ProofString
-      (pp.mergeDerived orchardActionTopLevelCircuit) Fp G)
+      (pp.mergeDerived actionCircuit) Fp G)
     (ch : Challenges
-      (pp.mergeDerived orchardActionTopLevelCircuit).k Fp)
+      (pp.mergeDerived actionCircuit).k Fp)
     (pU pW : Fp) (a : Fin (2 ^ urs.k) → Fp)
     (batchOpenings :
       OpenedBatchOpenings urs (evalVector urs.k ch.x3)
         (x4BatchCommitments
           (instanceCommitment := commitment pp urs inputs)
-          urs hk (orchardActionTopLevelCircuit.toVerifierKey pp urs) ps ch)
+          urs hk (actionCircuit.toVerifierKey pp urs) ps ch)
         (x4BatchEvals
           (instanceCommitment := commitment pp urs inputs)
-          (orchardActionTopLevelCircuit.toVerifierKey pp urs) ps ch)
+          (actionCircuit.toVerifierKey pp urs) ps ch)
         a pU pW)
     (memberDecode : ∀ i (hi : i <
         deployedX4PairCount
           (instanceCommitment := commitment pp urs inputs)
-          (orchardActionTopLevelCircuit.toVerifierKey pp urs) ps ch),
+          (actionCircuit.toVerifierKey pp urs) ps ch),
       OpenedMemberDecode
         (instanceCommitment := commitment pp urs inputs)
-        urs hk (orchardActionTopLevelCircuit.toVerifierKey pp urs)
+        urs hk (actionCircuit.toVerifierKey pp urs)
         ps ch batchOpenings i hi)
     (haccepts :
       DeployedAccepts urs hk
-        (orchardActionTopLevelCircuit.toVerifierKey pp urs)
+        (actionCircuit.toVerifierKey pp urs)
         (commitment pp urs inputs) ps ch)
     (hpoly : Polynomial Fp)
     (hsatisfied :
@@ -156,7 +143,7 @@ noncomputable def topLevelCorrectnessOfAcceptedCircuitSat
           ActionPermutationDomain.blindingFactors_lt pp urs)
         haccepts).CircuitSat
           ch.y hpoly
-          (orchardActionTopLevelCircuit.toVerifierKey pp urs).n a)
+          (actionCircuit.toVerifierKey pp urs).n a)
     (hgoodY : ∀ j,
       ch.y ∉ szBadSet
         (foldSplitWitness
@@ -165,21 +152,21 @@ noncomputable def topLevelCorrectnessOfAcceptedCircuitSat
             (hblinding :=
               ActionPermutationDomain.blindingFactors_lt pp urs)
             haccepts).constraints
-          (orchardActionTopLevelCircuit.toVerifierKey pp urs).n j))
+          (actionCircuit.toVerifierKey pp urs).n j))
     (permutationExclusions :
       ResolverPermutationChallengeExclusions
-        (orchardActionTopLevelCircuit.toVerifierKey pp urs)
+        (actionCircuit.toVerifierKey pp urs)
         ch
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode := memberDecode) haccepts)
         actionActiveRows)
     (lookupExclusions :
       TopLevelLookupCoherence.TopLevelLookupChallengeExclusions
-        orchardActionTopLevelCircuit pp urs ch
+        actionCircuit pp urs ch
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode := memberDecode) haccepts)) :
     TopLevelCircuitCorrectness
-      orchardActionTopLevelCircuit pp urs ch
+      actionCircuit pp urs ch
       (CanonicalMemberConstraintRelation.acceptedPolynomial
         (memberDecode := memberDecode) haccepts)
       (FlatCell actionNumPermCols actionDomainSize)
@@ -217,41 +204,41 @@ the shared augmented-basis relation.
 theorem action_bundleStatement_or_relation_of_accepted_topLevelBundleStatement
     (pp : ProofParams) (urs : URS G)
     (hk :
-      (pp.mergeDerived orchardActionTopLevelCircuit).k = urs.k)
+      (pp.mergeDerived actionCircuit).k = urs.k)
     (inputs :
-      Fin (pp.mergeDerived orchardActionTopLevelCircuit).numProofs →
-        PublicInputs)
+      Fin (pp.mergeDerived actionCircuit).numProofs →
+        PublicInputs Fp)
     (ps : ProofString
-      (pp.mergeDerived orchardActionTopLevelCircuit) Fp G)
+      (pp.mergeDerived actionCircuit) Fp G)
     (ch : Challenges
-      (pp.mergeDerived orchardActionTopLevelCircuit).k Fp)
+      (pp.mergeDerived actionCircuit).k Fp)
     (pU pW : Fp) (a : Fin (2 ^ urs.k) → Fp)
     (batchOpenings :
       OpenedBatchOpenings urs (evalVector urs.k ch.x3)
         (x4BatchCommitments
           (instanceCommitment := commitment pp urs inputs)
-          urs hk (orchardActionTopLevelCircuit.toVerifierKey pp urs) ps ch)
+          urs hk (actionCircuit.toVerifierKey pp urs) ps ch)
         (x4BatchEvals
           (instanceCommitment := commitment pp urs inputs)
-          (orchardActionTopLevelCircuit.toVerifierKey pp urs) ps ch)
+          (actionCircuit.toVerifierKey pp urs) ps ch)
         a pU pW)
     (memberDecode : ∀ i (hi : i <
         deployedX4PairCount
           (instanceCommitment := commitment pp urs inputs)
-          (orchardActionTopLevelCircuit.toVerifierKey pp urs) ps ch),
+          (actionCircuit.toVerifierKey pp urs) ps ch),
       OpenedMemberDecode
         (instanceCommitment := commitment pp urs inputs)
-        urs hk (orchardActionTopLevelCircuit.toVerifierKey pp urs)
+        urs hk (actionCircuit.toVerifierKey pp urs)
         ps ch batchOpenings i hi)
     (haccepts :
       DeployedAccepts urs hk
-        (orchardActionTopLevelCircuit.toVerifierKey pp urs)
+        (actionCircuit.toVerifierKey pp urs)
         (commitment pp urs inputs) ps ch)
     (htop :
-      TopLevelBundleStatement orchardActionTopLevelCircuit pp
+      TopLevelBundleStatement actionCircuit pp
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode := memberDecode) haccepts)) :
-    BundleStatement Specs.Sinsemilla.orchardGenerators orchardBases inputs ∨
+    BundleStatement inputs ∨
       HasNontrivialRelation (F := Fp) urs.g urs.u urs.w := by
   by_cases hrelation :
       HasNontrivialRelation (F := Fp) urs.g urs.u urs.w
@@ -260,16 +247,15 @@ theorem action_bundleStatement_or_relation_of_accepted_topLevelBundleStatement
       actionRowsInjectiveAtUrs pp urs hk
     have hinstance : ∀
         proofIndex :
-          Fin (pp.mergeDerived orchardActionTopLevelCircuit).numProofs,
+          Fin (pp.mergeDerived actionCircuit).numProofs,
         CanonicalMemberConstraintRelation.acceptedPolynomial
               (memberDecode := memberDecode) haccepts
             (.instanceCol proofIndex
-              (Circuit.configure
-                Specs.Sinsemilla.orchardGenerators {}).1.primary.index) =
+              actionCircuit.config.primary.index) =
           instanceRowPolynomial
-            (2 ^ orchardActionTopLevelCircuit.domainExponent)
+            (2 ^ actionCircuit.domainExponent)
             (Zcash.Arithmetic.omegaOf
-              orchardActionTopLevelCircuit.domainExponent)
+              actionCircuit.domainExponent)
             (inputs proofIndex).rows := by
       intro proofIndex
       have hbound :=
@@ -278,124 +264,72 @@ theorem action_bundleStatement_or_relation_of_accepted_topLevelBundleStatement
             (batchOpenings := batchOpenings)
             (memberDecode := memberDecode)
             haccepts proofIndex
-            (Circuit.configure
-              Specs.Sinsemilla.orchardGenerators {}).1.primary.index
+            actionCircuit.config.primary.index
             (instanceKey pp urs) (inputs proofIndex).rows 1
             (commitment_primary pp urs inputs proofIndex)
             hrows
             (instanceQuery_of_layout
-              (orchardActionTopLevelCircuit.toVerifierKey pp urs)
+              (actionCircuit.toVerifierKey pp urs)
               (commitment pp urs inputs) ps ch proofIndex
-              (Circuit.configure
-                Specs.Sinsemilla.orchardGenerators {}).1.primary.index
+              actionCircuit.config.primary.index
               0
-              (orchardActionTopLevelCircuit.toVerifierKey_instanceQueryCount
+              (actionCircuit.toVerifierKey_instanceQueryCount
                 pp urs)
               (QueryLayouts.instanceQueryLayout_of_constraintSystem
-                orchardActionTopLevelCircuit pp urs
-                (Circuit.configure
-                  Specs.Sinsemilla.orchardGenerators {}).1.primary
+                actionCircuit pp urs
+                actionCircuit.config.primary
                 0 primaryRegistered))
       have hrowPolynomial := hbound.resolve_right hrelation
       change
         CanonicalMemberConstraintRelation.acceptedPolynomial
               (memberDecode := memberDecode) haccepts
             (.instanceCol proofIndex
-              (Circuit.configure
-                Specs.Sinsemilla.orchardGenerators {}).1.primary.index) =
+              actionCircuit.config.primary.index) =
           instanceRowPolynomial (2 ^ urs.k)
             (Zcash.Arithmetic.omegaOf
-              orchardActionTopLevelCircuit.domainExponent)
+              actionCircuit.domainExponent)
             (inputs proofIndex).rows at hrowPolynomial
       simpa only [← hk] using hrowPolynomial
-    apply Or.inl
-    apply action_bundleStatement_of_topLevelBundleStatement
-      pp
-      (CanonicalMemberConstraintRelation.acceptedPolynomial
-        (memberDecode := memberDecode) haccepts)
-      inputs ActionPermutationDomain.domainExponent_lt
-    · rw [ActionPermutationDomain.domainExponent_eq]
+    have hsize :
+        10 ≤ 2 ^ actionCircuit.domainExponent := by
+      rw [ActionPermutationDomain.domainExponent_eq]
       norm_num
-    · exact hinstance
-    · exact htop
+    have hencoding : ∀ proofIndex,
+        let assignment : TopLevelAssignment actionCircuit
+            (pp.mergeDerived actionCircuit).numProofs proofIndex :=
+          { polynomial :=
+              CanonicalMemberConstraintRelation.acceptedPolynomial
+                (memberDecode := memberDecode) haccepts }
+        assignment.PublicInputEncoding (inputs proofIndex) := by
+      intro proofIndex
+      let assignment : TopLevelAssignment actionCircuit
+          (pp.mergeDerived actionCircuit).numProofs proofIndex :=
+        { polynomial :=
+            CanonicalMemberConstraintRelation.acceptedPolynomial
+              (memberDecode := memberDecode) haccepts }
+      change assignment.PublicInputEncoding (inputs proofIndex)
+      apply TopLevelAssignment.publicInputEncoding_of_contiguousRowPolynomial
+          (assignment := assignment)
+          (inputs proofIndex)
+          actionCircuit.config.primary
+      · intro index
+        rfl
+      · exact hsize
+      · simpa only [PublicInputs.rows] using hinstance proofIndex
+      · exact TopLevelAssignment.domainRowsInjective
+          ActionPermutationDomain.domainExponent_lt
+    have hpublic :=
+      TopLevelBundleStatement.of_publicInputEncoding
+        actionCircuit pp
+        (CanonicalMemberConstraintRelation.acceptedPolynomial
+          (memberDecode := memberDecode) haccepts)
+        inputs hencoding htop
+    apply Or.inl
+    intro proofIndex
+    exact hpublic proofIndex
 
 assert_no_sorry action_bundleStatement_or_relation_of_accepted_topLevelBundleStatement
 
-/--
-The Action endpoint with public-instance provenance closed.
-
-The instance commitment is computed from `inputs`; its compatible key, commitment
-equation, primary-query registration, Action domain bound, row capacity, and static
-gate package are all constructed here rather than supplied by the caller.
--/
-theorem action_bundleStatement_or_relation_of_canonicalMemberConstraintRelation
-    (pp : ProofParams) (urs : URS G)
-    (hk :
-      (pp.mergeDerived orchardActionTopLevelCircuit).k = urs.k)
-    (inputs :
-      Fin (pp.mergeDerived orchardActionTopLevelCircuit).numProofs →
-        PublicInputs)
-    (ps : ProofString
-      (pp.mergeDerived orchardActionTopLevelCircuit) Fp G)
-    (ch : Challenges
-      (pp.mergeDerived orchardActionTopLevelCircuit).k Fp)
-    (vk : VerifyingKey
-      (pp.mergeDerived orchardActionTopLevelCircuit) Fp G)
-    (hvk :
-      vk = orchardActionTopLevelCircuit.toVerifierKey pp urs)
-    (pU pW : Fp) (a : Fin (2 ^ urs.k) → Fp)
-    (batchOpenings :
-      OpenedBatchOpenings urs (evalVector urs.k ch.x3)
-        (x4BatchCommitments
-          (instanceCommitment := commitment pp urs inputs)
-          urs hk vk ps ch)
-        (x4BatchEvals
-          (instanceCommitment := commitment pp urs inputs)
-          vk ps ch)
-        a pU pW)
-    (memberDecode : ∀ i (hi : i <
-        deployedX4PairCount
-          (instanceCommitment := commitment pp urs inputs)
-          vk ps ch),
-      OpenedMemberDecode
-        (instanceCommitment := commitment pp urs inputs)
-        urs hk vk ps ch batchOpenings i hi)
-    (hblinding :
-      vk.blindingFactors < vk.n)
-    (hpoly : Polynomial Fp)
-    (relation :
-      CanonicalMemberConstraintRelation
-        urs hk vk
-        (commitment pp urs inputs) ps ch pU pW a
-        batchOpenings memberDecode hblinding ch.y hpoly vk.n)
-    (hgoodY : ∀ j,
-      ch.y ∉ szBadSet
-        (foldSplitWitness relation.model.constraints
-          vk.n j))
-    (permutationExclusions :
-      ResolverPermutationChallengeExclusions
-        (orchardActionTopLevelCircuit.toVerifierKey pp urs)
-        ch relation.polynomial actionActiveRows)
-    (lookupExclusions :
-      TopLevelLookupCoherence.TopLevelLookupChallengeExclusions
-        orchardActionTopLevelCircuit pp urs ch relation.polynomial) :
-    BundleStatement Specs.Sinsemilla.orchardGenerators orchardBases inputs ∨
-      HasNontrivialRelation (F := Fp) urs.g urs.u urs.w := by
-  have hsize :
-      10 ≤ 2 ^ orchardActionTopLevelCircuit.domainExponent := by
-    rw [ActionPermutationDomain.domainExponent_eq]
-    norm_num
-  exact
-    Zcash.Snark.action_bundleStatement_or_relation_of_canonicalMemberConstraintRelation
-      pp urs hk (commitment pp urs inputs) ps ch vk hvk pU pW a
-      batchOpenings memberDecode ActionPermutationDomain.domainExponent_lt
-      hblinding hpoly relation hgoodY inputs hsize (instanceKey pp urs)
-      (commitment_primary pp urs inputs) primaryRegistered
-      (ActionGateCoherence.topLevelGateCoherence pp urs)
-      permutationExclusions
-      lookupExclusions
-
-assert_no_sorry action_bundleStatement_or_relation_of_canonicalMemberConstraintRelation
 
 /--
 The deterministic `hencodes` handoff for an accepting verifier run.
@@ -408,18 +342,18 @@ endpoint; no free relation, constraint family, or statement proposition remains.
 theorem action_bundleStatement_or_relation_of_acceptedModel_circuitSat
     (pp : ProofParams) (urs : URS G)
     (hk :
-      (pp.mergeDerived orchardActionTopLevelCircuit).k = urs.k)
+      (pp.mergeDerived actionCircuit).k = urs.k)
     (inputs :
-      Fin (pp.mergeDerived orchardActionTopLevelCircuit).numProofs →
-        PublicInputs)
+      Fin (pp.mergeDerived actionCircuit).numProofs →
+        PublicInputs Fp)
     (ps : ProofString
-      (pp.mergeDerived orchardActionTopLevelCircuit) Fp G)
+      (pp.mergeDerived actionCircuit) Fp G)
     (ch : Challenges
-      (pp.mergeDerived orchardActionTopLevelCircuit).k Fp)
+      (pp.mergeDerived actionCircuit).k Fp)
     (vk : VerifyingKey
-      (pp.mergeDerived orchardActionTopLevelCircuit) Fp G)
+      (pp.mergeDerived actionCircuit) Fp G)
     (hvk :
-      vk = orchardActionTopLevelCircuit.toVerifierKey pp urs)
+      vk = actionCircuit.toVerifierKey pp urs)
     (pU pW : Fp) (a : Fin (2 ^ urs.k) → Fp)
     (batchOpenings :
       OpenedBatchOpenings urs (evalVector urs.k ch.x3)
@@ -457,18 +391,19 @@ theorem action_bundleStatement_or_relation_of_acceptedModel_circuitSat
           vk.n j))
     (permutationExclusions :
       ResolverPermutationChallengeExclusions
-        (orchardActionTopLevelCircuit.toVerifierKey pp urs)
+        (actionCircuit.toVerifierKey pp urs)
         ch
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode := memberDecode) haccepts)
         actionActiveRows)
     (lookupExclusions :
       TopLevelLookupCoherence.TopLevelLookupChallengeExclusions
-        orchardActionTopLevelCircuit pp urs ch
+        actionCircuit pp urs ch
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode := memberDecode) haccepts)) :
-    BundleStatement Specs.Sinsemilla.orchardGenerators orchardBases inputs ∨
+    BundleStatement inputs ∨
       HasNontrivialRelation (F := Fp) urs.g urs.u urs.w := by
+  subst vk
   let relation :=
     CanonicalMemberConstraintRelation.ofAcceptedCircuitSat
       haccepts hsatisfied
@@ -477,14 +412,32 @@ theorem action_bundleStatement_or_relation_of_acceptedModel_circuitSat
         CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode := memberDecode) haccepts := by
     rfl
-  apply action_bundleStatement_or_relation_of_canonicalMemberConstraintRelation
-    pp urs hk inputs ps ch vk hvk pU pW a batchOpenings memberDecode
-    hblinding hpoly relation
-  · simpa only [
+  have hgoodY' : ∀ j,
+      ch.y ∉ szBadSet
+        (foldSplitWitness relation.model.constraints
+          (actionCircuit.toVerifierKey pp urs).n j) := by
+    simpa only [
       CanonicalMemberConstraintRelation.model,
       hpolynomial] using hgoodY
-  · simpa only [hpolynomial] using permutationExclusions
-  · simpa only [hpolynomial] using lookupExclusions
+  have hcorrect :=
+    actionTopLevelCircuitCorrectness
+      pp urs hk (commitment pp urs inputs) ps ch pU pW a
+      batchOpenings memberDecode hpoly relation hgoodY'
+      (by simpa only [hpolynomial] using permutationExclusions)
+      (by simpa only [hpolynomial] using lookupExclusions)
+  have hn :
+      (actionCircuit.toVerifierKey pp urs).n ≠ 0 := by
+    change 2 ^ actionCircuit.domainExponent ≠ 0
+    positivity
+  have hsatisfaction :=
+    relation.constraintSatisfaction hn hgoodY'
+  have htop :=
+    topLevelBundleStatement_or_bad_of_constraintSatisfaction
+      hblinding hsatisfaction hcorrect
+  rcases htop with htop | hrelation
+  · exact action_bundleStatement_or_relation_of_accepted_topLevelBundleStatement
+      pp urs hk inputs ps ch pU pW a batchOpenings memberDecode haccepts htop
+  · exact Or.inr hrelation
 
 assert_no_sorry action_bundleStatement_or_relation_of_acceptedModel_circuitSat
 

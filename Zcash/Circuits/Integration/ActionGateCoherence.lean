@@ -54,7 +54,7 @@ namespace Zcash.Snark
 
 open Halo2 Keygen
 open Halo2
-open Zcash.Circuits.Action (orchardActionTopLevelCircuit)
+open Zcash.Circuits.Action (actionCircuit)
 
 namespace ActionGateCoherence
 
@@ -70,7 +70,7 @@ private theorem gateSelectorsAllocated_of_data_eq
   rwa [hgates, hselectors]
 
 private theorem gateSelectorsAllocated :
-    orchardActionTopLevelCircuit.constraintSystem.GateSelectorsAllocated :=
+    actionCircuit.constraintSystem.GateSelectorsAllocated :=
   gateSelectorsAllocated_of_data_eq
     (gateData_eq.1.trans (congrArg
       (fun program => (program {}).2.gates)
@@ -83,23 +83,23 @@ private theorem gateSelectorsAllocated :
 private theorem adviceQueryCount
     {G : Type} [AddCommGroup G] [Inhabited G]
     (pp : ProofParams) (urs : URS G) :
-    (orchardActionTopLevelCircuit.toVerifierKey pp urs).adviceQueryLayout.length =
-      (pp.mergeDerived orchardActionTopLevelCircuit).numAdviceQueries :=
-  orchardActionTopLevelCircuit.toVerifierKey_adviceQueryCount pp urs
+    (actionCircuit.toVerifierKey pp urs).adviceQueryLayout.length =
+      (pp.mergeDerived actionCircuit).numAdviceQueries :=
+  actionCircuit.toVerifierKey_adviceQueryCount pp urs
 
 private theorem fixedQueryCount
     {G : Type} [AddCommGroup G] [Inhabited G]
     (pp : ProofParams) (urs : URS G) :
-    (orchardActionTopLevelCircuit.toVerifierKey pp urs).fixedQueryLayout.length =
-      (pp.mergeDerived orchardActionTopLevelCircuit).numFixedQueries :=
-  orchardActionTopLevelCircuit.toVerifierKey_fixedQueryCount pp urs
+    (actionCircuit.toVerifierKey pp urs).fixedQueryLayout.length =
+      (pp.mergeDerived actionCircuit).numFixedQueries :=
+  actionCircuit.toVerifierKey_fixedQueryCount pp urs
 
 private theorem instanceQueryCount
     {G : Type} [AddCommGroup G] [Inhabited G]
     (pp : ProofParams) (urs : URS G) :
-    (orchardActionTopLevelCircuit.toVerifierKey pp urs).instanceQueryLayout.length =
-      (pp.mergeDerived orchardActionTopLevelCircuit).numInstanceQueries :=
-  orchardActionTopLevelCircuit.toVerifierKey_instanceQueryCount pp urs
+    (actionCircuit.toVerifierKey pp urs).instanceQueryLayout.length =
+      (pp.mergeDerived actionCircuit).numInstanceQueries :=
+  actionCircuit.toVerifierKey_instanceQueryCount pp urs
 
 /--
 The deployed Orchard Action circuit satisfies the complete static gate boundary
@@ -108,7 +108,7 @@ against its own derived verifying key.
 theorem topLevelGateCoherence
     {G : Type} [AddCommGroup G] [Inhabited G]
     (pp : ProofParams) (urs : URS G) :
-    TopLevelGateCoherence orchardActionTopLevelCircuit pp urs where
+    TopLevelGateCoherence actionCircuit pp urs where
   gateSelectorsAllocated := gateSelectorsAllocated
   adviceQueryCount := adviceQueryCount pp urs
   fixedQueryCount := fixedQueryCount pp urs

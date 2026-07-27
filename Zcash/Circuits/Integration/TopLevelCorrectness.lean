@@ -20,17 +20,51 @@ The statement owned by a top-level circuit, simultaneously for every polynomial
 assignment decoded from one accepted proof bundle.
 -/
 def TopLevelBundleStatement
-    {ConfigInput Config : Type} {Output : TypeMap}
-    [CircuitType Output]
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
     (pp : Keygen.ProofParams)
     (poly : CommitmentId → Polynomial Fp) : Prop :=
   ∀ proofIndex : Fin (pp.mergeDerived top).numProofs,
-    top.Statement 0
-      (({
+    let environment := ({
         polynomial := poly
       } : TopLevelAssignment top
-            (pp.mergeDerived top).numProofs proofIndex).placedEnvironment)
+            (pp.mergeDerived top).numProofs proofIndex).environment
+    top.Statement (top.extractPublicInput environment)
+
+namespace TopLevelBundleStatement
+
+/--
+Present the circuit-owned bundle statement at externally supplied public inputs once
+the canonical polynomial assignments are known to encode them through the circuit's
+declared instance-cell layout.
+-/
+theorem of_publicInputEncoding
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (pp : Keygen.ProofParams)
+    (poly : CommitmentId → Polynomial Fp)
+    (inputs : Fin (pp.mergeDerived top).numProofs → PublicInput Fp)
+    (hencoding : ∀ proofIndex,
+      let assignment : TopLevelAssignment top
+          (pp.mergeDerived top).numProofs proofIndex :=
+        { polynomial := poly }
+      assignment.PublicInputEncoding (inputs proofIndex))
+    (htop : TopLevelBundleStatement top pp poly) :
+    ∀ proofIndex, top.Statement (inputs proofIndex) := by
+  intro proofIndex
+  let assignment : TopLevelAssignment top
+      (pp.mergeDerived top).numProofs proofIndex :=
+    { polynomial := poly }
+  have hstatement := htop proofIndex
+  change top.Statement
+    (top.extractPublicInput assignment.environment) at hstatement
+  rw [assignment.extractPublicInput_eq
+    (inputs proofIndex) (hencoding proofIndex)] at hstatement
+  exact hstatement
+
+end TopLevelBundleStatement
 
 /--
 The representation-boundary facts needed to interpret one canonical polynomial
@@ -42,15 +76,20 @@ joined without turning this record into an opaque statement-level hypothesis.
 -/
 structure TopLevelCircuitCorrectness
     {G : Type} [AddCommGroup G] [Inhabited G]
-    {ConfigInput Config : Type} {Output : TypeMap}
-    [CircuitType Output]
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
     (pp : Keygen.ProofParams) (urs : URS G)
     (ch : Challenges (pp.mergeDerived top).k Fp)
     (poly : CommitmentId → Polynomial Fp)
     (cell : Type) [DecidableEq cell] [Fintype cell]
     (Bad : Prop) : Prop where
   gates : TopLevelGateCoherence top pp urs
+  fixedEncoding : ∀ proofIndex,
+    let assignment :
+        TopLevelAssignment top (pp.mergeDerived top).numProofs proofIndex :=
+      { polynomial := poly }
+    assignment.FixedColumnEncoding pp urs ∨ Bad
   fixed : ∀ proofIndex,
     (SelectorActivationsRealized
         top.selectorMap top.selectorActivations
@@ -61,14 +100,14 @@ structure TopLevelCircuitCorrectness
         (resolverEnvironment
           (top.toVerifierKey pp urs) poly proofIndex
           (top.usableRowsAt top.domainExponent))
-        (top.operations 0) 0) ∨ Bad
+        (top.operations) 0) ∨ Bad
   copies : ∀ proofIndex,
     Nonempty
       (CopyReplayWitness top.placement
         (resolverEnvironment
           (top.toVerifierKey pp urs) poly proofIndex
           (top.usableRowsAt top.domainExponent))
-        (top.operations 0) cell Bad) ∨ Bad
+        (top.operations) cell Bad) ∨ Bad
   lookups : ∀ proofIndex,
     TopLevelLookupCoherence.TopLevelLookupWitnessConditions
       top pp urs ch poly proofIndex ∨ Bad

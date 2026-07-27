@@ -35,9 +35,9 @@ circuit's named component-level correctness package for that assignment, not an
 opaque implication to the desired statement.
 -/
 theorem topLevelBundleStatement_or_relation_of_deployedAccepts
-    {ConfigInput Config : Type} {Output : TypeMap}
-    [CircuitType Output]
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS VestaG)
     (hk : (pp.mergeDerived top).k = urs.k)
     (instanceCommitment :

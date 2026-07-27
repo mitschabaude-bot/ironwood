@@ -16,7 +16,7 @@ open Zcash.Arithmetic (scalarFieldOrder)
 
 open Halo2 Keygen
 open Zcash.Circuits
-open Zcash.Circuits.Action (orchardActionTopLevelCircuit)
+open Zcash.Circuits.Action (actionCircuit)
 
 namespace ActionGateCoherence
 
@@ -25,21 +25,21 @@ Closing the Action configure result under its own synthesis does not add gates o
 change the selector allocation bound.
 -/
 theorem gateData_eq :
-    orchardActionTopLevelCircuit.constraintSystem.gates =
+    actionCircuit.constraintSystem.gates =
         (Action.Circuit.configure Specs.Sinsemilla.orchardGenerators {}).2.gates ∧
-      orchardActionTopLevelCircuit.constraintSystem.numSelectors =
+      actionCircuit.constraintSystem.numSelectors =
         (Action.Circuit.configure
           Specs.Sinsemilla.orchardGenerators {}).2.numSelectors := by
   native_decide
 
 /-- The derived Action constraint-system degree is below the Pasta field order. -/
 theorem selectorDegree :
-    csDegree orchardActionTopLevelCircuit.constraintSystem < scalarFieldOrder := by
+    csDegree actionCircuit.constraintSystem < scalarFieldOrder := by
   native_decide
 
 /-- The circuit-derived Action domain exponent is within Pasta's supported range. -/
 theorem domainExponent_lt :
-    orchardActionTopLevelCircuit.domainExponent < 33 := by
+    actionCircuit.domainExponent < 33 := by
   native_decide
 
 assert_no_sorry gateData_eq

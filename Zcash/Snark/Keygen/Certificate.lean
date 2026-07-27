@@ -72,7 +72,7 @@ open Zcash.Arithmetic (commitInvDftMontWith commitInvDftMontWith_eq commitMontPr
 open Zcash.Snark
 open Zcash.Snark.Fixture
 open Halo2
-open Zcash.Circuits.Action (orchardActionTopLevelCircuit)
+open Zcash.Circuits.Action (actionCircuit)
 open CompElliptic.Curves.Pasta
 open CompElliptic.Curves.Pasta.Fast.ProjectiveMont (PM)
 open Montgomery.Native64x8 (Limbs8)
@@ -111,8 +111,8 @@ private def lagrangeBasis : List G :=
 `pinned` in method spelling. Nullary, so the selector-map/derive work evaluates once
 per `native_decide` process (main-thread use only; see the module docstring). -/
 private def actionPinned : PinnedConstraintSystem Fp :=
-  PinnedConstraintSystem.derive orchardActionTopLevelCircuit.constraintSystem
-    orchardActionTopLevelCircuit.selectorMap
+  PinnedConstraintSystem.derive actionCircuit.constraintSystem
+    actionCircuit.selectorMap
 
 
 /-- `Decidable` instance for the bundle, CONSTRUCTED leaf-by-leaf (see the module
@@ -138,29 +138,26 @@ chunks; the two lookup-expression families; and the derived `Shape`
 theorem certificate :
     (lagrangeBasis.take capturedUrsGLagrange.length,
       fixedCommitmentsSeqWith commitProj
-        orchardActionTopLevelCircuit.selectorMap
-        orchardActionTopLevelCircuit.domainExponent
-        orchardActionTopLevelCircuit.constraintSystem
-        (orchardActionTopLevelCircuit.operations 0),
+        actionCircuit.fixedRows,
       permutationCommitmentsSeqWith commitProj
-        orchardActionTopLevelCircuit.domainExponent
-        orchardActionTopLevelCircuit.constraintSystem
-        (orchardActionTopLevelCircuit.operations 0),
-      (omegaOf orchardActionTopLevelCircuit.domainExponent,
-        2 ^ orchardActionTopLevelCircuit.domainExponent,
-        orchardActionTopLevelCircuit.constraintSystem.blindingFactors, deltaFp,
-        orchardActionTopLevelCircuit.constraintSystem.chunkLen),
+        actionCircuit.domainExponent
+        actionCircuit.constraintSystem
+        (actionCircuit.operations),
+      (omegaOf actionCircuit.domainExponent,
+        2 ^ actionCircuit.domainExponent,
+        actionCircuit.constraintSystem.blindingFactors, deltaFp,
+        actionCircuit.constraintSystem.chunkLen),
       actionPinned.gates.map RichExpression.toExpr,
       (actionPinned.instanceQueryLayout,
         actionPinned.adviceQueryLayout,
         actionPinned.fixedQueryLayout),
-      permutationChunksOf orchardActionTopLevelCircuit.selectorMap
-        orchardActionTopLevelCircuit.constraintSystem,
+      permutationChunksOf actionCircuit.selectorMap
+        actionCircuit.constraintSystem,
       (List.ofFn fun l : Fin shape.numLookups =>
           (actionPinned.lookupInputExprs.getD l.val []).map RichExpression.toExpr,
        List.ofFn fun l : Fin shape.numLookups =>
           (actionPinned.lookupTableExprs.getD l.val []).map RichExpression.toExpr),
-      actionProofParams.mergeDerived orchardActionTopLevelCircuit)
+      actionProofParams.mergeDerived actionCircuit)
     = (capturedUrsGLagrange,
        capturedFixedCommitments,
        capturedPermutationCommonCommitments,
@@ -175,7 +172,7 @@ theorem certificate :
 /-- The fixture's `Shape` is the proof-shape parameters merged with the circuit-derived
 counts. -/
 theorem shape_eq_mergeDerived :
-    actionProofParams.mergeDerived orchardActionTopLevelCircuit = shape := by
+    actionProofParams.mergeDerived actionCircuit = shape := by
   have h := certificate
   simp only [Prod.mk.injEq] at h
   exact h.2.2.2.2.2.2.2.2
@@ -185,7 +182,7 @@ column length the commitment families produce is the domain the committer's inve
 over. Read off the bundle's `Shape` component (`mergeDerived`'s `k` field is the circuit's
 `domainExponent`) rather than by reducing `minimalK`. -/
 private theorem domainExponent_eq :
-    orchardActionTopLevelCircuit.domainExponent = capturedURS.k := by
+    actionCircuit.domainExponent = capturedURS.k := by
   have h := congrArg Shape.k shape_eq_mergeDerived
   simp only [ProofParams.mergeDerived] at h
   rw [h]
@@ -196,13 +193,28 @@ set_option maxRecDepth 1000000 in
 Lagrange basis**, on every full-domain column: `commitInvDftMontWith_eq` is the
 bilinearity theorem run through the Montgomery lane on both halves. -/
 private theorem committer_eq (l : List Fp)
-    (hl : l.length = 2 ^ orchardActionTopLevelCircuit.domainExponent) :
+    (hl : l.length = 2 ^ actionCircuit.domainExponent) :
     commitProj l = Fast.Msm.commitLagrangeFastWith Fast.Msm.defaultWindow capturedURS.w
       (derivedUrsGLagrange capturedURS) l := by
   rw [Fast.Msm.commitLagrangeFastWith_eq _ (by decide)]
   simp only [commitProj, monomialBasis]
   rw [commitInvDftMontWith_eq Fast.Msm.defaultWindow (by decide) invDftTwiddles
     invDftScale capturedURS (by decide) rfl rfl l (by rw [hl, domainExponent_eq])]
+
+/-- Every Clean-compiled Action fixed row spans the full evaluation domain. -/
+private theorem fixedRowLength (row : List Fp)
+    (hrow : row ∈ actionCircuit.fixedRows) :
+    row.length = 2 ^ actionCircuit.domainExponent := by
+  obtain ⟨column, hcolumn, rfl⟩ := List.mem_iff_getElem.mp hrow
+  have hcolumn' :
+      column <
+        (PinnedConstraintSystem.derive
+          actionCircuit.constraintSystem
+          actionCircuit.selectorMap).numFixedColumns := by
+    simpa only [actionCircuit.fixedRows_length] using hcolumn
+  have hlength :=
+    actionCircuit.fixedRows_getD_length column hcolumn'
+  rwa [List.getD_eq_getElem _ _ hcolumn] at hlength
 
 set_option maxRecDepth 1000000 in
 /-- The derived Lagrange URS reproduces the captured 10-generator prefix. -/
@@ -225,10 +237,12 @@ theorem derivedFixedCommitments_eq :
   have h := certificate
   simp only [Prod.mk.injEq] at h
   have hfc := h.2.1
-  rw [fixedCommitmentsSeqWith_congr _ _ _ _ committer_eq, fixedCommitmentsSeqWith_eq] at hfc
+  rw [fixedCommitmentsSeqWith_congr
+      actionCircuit.fixedRows
+      (fun row hrow => committer_eq row (fixedRowLength row hrow)),
+    fixedCommitmentsSeqWith_eq] at hfc
   simp only [fixedCommitmentsWith] at hfc
-  simp only [derivedFixedCommitments, Halo2.TopLevelCircuit.fixedCommitments,
-    Halo2.TopLevelCircuit.fixedRows]
+  simp only [derivedFixedCommitments, Halo2.TopLevelCircuit.fixedCommitments]
   exact hfc
 
 set_option maxRecDepth 1000000 in
@@ -255,11 +269,13 @@ theorem vk_eq_derived : vk = derivedActionVk shape capturedURS := by
   simp only [Prod.mk.injEq] at h
   obtain ⟨-, hfc, hpc, ⟨ho, hn, hb, hd, hc⟩, hg, ⟨hiq, haq, hfq⟩, hpch, ⟨hli, hlt⟩, -⟩ := h
   -- align the bundle's spellings with the keygen internals
-  rw [fixedCommitmentsSeqWith_congr _ _ _ _ committer_eq, fixedCommitmentsSeqWith_eq] at hfc
+  rw [fixedCommitmentsSeqWith_congr
+      actionCircuit.fixedRows
+      (fun row hrow => committer_eq row (fixedRowLength row hrow)),
+    fixedCommitmentsSeqWith_eq] at hfc
   rw [permutationCommitmentsSeqWith_congr _ _ _ committer_eq,
     permutationCommitmentsSeqWith_eq] at hpc
   simp only [actionPinned, Halo2.TopLevelCircuit.selectorMap,
-    Halo2.TopLevelCircuit.selectorActivations, Halo2.TopLevelCircuit.regionStarts,
     Halo2.TopLevelCircuit.domainExponent]
     at ho hn hb hc hg hiq haq hfq hpch hli hlt hfc hpc
   -- open both records
@@ -271,17 +287,18 @@ theorem vk_eq_derived : vk = derivedActionVk shape capturedURS := by
     hfq.symm, ?_, ?_, hpch.symm, ?_, ?_⟩
   · rw [← hfc]
   · rw [← hpc]
+    rfl
   · exact (List.ofFn_inj.mp hli).symm
   · exact (List.ofFn_inj.mp hlt).symm
 
 set_option maxRecDepth 1000000 in
-/-- **`vk = orchardActionTopLevelCircuit.toVerifierKey actionProofParams capturedURS`**
+/-- **`vk = actionCircuit.toVerifierKey actionProofParams capturedURS`**
 — the captured Orchard Action verifying key IS the closed circuit's derived verifying
 key (transported along `shape_eq_mergeDerived`): every field, including the `Shape` in
 the type, comes from the circuit plus the URS and the two proof-shape counts. -/
 theorem vk_eq_toVerifierKey :
     vk = shape_eq_mergeDerived
-      ▸ orchardActionTopLevelCircuit.toVerifierKey actionProofParams capturedURS := by
+      ▸ actionCircuit.toVerifierKey actionProofParams capturedURS := by
   rw [toVerifierKey_action, vk_eq_derived]
   exact (derivedActionVk_cast shape_eq_mergeDerived capturedURS).symm
 

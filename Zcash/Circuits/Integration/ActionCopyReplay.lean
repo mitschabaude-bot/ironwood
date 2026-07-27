@@ -16,7 +16,7 @@ namespace Zcash.Snark
 
 open Halo2 Polynomial
 open ActionPermutationDomain
-open Zcash.Circuits.Action (orchardActionTopLevelCircuit)
+open Zcash.Circuits.Action (actionCircuit)
 
 set_option maxHeartbeats 20000
 
@@ -61,22 +61,22 @@ theorem actionCopyReplayWitness_or_relation
         (foldSplitWitness relation.model.constraints
           (actionVk pp urs).n j))
     (fixedCoherence :
-      TopLevelFixedCoherence orchardActionTopLevelCircuit pp urs)
+      TopLevelFixedCoherence actionCircuit pp urs)
     (exclusions : ResolverPermutationChallengeExclusions
       (actionVk pp urs) ch relation.polynomial actionActiveRows)
     (proofIndex : Fin (actionShape pp).numProofs) :
     Nonempty
-        (CopyReplayWitness orchardActionTopLevelCircuit.placement
+        (CopyReplayWitness actionCircuit.placement
           (resolverEnvironment
             (actionVk pp urs) relation.polynomial proofIndex
               actionActiveRows)
-          (orchardActionTopLevelCircuit.operations 0)
+          (actionCircuit.operations)
           (FlatCell actionNumPermCols actionDomainSize)
           (HasNontrivialRelation (F := Fp) urs.g urs.u urs.w)) ∨
       HasNontrivialRelation (F := Fp) urs.g urs.u urs.w := by
   classical
   have hn : (actionVk pp urs).n ≠ 0 := by
-    change 2 ^ orchardActionTopLevelCircuit.domainExponent ≠ 0
+    change 2 ^ actionCircuit.domainExponent ≠ 0
     positivity
   have hsatisfaction :=
     relation.constraintSatisfaction hn hgoodY
@@ -101,11 +101,11 @@ theorem actionCopyReplayWitness_or_relation
     have hdomainSize :
         (actionVk pp urs).n = 2 ^ urs.k := by
       change
-        2 ^ orchardActionTopLevelCircuit.domainExponent = 2 ^ urs.k
+        2 ^ actionCircuit.domainExponent = 2 ^ urs.k
       exact congrArg (2 ^ ·) hk
     have hfixedRead : ∀ {column row value : ℕ},
         (column, row, value) ∈
-            topLevelRequiredFixedEntries orchardActionTopLevelCircuit →
+            topLevelRequiredFixedEntries actionCircuit →
           (resolverEnvironment
             (actionVk pp urs) relation.polynomial proofIndex
               actionActiveRows).fixed

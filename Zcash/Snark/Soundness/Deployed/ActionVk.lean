@@ -5,9 +5,9 @@ import Zcash.Snark.Keygen.Certificate
 # The Action soundness terminal at the deployed verifying key
 
 `action_bundleStatement_or_relation_of_decodedMemberPolynomial_eq` is stated at the
-circuit-derived verifying key `orchardActionTopLevelCircuit.toVerifierKey pp urs`
+circuit-derived verifying key `actionCircuit.toVerifierKey pp urs`
 for generic proof parameters and URS, with every object indexed by the derived
-`Shape` `pp.mergeDerived orchardActionTopLevelCircuit`. The keygen certificate
+`Shape` `pp.mergeDerived actionCircuit`. The keygen certificate
 (`Zcash.Snark.Keygen.Certificate`) proves that at the capture these are the
 DEPLOYED artifacts: `shape_eq_mergeDerived` identifies the derived `Shape` with
 the fixture's `shape`, and `vk_eq_derived` identifies the captured `Fixture.vk`
@@ -23,24 +23,21 @@ No cast, `▸`, or `HEq` occurs anywhere, in the statements or in the proofs. Th
 transport lemma `actionDeployed_transport` states everything at a VARIABLE shape
 `s` and a VARIABLE key `K`, with two plain equations:
 
-* `hs : actionProofParams.mergeDerived orchardActionTopLevelCircuit = s`, and
+* `hs : actionProofParams.mergeDerived actionCircuit = s`, and
 * `hK : K = derivedActionVk s capturedURS` — both sides live in
   `VerifyingKey s Fp G`, so this is an ordinary `Eq`, not an `HEq`.
 
 `subst hs` turns every index into the derived `Shape`; `hK` is then rewritten
 backwards along `toVerifierKey_action` (`toVerifierKey pp urs =
 derivedActionVk (pp.mergeDerived top) urs`) and `subst hK` turns every key into
-`orchardActionTopLevelCircuit.toVerifierKey actionProofParams capturedURS`. At
+`actionCircuit.toVerifierKey actionProofParams capturedURS`. At
 that point the goal is literally the generic terminal. The public theorem
 instantiates the lemma with the two certificate equalities verbatim
 (`shape_eq_mergeDerived`, `vk_eq_derived`).
 
-The instance-commitment family is the one object of the terminal whose
-circuit-native spelling (`ActionInstanceCommitment.commitment pp urs`) is TYPED
-at the derived shape and therefore cannot be written at the fixture `shape`. It
-is respelled here shape-generically as `deployedInstanceCommitment`, whose type
-mentions only the ambient `Shape`; at the derived shape it is `commitment
-actionProofParams capturedURS` by `deployedInstanceCommitment_eq` (`rfl`).
+The public-instance commitment is `ActionInstanceCommitment.commitment
+actionProofParams capturedURS`. Its proof-count index is generic, so the same
+definition is used directly at both the circuit-derived and captured fixture shapes.
 
 The `k`-match and blinding-factor premises of the generic terminal are
 discharged internally from the fixture data (`shape_k_eq_capturedURS_k`,
@@ -53,7 +50,7 @@ its challenges at `(pp.mergeDerived top).k`, which cannot be spelled at the
 fixture `shape` without evaluating the derived domain exponent. Its `γ`/`β`
 fields are shape-generic and appear here at `Fixture.vk`; the `θ` field, like the
 other circuit-derived lookup exclusions, is inherited verbatim from the
-Clean/Ironwood seam and still names `orchardActionTopLevelCircuit`. Exact packed
+Clean/Ironwood seam and still names `actionCircuit`. Exact packed
 lookup-selector values are constructed inside the terminal from fixed coherence
 and are not a deployed-capstone premise.
 -/
@@ -76,36 +73,6 @@ set_option maxRecDepth 100000 in
 theorem vk_blindingFactors_lt : Fixture.vk.blindingFactors < Fixture.vk.n := by
   decide
 
-/--
-The deployed public-instance commitment family, spelled at an arbitrary `Shape`
-index.
-
-`ActionInstanceCommitment.commitment` has the derived `Shape` baked into its
-type, so it cannot be applied to public inputs indexed by the fixture `shape`.
-This is the same family — the Action circuit's single primary column carries the
-Lagrange commitment of that proof's public rows, every other column index
-commits to zero — with the index left as an ordinary parameter.
--/
-noncomputable def deployedInstanceCommitment (s : Shape)
-    (inputs : Fin s.numProofs → PublicInputs) :
-    Fin s.numProofs → ℕ → G :=
-  fun proofIndex column =>
-    if column =
-        (Action.Circuit.configure
-          Specs.Sinsemilla.orchardGenerators {}).1.primary.index then
-      (instanceKey actionProofParams capturedURS).commitInstance
-        (inputs proofIndex).rows 1
-    else 0
-
-/-- At the derived `Shape` the respelled family is the circuit-native one. -/
-theorem deployedInstanceCommitment_eq
-    (inputs :
-      Fin (actionProofParams.mergeDerived
-        orchardActionTopLevelCircuit).numProofs → PublicInputs) :
-    deployedInstanceCommitment
-        (actionProofParams.mergeDerived orchardActionTopLevelCircuit) inputs
-      = commitment actionProofParams capturedURS inputs := rfl
-
 set_option maxRecDepth 1000000 in
 /--
 Transport the accepted-circuit-satisfaction Action endpoint to an arbitrary
@@ -117,34 +84,34 @@ by the live Vesta constraint relation.
 -/
 private theorem acceptedModel_circuitSat_deployed_transport
     (s : Shape)
-    (hs : actionProofParams.mergeDerived orchardActionTopLevelCircuit = s)
+    (hs : actionProofParams.mergeDerived actionCircuit = s)
     (K : VerifyingKey s Fp G)
     (hK : K = derivedActionVk s capturedURS)
     (hk : s.k = capturedURS.k)
     (hbl : K.blindingFactors < K.n)
-    (inputs : Fin s.numProofs → PublicInputs)
+    (inputs : Fin s.numProofs → PublicInputs Fp)
     (ps : ProofString s Fp G)
     (ch : Challenges s.k Fp)
     (pU pW : Fp) (a : Fin (2 ^ capturedURS.k) → Fp)
     (batchOpenings :
       OpenedBatchOpenings capturedURS (evalVector capturedURS.k ch.x3)
         (x4BatchCommitments
-          (instanceCommitment := deployedInstanceCommitment s inputs)
+          (instanceCommitment := commitment actionProofParams capturedURS inputs)
           capturedURS hk K ps ch)
         (x4BatchEvals
-          (instanceCommitment := deployedInstanceCommitment s inputs)
+          (instanceCommitment := commitment actionProofParams capturedURS inputs)
           K ps ch)
         a pU pW)
     (memberDecode : ∀ i (hi : i <
         deployedX4PairCount
-          (instanceCommitment := deployedInstanceCommitment s inputs)
+          (instanceCommitment := commitment actionProofParams capturedURS inputs)
           K ps ch),
       OpenedMemberDecode
-        (instanceCommitment := deployedInstanceCommitment s inputs)
+        (instanceCommitment := commitment actionProofParams capturedURS inputs)
         capturedURS hk K ps ch batchOpenings i hi)
     (haccepts :
       DeployedAccepts capturedURS hk K
-        (deployedInstanceCommitment s inputs) ps ch)
+        (commitment actionProofParams capturedURS inputs) ps ch)
     (hpoly : Polynomial Fp)
     (hsatisfied :
       (CanonicalMemberConstraintRelation.acceptedModel
@@ -180,10 +147,10 @@ private theorem acceptedModel_circuitSat_deployed_transport
         (K.n - K.blindingFactors - 2))
     (lookupTheta :
       ch.theta ∉ TopLevelLookupCoherence.allTopLevelLookupThetaBadSet
-        orchardActionTopLevelCircuit actionProofParams capturedURS
+        actionCircuit actionProofParams capturedURS
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode := memberDecode) haccepts)) :
-    BundleStatement Specs.Sinsemilla.orchardGenerators orchardBases inputs ∨
+    BundleStatement inputs ∨
       HasNontrivialRelation (F := Fp)
         capturedURS.g capturedURS.u capturedURS.w := by
   subst hs
@@ -192,10 +159,9 @@ private theorem acceptedModel_circuitSat_deployed_transport
   have terminal :=
     action_bundleStatement_or_relation_of_acceptedModel_circuitSat
       actionProofParams capturedURS hk inputs ps ch
-      (orchardActionTopLevelCircuit.toVerifierKey
+      (actionCircuit.toVerifierKey
         actionProofParams capturedURS)
       rfl pU pW a
-  rw [← deployedInstanceCommitment_eq inputs] at terminal
   exact terminal batchOpenings memberDecode haccepts hbl hpoly hsatisfied hgoodY
     ⟨permGamma, permBeta⟩
     ⟨lookupGamma, lookupBeta, lookupTheta⟩
@@ -206,7 +172,7 @@ The accepted-circuit-satisfaction Action endpoint at the deployed verifying key.
 This is the concrete `hencodes` target for the Vesta constraint-carrying relation.
 -/
 theorem action_bundleStatement_or_relation_of_acceptedModel_circuitSat_deployed
-    (inputs : Fin Fixture.shape.numProofs → PublicInputs)
+    (inputs : Fin Fixture.shape.numProofs → PublicInputs Fp)
     (ps : ProofString Fixture.shape Fp G)
     (ch : Challenges Fixture.shape.k Fp)
     (pU pW : Fp) (a : Fin (2 ^ capturedURS.k) → Fp)
@@ -214,26 +180,26 @@ theorem action_bundleStatement_or_relation_of_acceptedModel_circuitSat_deployed
       OpenedBatchOpenings capturedURS (evalVector capturedURS.k ch.x3)
         (x4BatchCommitments
           (instanceCommitment :=
-            deployedInstanceCommitment Fixture.shape inputs)
+            commitment actionProofParams capturedURS inputs)
           capturedURS shape_k_eq_capturedURS_k Fixture.vk ps ch)
         (x4BatchEvals
           (instanceCommitment :=
-            deployedInstanceCommitment Fixture.shape inputs)
+            commitment actionProofParams capturedURS inputs)
           Fixture.vk ps ch)
         a pU pW)
     (memberDecode : ∀ i (hi : i <
         deployedX4PairCount
           (instanceCommitment :=
-            deployedInstanceCommitment Fixture.shape inputs)
+            commitment actionProofParams capturedURS inputs)
           Fixture.vk ps ch),
       OpenedMemberDecode
         (instanceCommitment :=
-          deployedInstanceCommitment Fixture.shape inputs)
+          commitment actionProofParams capturedURS inputs)
         capturedURS shape_k_eq_capturedURS_k Fixture.vk ps ch
         batchOpenings i hi)
     (haccepts :
       DeployedAccepts capturedURS shape_k_eq_capturedURS_k Fixture.vk
-        (deployedInstanceCommitment Fixture.shape inputs) ps ch)
+        (commitment actionProofParams capturedURS inputs) ps ch)
     (hpoly : Polynomial Fp)
     (hsatisfied :
       (CanonicalMemberConstraintRelation.acceptedModel
@@ -269,10 +235,10 @@ theorem action_bundleStatement_or_relation_of_acceptedModel_circuitSat_deployed
         (Fixture.vk.n - Fixture.vk.blindingFactors - 2))
     (lookupTheta :
       ch.theta ∉ TopLevelLookupCoherence.allTopLevelLookupThetaBadSet
-        orchardActionTopLevelCircuit actionProofParams capturedURS
+        actionCircuit actionProofParams capturedURS
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode := memberDecode) haccepts)) :
-    BundleStatement Specs.Sinsemilla.orchardGenerators orchardBases inputs ∨
+    BundleStatement inputs ∨
       HasNontrivialRelation (F := Fp)
         capturedURS.g capturedURS.u capturedURS.w :=
   acceptedModel_circuitSat_deployed_transport
@@ -296,34 +262,34 @@ consumed by `subst`; no cast appears in the statement or in the proof.
 -/
 private theorem actionDeployed_transport
     (s : Shape)
-    (hs : actionProofParams.mergeDerived orchardActionTopLevelCircuit = s)
+    (hs : actionProofParams.mergeDerived actionCircuit = s)
     (K : VerifyingKey s Fp G)
     (hK : K = derivedActionVk s capturedURS)
     (hk : s.k = capturedURS.k)
     (hbl : K.blindingFactors < K.n)
-    (inputs : Fin s.numProofs → PublicInputs)
+    (inputs : Fin s.numProofs → PublicInputs Fp)
     (ps : ProofString s Fp G)
     (ch : Challenges s.k Fp)
     (pU pW : Fp) (a : Fin (2 ^ capturedURS.k) → Fp)
     (batchOpenings :
       OpenedBatchOpenings capturedURS (evalVector capturedURS.k ch.x3)
         (x4BatchCommitments
-          (instanceCommitment := deployedInstanceCommitment s inputs)
+          (instanceCommitment := commitment actionProofParams capturedURS inputs)
           capturedURS hk K ps ch)
         (x4BatchEvals
-          (instanceCommitment := deployedInstanceCommitment s inputs)
+          (instanceCommitment := commitment actionProofParams capturedURS inputs)
           K ps ch)
         a pU pW)
     (memberDecode : ∀ i (hi : i <
         deployedX4PairCount
-          (instanceCommitment := deployedInstanceCommitment s inputs)
+          (instanceCommitment := commitment actionProofParams capturedURS inputs)
           K ps ch),
       OpenedMemberDecode
-        (instanceCommitment := deployedInstanceCommitment s inputs)
+        (instanceCommitment := commitment actionProofParams capturedURS inputs)
         capturedURS hk K ps ch batchOpenings i hi)
     (haccepts :
       DeployedAccepts capturedURS hk K
-        (deployedInstanceCommitment s inputs) ps ch)
+        (commitment actionProofParams capturedURS inputs) ps ch)
     (hpoly : Polynomial Fp)
     (hquot :
       hpoly =
@@ -331,16 +297,16 @@ private theorem actionDeployed_transport
           (memberDecode := memberDecode) haccepts .vanishingH)
     (hbind : ∀
       (slot : DeployedMemberSlot
-        (instanceCommitment := deployedInstanceCommitment s inputs) K ps ch)
+        (instanceCommitment := commitment actionProofParams capturedURS inputs) K ps ch)
       (point : Fp),
       point ∈ deployedSetPts
-          (instanceCommitment := deployedInstanceCommitment s inputs)
+          (instanceCommitment := commitment actionProofParams capturedURS inputs)
           K ps ch slot.setIndex →
       (decodedMemberPolynomial
-        (instanceCommitment := deployedInstanceCommitment s inputs)
+        (instanceCommitment := commitment actionProofParams capturedURS inputs)
         capturedURS hk K ps ch memberDecode slot).eval point =
           deployedMemberClaim
-            (instanceCommitment := deployedInstanceCommitment s inputs)
+            (instanceCommitment := commitment actionProofParams capturedURS inputs)
             K ps ch slot point
         ∨ HasNontrivialRelation (F := Fp)
             capturedURS.g capturedURS.u capturedURS.w)
@@ -423,10 +389,10 @@ private theorem actionDeployed_transport
         (K.n - K.blindingFactors - 2))
     (lookupTheta :
       ch.theta ∉ TopLevelLookupCoherence.allTopLevelLookupThetaBadSet
-        orchardActionTopLevelCircuit actionProofParams capturedURS
+        actionCircuit actionProofParams capturedURS
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode := memberDecode) haccepts)) :
-    BundleStatement Specs.Sinsemilla.orchardGenerators orchardBases inputs ∨
+    BundleStatement inputs ∨
       HasNontrivialRelation (F := Fp)
         capturedURS.g capturedURS.u capturedURS.w := by
   subst hs
@@ -435,7 +401,6 @@ private theorem actionDeployed_transport
   have terminal :=
     action_bundleStatement_or_relation_of_decodedMemberPolynomial_eq
       actionProofParams capturedURS hk inputs ps ch pU pW a
-  rw [← deployedInstanceCommitment_eq inputs] at terminal
   exact terminal batchOpenings memberDecode haccepts hpoly hquot hbind
     hxgood hgoodY ⟨permGamma, permBeta⟩
     ⟨lookupGamma, lookupBeta, lookupTheta⟩
@@ -453,30 +418,30 @@ the fixture facts `shape_k_eq_capturedURS_k` and `vk_blindingFactors_lt`,
 discharged here rather than assumed.
 -/
 theorem action_bundleStatement_or_relation_of_decodedMemberPolynomial_eq_deployed
-    (inputs : Fin Fixture.shape.numProofs → PublicInputs)
+    (inputs : Fin Fixture.shape.numProofs → PublicInputs Fp)
     (ps : ProofString Fixture.shape Fp G)
     (ch : Challenges Fixture.shape.k Fp)
     (pU pW : Fp) (a : Fin (2 ^ capturedURS.k) → Fp)
     (batchOpenings :
       OpenedBatchOpenings capturedURS (evalVector capturedURS.k ch.x3)
         (x4BatchCommitments
-          (instanceCommitment := deployedInstanceCommitment Fixture.shape inputs)
+          (instanceCommitment := commitment actionProofParams capturedURS inputs)
           capturedURS shape_k_eq_capturedURS_k Fixture.vk ps ch)
         (x4BatchEvals
-          (instanceCommitment := deployedInstanceCommitment Fixture.shape inputs)
+          (instanceCommitment := commitment actionProofParams capturedURS inputs)
           Fixture.vk ps ch)
         a pU pW)
     (memberDecode : ∀ i (hi : i <
         deployedX4PairCount
-          (instanceCommitment := deployedInstanceCommitment Fixture.shape inputs)
+          (instanceCommitment := commitment actionProofParams capturedURS inputs)
           Fixture.vk ps ch),
       OpenedMemberDecode
-        (instanceCommitment := deployedInstanceCommitment Fixture.shape inputs)
+        (instanceCommitment := commitment actionProofParams capturedURS inputs)
         capturedURS shape_k_eq_capturedURS_k Fixture.vk ps ch
         batchOpenings i hi)
     (haccepts :
       DeployedAccepts capturedURS shape_k_eq_capturedURS_k Fixture.vk
-        (deployedInstanceCommitment Fixture.shape inputs) ps ch)
+        (commitment actionProofParams capturedURS inputs) ps ch)
     (hpoly : Polynomial Fp)
     (hquot :
       hpoly =
@@ -484,18 +449,18 @@ theorem action_bundleStatement_or_relation_of_decodedMemberPolynomial_eq_deploye
           (memberDecode := memberDecode) haccepts .vanishingH)
     (hbind : ∀
       (slot : DeployedMemberSlot
-        (instanceCommitment := deployedInstanceCommitment Fixture.shape inputs)
+        (instanceCommitment := commitment actionProofParams capturedURS inputs)
         Fixture.vk ps ch)
       (point : Fp),
       point ∈ deployedSetPts
-          (instanceCommitment := deployedInstanceCommitment Fixture.shape inputs)
+          (instanceCommitment := commitment actionProofParams capturedURS inputs)
           Fixture.vk ps ch slot.setIndex →
       (decodedMemberPolynomial
-        (instanceCommitment := deployedInstanceCommitment Fixture.shape inputs)
+        (instanceCommitment := commitment actionProofParams capturedURS inputs)
         capturedURS shape_k_eq_capturedURS_k Fixture.vk ps ch
         memberDecode slot).eval point =
           deployedMemberClaim
-            (instanceCommitment := deployedInstanceCommitment Fixture.shape inputs)
+            (instanceCommitment := commitment actionProofParams capturedURS inputs)
             Fixture.vk ps ch slot point
         ∨ HasNontrivialRelation (F := Fp)
             capturedURS.g capturedURS.u capturedURS.w)
@@ -578,10 +543,10 @@ theorem action_bundleStatement_or_relation_of_decodedMemberPolynomial_eq_deploye
         (Fixture.vk.n - Fixture.vk.blindingFactors - 2))
     (lookupTheta :
       ch.theta ∉ TopLevelLookupCoherence.allTopLevelLookupThetaBadSet
-        orchardActionTopLevelCircuit actionProofParams capturedURS
+        actionCircuit actionProofParams capturedURS
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode := memberDecode) haccepts)) :
-    BundleStatement Specs.Sinsemilla.orchardGenerators orchardBases inputs ∨
+    BundleStatement inputs ∨
       HasNontrivialRelation (F := Fp)
         capturedURS.g capturedURS.u capturedURS.w :=
   actionDeployed_transport

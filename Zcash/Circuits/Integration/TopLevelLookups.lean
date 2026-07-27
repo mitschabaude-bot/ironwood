@@ -27,14 +27,14 @@ set_option maxHeartbeats 20000
 
 variable
     {G : Type} [AddCommGroup G] [Inhabited G]
-    {ConfigInput Config : Type} {Output : TypeMap}
-    [CircuitType Output]
-    {top : TopLevelCircuit Fp ConfigInput Config Output}
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
+    {top : TopLevelCircuit Fp Config PublicInput}
     {pp : ProofParams} {urs : URS G}
 
 /-- A synthesis-enabled lookup routed to its configured lookup index. -/
 structure EnabledLookup.TopLevelRoute
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (lookup : EnabledLookup Fp) where
   index : Fin (pp.mergeDerived top).numLookups
   argument :
@@ -47,7 +47,7 @@ lookup operation.
 noncomputable def EnabledLookup.topLevelRoute
     (lookup : EnabledLookup Fp)
     (henabled :
-      lookup ∈ operationEnabledLookups (top.operations 0) 0) :
+      lookup ∈ operationEnabledLookups (top.operations) 0) :
     lookup.TopLevelRoute top pp := by
   have hargument :
       lookup.argument ∈ top.constraintSystem.lookups :=
@@ -73,12 +73,12 @@ footprint.
 theorem EnabledLookup.activationRow_lt_usedRows
     (lookup : EnabledLookup Fp)
     (henabled :
-      lookup ∈ operationEnabledLookups (top.operations 0) 0) :
+      lookup ∈ operationEnabledLookups (top.operations) 0) :
     top.placement lookup.region + lookup.row < top.usedRows := by
   obtain ⟨body, hregion, hoperation⟩ :=
-    (mem_operationEnabledLookups_iff lookup (top.operations 0) 0).mp henabled
+    (mem_operationEnabledLookups_iff lookup (top.operations) 0).mp henabled
   exact absoluteRow_lt_usedRows_of_enableLookup_mem
-    (top.operations 0) lookup.region body hregion
+    (top.operations) lookup.region body hregion
     lookup.argument lookup.enabled lookup.row hoperation
 
 /--
@@ -86,15 +86,14 @@ A fitting circuit-derived domain places every lookup activation in the usable-ro
 prefix.
 -/
 theorem EnabledLookup.activationRow_lt_usableRows
-    (gateCoherence : TopLevelGateCoherence top pp urs)
     (lookup : EnabledLookup Fp)
     (henabled :
-      lookup ∈ operationEnabledLookups (top.operations 0) 0) :
+      lookup ∈ operationEnabledLookups (top.operations) 0) :
     top.placement lookup.region + lookup.row <
       top.usableRowsAt top.domainExponent :=
   (lookup.activationRow_lt_usedRows henabled).trans_le
     (top.usedRows_le_usableRowsAt top.domainExponent
-      (top.fitsAt_domainExponent gateCoherence.domainExponent_lt))
+      top.fitsAt_domainExponent)
 
 /--
 Static lookup facts at the circuit-derived projection boundary.
@@ -104,7 +103,7 @@ expressions are selector-free because Halo 2 constructs them from lookup-table
 columns. Arity is inherited from the list-of-pairs lookup constructor.
 -/
 structure TopLevelLookupCoherence
-    (top : TopLevelCircuit Fp ConfigInput Config Output) : Prop where
+    (top : TopLevelCircuit Fp Config PublicInput) : Prop where
   inputsCovered : ∀ argument ∈ top.constraintSystem.lookups,
     ∀ expression ∈ argument.inputs,
       expression.selectorsCovered
@@ -170,7 +169,7 @@ operation's zero/one selector valuation. Tables usually discharge the second
 field structurally because Halo 2 tables are selector-free.
 -/
 structure EnabledLookup.SelectorProjection
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    (top : TopLevelCircuit Fp Config PublicInput)
     (environment : Environment Fp) (lookup : EnabledLookup Fp) : Prop where
   input :
     lookup.argument.inputs.map
@@ -229,7 +228,7 @@ selectors. A gate selector can legitimately be active on the same absolute row
 without occurring in this lookup's inputs.
 -/
 def EnabledLookup.InputSelectorValuesRealized
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    (top : TopLevelCircuit Fp Config PublicInput)
     (environment : Environment Fp) (lookup : EnabledLookup Fp) : Prop :=
   ∀ expression ∈ lookup.argument.inputs,
     expression.eval
@@ -320,7 +319,7 @@ theorem resolverInterpretsPinned
 end TopLevelGateCoherence
 
 @[simp] theorem toVerifierKey_lookupInputExprs
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G)
     (lookup : Fin (pp.mergeDerived top).numLookups) :
     (top.toVerifierKey pp urs).lookupInputExprs lookup =
@@ -330,7 +329,7 @@ end TopLevelGateCoherence
   rfl
 
 @[simp] theorem toVerifierKey_lookupTableExprs
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G)
     (lookup : Fin (pp.mergeDerived top).numLookups) :
     (top.toVerifierKey pp urs).lookupTableExprs lookup =
@@ -340,14 +339,14 @@ end TopLevelGateCoherence
   rfl
 
 @[simp] theorem toVerifierKey_n
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G) :
     (top.toVerifierKey pp urs).n =
       2 ^ top.domainExponent := by
   rfl
 
 @[simp] theorem toVerifierKey_blindingFactors
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G) :
     (top.toVerifierKey pp urs).blindingFactors =
       top.blindingFactors := by
@@ -398,7 +397,7 @@ theorem projectedValues
     (proofIndex : Fin (pp.mergeDerived top).numProofs)
     (lookup : EnabledLookup Fp)
     (henabled :
-      lookup ∈ operationEnabledLookups (top.operations 0) 0)
+      lookup ∈ operationEnabledLookups (top.operations) 0)
     (selectors :
       lookup.SelectorProjection top
         (resolverEnvironment
@@ -539,7 +538,7 @@ theorem projectedPolynomialValues
     (proofIndex : Fin (pp.mergeDerived top).numProofs)
     (lookup : EnabledLookup Fp)
     (henabled :
-      lookup ∈ operationEnabledLookups (top.operations 0) 0)
+      lookup ∈ operationEnabledLookups (top.operations) 0)
     (selectors :
       lookup.SelectorProjection top
         (resolverEnvironment
@@ -625,7 +624,7 @@ noncomputable def deployedWitness
         (top.toVerifierKey pp urs).n = 1)
     (lookup : EnabledLookup Fp)
     (henabled :
-      lookup ∈ operationEnabledLookups (top.operations 0) 0)
+      lookup ∈ operationEnabledLookups (top.operations) 0)
     (selectors :
       lookup.SelectorProjection top
         (resolverEnvironment
@@ -762,21 +761,21 @@ fit are derived from the top-level circuit; this record contains only selector- 
 challenge-dependent facts.
 -/
 structure TopLevelLookupWitnessConditions
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G)
     (ch : Challenges (pp.mergeDerived top).k Fp)
     (poly : CommitmentId → Polynomial Fp)
     (proofIndex : Fin (pp.mergeDerived top).numProofs) : Prop where
   inputSelectorValues : ∀ lookup
       (_henabled :
-        lookup ∈ operationEnabledLookups (top.operations 0) 0),
+        lookup ∈ operationEnabledLookups (top.operations) 0),
     lookup.InputSelectorValuesRealized top
       (resolverEnvironment
         (top.toVerifierKey pp urs) poly proofIndex
         (top.usableRowsAt top.domainExponent))
   resolverGood : ∀ lookup
       (henabled :
-        lookup ∈ operationEnabledLookups (top.operations 0) 0),
+        lookup ∈ operationEnabledLookups (top.operations) 0),
     ResolverLookupGoodChallenges
       (top.toVerifierKey pp urs) ch poly proofIndex
       (lookup.topLevelRoute
@@ -785,7 +784,7 @@ structure TopLevelLookupWitnessConditions
         (top.toVerifierKey pp urs).blindingFactors - 2)
   thetaGood : ∀ lookup
       (_henabled :
-        lookup ∈ operationEnabledLookups (top.operations 0) 0),
+        lookup ∈ operationEnabledLookups (top.operations) 0),
     ch.theta ∉ lookup.thetaBadSet top.placement
       (resolverEnvironment
         (top.toVerifierKey pp urs) poly proofIndex
@@ -796,10 +795,10 @@ Index every lookup activation in every proof of a top-level bundle. The activati
 list is shared by all proofs, while the resolver environment is proof-indexed.
 -/
 abbrev TopLevelLookupActivationIndex
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) :=
   Fin (pp.mergeDerived top).numProofs ×
-    Fin (operationEnabledLookups (top.operations 0) 0).length
+    Fin (operationEnabledLookups (top.operations) 0).length
 
 /--
 The exact bundle-wide `θ` collision surface for a top-level circuit. A single
@@ -807,7 +806,7 @@ transcript challenge is shared by every proof and every enabled lookup activatio
 so the event must be unioned across both indices.
 -/
 noncomputable def allTopLevelLookupThetaBadSet
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G)
     (poly : CommitmentId → Polynomial Fp) : Finset Fp :=
   enabledLookupThetaBadSetFamily
@@ -818,11 +817,11 @@ noncomputable def allTopLevelLookupThetaBadSet
         (top.toVerifierKey pp urs) poly index.1
         (top.usableRowsAt top.domainExponent))
     (fun index =>
-      (operationEnabledLookups (top.operations 0) 0).get index.2)
+      (operationEnabledLookups (top.operations) 0).get index.2)
 
 /-- The row-by-arity root budget for the top-level bundle's `θ` surface. -/
 noncomputable def topLevelLookupThetaBudget
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G)
     (poly : CommitmentId → Polynomial Fp) : ℕ :=
   ∑ index : TopLevelLookupActivationIndex top pp,
@@ -835,7 +834,7 @@ noncomputable def topLevelLookupThetaBudget
         (top.toVerifierKey pp urs) poly index.1
         (top.usableRowsAt top.domainExponent))
       ((operationEnabledLookups
-        (top.operations 0) 0).get index.2)).length
+        (top.operations) 0).get index.2)).length
 
 /--
 The bundle-wide top-level `θ` surface has exactly the generic
@@ -853,9 +852,9 @@ theorem uniformChallenge_allTopLevelLookupThetaBadSet
   apply uniformChallenge_enabledLookupThetaBadSetFamily
   intro index row _hrow
   let lookup :=
-    (operationEnabledLookups (top.operations 0) 0).get index.2
+    (operationEnabledLookups (top.operations) 0).get index.2
   have henabled :
-      lookup ∈ operationEnabledLookups (top.operations 0) 0 :=
+      lookup ∈ operationEnabledLookups (top.operations) 0 :=
     List.get_mem ..
   have hargument :
       lookup.argument ∈ top.constraintSystem.lookups :=
@@ -870,7 +869,7 @@ These are transcript/probability-layer facts, independent of fixed-column select
 realization.
 -/
 structure TopLevelLookupChallengeExclusions
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G)
     (ch : Challenges (pp.mergeDerived top).k Fp)
     (poly : CommitmentId → Polynomial Fp) : Prop where
@@ -897,7 +896,7 @@ noncomputable def TopLevelLookupWitnessConditions.ofChallengeExclusions
     (proofIndex : Fin (pp.mergeDerived top).numProofs)
     (inputSelectorValues : ∀ lookup
       (_henabled :
-        lookup ∈ operationEnabledLookups (top.operations 0) 0),
+        lookup ∈ operationEnabledLookups (top.operations) 0),
       lookup.InputSelectorValuesRealized top
         (resolverEnvironment
           (top.toVerifierKey pp urs) poly proofIndex
@@ -929,7 +928,7 @@ noncomputable def TopLevelLookupWitnessConditions.ofChallengeExclusions
             (top.toVerifierKey pp urs) poly index.1
             (top.usableRowsAt top.domainExponent))
         (fun index =>
-          (operationEnabledLookups (top.operations 0) 0).get index.2)
+          (operationEnabledLookups (top.operations) 0).get index.2)
         ch.theta).mp exclusions.theta
         (proofIndex, ⟨index, hindex⟩)
     simpa [allTopLevelLookupThetaBadSet, hlookup] using hfamily
@@ -957,7 +956,7 @@ noncomputable def deployedWitnesses
         (top.toVerifierKey pp urs).n = 1)
     (conditions :
       TopLevelLookupWitnessConditions top pp urs ch poly proofIndex) :
-    ∀ lookup ∈ operationEnabledLookups (top.operations 0) 0,
+    ∀ lookup ∈ operationEnabledLookups (top.operations) 0,
       lookup.DeployedWitness top.placement
         (resolverEnvironment
           (top.toVerifierKey pp urs) poly proofIndex
@@ -980,7 +979,7 @@ noncomputable def deployedWitnesses
   exact coherence.deployedWitness gateCoherence ch poly proofIndex
     hblinding satisfaction hrows hroot lookup henabled
     selectorProjection
-    (lookup.activationRow_lt_usableRows gateCoherence henabled)
+    (lookup.activationRow_lt_usableRows henabled)
     (conditions.resolverGood lookup henabled)
     (conditions.thetaGood lookup henabled)
 
@@ -1011,7 +1010,7 @@ theorem constraints
       (resolverEnvironment
         (top.toVerifierKey pp urs) poly proofIndex
         (top.usableRowsAt top.domainExponent))
-      (top.operations 0) 0 := by
+      (top.operations) 0 := by
   apply lookup_constraints_of_deployed_witnesses
   exact coherence.deployedWitnesses gateCoherence ch poly proofIndex
     hblinding satisfaction hrows hroot conditions

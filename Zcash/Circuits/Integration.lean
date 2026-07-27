@@ -8,7 +8,6 @@ import Zcash.Circuits.Integration.ActionPermutationDomain
 import Zcash.Circuits.Integration.ActionPermutationCycle
 import Zcash.Circuits.Integration.ActionCopyReplay
 import Zcash.Circuits.Integration.ActionPermutationDomainCompute
-import Zcash.Circuits.Integration.ActionStatement
 import Zcash.Circuits.Integration.ActionTerminal
 import Zcash.Circuits.Integration.CircuitIntegration
 import Zcash.Circuits.Integration.CircuitSatisfaction

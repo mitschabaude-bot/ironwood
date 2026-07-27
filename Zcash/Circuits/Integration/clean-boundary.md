@@ -13,7 +13,7 @@ and the guest must not scatter *its* vocabulary (`Halo2.ConstraintSystem`, `Oper
 
 Everything Clean produces is funneled through **one concept: `TopLevelCircuit`**, which
 carries everything downstream needs and is instantiated once per concrete circuit
-(`orchardActionTopLevelCircuit`).
+(`actionCircuit`).
 
 `TopLevelCircuit` is deliberately two-sided:
 
@@ -153,12 +153,18 @@ final deployed capstone.
 
 ### The public satisfaction contract has two levels
 
-`TopLevelCircuit.Statement` currently consumes a placed Clean `Environment`. It is the
-right internal endpoint for the generic proof, but it is not itself an ironwood-native
-public interface. The boundary should therefore expose two theorem levels:
+`TopLevelCircuit` declares a `PublicInput` type and an injective layout of its encoded
+elements in instance cells. That one layout derives both extraction from a Clean
+environment and the cell/value assignments consumed by verifier integration. The
+top-level circuit separately extracts a private witness, recombines public and private
+data into its formal-circuit witness, and proves that this factorization agrees with
+the formal circuit's native extractor. Its `Spec` receives public and private data
+explicitly; only `Statement public` existentially hides the private witness.
+
+The boundary therefore exposes two theorem levels:
 
 1. a boundary-internal generic theorem taking satisfaction of the circuit-derived key
-   to `top.Statement` over the reconstructed Clean environment;
+   to `top.Statement` at the public input extracted through the declared layout;
 2. a public theorem phrased only in ironwood-decoded data and the concrete circuit's
    public statement, for example the structured Orchard Action public inputs.
 

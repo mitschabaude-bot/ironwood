@@ -114,30 +114,30 @@ namespace QueryLayouts
 
 variable
     {G : Type} [AddCommGroup G] [Inhabited G]
-    {ConfigInput Config : Type} {Output : TypeMap}
-    [CircuitType Output]
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
 
-/-- An instance query registered by a top-level circuit's own configure run is still
-registered in the constraint system key generation consumes.
+/-- An instance query registered by a circuit's own configure run is still registered in the
+constraint system key generation consumes.
 
-Closure is the only step in between, and it never removes a registration. Stating this
-generically keeps the circuit's operation stream abstract: unfolding it at the Action
-instance is what makes the same step unaffordable. -/
+Closure is the only step in between, and it never removes a registration. Stated at the formal
+circuit rather than the `TopLevelCircuit` bundle: that keeps the operation stream abstract —
+unfolding it at the Action instance is what makes the same step unaffordable — and keeps the
+lemma clear of the bundle's own signature. -/
 theorem mem_instanceQueries_constraintSystem {F : Type} [FiniteField F]
-    (top : TopLevelCircuit F ConfigInput Config Output)
+    (circuit : FormalCircuit F Unit Config unit unit)
     (query : Column .instance × Rotation)
-    (hquery :
-      query ∈ (top.formalCircuit.configure top.configInput {}).2.instanceQueries) :
-    query ∈ top.constraintSystem.instanceQueries := by
+    (hquery : query ∈ (circuit.configure () {}).2.instanceQueries) :
+    query ∈ (TopLevelCompilation.constraintSystem circuit).instanceQueries := by
   -- Name the closure by unfolding rather than leaving it to unification, which otherwise
-  -- searches through the whole `TopLevelCircuit` bundle.
-  unfold TopLevelCircuit.constraintSystem Halo2.FormalCircuit.toConstraintSystem
+  -- searches through the whole compilation pipeline.
+  unfold TopLevelCompilation.constraintSystem Halo2.FormalCircuit.toConstraintSystem
   exact mem_instanceQueries_closeWithOperations_of_mem _ _ _ hquery
 
 /-- A query present in the synthesis-closed top-level constraint system remains in
 its derived verifying key's instance-query layout. -/
 theorem instanceQueryLayout_of_constraintSystem
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    (top : TopLevelCircuit Fp Config PublicInput)
     (pp : Keygen.ProofParams) (urs : URS G)
     (column : Column .instance) (rotation : Rotation)
     (hquery :

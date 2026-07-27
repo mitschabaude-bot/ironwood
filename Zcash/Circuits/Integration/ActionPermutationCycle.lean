@@ -21,7 +21,7 @@ open Zcash.Arithmetic (derivedUrsGLagrange omegaOf)
 open Halo2 Polynomial
 open Keygen
 open ActionPermutationDomain
-open Zcash.Circuits.Action (orchardActionTopLevelCircuit)
+open Zcash.Circuits.Action (actionCircuit)
 
 set_option maxHeartbeats 20000
 
@@ -30,12 +30,12 @@ variable {G : Type} [AddCommGroup G] [Module Fp G]
 
 theorem actionCopyList_decoded :
     Halo2.Layout.V1.copyList
-        (Keygen.permColsOf orchardActionTopLevelCircuit.constraintSystem)
+        (Keygen.permColsOf actionCircuit.constraintSystem)
         (Halo2.FloorPlanner.V1.starts
-          (orchardActionTopLevelCircuit.operations 0))
-        (orchardActionTopLevelCircuit.operations 0)
-        (Keygen.constantsOf orchardActionTopLevelCircuit.constraintSystem
-          (orchardActionTopLevelCircuit.operations 0)) =
+          (actionCircuit.operations))
+        (actionCircuit.operations)
+        (Keygen.constantCopyEntries actionCircuit.constraintSystem
+          (actionCircuit.operations)) =
       Zcash.Snark.actionCopies.map fun pair =>
         (pair.1.pair.1, pair.1.pair.2,
           pair.2.pair.1, pair.2.pair.2) := by
@@ -60,7 +60,7 @@ theorem actionPermutationRows_eq_chunkRowName
         (actionVk pp urs) poly proofIndex chunk).length)
     (row : Fin Zcash.Snark.actionDomainSize) :
     (Zcash.Snark.topLevelPermutationRows
-      orchardActionTopLevelCircuit
+      actionCircuit
       ((Zcash.Snark.actionChunkFlatten pp urs poly proofIndex
         ⟨chunk, row, column⟩).2 : ℕ)).getD (row : ℕ) 0 =
       chunkRowName
@@ -74,8 +74,8 @@ theorem actionPermutationRows_eq_chunkRowName
         ((Zcash.Snark.actionFullSigma pp urs poly proofIndex
           ⟨chunk, row, column⟩).2.2 : ℕ) := by
   apply Zcash.Snark.Layout.Asm.permPolysOf_getD_eq_chunkRowName
-    orchardActionTopLevelCircuit.constraintSystem
-    (orchardActionTopLevelCircuit.operations 0)
+    actionCircuit.constraintSystem
+    (actionCircuit.operations)
     Zcash.Snark.actionCopies
     actionCopyList_decoded
     (actionVk pp urs).chunkLen
@@ -161,7 +161,7 @@ theorem actionChunkCommonIndex
     · norm_num [htwo]
   have hglobal :
       global <
-        orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length := by
+        actionCircuit.constraintSystem.permutationColumns.length := by
     have h := (flatten ⟨chunk, row, column⟩).2.isLt
     simpa only [global, Zcash.Snark.actionNumPermCols,
       Zcash.Snark.actionPermCols, Keygen.permColsOf,
@@ -186,14 +186,14 @@ theorem actionChunkCommonIndex
   rw [hglobalIndex] at hlocal
   have hflatten :=
     Zcash.Snark.permutationChunksOf_flatten
-      orchardActionTopLevelCircuit.selectorMap
-      orchardActionTopLevelCircuit.constraintSystem
+      actionCircuit.selectorMap
+      actionCircuit.constraintSystem
   change
     vk.permutationChunks.flatten =
-      (orchardActionTopLevelCircuit.constraintSystem.permutationColumns.map
+      (actionCircuit.constraintSystem.permutationColumns.map
         (Zcash.Snark.permutationQueryReference
-          (projectCS orchardActionTopLevelCircuit.selectorMap
-            orchardActionTopLevelCircuit.constraintSystem))).zipIdx at hflatten
+          (projectCS actionCircuit.selectorMap
+            actionCircuit.constraintSystem))).zipIdx at hflatten
   calc
     ((vk.permutationChunks.getD chunk []).getD
         column ((.advice 0), 0)).2 =
@@ -201,10 +201,10 @@ theorem actionChunkCommonIndex
           global ((.advice 0), 0)).2 := by
       exact congrArg Prod.snd hlocal.symm
     _ =
-        (((orchardActionTopLevelCircuit.constraintSystem.permutationColumns.map
+        (((actionCircuit.constraintSystem.permutationColumns.map
           (Zcash.Snark.permutationQueryReference
-            (projectCS orchardActionTopLevelCircuit.selectorMap
-              orchardActionTopLevelCircuit.constraintSystem))).zipIdx).getD
+            (projectCS actionCircuit.selectorMap
+              actionCircuit.constraintSystem))).zipIdx).getD
           global ((.advice 0), 0)).2 := by
       rw [hflatten]
     _ = global := zipIdx_getD_snd _ (ColumnRef.advice 0) global
@@ -222,10 +222,10 @@ theorem actionPermutationCommitment_ofKeygen
         (derivedUrsGLagrange urs)
         setup.generator_eq).commitInstance
           (topLevelPermutationRows
-            orchardActionTopLevelCircuit column) 1 := by
-  rw [orchardActionTopLevelCircuit.toVerifierKey_permutationCommonCommitment]
+            actionCircuit column) 1 := by
+  rw [actionCircuit.toVerifierKey_permutationCommonCommitment]
   apply PermutationCommitmentCoherence.commitment_ofKeygen
-    orchardActionTopLevelCircuit urs hk setup column
+    actionCircuit urs hk setup column
   simpa only [topLevelPermutationColumnCount,
     Keygen.ProofParams.mergeDerived, Keygen.permColsOf,
     List.length_map] using column.isLt
@@ -240,17 +240,17 @@ theorem actionRowsInjectiveAtUrs
   let left' : Fin (actionVk pp urs).n :=
     ⟨left, by
       change (left : ℕ) <
-        2 ^ orchardActionTopLevelCircuit.domainExponent
+        2 ^ actionCircuit.domainExponent
       have hdomain :
-          orchardActionTopLevelCircuit.domainExponent = urs.k := hk
+          actionCircuit.domainExponent = urs.k := hk
       rw [hdomain]
       exact left.isLt⟩
   let right' : Fin (actionVk pp urs).n :=
     ⟨right, by
       change (right : ℕ) <
-        2 ^ orchardActionTopLevelCircuit.domainExponent
+        2 ^ actionCircuit.domainExponent
       have hdomain :
-          orchardActionTopLevelCircuit.domainExponent = urs.k := hk
+          actionCircuit.domainExponent = urs.k := hk
       rw [hdomain]
       exact right.isLt⟩
   have hfin := rowsInjective pp urs
@@ -305,7 +305,7 @@ theorem actionResolverPermutationCycle_or_relation
   · apply Or.inl
     have hkUrs : urs.k ≤ 32 := by
       have hdomain :
-          orchardActionTopLevelCircuit.domainExponent = urs.k := hk
+          actionCircuit.domainExponent = urs.k := hk
       rw [← hdomain]
       exact Nat.le_of_lt_succ domainExponent_lt
     let setup := LagrangePrefixSetup.ofDerived urs hkUrs
@@ -341,7 +341,7 @@ theorem actionResolverPermutationCycle_or_relation
       have homega :
           vk.omega = omegaOf urs.k := by
         change
-          omegaOf orchardActionTopLevelCircuit.domainExponent =
+          omegaOf actionCircuit.domainExponent =
             omegaOf urs.k
         exact congrArg omegaOf hk
       let key : LagrangeCommitmentKey urs vk.omega := by
@@ -359,7 +359,7 @@ theorem actionResolverPermutationCycle_or_relation
           vk.permutationCommonCommitment common =
             key.commitInstance
               (topLevelPermutationRows
-                orchardActionTopLevelCircuit common) 1 := by
+                actionCircuit common) 1 := by
         have source :=
           actionPermutationCommitment_ofKeygen pp urs hk setup common
         simpa only [vk, key, LagrangeCommitmentKey.commitInstance,
@@ -373,7 +373,7 @@ theorem actionResolverPermutationCycle_or_relation
       have hval :
           ∀ i : Fin Zcash.Snark.actionDomainSize,
             (topLevelPermutationRows
-              orchardActionTopLevelCircuit common).getD (i : ℕ) 0 =
+              actionCircuit common).getD (i : ℕ) 0 =
               chunkRowName vk.omega vk.delta vk.chunkLen
                 (Zcash.Snark.actionFullSigma
                   pp urs relation.polynomial proofIndex
@@ -411,7 +411,7 @@ theorem actionResolverPermutationCycle_or_relation
         relation.resolverPermutationPairs_snd_eq_keygenSigmaColumn_or_relation_of_size
           proofIndex chunk column hj common hidx key
           (topLevelPermutationRows
-            orchardActionTopLevelCircuit common)
+            actionCircuit common)
           hcommit (actionRowsInjectiveAtUrs pp urs hk)
           (by
             unfold Zcash.Snark.actionDomainSize

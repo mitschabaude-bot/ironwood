@@ -19,19 +19,18 @@ set_option maxHeartbeats 20000
 namespace FullCircuitSatisfaction
 
 variable
-    {ConfigInput Config : Type} {Output : TypeMap}
-    [CircuitType Output]
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
 
 /-- Exact full operation satisfaction implies the circuit-owned semantic statement. -/
 theorem topLevelSoundness
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
-    (i : RegionIndex) (env : Placed Environment Fp)
-    (hwellFormed :
-      SynthesisWellFormed env.env (top.operations i))
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (assignment : ProofAssignment Fp)
     (hsatisfied :
-      FullCircuitSatisfaction env.place env.env (top.operations i) i) :
-    top.Statement i env := by
-  apply top.soundness i env hwellFormed
+      FullCircuitSatisfaction top.placement
+        (top.environment assignment) top.operations 0) :
+    top.Statement (top.extractPublicInput (top.environment assignment)) := by
+  apply top.statement_soundness assignment
   exact FullCircuitSatisfaction.constraints hsatisfied
 
 end FullCircuitSatisfaction
@@ -39,8 +38,8 @@ end FullCircuitSatisfaction
 namespace FullCircuitBridge
 
 variable
-    {ConfigInput Config : Type} {Output : TypeMap}
-    [CircuitType Output]
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
     {cell : Type} [DecidableEq cell] [Fintype cell]
     {Bad : Prop}
 
@@ -49,15 +48,13 @@ The generic semantic last mile: reconstructed full constraints imply the top-lev
 circuit's own statement, preserving the bridge's shared exceptional event.
 -/
 theorem topLevelSoundness_or_bad
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
-    (i : RegionIndex) (env : Placed Environment Fp)
-    (hwellFormed :
-      SynthesisWellFormed env.env (top.operations i))
-    (bridge : FullCircuitBridge env.place env.env
-      (top.operations i) i cell Bad) :
-    top.Statement i env ∨ Bad := by
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (assignment : ProofAssignment Fp)
+    (bridge : FullCircuitBridge top.placement (top.environment assignment)
+      top.operations 0 cell Bad) :
+    top.Statement (top.extractPublicInput (top.environment assignment)) ∨ Bad := by
   rcases bridge.satisfaction_or_bad with hsatisfied | hbad
-  · exact Or.inl (hsatisfied.topLevelSoundness top i env hwellFormed)
+  · exact Or.inl (hsatisfied.topLevelSoundness top assignment)
   · exact Or.inr hbad
 
 end FullCircuitBridge

@@ -26,15 +26,20 @@ every enabled lookup. No proof-specific verifier data enters this statement.
 theorem actionLookupInputSelectorLeafRowsExact
     {pp : Keygen.ProofParams} {urs : URS G}
     (coherence :
-      TopLevelFixedCoherence orchardActionTopLevelCircuit pp urs)
+      TopLevelFixedCoherence actionCircuit pp urs)
     (lookup : EnabledLookup Fp)
     (henabled :
       lookup ∈ operationEnabledLookups
-        (orchardActionTopLevelCircuit.operations 0) 0) :
+        (actionCircuit.operations) 0) :
     lookup.InputSelectorLeafRowsExact
-      orchardActionTopLevelCircuit coherence.rows := by
+      actionCircuit
+        (fun column =>
+          actionCircuit.fixedRows.getD column []) := by
   apply EnabledLookup.inputSelectorLeafRowsExact_of_realizes
-    orchardActionTopLevelCircuit coherence.rows lookup henabled
+    actionCircuit
+      (fun column =>
+        actionCircuit.fixedRows.getD column [])
+      lookup henabled
   intro column row value hentry
   have hrealized := coherence.realizes column row value hentry
   exact ⟨hrealized.2.1, hrealized.2.2⟩

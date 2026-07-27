@@ -595,7 +595,7 @@ theorem permPolysOf_getD_eq {k : ℕ} (cs : ConstraintSystem Fp) (ops : Operatio
       FlatCell (Keygen.permColsOf cs).length (2 ^ k)))
     (hcopies : Halo2.Layout.V1.copyList (Keygen.permColsOf cs)
         (Halo2.FloorPlanner.V1.starts ops) ops
-        (Keygen.constantsOf cs ops) =
+        (Keygen.constantCopyEntries cs ops) =
       copies'.map fun p => (p.1.pair.1, p.1.pair.2, p.2.pair.1, p.2.pair.2))
     (g : Fin (Keygen.permColsOf cs).length) (j : Fin (2 ^ k)) :
     ((Keygen.permPolysOf k cs ops).getD (g : ℕ) []).getD (j : ℕ) 0 =
@@ -629,7 +629,7 @@ theorem permPolysOf_getD_eq_chunkRowName {k : ℕ}
       FlatCell (Keygen.permColsOf cs).length (2 ^ k)))
     (hcopies : Halo2.Layout.V1.copyList (Keygen.permColsOf cs)
         (Halo2.FloorPlanner.V1.starts ops) ops
-        (Keygen.constantsOf cs ops) =
+        (Keygen.constantCopyEntries cs ops) =
       copies'.map fun p => (p.1.pair.1, p.1.pair.2, p.2.pair.1, p.2.pair.2))
     {nc : ℕ} {width : ℕ → ℕ} (chunkLen : ℕ)
     (flatten : ChunkCell nc (2 ^ k) width ≃
