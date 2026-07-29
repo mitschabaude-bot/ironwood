@@ -1,5 +1,5 @@
 import Mathlib
-import Zcash.Snark.Core.Field
+import Zcash.Arithmetic
 import Zcash.Snark.Verifier.Expressions
 import Zcash.Snark.Verifier.Assemble
 
@@ -34,6 +34,8 @@ on the full path covers gates, the permutation argument, and the lookup argument
 -/
 
 namespace Zcash.Snark
+
+open Zcash.Arithmetic (scalarFieldOrder)
 
 open Polynomial Finset
 

@@ -1,13 +1,13 @@
-import Zcash.Circuits.Action.GateCoherence
+import Zcash.Circuits.Action.Circuit
 import Zcash.Circuits.Integration.SelectorCoherence
 
 /-!
 # Action configure selector coherence
 
 Compositional certificates that every selector reference registered by the Orchard
-Action configure program was allocated by that same program.  This is the syntactic
-companion to `Action.GateCoherence`: semantic gate shape and selector allocation are
-kept separate because neither implies the other.
+Action configure program was allocated by that same program. Semantic gate
+well-formedness is intrinsic to `Gate`; this module supplies the distinct syntactic
+selector-allocation invariant.
 -/
 
 namespace Zcash.Circuits
@@ -389,12 +389,7 @@ theorem rangeCheckGate_selectorsOwned
     (W : ℕ) (cfg : Config) :
     (rangeCheckGate W cfg).SelectorsOwned := by
   apply Gate.selectorsOwned_of_withSelector
-  rw [List.forall_iff_forall_mem]
-  intro constraint hconstraint
-  simp only [List.mem_singleton] at hconstraint
-  subst constraint
-  apply rangeCheckExpr_selectorFree
-  simp [Expression.SelectorFree, queryAdvice]
+  selector_free
 
 /--
 Relational preservation for the child configure program whose selector is allocated
@@ -408,6 +403,9 @@ theorem configure_preservesGateSelectorsAllocated_of_lt
     ConstraintSystem.GateSelectorsAllocated
       (((configure W qRangeCheck z) cs).2) := by
   unfold configure
+  simp only [
+    Configure.PreservesGateSelectorsAllocated.gateSelectorsAllocated_run_bind,
+    Configure.PreservesGateSelectorsAllocated.gateSelectorsAllocated_run_pure]
   let afterEquality :=
     (enableEquality z.toAny cs).2
   change
@@ -422,7 +420,7 @@ theorem configure_preservesGateSelectorsAllocated_of_lt
   · apply Gate.SelectorsAllocated.of_owned
       (rangeCheckGate_selectorsOwned W
         { qRangeCheck, z })
-    simpa [afterEquality, enableEquality] using hselector
+    simpa [afterEquality] using hselector
 
 @[simp]
 theorem configure_numSelectors
@@ -431,12 +429,7 @@ theorem configure_numSelectors
     ((configure W qRangeCheck z) cs).2.numSelectors =
       cs.numSelectors := by
   unfold configure
-  change
-    ((createGate (rangeCheckGate W { qRangeCheck, z })
-      (enableEquality z.toAny cs).2).2).numSelectors =
-        cs.numSelectors
-  rw [ConstraintSystem.createGate_numSelectors]
-  simp [enableEquality]
+  simp
 
 end DecomposeRunningSum
 
@@ -1092,9 +1085,7 @@ namespace Ecc.MulFixed.BaseFieldElem
 theorem canonGate_selectorsOwned (cfg : Config) :
     (canonGate cfg).SelectorsOwned := by
   apply Gate.selectorsOwned_of_withSelector
-  simp [DecomposeRunningSum.rangeCheckExpr_selectorFree,
-    Expression.mulConstant, Expression.SelectorFree,
-    queryAdvice]
+  selector_free
 
 theorem configure_preservesGateSelectorsAllocated
     (canonAdvices : Fin 3 → Column .advice)
@@ -1134,8 +1125,7 @@ namespace Ecc.MulFixed.Short
 theorem shortGate_selectorsOwned (cfg : Config) :
     (shortGate cfg).SelectorsOwned := by
   apply Gate.selectorsOwned_of_withSelector
-  simp [DecomposeRunningSum.rangeCheckExpr_selectorFree,
-    Expression.SelectorFree, queryAdvice]
+  selector_free
 
 theorem configure_preservesGateSelectorsAllocated
     (superConfig : MulFixed.Config) :
@@ -1161,16 +1151,7 @@ namespace Ecc.MulFixed.FullWidth
 theorem fullWidthGate_selectorsOwned (cfg : Config) :
     (fullWidthGate cfg).SelectorsOwned := by
   apply Gate.selectorsOwned_of_withSelector
-  rw [List.forall_append]
-  constructor
-  · apply MulFixed.coordsCheck_selectorFree
-    simp [Expression.SelectorFree, queryAdvice]
-  · rw [List.forall_iff_forall_mem]
-    intro constraint hconstraint
-    simp only [List.mem_singleton] at hconstraint
-    subst constraint
-    apply DecomposeRunningSum.rangeCheckExpr_selectorFree
-    simp [Expression.SelectorFree, queryAdvice]
+  selector_free
 
 theorem configure_preservesGateSelectorsAllocated
     (superConfig : MulFixed.Config) :
@@ -1196,8 +1177,55 @@ namespace Ecc.MulFixed
 theorem coordsGate_selectorsOwned (cfg : Config) :
     (coordsGate cfg).SelectorsOwned := by
   apply Gate.selectorsOwned_of_withSelector
-  apply coordsCheck_selectorFree
-  simp [Expression.SelectorFree, queryAdvice]
+  selector_free
+
+private theorem configureProgram_preservesGateSelectorsAllocated_of_lt
+    (window : Column .advice) (qRunningSum : Selector)
+    (cs : ConstraintSystem Fp)
+    (hcs : cs.GateSelectorsAllocated)
+    (hselector : qRunningSum.index < cs.numSelectors) :
+    ((configureProgram window qRunningSum) cs).2.GateSelectorsAllocated := by
+  simp only [configureProgram,
+    Configure.PreservesGateSelectorsAllocated.gateSelectorsAllocated_run_bind,
+    Configure.PreservesGateSelectorsAllocated.gateSelectorsAllocated_run_pure]
+  exact Configure.PreservesGateSelectorsAllocated.fixedColumn.run
+    ((DecomposeRunningSum.configure 3 qRunningSum window) cs).2
+    (DecomposeRunningSum.configure_preservesGateSelectorsAllocated_of_lt
+      3 qRunningSum window cs hcs hselector)
+
+private theorem configureProgram_numSelectors
+    (window : Column .advice) (qRunningSum : Selector)
+    (cs : ConstraintSystem Fp) :
+    ((configureProgram window qRunningSum) cs).2.numSelectors =
+      cs.numSelectors := by
+  simp only [configureProgram, Configure.run_bind_numSelectors]
+  have h :=
+    DecomposeRunningSum.configure_numSelectors
+      3 qRunningSum window cs
+  rw [Configure.run_numSelectors] at h
+  exact h
+
+private theorem configureTail_preservesGateSelectorsAllocated
+    (lagrangeCoeffs : Fin 8 → Column .fixed)
+    (window u : Column .advice)
+    (addConfig : Ecc.Add.Config)
+    (addIncompleteConfig : Ecc.AddIncomplete.Config) :
+    Configure.PreservesGateSelectorsAllocated
+      (configureTail lagrangeCoeffs window u
+        addConfig addIncompleteConfig) := by
+  unfold configureTail
+  exact Configure.PreservesGateSelectorsAllocated.selectorProgramGate
+    (configureProgram window)
+    (configureGate lagrangeCoeffs window u
+      addConfig addIncompleteConfig)
+    (configureResult lagrangeCoeffs window u
+      addConfig addIncompleteConfig)
+    (configureProgram_preservesGateSelectorsAllocated_of_lt window)
+    (configureProgram_numSelectors window)
+    (fun _ _ => rfl)
+    (by
+      intro _ _
+      apply coordsGate_selectorsOwned)
 
 theorem configure_preservesGateSelectorsAllocated
     (lagrangeCoeffs : Fin 8 → Column .fixed)
@@ -1208,62 +1236,16 @@ theorem configure_preservesGateSelectorsAllocated
       (configure lagrangeCoeffs window u addConfig
         addIncompleteConfig) := by
   unfold configure
-  exact Configure.PreservesGateSelectorsAllocated.bind
+  apply Configure.PreservesGateSelectorsAllocated.bind
     (Configure.PreservesGateSelectorsAllocated.enableEquality
-      window.toAny) fun _ =>
-    Configure.PreservesGateSelectorsAllocated.bind
+      window.toAny)
+  intro _
+  apply Configure.PreservesGateSelectorsAllocated.bind
       (Configure.PreservesGateSelectorsAllocated.enableEquality
-        u.toAny) fun _ =>
-    Configure.PreservesGateSelectorsAllocated.selectorProgramGate
-      (fun qRunningSum => do
-        let runningSumConfig ←
-          DecomposeRunningSum.configure 3 qRunningSum window
-        let fixedZ ← fixedColumn
-        return (runningSumConfig, fixedZ))
-      (fun _ value =>
-        coordsGate
-          { runningSumConfig := value.1
-            lagrangeCoeffs
-            fixedZ := value.2
-            window
-            u
-            addConfig
-            addIncompleteConfig })
-      (fun _ value =>
-        ({ runningSumConfig := value.1
-           lagrangeCoeffs
-           fixedZ := value.2
-           window
-           u
-           addConfig
-           addIncompleteConfig } : Config))
-      (by
-        intro qRunningSum cs hcs hselector
-        let afterDecompose :=
-          ((DecomposeRunningSum.configure
-            3 qRunningSum window) cs).2
-        exact
-          Configure.PreservesGateSelectorsAllocated.fixedColumn.run
-            afterDecompose
-            (DecomposeRunningSum.configure_preservesGateSelectorsAllocated_of_lt
-                3 qRunningSum window cs hcs hselector))
-      (by
-        intro qRunningSum cs
-        change
-          ((fixedColumn
-            ((DecomposeRunningSum.configure
-              3 qRunningSum window) cs).2).2).numSelectors =
-            cs.numSelectors
-        change
-          ((DecomposeRunningSum.configure
-            3 qRunningSum window) cs).2.numSelectors =
-            cs.numSelectors
-        exact DecomposeRunningSum.configure_numSelectors
-          3 qRunningSum window cs)
-      (fun _ _ => rfl)
-      (by
-        intro _ _
-        apply coordsGate_selectorsOwned)
+        u.toAny)
+  intro _
+  exact configureTail_preservesGateSelectorsAllocated
+    lagrangeCoeffs window u addConfig addIncompleteConfig
 
 end Ecc.MulFixed
 
@@ -1330,34 +1312,45 @@ theorem configure_preservesGateSelectorsAllocated
     (G : Specs.Sinsemilla.Generators) :
     Configure.PreservesGateSelectorsAllocated (configure G) := by
   unfold configure
+  apply Configure.PreservesGateSelectorsAllocated.bind
+    Configure.PreservesGateSelectorsAllocated.adviceColumn
+  intro a0
+  apply Configure.PreservesGateSelectorsAllocated.bind
+    Configure.PreservesGateSelectorsAllocated.adviceColumn
+  intro a1
+  apply Configure.PreservesGateSelectorsAllocated.bind
+    Configure.PreservesGateSelectorsAllocated.adviceColumn
+  intro a2
+  apply Configure.PreservesGateSelectorsAllocated.bind
+    Configure.PreservesGateSelectorsAllocated.adviceColumn
+  intro a3
+  apply Configure.PreservesGateSelectorsAllocated.bind
+    Configure.PreservesGateSelectorsAllocated.adviceColumn
+  intro a4
+  apply Configure.PreservesGateSelectorsAllocated.bind
+    Configure.PreservesGateSelectorsAllocated.adviceColumn
+  intro a5
+  apply Configure.PreservesGateSelectorsAllocated.bind
+    Configure.PreservesGateSelectorsAllocated.adviceColumn
+  intro a6
+  apply Configure.PreservesGateSelectorsAllocated.bind
+    Configure.PreservesGateSelectorsAllocated.adviceColumn
+  intro a7
+  apply Configure.PreservesGateSelectorsAllocated.bind
+    Configure.PreservesGateSelectorsAllocated.adviceColumn
+  intro a8
+  apply Configure.PreservesGateSelectorsAllocated.bind
+    Configure.PreservesGateSelectorsAllocated.adviceColumn
+  intro a9
+  let advices : Fin 10 → Column .advice :=
+    ![a0, a1, a2, a3, a4, a5, a6, a7, a8, a9]
+  apply Configure.PreservesGateSelectorsAllocated.selectorCreateGateThen
+    (fun qOrchard => orchardGate qOrchard advices)
+    (fun _ => rfl)
+    (fun qOrchard =>
+      orchardGate_selectorsOwned qOrchard advices)
+  intro qOrchard
   exact Configure.PreservesGateSelectorsAllocated.bind
-    Configure.PreservesGateSelectorsAllocated.adviceColumn fun a0 =>
-    Configure.PreservesGateSelectorsAllocated.bind
-      Configure.PreservesGateSelectorsAllocated.adviceColumn fun a1 =>
-    Configure.PreservesGateSelectorsAllocated.bind
-      Configure.PreservesGateSelectorsAllocated.adviceColumn fun a2 =>
-    Configure.PreservesGateSelectorsAllocated.bind
-      Configure.PreservesGateSelectorsAllocated.adviceColumn fun a3 =>
-    Configure.PreservesGateSelectorsAllocated.bind
-      Configure.PreservesGateSelectorsAllocated.adviceColumn fun a4 =>
-    Configure.PreservesGateSelectorsAllocated.bind
-      Configure.PreservesGateSelectorsAllocated.adviceColumn fun a5 =>
-    Configure.PreservesGateSelectorsAllocated.bind
-      Configure.PreservesGateSelectorsAllocated.adviceColumn fun a6 =>
-    Configure.PreservesGateSelectorsAllocated.bind
-      Configure.PreservesGateSelectorsAllocated.adviceColumn fun a7 =>
-    Configure.PreservesGateSelectorsAllocated.bind
-      Configure.PreservesGateSelectorsAllocated.adviceColumn fun a8 =>
-    Configure.PreservesGateSelectorsAllocated.bind
-      Configure.PreservesGateSelectorsAllocated.adviceColumn fun a9 =>
-    let advices : Fin 10 → Column .advice :=
-      ![a0, a1, a2, a3, a4, a5, a6, a7, a8, a9]
-    Configure.PreservesGateSelectorsAllocated.selectorCreateGateThen
-        (fun qOrchard => orchardGate qOrchard advices)
-        (fun _ => rfl)
-        (fun qOrchard =>
-          orchardGate_selectorsOwned qOrchard advices) fun qOrchard =>
-    Configure.PreservesGateSelectorsAllocated.bind
       (AddChip.configure_preservesGateSelectorsAllocated a7 a8 a6)
         fun addChipConfig =>
     Configure.PreservesGateSelectorsAllocated.bind

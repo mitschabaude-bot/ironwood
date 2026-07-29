@@ -1,5 +1,6 @@
 import Zcash.Circuits.Integration.CircuitSatisfaction
-import Zcash.Snark.Soundness.PermutationSemantics
+import Zcash.Common.RelationWitness
+import Zcash.Snark.Soundness.Canonical.PermutationSemantics
 
 /-!
 # Declared operation copies and permutation-cycle satisfaction
@@ -132,8 +133,12 @@ global exceptional branch rather than one branch per operation.
 The concrete layout layer only needs to provide `encode` and `hread`; constant endpoints may be
 encoded by the floor planner's allocated constants-column cells there. `hread` is required
 only at the DECLARED endpoints — an unconditional read fact is uninstantiable for any
-finite cell type, since a constant endpoint evaluates to an arbitrary field element. -/
-theorem declaredCopies_satisfied_or_bad_of_replay
+finite cell type, since a constant endpoint evaluates to an arbitrary field element.
+
+`hcycle` reports its exceptional branch as data, so this bridge cannot decide that branch once
+for all copies; it walks `copies` and returns the first break `hcycle` computes
+(`listForallOrRelationWitness`). -/
+def declaredCopies_satisfied_or_bad_of_replay
     {F cell : Type} [FiniteField F] [DecidableEq cell] [Fintype cell]
     (place : RegionIndex → ℕ) (env : Environment F)
     (copies : List (DeclaredCopy F))
@@ -141,30 +146,29 @@ theorem declaredCopies_satisfied_or_bad_of_replay
     (hread : ∀ copy ∈ copies,
       copy.1.eval place env = value (encode copy.1) ∧
         copy.2.eval place env = value (encode copy.2))
-    (Bad : Prop)
+    (Bad : Type)
     (hcycle : ∀ {left right : cell},
       (replayKeygenPermutation (encodeDeclaredCopies encode copies)).SameCycle left right →
-        value left = value right ∨ Bad) :
-    copies.Forall (DeclaredCopy.Satisfied place env) ∨ Bad := by
-  by_cases hbad : Bad
-  · exact Or.inr hbad
-  · left
-    rw [List.forall_iff_forall_mem]
-    intro copy hcopy
-    have hencoded :
-        (encode copy.1, encode copy.2) ∈ encodeDeclaredCopies encode copies := by
-      exact List.mem_map.mpr ⟨copy, hcopy, rfl⟩
-    have hlinked :=
-      replayKeygenPermutation_pair_linked
-        (encodeDeclaredCopies encode copies) hencoded
-    rcases hcycle hlinked with heq | hbad'
-    · obtain ⟨h1, h2⟩ := hread copy hcopy
-      simpa [DeclaredCopy.Satisfied, h1, h2] using heq
-    · exact absurd hbad' hbad
+        value left = value right ⊕' Bad) :
+    copies.Forall (DeclaredCopy.Satisfied place env) ⊕' Bad :=
+  bindOrRelationWitness
+    (listForallOrRelationWitness copies fun copy hcopy => by
+      have hencoded :
+          (encode copy.1, encode copy.2) ∈ encodeDeclaredCopies encode copies := by
+        exact List.mem_map.mpr ⟨copy, hcopy, rfl⟩
+      have hlinked :=
+        replayKeygenPermutation_pair_linked
+          (encodeDeclaredCopies encode copies) hencoded
+      rcases hcycle hlinked with heq | hbad
+      · refine PSum.inl ?_
+        obtain ⟨h1, h2⟩ := hread copy hcopy
+        simpa [DeclaredCopy.Satisfied, h1, h2] using heq
+      · exact PSum.inr hbad)
+    List.forall_iff_forall_mem.mpr
 
 /-- The generic replay bridge, phrased directly as the `copies` field of full circuit
 satisfaction. -/
-theorem copy_constraints_or_bad_of_replay
+def copy_constraints_or_bad_of_replay
     {F cell : Type} [FiniteField F] [DecidableEq cell] [Fintype cell]
     (place : RegionIndex → ℕ) (env : Environment F)
     (ops : Operations F) (i : RegionIndex)
@@ -172,14 +176,15 @@ theorem copy_constraints_or_bad_of_replay
     (hread : ∀ copy ∈ operationDeclaredCopies ops,
       copy.1.eval place env = value (encode copy.1) ∧
         copy.2.eval place env = value (encode copy.2))
-    (Bad : Prop)
+    (Bad : Type)
     (hcycle : ∀ {left right : cell},
       (replayKeygenPermutation
         (encodeDeclaredCopies encode (operationDeclaredCopies ops))).SameCycle left right →
-        value left = value right ∨ Bad) :
-    CircuitConstraintFamily.constraints .copy place env ops i ∨ Bad := by
-  rw [CircuitConstraintFamily.copy_constraints_iff_declaredCopies]
-  exact declaredCopies_satisfied_or_bad_of_replay
-    place env (operationDeclaredCopies ops) encode value hread Bad hcycle
+        value left = value right ⊕' Bad) :
+    CircuitConstraintFamily.constraints .copy place env ops i ⊕' Bad :=
+  bindOrRelationWitness
+    (declaredCopies_satisfied_or_bad_of_replay
+      place env (operationDeclaredCopies ops) encode value hread Bad hcycle)
+    (CircuitConstraintFamily.copy_constraints_iff_declaredCopies place env ops i).mpr
 
 end Zcash.Snark

@@ -1,0 +1,366 @@
+# Source Map
+
+A directory-by-directory index of the Lean development under [`Zcash/`](https://github.com/zcash/ironwood/tree/main/Zcash):
+what each subtree contains and where to start reading. It is the source-tree companion
+to the [proof map](proof-map.md) (which traces how the results connect), the
+[security definitions](security-definitions.md) (which state the properties being proven),
+and the [glossary](glossary.md) (which defines the coined terms).
+
+The development has four tiers. **`Zcash/Arithmetic/`** holds the objects the other three are
+stated over — the scalar field, the verifier group and its reference string, the fingerprint
+multiscalar multiplication, and the transform machinery and fast kernels behind them.
+**`Zcash/Snark/`** is verifier soundness for the deployed Halo 2 verifier — an accepting proof is
+bound to a witness satisfying the circuit, or else an explicit break of a hardness assumption is
+computed. **`Zcash/Circuits/`** is the circuit layer — a port of the Orchard Action circuit onto
+Clean's Halo 2 formalization, saying what satisfying that circuit means in protocol terms, with
+`Integration/` carrying the Clean-to-Ironwood boundary. **`Zcash/Security/`** is the protocol
+security-property layer — the binding-signature balance, key-binding, and ledger-model games built
+on top. A small set of shared leaves (`Zcash/Common/`, `Zcash/Meta/`) and a library-wide trust
+census (`Zcash/TrustBoundary.lean`) support all four.
+
+Each `.lean` file carries a module docstring with the details; this page stays at the
+directory level, naming the notable modules as entry points.
+
+## Top level — `Zcash/`
+
+- **`Common/`** — shared leaves that two tiers need and neither should import the other for.
+  `DiscreteLogRelation` carries a nontrivial `F`-linear (discrete-log) relation among a family of
+  generators as *computed data* — the coefficients — so the reduction-style security arguments can
+  produce a break rather than merely assert one exists (see *breaks as computed data* on the
+  [Formal Verification](../formal-verification.md) page). `Expr` is the gate-polynomial AST exactly
+  as halo2 evaluates it, produced by the circuit-side VK-match projection and consumed by the
+  verifier stack. `RelationWitness` supplies the combinators for sequencing a computed break branch:
+  a conclusion `A ⊕' R` cannot be case-split classically, so composing such reductions — and
+  commuting a family of them past `∀` — needs explicit searches rather than `by_cases`. `ParMap` is
+  `List.map` on the task runtime, proven equal to `List.map` definitionally.
+- **`Meta/`** — build-time metaprogramming. `AxiomCheck` provides `assert_axioms`, a sibling
+  of Mathlib's `assert_no_sorry` that asserts an *upper bound* on a declaration's trusted
+  base without hard-coding the pretty-printed axiom list, so the trust pins stay green across
+  toolchain bumps that rename the `native_decide` axiom, and `assert_computable`, which additionally
+  requires the declaration to be a plain `def`.
+- **`Arithmetic.lean`** — the tier's root module, and the only place in the repository that earns
+  root vocabulary: `Fp` and `URS` are re-exported at `Zcash` so every module finds them by the
+  enclosing-namespace walk.
+- **`TrustBoundary.lean`** — the library-wide census that makes the trust claims build-time
+  checks rather than prose: a change that widens any checked declaration's trusted base — a
+  reachable `sorry`, an unexpected axiom, or `native_decide` where none was permitted — fails
+  the build here. Computed break reductions are pinned with `assert_computable`, theorems with
+  `assert_axioms`. The SNARK-side censuses were consolidated into this one file, so apart from
+  the two per-capture fixture boundaries below it is the single place the trust claims are pinned.
+
+## Arithmetic — `Zcash/Arithmetic/`
+
+The objects every other tier is stated over, and the evaluation lanes that make the concrete
+computations affordable. Most of these names stay qualified; a module that wants one opens
+`Zcash.Arithmetic` for exactly that name.
+
+`Field` fixes the scalar field `F_p` (Vesta's scalar = Pallas base) and its cardinality, which
+appears in every Schwartz–Zippel bound; `Group` fixes the verifier group `E_q` (Vesta) and the
+uniform reference string as an `F`-module, with the concrete instantiation unconditional —
+CompElliptic's Vesta curve is a proven `AddCommGroup` and its order is pinned with no assumption —
+and `VestaModule` supplies that module instance as a plain `def`. `Msm` is the fingerprint
+multiscalar multiplication the verifier collapses its whole check into, mirroring halo2's `MSM<C>`,
+and `FastMsm` gives it a windowed Pippenger evaluation path registered with `@[csimp]`, so the
+fixtures' `native_decide` auxiliaries run fast while the statement surface is untouched.
+
+The transform stack is what the verifying-key derivation is built from: `Domain` (halo2's domain
+scalars
+— `omegaOf`, `DELTA`, the primitive-root facts, bridged to CompElliptic's certified Pasta root),
+`Fft` (`bestFftG`, halo2's `best_fft` over an arbitrary `Fp`-module, so the scalar and group
+instances share one definition), `FftSpec` (its full DFT specification, `bestFftG_dft`), `InvDft`
+and `ScalarInvDft`, `LagrangeBasis` (the closed coefficient form `ℓ_i = n⁻¹ · Σ_t ω^{-i·t} Xᵗ`),
+and `CommitLagrange` (the per-column committer, which inverse-DFTs the coefficients as *scalars*
+and commits against the monomial basis, so no group FFT is ever evaluated). `NatKernel` and
+`NatKernelEquiv` are the dictionary-free evaluation lane underneath — projective Vesta points as
+canonical-`ℕ` triples dispatching to GMP under the interpreter, proven equal to the
+statement-surface functions.
+
+## Verifier soundness — `Zcash/Snark/`
+
+### `Core/` — the verifier's proof-side objects
+
+`ProofString` is the proof as opaque field and group elements after canonical decoding;
+`Challenges` records the verifier's challenges in squeeze order (`θ, β, γ, y, x`, the multiopen
+`x₁…x₄`, and the IPA `ξ, z` and round challenges `uⱼ`). The field, group, and MSM these are read
+against live in `Zcash/Arithmetic/`; `Core.lean` is a one-line compatibility shim re-exporting
+`Msm` at `Zcash.Snark` for the generated captures, to be deleted when they are next regenerated.
+
+### `Verifier/` — the MSM assembly
+
+The pure function that assembles the fingerprint MSM in the exact order of halo2's
+`plonk/verifier.rs` — the Lean image of the interactive verifier.
+
+- `Assemble` and `Checks` compose the building blocks.
+- `Queries` builds the per-argument opening queries; `QueryCommitment` resolves each assembled
+  query back to the canonical group element it references.
+- `Expressions` recomputes the vanishing argument's `expected_h_eval`.
+- `Ipa` is the inner-product-argument opening (`compute_s` / `compute_b`).
+- `FiatShamir` models halo2's Blake2b challenge schedule as an abstract `squeeze`.
+- `Parametric` proves the assembly and schedule traverse every sub-proof for an arbitrary proof
+  count; every consensus-valid Orchard action count is one such count.
+
+### `Keygen/` — the verifying key, derived rather than assumed
+
+The circuit-side half of halo2's `keygen_vk`. `Pipeline` is the single generic route from a closed
+`TopLevelCircuit` and a monomial URS to a full `VerifyingKey`: Clean's `Halo2.Keygen` supplies the
+pinned constraint system, domain exponent and selector map, and this module adds the group side.
+`Derivation` instantiates it at the closed Orchard Action circuit — every definition there is a
+`TopLevelCircuit` method applied to `actionCircuit` — and is what ordinary clients consume.
+`Lagrange` relates the two directions of the Lagrange basis: the verifier-side commitment keys are
+built from the closed coefficient rows, and conversely the derived basis's `i`-th entry is the
+monomial commitment to that same closed row. `Certificate` holds the one slow check — a single
+bundled
+`native_decide` comparing every field of the derived key against the capture, which dominates the
+elaboration time of the lane — and so is built only in the fixture lane.
+
+### `Fingerprint/` — the cross-check and its soundness
+
+`Match` is the fingerprint match: running the deployed Rust verifier and the Lean `assemble`
+on the same proof and challenges and comparing the assembled MSMs coefficient-for-coefficient
+— the cross-check that validates the Lean assembly in place of a line-by-line translation
+proof. `SchwartzZippel` and `Batch` supply the soundness bounds: a fingerprint agrees with a
+random evaluation, and a random-linear-combination batch is the identity, only with negligible
+probability.
+
+### `Fixtures/` — captured proofs and boundary checks
+
+Concrete Orchard captures that exercise the assembly end-to-end and make the Rust/Lean boundary
+less silent. This subtree is the `FixtureCheck` lake target, kept out of `lake build Zcash` (the
+captures are large, generated, and slow) but built by CI; the target's glob also names
+`Soundness.Deployed.ActionVesta`, which extends the same instance-level lane to the verifying-key
+commitment certificate chain. `MaxShape` specializes the verifier shape to the captured column and
+query dimensions while leaving the action count free, and `MaxShapeBounds` and
+`StraightLineMaxShapeBounds` evaluate the composite bounds at that shape and at the consensus
+maximum; `ScheduleMarker` re-encodes captured Fiat–Shamir schedules into the model's marker form;
+`PostNu63` pins the canonical post-NU 6.3 verifying key and URS so fixture drift is visible here;
+`InstanceWitness` computes the inverse DFT of each capture's public inputs in Lean, then checks the
+result two ways: its monomial commitment under halo2's default blind is the commitment the deployed
+verifier used, and its polynomial takes the public inputs on every domain row.
+
+`SingleAction/` and `MultiAction/` hold the captured single- and multi-action proofs, each with its
+**Fiat–Shamir** schedule check and its checked `TrustBoundary` turning the fingerprint match into
+build-time obligations; `SingleAction/VkMatch` computes the capture's constraint-system fields equal
+to the ones derived end to end from the ported `configure`. The multi-action capture additionally
+carries the shape/VK **faithfulness** checks, the adversarial **negative** fixtures, the degree,
+schedule and static-check modules, the two knowledge-error endpoints (compressed-identity and
+straight-line), and `CapturedZeroFamily` — the shape-generic zero prover instantiated at the
+captured key's own scalar data, so the staged IPA trace carries eleven live rounds.
+
+### `Soundness/` — the soundness argument
+
+The core argument that an accepting proof yields a witness or a computed break. The top-level
+modules cover the argument end to end: `Main` (conditional soundness and the deployed-acceptance
+route), `KnowledgeSoundness` (the `SnarkRelation` knowledge-soundness relation), `Constraints`
+(Schwartz–Zippel soundness of the vanishing check) with `FoldSplit` (recovering the individual
+constraints from the verifier's `y`-fold), `ConstraintCore` and `ConstraintRouting` (the
+rewind-free deterministic identities the algebraic decoder consumes), `ConstraintRelations` (the
+row-level results the capstone's satisfaction predicate yields — the permutation argument's copy
+constraints and the lookup argument's inclusion), `DegreeWalk` (an explicit degree
+bound `D` for the combined constraint difference, hence `εx = D / |𝔽|`), and
+`GoodChallenge`/`ChallengePricing` (deriving the good-challenge exclusions from challenge
+uniformity rather than assuming them). The permutation/lookup stack is `GrandProduct` — the shared
+grand-product-to-multiset kernel — with `RunningProduct` (telescoping the running product),
+`GrandProductBridge` (the two Schwartz–Zippel steps from the verifier's evaluated check to the
+multiset identity), `Permutation`, `PermutationConstruction`, `PermutationRows`, `Lookup`, and
+`LookupAssembly`. The IPA stack is `InnerProduct`, `IpaSoundness`, `Extraction`, `Consistency`,
+`CommitFold`. `InstanceBinding` closes the public-instance gap: a decoded instance column is the
+polynomial halo2 committed from its `instances` argument, or a `(g, U, W)` relation is computed.
+`ZeroData` supplies the zero-data multiopen keystone the constant prover families
+are built on. `Vesta` pins the abstract group to the actual Vesta curve. `TopLevelTerminal` and `TopLevelVesta` connect verifier acceptance to the Spec of an arbitrary top-level circuit, using that circuit's derived verifier key. `ActionVesta` specializes them to our concrete Lean model of the Action circuit.
+
+Six subtrees carry the heavier machinery:
+
+- **`AGM/`** — the algebraic-group-model layer. It turns the relation coefficients computed
+  from algebraic prover data (`Peel`, `Capstone`) into a discrete-log solution over the
+  augmented basis `(g, U, W)` (`Adapter`, following
+  [Fuchsbauer–Kiltz–Loss 2018](https://eprint.iacr.org/2017/620)), adds the algebraic
+  coefficients to the prover and forking-certificate interfaces (`Prover`), feeds the
+  binding-signature relations in as AGM inputs (`BindingSignature`), and bounds the reduction's
+  probability loss (`Probability`, `ProbabilityCoins`, `ProbabilityVesta`) — programming *every*
+  basis slot from the
+  DL challenge rather than guessing which slot the relation will hit, so the loss is an additive
+  `1/|F|` with no multiplicative factor. The bulk of the subtree is the rewind-free deployed
+  decoder, consisting of the unbatching chain (`AlgebraicUnbatch`, `DeployedX1`,
+  `DeployedMultiopen`,
+  `ValueUnbatch`, `DeployedValueUnbatch`, `ShiftRecovery`), the coordinate decode
+  (`RepresentationDecode`, `DeployedCoordinateDecode`, `DirectX4Columns`, `DirectConstraintFamily`),
+  the explicit root sets it must avoid (`DeployedRootSets`, `DeployedRootDecode`,
+  `DeployedPinnedRoots`, `PinnedRootWitness`), the retained-provenance route (`OnlineMembers`,
+  `OnlineMultiopen`, `OnlineConstraint`, `DeployedConstraintSupply`), and the adapters back onto
+  the historical opened-batch interface (`SyntheticOpened`, `DeployedSyntheticOpened`,
+  `DecodeToOpened`). `StraightLineIpa` and `StraightLinePinnedRoots` classify one accepting
+  algebraic transcript as a clean opening, an explicit relation, or a squeeze-pinned bad-challenge
+  event, from a single execution with no rewinding; `StraightLineFiniteSecurity` records group
+  work, random-oracle queries and direct-decode field work as distinct quantities and asserts no
+  generic-group DLOG formula. `ZeroFamily` and `ZeroFamilyRoots` are the constant zero-data prover
+  at an arbitrary shape, whose multiopen obligation reduces to `0 = 0`.
+- **`Canonical/`** — the verifier-native constraint model the circuit layer is handed. It installs
+  the fixed selector triple into the commitment-ID resolver (`ConstraintModel`, `DomainSelectors`),
+  recovers the three constraint families from the flat `y`-folded list (`ConstraintSatisfaction`),
+  interpolates rows on the `ω` domain (`PolynomialEnvironment`), joins halo2's Lagrange-basis
+  instance commitments to the extractor's monomial coefficient vectors (`InstanceCommitment`), and
+  instantiates the permutation and lookup arguments at routed decoded polynomials
+  (`PermutationInstantiation`, `PermutationSemantics`, `LookupInstantiation`, `LookupSemantics`,
+  `LookupRows`), ending at `Terminal` and its Vesta adapter.
+- **`Composition/`** — joining the two halves the architecture keeps apart and bounding the
+  probability loss the join costs. `Bridge`
+  identifies the algebraic forking extraction's clean opening with the deployed decoded capstone's
+  opened commitment; `Decomposition` splits the knowledge-error bound unconditionally into the
+  clean-opening failure, with its probability bound, plus a measured clean-but-not-extracted
+  residual.
+  `DeployedAcceptance` and `DeployedRuntime` isolate the deployed decision from the historical
+  rewind construction; `RootContainment`, `DeployedRootContainment` and
+  `DeployedConstraintContainment` replace the four-level joint-event coupling with a finite union
+  of explicit bad-root events, each fixed before its own squeeze, so the residual is additive and
+  has no fourth root. `Quotient` reconstructs a genuinely pre-`x` quotient, `PrefixedSqueeze` and
+  `ScheduleBudget` bound the probability loss at the `x` squeeze, and `ActionBudget` and
+  `AlgebraicRootBudget` cap the
+  action-dependent counts at the consensus maximum. The straight-line route is
+  `StraightLineDeployed` (the primary deployed path), `StraightLineConstraint`,
+  `StraightLineDecodeSupply`, and the two inhabitants of its interface — `StraightLineWitness` at
+  the degenerate shape and `ZeroStraightLine` with eleven live IPA rounds.
+  `SemanticChallengeRemainder` bounds the probability loss from the bundle-wide `y`/`β`/`γ`/`θ`
+  exclusions the Action-level statement needs, and `DirectPathCost` bounds the direct-coordinate
+  postprocessing's field
+  operations and data traversal by a shape polynomial with no `|F|` term.
+- **`Deployed/`** — the bridge from the clean, abstract soundness onto halo2's actual deployed
+  IPA. It models the deployed IPA's `U`/`W` apparatus and peels it onto the clean recursive IPA
+  (`Ipa`, `IpaPeel`), unfolds the flattened deployed MSM into the recursive generator fold
+  (`Fold`), shows deployed acceptance implies halo2's explicit IPA verifier equation
+  (`Verification`), reduces binding over the augmented generators to discrete-log-relation
+  hardness (`Binding`), reads the fork-tree knowledge error off the deployed Orchard parameters as
+  a concrete number (`ConcreteBounds` — `33/|F_p| ≈ 2⁻²⁴⁹` at the captured depth `k = 11`), and
+  states the Action capstone at the captured artifacts (`ActionVesta`).
+- **`Forking/`** — the reusable Fiat–Shamir forking kernel: random-oracle primitives
+  (`Oracle`), the deployed round ordering and rewinding (`Ordering`, `Rewind`), fork-tree
+  existence and the forking-lemma probability bound (`Tree`, `Probability`), the closed form
+  of that bound (`KnowledgeError`), the transcript assembly and extraction that turn forked
+  transcripts into a deployed IPA tree (`Assembly`, `Extractor`), the one-level pinned-squeeze
+  bound and the additive union of pinned root events (`PinnedSqueeze`, `PinnedRoots`), and the
+  wrapper that returns a run's own oracle reads with its output (`WithReads`).
+  **`Forking/Adversary/`** builds the querying-adversary reduction on top: the `Q`-query
+  adaptive adversary model (`OracleComp`), executable recursive forking from a finite tape
+  (`Recursive`), the Fiat–Shamir-to-AGM handoff (`Algebraic`), oracle-domain reduction to
+  finite support (`DomainReduction`), the adaptive interface and pre-IPA query accounting
+  (`Adaptive`, `PreIpa`, `Provenance`), and the expected-run bookkeeping (`ExpectedRuns`,
+  `ExpectedRunsPoly`). The efficiency floor of the reduction is unconditional:
+  `afkRunBound Q k = (8Q + 1) · 10^k`
+  follows from the adversary's query bound alone, field-independent and with no premise on the
+  fork DAG. That is a ~40-bit cost against the straight-line route's four prover invocations,
+  which is why the recursive route is retained as an alternative carrying its own probability
+  bound rather than the path the headline rests on.
+- **`Multiopen/`** — the multiopen argument's value binding. `Decode` recovers the individual
+  columns from openings of the batch at enough distinct batching challenges, and `Deployed`
+  discharges the flat-power-batch shape those openings are stated in against the deployed verifier
+  rather than assuming it; `Compat` is the MSM evaluation spine; `RPoly` supplies the interpolation
+  core (Mathlib's `Lagrange.interpolate`, plus the bridge to the deployed `foldl`); `Claimed`,
+  `Opened`, `ValueCheck`, `ValueCheckDeployed`, and `NodeBinding` bind each decoded aggregate
+  column to its claimed evaluation; and `ConstraintResolver`, `CanonicalSelection` and
+  `CanonicalRelation` route the decoded members into the canonical constraint model, which is the
+  semantic handoff to the formal circuit.
+
+## Circuit layer — `Zcash/Circuits/`
+
+A port of the Orchard Action circuit onto [Clean](https://github.com/Verified-zkEVM/clean)'s
+Halo 2 formalization, with elliptic-curve arithmetic from
+[CompElliptic](https://github.com/daira/CompElliptic). Each chip is ported from the actual Rust
+(`orchard@0.14.0`, `halo2_gadgets-0.5.0`) rather than from memory, and the module docstrings cite
+the source lines. Where the Sinsemilla incomplete-addition escapes can fire, the statements carry
+them as data (`SpecOrBreak`) rather than assuming them away.
+
+- **`Specs/`** — the value-level protocol specifications the circuits are proven against:
+  Orchard data shapes (`Types`), the Pallas curve and its certified arithmetic (`Pallas`,
+  `PallasCert`, `CompEllipticExtras`), bit-range arithmetic (`Bitrange`), and the Sinsemilla
+  hash with its generators and break structure (`Sinsemilla`, `SinsemillaGenerators`,
+  `SinsemillaBreak`).
+- **`Utilities/`** — the shared gadgets: `LookupRangeCheck` (the first lookup-consuming gadget
+  ported, generic over `K`), `RunningSum`/`DecomposeRunningSum`, `CondSwap`, and `AddChip`.
+- **`Ecc/`** — the ECC chip. Point witnessing (`WitnessPoint`), complete and incomplete addition
+  (`Add`, `AddIncomplete`), variable-base multiplication in its incomplete/complete/overflow
+  phases (`Mul`, `MulIncomplete`, `MulIncompleteRound`, `MulComplete`, `MulOverflow`,
+  `DoubleAndAdd`), and fixed-base multiplication (`MulFixed/`, with full-width, short, and
+  base-field-element variants). **`MulFixed/Certs/`** holds the six deployed fixed bases with
+  their window-table certificates, checked through `CertCheck`'s `ℕ`-literal evaluator.
+- **`Sinsemilla/`** — the Sinsemilla chip: the `2^K` generator table (`Basic`), one hash piece
+  and its rounds (`HashPiece`, `HashPieceRound`), the `⊥`-propagating chain (`Chain`,
+  `HashToPoint`), the commit domain (`CommitDomain`), and the fixed-depth Merkle path (`Merkle`).
+- **`Poseidon/`** — the Poseidon chip: the `pow5` S-box and round structure (`Pow5`, `Rounds`,
+  `Constants`), the permutation (`Permute`), and the sponge/hash at `ConstantLength<2>` (`Hash`).
+- **`NoteCommit/`** and **`CommitIvk/`** — the two commitment circuits, each as pieces and
+  decompositions, the gate set, the canonicity checks, and the assembled `Main`/`MainBundle`
+  contract at the extracted window scalar.
+- **`Action/`** — the top-level Orchard Action circuit. `Circuit` is the ironwood `configure`
+  and `synthesize` in exact region-creation order; `CircuitPreIronwood` is the post-NU 6.2
+  circuit without the cross-address region (both share `configure`);
+  `RealBases` instantiates everything at the actual deployed constants; `PublicInput` declares the
+  public instance-cell layout and splits the semantic witness into public and private halves;
+  `SelectorCoherence` certifies that every selector reference the configure program registers was
+  allocated by that same program; the per-check modules are `ValueCommit`, `DeriveNullifier`,
+  `SpendAuthority`, and `AddressIntegrity`; `Bundle` is the end-to-end statement against protocol
+  spec §4.17.4; and `TopLevel` presents the whole thing as a closed `TopLevelCircuit`.
+- **`Integration/`** — the Clean-to-Ironwood boundary, and the largest directory in the tree. Only
+  modules that *translate* belong here; pure verifier-native constraint, permutation and lookup
+  mathematics stays in `Zcash/Snark/`. It compiles the circuit's declared structure into what the
+  verifier's soundness model quantifies over: gates and lookups from the operation stream
+  (`OperationGates`, `OperationLookups`, `OperationFixed`, `OperationCopies`), the permutation
+  round trip (`PermutationCompiler`, `PermutationReplay`, `CopyListMembership`), the layout and
+  selector compilers (`FixedLayout`, `SelectorCoherence`, `LookupSelectorRows`, `QueryLayouts`),
+  the commitment provenance of the fixed, σ and instance columns (`FixedColumns`,
+  `PermutationColumns`, `InstanceColumns`), the resolver-backed environments (`ResolverGates`,
+  `ResolverQueryEnvironment`, `PolynomialEnvironment`, `ExprRich`), and the reassembly of full
+  circuit satisfaction (`CircuitSatisfaction`, `CircuitIntegration`). The `Action*` modules
+  specialize all of that to the deployed Action circuit and land at `ActionTerminal`; the
+  `TopLevel*` modules are the circuit-generic versions. `StraightLineActionTerminal` reaches that
+  same terminal from one accepting execution instead of a rewinding one, and
+  `StraightLineActionEvent` bounds the probability loss from the challenge exclusions it leaves
+  open — the probability that an accepting run carries neither the bundle statement nor a
+  nontrivial relation.
+- **`Fixtures/`** and **`Tests/`** — the VK cross-check against Rust. `Fixtures/` reconstructs,
+  purely and computably, the layout products a keygen-view dump pins (the ordered copy list, the
+  permutation σ, the fixed assignments) from a circuit's `Operations`, with the dumps carried as
+  JSON data files (`Json`) and their SHA-256 pins as Lean data (`Stamp`, generated, the module that
+  carries a fixture change into Lake's import graph); `Tests/` checks that the ported `configure` is equal
+  to those dumps' post-`compress_selectors`, and is the `CircuitCheck` lake target —
+  like `FixtureCheck`, kept out of `lake build Zcash` but compiled by CI, with the glob covering the
+  whole directory so a newly added test cannot land in no target at all.
+
+## Protocol security — `Zcash/Security/`
+
+The security-property games layered on the verifier, all in the reduction style: a property
+violation *exhibits* a concrete break (a hash collision or a discrete-log relation), carried as
+computed data.
+
+- **`Common/`** — the classical random-oracle foundation shared by the games. `RandomOracle`
+  is the collision vocabulary (the `Collision` / `CollisionUpToSign` structures); `Birthday`
+  is the birthday-bound counting for random-oracle ±-collisions, in the counting-fraction style
+  used throughout (no probability monad).
+- **`Concrete/`** — `PallasGroup`, the Pallas group behind a small protocol-facing wrapper over
+  CompElliptic's affine `SWPoint`, carrying the transported group laws and the scalar-module
+  structure the deployed pool's primitives are stated over.
+- **`BindingSignature/`** — the binding-signature *balance* argument (spec §4.13 Sapling /
+  §4.14 Orchard). `Balance` is the shared algebraic core over an arbitrary `F`-module;
+  `Orchard` and `Sapling` add the per-pool no-overflow bounds that keep the value sums below
+  the scalar-field order.
+- **`KeyBinding/`** — the key-binding theorem (ZIP 2005, ROM). `Basic` is the deterministic
+  layer: a verifying Recovery-Statement witness pins the key components (`ak` up to y-sign,
+  `nk`, and the `qk`/`sk` branch) to `ivk` unless an explicit break is computed. `Instance`
+  bridges that concrete development to the games' `KeyBindingInterface`, `Pool` states it at the
+  Orchard Action, and `Probability` adds the whole-table random-oracle model that turns the
+  counting facts into a probability bound.
+- **`Ledger/`** — the ledger-model games. `Statement` transcribes the games-relevant conjuncts
+  of an Orchard-shaped Action statement over abstract primitives — the interface the games
+  consume — and `Model` is the witness-annotated ledger they quantify over, with `Effects`
+  reading off the outputs, spends, and shielded-pool balance. `Bridge` is deliberately the only
+  place that translates an extracted Action circuit witness into that statement, and the only place
+  Sinsemilla escapes become break statements, with `BridgeTests` guarding the protocol
+  distinctions a type-correct refinement can silently erase and `SinsemillaDLR` carrying a
+  classified escape onward as a relation. The games themselves: `Balance` (every nonzero spend is a
+  committed output of a strictly earlier transaction, or a Merkle/note-commitment break is
+  computed), `Spendability` (the Faerie-Gold core — nullifiers pin note tuples — plus persistence),
+  and `SpendAuthority` (an unsigned spend yields a signature forgery or a key-binding break), with
+  `Merkle` proving fixed-depth Merkle trees position-binding up to an exhibited tree-hash collision
+  and `Nullifier` reducing a nullifier collision to a discrete-log relation. `Pool` instantiates
+  the abstract primitives at the deployed pool, `Value` discharges the balance-value premiss
+  against the binding-signature layer, `KeyBindingArm` discharges the key-binding ε in the oracle
+  model, `Capstone` lifts the deterministic layer to a distribution over valid annotated ledgers,
+  and `Completeness` checks the other direction — that an honest wallet's spend actually verifies.

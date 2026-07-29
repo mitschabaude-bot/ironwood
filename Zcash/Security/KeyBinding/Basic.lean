@@ -92,8 +92,8 @@ def FinalQuery.eval (Hrivk_legacy : SK → RIVK) (Hrivk_ext : QK → AK → NK �
   | .int rivk_ext ak nk => Hrivk_int rivk_ext ak nk
 
 /-- The two extract maps of the key-binding model; both instantiate to `Extract_P`
-concretely. `toIVK` carries the ±-property (`toIVK_pm`); `toAK` serves the derivation and
-projection side. -/
+concretely, and both carry the ±-property. `toIVK` serves the commitment opening; `toAK`
+serves the derivation and projection side. -/
 structure Extractor (G IVK AK : Type*) [Neg G] where
   toIVK : G → IVK
   toAK : G → AK
@@ -101,6 +101,11 @@ structure Extractor (G IVK AK : Type*) [Neg G] where
   point the concrete x-coordinate instantiation needs "no Pallas point has x = 0"
   (x = 0 forces y² = 5, a non-square). -/
   toIVK_pm : ∀ P Q : G, toIVK P = toIVK Q ↔ P =± Q
+  /-- `toAK` identifies exactly the ±-pairs, like `toIVK`. The forward direction is what
+  discharges the games' `break_of_akP_ne`: `ak` is consumed as a single extracted
+  coordinate, so two witnesses whose `ak^ℙ` differ by more than y-sign have different
+  break projections. -/
+  toAK_pm : ∀ P Q : G, toAK P = toAK Q ↔ P =± Q
 
 /-- `toIVK` is at most 2-to-1 (`toIVK_pm`), so the `IVK` domain is at least half the group:
 `|G| ≤ 2·|IVK|`. An `IVK` small enough to find collisions in admits no `Extractor` at all —

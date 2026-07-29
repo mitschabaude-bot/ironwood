@@ -1,7 +1,3 @@
-/-
-Copyright (c) 2026 Ironwood Contributors.
-Released under the Apache License, Version 2.0.
--/
 import Mathlib.Data.List.Basic
 
 /-!
@@ -27,8 +23,6 @@ the compiled `Task` primitives are already part of the `native_decide` trust bou
   `Task.spawn fn = ⟨fn ()⟩`, `Task.get ⟨a⟩ = a` are what the kernel and `decide` see.
 -/
 
-namespace Zcash.Snark.Keygen.Fast
-
 universe u v
 
 /-- Parallel map: spawn a task per element, then collect the results in order. Pure — equal to
@@ -42,34 +36,3 @@ def _root_.List.parMap {α : Type u} {β : Type v} (f : α → β) (xs : List α
 @[simp] theorem _root_.List.parMap_eq_map {α : Type u} {β : Type v} (f : α → β) (xs : List α) :
     xs.parMap f = xs.map f := by
   rw [List.parMap, List.map_map]; rfl
-
-/-- Split a list into consecutive chunks of size `n+1` (the last chunk may be shorter). Used to
-control task granularity: one spawned task per chunk rather than per element, when per-element work
-is small relative to spawn overhead. `n+1` keeps the recursion structurally decreasing. -/
-def chunk {α : Type u} (n : ℕ) : List α → List (List α)
-  | [] => []
-  | (x :: xs) => (x :: xs).take (n + 1) :: chunk n ((x :: xs).drop (n + 1))
-  termination_by l => l.length
-  decreasing_by
-    simp only [List.length_drop, List.length_cons]
-    omega
-
-/-- `chunk n` concatenated back is the identity — `chunk` only regroups, it drops nothing. -/
-theorem chunk_flatten {α : Type u} (n : ℕ) (xs : List α) : (chunk n xs).flatten = xs := by
-  fun_induction chunk n xs with
-  | case1 => rfl
-  | case2 x xs ih =>
-    simp only [List.flatten_cons, ih, List.take_append_drop]
-
-/-- Chunked parallel map: `parMap` over chunks of size `chunkSize+1`, mapping `f` within each chunk
-on a single task. Provably `List.map f` (`parMapChunked_eq_map`), with coarser task granularity. -/
-def parMapChunked {α : Type u} {β : Type v} (chunkSize : ℕ) (f : α → β) (xs : List α) : List β :=
-  ((chunk chunkSize xs).parMap (fun c => c.map f)).flatten
-
-/-- The chunked parallel map is `List.map`. -/
-@[simp] theorem parMapChunked_eq_map {α : Type u} {β : Type v}
-    (chunkSize : ℕ) (f : α → β) (xs : List α) : parMapChunked chunkSize f xs = xs.map f := by
-  unfold parMapChunked
-  rw [List.parMap_eq_map, ← List.map_flatten, chunk_flatten]
-
-end Zcash.Snark.Keygen.Fast

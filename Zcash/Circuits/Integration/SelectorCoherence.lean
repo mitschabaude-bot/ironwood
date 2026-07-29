@@ -12,6 +12,8 @@ captured Action selector map.
 
 namespace Halo2
 
+open Zcash.Arithmetic (scalarFieldOrder)
+
 set_option maxHeartbeats 20000
 
 /--
@@ -132,9 +134,7 @@ theorem Expression.selectorsCovered_of_selectorFree
         Expression.selectorsCovered, Bool.and_eq_true] at hfree ⊢
       exact ⟨ihLeft hfree.1, ihRight hfree.2⟩
 
-/--
-The standard `Constraints.withSelector` gate shape mentions no foreign selectors.
--/
+/-- The standard `Gate.withSelector` shape mentions no foreign selectors. -/
 @[circuit_norm]
 theorem Gate.selectorsOwned_of_withSelector
     {F : Type} [Field F]
@@ -143,18 +143,15 @@ theorem Gate.selectorsOwned_of_withSelector
     (constraints : List (String × Expression F Query))
     (hfree : constraints.Forall fun constraint =>
       constraint.2.SelectorFree) :
-    ({ name := name
-       selector := selector
-       queriedCells := queriedCells
-       constraints := Constraints.withSelector selector constraints
-         (List.forall_iff_forall_mem.mp hfree) } :
-      Gate F).SelectorsOwned := by
+    (Gate.withSelector name selector queriedCells constraints
+      (List.forall_iff_forall_mem.mp hfree)).SelectorsOwned := by
   rw [Gate.SelectorsOwned, List.forall_iff_forall_mem]
   intro constraint hconstraint
+  change constraint ∈ constraints.map _ at hconstraint
   obtain ⟨source, hsource, rfl⟩ :=
     List.mem_map.mp hconstraint
-  simp only [querySelector, Expression.selectorsCovered,
-    decide_true, Bool.true_and]
+  simp only [Gate.withSelector, querySelector,
+    Expression.selectorsCovered, decide_true, Bool.true_and]
   exact Expression.selectorsCovered_of_selectorFree
     (fun index => decide (index = selector.index))
     source.2
@@ -222,56 +219,19 @@ theorem mono
 
 end ConstraintSystem.GateSelectorsAllocated
 
-namespace ConstraintSystem
+namespace ConfigureDelta
 
-@[simp]
-theorem queryAdviceIndex_numSelectors
-    {F : Type} (cs : ConstraintSystem F)
-    (column : Column .advice) (rotation : Rotation) :
-    (cs.queryAdviceIndex column rotation).numSelectors =
-      cs.numSelectors := by
-  simp only [queryAdviceIndex]
-  split <;> rfl
+@[simp] theorem gates_append
+    {F : Type} (left right : ConfigureDelta F) :
+    (left.append right).gates = left.gates ++ right.gates :=
+  rfl
 
-@[simp]
-theorem queryFixedIndex_numSelectors
-    {F : Type} (cs : ConstraintSystem F)
-    (column : Column .fixed) :
-    (cs.queryFixedIndex column).numSelectors =
-      cs.numSelectors := by
-  simp only [queryFixedIndex]
-  split <;> rfl
-
-@[simp]
-theorem queryInstanceIndex_numSelectors
-    {F : Type} (cs : ConstraintSystem F)
-    (column : Column .instance) (rotation : Rotation) :
-    (cs.queryInstanceIndex column rotation).numSelectors =
-      cs.numSelectors := by
-  simp only [queryInstanceIndex]
-  split <;> rfl
-
-@[simp]
-theorem queryAnyIndex_numSelectors
-    {F : Type} (cs : ConstraintSystem F)
-    (column : AnyColumn) :
-    (cs.queryAnyIndex column).numSelectors =
-      cs.numSelectors := by
-  cases column with
-  | mk columnType index =>
-      cases columnType <;> simp [queryAnyIndex]
-
-@[simp]
-theorem registerQueriedCell_numSelectors
-    {F : Type} (cs : ConstraintSystem F) (owner : String)
-    (expression : Expression F Query) :
-    (cs.registerQueriedCell owner expression).numSelectors =
-      cs.numSelectors := by
+@[simp] theorem queriedCell_gates
+    {F : Type} (owner : String) (expression : Expression F Query) :
+    (queriedCell owner expression).gates = [] := by
   cases expression with
   | var query =>
-      cases query <;> simp [registerQueriedCell,
-        queryAdviceIndex, queryFixedIndex, queryInstanceIndex] <;>
-        split <;> rfl
+      cases query <;> rfl
   | const value =>
       rfl
   | add left right =>
@@ -279,19 +239,154 @@ theorem registerQueriedCell_numSelectors
   | mul left right =>
       rfl
 
-@[simp]
-theorem registerQueriedCells_numSelectors
-    {F : Type} (cs : ConstraintSystem F) (owner : String)
+@[simp] theorem queriedCells_gates
+    {F : Type} (owner : String)
     (expressions : List (Expression F Query)) :
-    (cs.registerQueriedCells owner expressions).numSelectors =
-      cs.numSelectors := by
-  unfold registerQueriedCells
-  induction expressions generalizing cs with
-  | nil =>
-      rfl
-  | cons expression rest ih =>
-      rw [List.foldl_cons, ih,
-        registerQueriedCell_numSelectors]
+    (queriedCells owner expressions).gates = [] := by
+  unfold queriedCells
+  have aux (initial : ConfigureDelta F)
+      (cells : List (Expression F Query)) :
+      (cells.foldl
+        (fun delta cell => delta.append (queriedCell owner cell))
+        initial).gates = initial.gates := by
+    induction cells generalizing initial with
+    | nil =>
+        rfl
+    | cons cell cells ih =>
+        rw [List.foldl_cons, ih, gates_append,
+          queriedCell_gates, List.append_nil]
+  exact aux {} expressions
+
+end ConfigureDelta
+
+namespace Configure
+
+@[simp] theorem counts_numSelectors
+    {F : Type} (cs : ConstraintSystem F) :
+    (ConfigureCounts.ofConstraintSystem cs).numSelectors =
+      cs.numSelectors :=
+  rfl
+
+@[simp] theorem run_output
+    {F α : Type} (program : Configure F α)
+    (cs : ConstraintSystem F) :
+    (program cs).1 =
+      program.output (ConfigureCounts.ofConstraintSystem cs) :=
+  rfl
+
+@[simp] theorem run_gates
+    {F α : Type} (program : Configure F α)
+    (cs : ConstraintSystem F) :
+    (program cs).2.gates =
+      cs.gates ++
+        (program.delta
+          (ConfigureCounts.ofConstraintSystem cs)).gates :=
+  rfl
+
+@[simp] theorem run_numSelectors
+    {F α : Type} (program : Configure F α)
+    (cs : ConstraintSystem F) :
+    (program cs).2.numSelectors =
+      (program.finalCounts
+        (ConfigureCounts.ofConstraintSystem cs)).numSelectors :=
+  rfl
+
+@[simp] theorem counts_run
+    {F α : Type} (program : Configure F α)
+    (cs : ConstraintSystem F) :
+    ConfigureCounts.ofConstraintSystem (program cs).2 =
+      program.finalCounts (ConfigureCounts.ofConstraintSystem cs) :=
+  rfl
+
+@[simp] theorem delta_lookup_gates
+    {F : Type} (queriedCells : List (Expression F Query))
+    (tableMap : List (Expression F Query × TableColumn))
+    (counts : ConfigureCounts) :
+    (delta (Halo2.lookup queriedCells tableMap) counts).gates = [] := by
+  simp only [delta, Halo2.lookup, ConfigureDelta.gates_append,
+    ConfigureDelta.queriedCells_gates, List.nil_append]
+  have aux (initial : ConfigureDelta F) (tables : List TableColumn) :
+      (tables.foldl
+        (fun delta table =>
+          delta.append { fixedQueries := [(table.inner, 0)] })
+        initial).gates = initial.gates := by
+    induction tables generalizing initial with
+    | nil =>
+        rfl
+    | cons table tables ih =>
+        rw [List.foldl_cons, ih, ConfigureDelta.gates_append,
+          List.append_nil]
+  simp [aux]
+
+@[simp] theorem delta_createGate_gates
+    {F : Type} (gate : Gate F) (counts : ConfigureCounts) :
+    (delta (Halo2.createGate gate) counts).gates = [gate] := by
+  simp [delta, Halo2.createGate]
+
+@[simp] theorem delta_pure_gates
+    {F α : Type} (value : α) (counts : ConfigureCounts) :
+    (delta (pure value : Configure F α) counts).gates = [] :=
+  rfl
+
+@[simp] theorem delta_adviceColumn_gates
+    {F : Type} (counts : ConfigureCounts) :
+    (delta (Halo2.adviceColumn : Configure F (Column .advice))
+      counts).gates = [] :=
+  rfl
+
+@[simp] theorem delta_fixedColumn_gates
+    {F : Type} (counts : ConfigureCounts) :
+    (delta (Halo2.fixedColumn : Configure F (Column .fixed))
+      counts).gates = [] :=
+  rfl
+
+@[simp] theorem delta_instanceColumn_gates
+    {F : Type} (counts : ConfigureCounts) :
+    (delta (Halo2.instanceColumn : Configure F (Column .instance))
+      counts).gates = [] :=
+  rfl
+
+@[simp] theorem delta_selector_gates
+    {F : Type} (counts : ConfigureCounts) :
+    (delta (Halo2.selector : Configure F Selector) counts).gates = [] :=
+  rfl
+
+@[simp] theorem delta_complexSelector_gates
+    {F : Type} (counts : ConfigureCounts) :
+    (delta (Halo2.complexSelector : Configure F Selector) counts).gates = [] :=
+  rfl
+
+@[simp] theorem delta_enableEquality_gates
+    {F : Type} (column : AnyColumn) (counts : ConfigureCounts) :
+    (delta (Halo2.enableEquality (F := F) column) counts).gates = [] := by
+  cases column with
+  | mk kind index =>
+      cases kind <;> rfl
+
+@[simp] theorem delta_enableConstant_gates
+    {F : Type} (column : Column .fixed) (counts : ConfigureCounts) :
+    (delta (Halo2.enableConstant (F := F) column) counts).gates = [] :=
+  rfl
+
+@[simp] theorem run_bind_gates
+    {F α β : Type} (program : Configure F α)
+    (next : α → Configure F β) (cs : ConstraintSystem F) :
+    ((program >>= next) cs).2.gates =
+      ((next (program cs).1) (program cs).2).2.gates := by
+  simp only [run_gates, delta_bind, ConfigureDelta.gates_append,
+    run_output, counts_run]
+  simp [List.append_assoc]
+
+@[simp] theorem run_bind_numSelectors
+    {F α β : Type} (program : Configure F α)
+    (next : α → Configure F β) (cs : ConstraintSystem F) :
+    ((program >>= next) cs).2.numSelectors =
+      ((next (program cs).1) (program cs).2).2.numSelectors := by
+  simp
+
+end Configure
+
+namespace ConstraintSystem
 
 /-- Lookup registration does not change the configured gate list. -/
 @[simp]
@@ -301,27 +396,7 @@ theorem lookup_gates
     (cs : ConstraintSystem F) :
     ((Halo2.lookup queriedCells tableMap) cs).2.gates =
       cs.gates := by
-  unfold Halo2.lookup
-  simp only
-  let registered :=
-    cs.registerQueriedCells "lookup" queriedCells
-  have foldGates
-      (state : ConstraintSystem F)
-      (entries : List (Expression F Query × TableColumn)) :
-      (entries.foldl
-        (fun current entry =>
-          current.queryFixedIndex entry.2.inner)
-        state).gates = state.gates := by
-    induction entries generalizing state with
-    | nil =>
-        rfl
-    | cons entry rest ih =>
-        rw [List.foldl_cons, ih,
-          queryFixedIndex_gates]
-  calc
-    _ = registered.gates := foldGates registered tableMap
-    _ = cs.gates :=
-      registerQueriedCells_gates cs "lookup" queriedCells
+  simp
 
 /-- Lookup registration does not change the selector allocation count. -/
 @[simp]
@@ -331,29 +406,7 @@ theorem lookup_numSelectors
     (cs : ConstraintSystem F) :
     ((Halo2.lookup queriedCells tableMap) cs).2.numSelectors =
       cs.numSelectors := by
-  unfold Halo2.lookup
-  simp only
-  let registered :=
-    cs.registerQueriedCells "lookup" queriedCells
-  have foldSelectors
-      (state : ConstraintSystem F)
-      (entries : List (Expression F Query × TableColumn)) :
-      (entries.foldl
-        (fun current entry =>
-          current.queryFixedIndex entry.2.inner)
-        state).numSelectors = state.numSelectors := by
-    induction entries generalizing state with
-    | nil =>
-        rfl
-    | cons entry rest ih =>
-        rw [List.foldl_cons, ih,
-          queryFixedIndex_numSelectors]
-  calc
-    _ = registered.numSelectors :=
-      foldSelectors registered tableMap
-    _ = cs.numSelectors :=
-      registerQueriedCells_numSelectors
-        cs "lookup" queriedCells
+  simp
 
 end ConstraintSystem
 
@@ -374,27 +427,18 @@ theorem ConstraintSystem.gateSelectorsAllocated_createGate
     ((createGate gate cs).2).GateSelectorsAllocated ↔
       cs.GateSelectorsAllocated ∧
         gate.SelectorsAllocated cs.numSelectors := by
-  change List.Forall
-      (fun configured =>
-        configured.SelectorsAllocated
-          (cs.registerQueriedCells gate.name
-            gate.queriedCells).numSelectors)
-      ((cs.registerQueriedCells gate.name
-        gate.queriedCells).gates ++ [gate]) ↔
-    cs.gates.Forall
-      (fun configured =>
-        configured.SelectorsAllocated cs.numSelectors) ∧
-      gate.SelectorsAllocated cs.numSelectors
-  rw [ConstraintSystem.registerQueriedCells_gates,
-    ConstraintSystem.registerQueriedCells_numSelectors,
-    List.forall_append]
+  unfold ConstraintSystem.GateSelectorsAllocated
+  simp only [Configure.run_gates, Configure.delta_createGate_gates,
+    Configure.run_numSelectors, Configure.finalCounts_createGate,
+    Configure.counts_numSelectors, List.forall_append,
+    List.forall_cons]
   simp
 
 @[simp]
 theorem ConstraintSystem.createGate_numSelectors
     {F : Type} (cs : ConstraintSystem F) (gate : Gate F) :
     (createGate gate cs).2.numSelectors = cs.numSelectors := by
-  simp [createGate]
+  simp
 
 namespace Configure
 
@@ -410,6 +454,22 @@ structure PreservesGateSelectorsAllocated
 namespace PreservesGateSelectorsAllocated
 
 variable {F α β : Type}
+
+@[simp] theorem gateSelectorsAllocated_run_pure
+    (value : α) (cs : ConstraintSystem F) :
+    ((pure value : Configure F α) cs).2.GateSelectorsAllocated ↔
+      cs.GateSelectorsAllocated := by
+  unfold ConstraintSystem.GateSelectorsAllocated
+  simp
+
+@[simp] theorem gateSelectorsAllocated_run_bind
+    (program : Configure F α) (next : α → Configure F β)
+    (cs : ConstraintSystem F) :
+    ((program >>= next) cs).2.GateSelectorsAllocated ↔
+      ((next (program cs).1) (program cs).2).2.GateSelectorsAllocated := by
+  unfold ConstraintSystem.GateSelectorsAllocated
+  simp only [Configure.run_bind_gates,
+    Configure.run_bind_numSelectors]
 
 /--
 Any configure action that changes neither the gate list nor selector count preserves
@@ -431,9 +491,7 @@ theorem of_gates_numSelectors
 theorem pure (value : α) :
     PreservesGateSelectorsAllocated
       (pure value : Configure F α) := by
-  constructor
-  intro cs hcs
-  exact hcs
+  apply of_gates_numSelectors <;> simp
 
 @[circuit_norm]
 theorem bind
@@ -444,41 +502,37 @@ theorem bind
     PreservesGateSelectorsAllocated (program >>= next) := by
   constructor
   intro cs hcs
-  exact (hnext (program cs).1).run (program cs).2
-    (hprogram.run cs hcs)
+  have hresult :=
+    (hnext (program cs).1).run (program cs).2
+      (hprogram.run cs hcs)
+  unfold ConstraintSystem.GateSelectorsAllocated at hresult ⊢
+  simpa only [Configure.run_bind_gates,
+    Configure.run_bind_numSelectors] using hresult
 
 @[circuit_norm]
 theorem map
     (function : α → β) {program : Configure F α}
     (hprogram : PreservesGateSelectorsAllocated program) :
     PreservesGateSelectorsAllocated (function <$> program) := by
-  constructor
-  intro cs hcs
-  exact hprogram.run cs hcs
+  exact bind hprogram fun _ => pure _
 
 @[circuit_norm]
 theorem adviceColumn :
     PreservesGateSelectorsAllocated
       (Halo2.adviceColumn : Configure F (Column .advice)) := by
-  constructor
-  intro cs hcs
-  exact hcs
+  apply of_gates_numSelectors <;> simp
 
 @[circuit_norm]
 theorem fixedColumn :
     PreservesGateSelectorsAllocated
       (Halo2.fixedColumn : Configure F (Column .fixed)) := by
-  constructor
-  intro cs hcs
-  exact hcs
+  apply of_gates_numSelectors <;> simp
 
 @[circuit_norm]
 theorem instanceColumn :
     PreservesGateSelectorsAllocated
       (Halo2.instanceColumn : Configure F (Column .instance)) := by
-  constructor
-  intro cs hcs
-  exact hcs
+  apply of_gates_numSelectors <;> simp
 
 @[circuit_norm]
 theorem selector :
@@ -486,6 +540,10 @@ theorem selector :
       (Halo2.selector : Configure F Selector) := by
   constructor
   intro cs hcs
+  unfold ConstraintSystem.GateSelectorsAllocated
+  simp only [Configure.run_gates, Configure.delta_selector_gates,
+    List.append_nil, Configure.run_numSelectors,
+    Configure.finalCounts_selector, Configure.counts_numSelectors]
   exact ConstraintSystem.GateSelectorsAllocated.mono
     hcs (Nat.le_succ cs.numSelectors)
 
@@ -495,6 +553,10 @@ theorem complexSelector :
       (Halo2.complexSelector : Configure F Selector) := by
   constructor
   intro cs hcs
+  unfold ConstraintSystem.GateSelectorsAllocated
+  simp only [Configure.run_gates, Configure.delta_complexSelector_gates,
+    List.append_nil, Configure.run_numSelectors,
+    Configure.finalCounts_complexSelector, Configure.counts_numSelectors]
   exact ConstraintSystem.GateSelectorsAllocated.mono
     hcs (Nat.le_succ cs.numSelectors)
 
@@ -503,20 +565,16 @@ theorem enableEquality (column : AnyColumn) :
     PreservesGateSelectorsAllocated
       (Halo2.enableEquality (F := F) column) := by
   apply of_gates_numSelectors
-  · intro cs
-    simp [Halo2.enableEquality]
-  · intro cs
-    simp [Halo2.enableEquality]
+  · intro cs; simp
+  · intro cs; simp
 
 @[circuit_norm]
 theorem enableConstant (column : Column .fixed) :
     PreservesGateSelectorsAllocated
       (Halo2.enableConstant (F := F) column) := by
   apply of_gates_numSelectors
-  · intro cs
-    simp [Halo2.enableConstant]
-  · intro cs
-    simp [Halo2.enableConstant]
+  · intro cs; simp
+  · intro cs; simp
 
 @[circuit_norm]
 theorem lookupTableColumn :
@@ -552,20 +610,22 @@ theorem selectorCreateGate
       return result selector) := by
   constructor
   intro cs hcs
+  simp only [gateSelectorsAllocated_run_bind,
+    gateSelectorsAllocated_run_pure]
+  let selector := (Halo2.selector (F := F) cs).1
+  let allocated := (Halo2.selector (F := F) cs).2
   change
     ConstraintSystem.GateSelectorsAllocated
       ((Halo2.createGate
-      (gate ⟨cs.numSelectors, true⟩)
-      { cs with
-        numSelectors := cs.numSelectors + 1 }).2)
+      (gate selector) allocated).2)
   rw [ConstraintSystem.gateSelectorsAllocated_createGate]
   constructor
-  · exact ConstraintSystem.GateSelectorsAllocated.mono
-      hcs (Nat.le_succ cs.numSelectors)
+  · exact
+      PreservesGateSelectorsAllocated.selector.run cs hcs
   · apply Gate.SelectorsAllocated.of_owned
-      (howned ⟨cs.numSelectors, true⟩)
+      (howned selector)
     rw [hselector]
-    exact Nat.lt_succ_self cs.numSelectors
+    simp [selector, allocated]
 
 /--
 Continuation form of `selectorCreateGate`.  Keeping the continuation inside this
@@ -587,9 +647,9 @@ theorem selectorCreateGateThen
       next selector) := by
   constructor
   intro cs hcs
-  let selector : Selector := ⟨cs.numSelectors, true⟩
-  let allocated : ConstraintSystem F :=
-    { cs with numSelectors := cs.numSelectors + 1 }
+  simp only [gateSelectorsAllocated_run_bind]
+  let selector := (Halo2.selector (F := F) cs).1
+  let allocated := (Halo2.selector (F := F) cs).2
   let afterGate :=
     (Halo2.createGate (gate selector) allocated).2
   apply (hnext selector).run afterGate
@@ -597,12 +657,12 @@ theorem selectorCreateGateThen
     ((Halo2.createGate (gate selector) allocated).2)
   rw [ConstraintSystem.gateSelectorsAllocated_createGate]
   constructor
-  · exact ConstraintSystem.GateSelectorsAllocated.mono
-      hcs (Nat.le_succ cs.numSelectors)
+  · exact
+      PreservesGateSelectorsAllocated.selector.run cs hcs
   · apply Gate.SelectorsAllocated.of_owned
       (howned selector)
     rw [hselector]
-    exact Nat.lt_succ_self cs.numSelectors
+    simp [selector, allocated]
 
 /-- Complex-selector counterpart of `selectorCreateGate`. -/
 @[circuit_norm]
@@ -617,20 +677,22 @@ theorem complexSelectorCreateGate
       return result selector) := by
   constructor
   intro cs hcs
+  simp only [gateSelectorsAllocated_run_bind,
+    gateSelectorsAllocated_run_pure]
+  let selector := (Halo2.complexSelector (F := F) cs).1
+  let allocated := (Halo2.complexSelector (F := F) cs).2
   change
     ConstraintSystem.GateSelectorsAllocated
       ((Halo2.createGate
-      (gate ⟨cs.numSelectors, false⟩)
-      { cs with
-        numSelectors := cs.numSelectors + 1 }).2)
+      (gate selector) allocated).2)
   rw [ConstraintSystem.gateSelectorsAllocated_createGate]
   constructor
-  · exact ConstraintSystem.GateSelectorsAllocated.mono
-      hcs (Nat.le_succ cs.numSelectors)
+  · exact
+      PreservesGateSelectorsAllocated.complexSelector.run cs hcs
   · apply Gate.SelectorsAllocated.of_owned
-      (howned ⟨cs.numSelectors, false⟩)
+      (howned selector)
     rw [hselector]
-    exact Nat.lt_succ_self cs.numSelectors
+    simp [selector, allocated]
 
 /--
 Allocate two simple selectors and create one owned gate for each.  This retains the
@@ -657,10 +719,12 @@ theorem twoSelectorsTwoGates
       return result first second) := by
   constructor
   intro cs hcs
-  let first : Selector := ⟨cs.numSelectors, true⟩
-  let second : Selector := ⟨cs.numSelectors + 1, true⟩
-  let allocated : ConstraintSystem F :=
-    { cs with numSelectors := cs.numSelectors + 2 }
+  simp only [gateSelectorsAllocated_run_bind,
+    gateSelectorsAllocated_run_pure]
+  let first := (Halo2.selector (F := F) cs).1
+  let afterFirst := (Halo2.selector (F := F) cs).2
+  let second := (Halo2.selector (F := F) afterFirst).1
+  let allocated := (Halo2.selector (F := F) afterFirst).2
   change
     ConstraintSystem.GateSelectorsAllocated
       ((Halo2.createGate (secondGate first second)
@@ -670,16 +734,16 @@ theorem twoSelectorsTwoGates
   constructor
   · rw [ConstraintSystem.gateSelectorsAllocated_createGate]
     constructor
-    · exact ConstraintSystem.GateSelectorsAllocated.mono
-        hcs (by simp [allocated])
+    · exact PreservesGateSelectorsAllocated.selector.run afterFirst
+        (PreservesGateSelectorsAllocated.selector.run cs hcs)
     · apply Gate.SelectorsAllocated.of_owned
         (hfirstOwned first second)
       rw [hfirstSelector]
-      simp [first, allocated]
+      simp [first, allocated, afterFirst]
   · apply Gate.SelectorsAllocated.of_owned
       (hsecondOwned first second)
     rw [hsecondSelector]
-    simp [second, allocated]
+    simp [second, allocated, afterFirst]
 
 /-- Three-selector/three-gate counterpart of `twoSelectorsTwoGates`. -/
 @[circuit_norm]
@@ -712,11 +776,14 @@ theorem threeSelectorsThreeGates
       return result first second third) := by
   constructor
   intro cs hcs
-  let first : Selector := ⟨cs.numSelectors, true⟩
-  let second : Selector := ⟨cs.numSelectors + 1, true⟩
-  let third : Selector := ⟨cs.numSelectors + 2, true⟩
-  let allocated : ConstraintSystem F :=
-    { cs with numSelectors := cs.numSelectors + 3 }
+  simp only [gateSelectorsAllocated_run_bind,
+    gateSelectorsAllocated_run_pure]
+  let first := (Halo2.selector (F := F) cs).1
+  let afterFirst := (Halo2.selector (F := F) cs).2
+  let second := (Halo2.selector (F := F) afterFirst).1
+  let afterSecond := (Halo2.selector (F := F) afterFirst).2
+  let third := (Halo2.selector (F := F) afterSecond).1
+  let allocated := (Halo2.selector (F := F) afterSecond).2
   change
     ConstraintSystem.GateSelectorsAllocated
       ((Halo2.createGate (thirdGate first second third)
@@ -729,20 +796,22 @@ theorem threeSelectorsThreeGates
     constructor
     · rw [ConstraintSystem.gateSelectorsAllocated_createGate]
       constructor
-      · exact ConstraintSystem.GateSelectorsAllocated.mono
-          hcs (by simp [allocated])
+      · exact PreservesGateSelectorsAllocated.selector.run afterSecond
+          (PreservesGateSelectorsAllocated.selector.run afterFirst
+            (PreservesGateSelectorsAllocated.selector.run cs hcs))
       · apply Gate.SelectorsAllocated.of_owned
           (hfirstOwned first second third)
         rw [hfirstSelector]
-        simp [first, allocated]
+        simp [first, allocated, afterSecond, afterFirst]
+        omega
     · apply Gate.SelectorsAllocated.of_owned
         (hsecondOwned first second third)
       rw [hsecondSelector]
-      simp [second, allocated]
+      simp [second, allocated, afterSecond, afterFirst]
   · apply Gate.SelectorsAllocated.of_owned
       (hthirdOwned first second third)
     rw [hthirdSelector]
-    simp [third, allocated]
+    simp [third, allocated, afterSecond, afterFirst]
 
 /--
 The common lookup-chip pattern: two complex selectors and one simple selector,
@@ -772,11 +841,14 @@ theorem complexComplexSimpleLookupGate
       return result first second third) := by
   constructor
   intro cs hcs
-  let first : Selector := ⟨cs.numSelectors, false⟩
-  let second : Selector := ⟨cs.numSelectors + 1, false⟩
-  let third : Selector := ⟨cs.numSelectors + 2, true⟩
-  let allocated : ConstraintSystem F :=
-    { cs with numSelectors := cs.numSelectors + 3 }
+  simp only [gateSelectorsAllocated_run_bind,
+    gateSelectorsAllocated_run_pure]
+  let first := (Halo2.complexSelector (F := F) cs).1
+  let afterFirst := (Halo2.complexSelector (F := F) cs).2
+  let second := (Halo2.complexSelector (F := F) afterFirst).1
+  let afterSecond := (Halo2.complexSelector (F := F) afterFirst).2
+  let third := (Halo2.selector (F := F) afterSecond).1
+  let allocated := (Halo2.selector (F := F) afterSecond).2
   let afterLookup :=
     (Halo2.lookup (queriedCells first second third)
       (tableMap first second third) allocated).2
@@ -788,8 +860,9 @@ theorem complexComplexSimpleLookupGate
   · exact
       (lookup (queriedCells first second third)
         (tableMap first second third)).run allocated
-        (ConstraintSystem.GateSelectorsAllocated.mono
-          hcs (by simp [allocated]))
+        (PreservesGateSelectorsAllocated.selector.run afterSecond
+          (PreservesGateSelectorsAllocated.complexSelector.run afterFirst
+            (PreservesGateSelectorsAllocated.complexSelector.run cs hcs)))
   · apply Gate.SelectorsAllocated.of_owned
       (howned first second third)
     rw [hselector]
@@ -799,7 +872,7 @@ theorem complexComplexSimpleLookupGate
         (tableMap first second third) allocated
     change third.index < afterLookup.numSelectors
     rw [hcount]
-    simp [third, allocated]
+    simp [third, allocated, afterSecond, afterFirst]
 
 /--
 The Sinsemilla-style registration pattern: allocate a complex selector, a fixed
@@ -838,19 +911,14 @@ theorem complexFixedSimpleLookupTwoGates
       return result complex fixed simple) := by
   constructor
   intro cs hcs
-  let complex : Selector := ⟨cs.numSelectors, false⟩
-  let afterComplex : ConstraintSystem F :=
-    { cs with numSelectors := cs.numSelectors + 1 }
-  let fixed : Column .fixed :=
-    ⟨afterComplex.numFixedColumns⟩
-  let afterFixed : ConstraintSystem F :=
-    { afterComplex with
-      numFixedColumns := afterComplex.numFixedColumns + 1 }
-  let simple : Selector :=
-    ⟨afterFixed.numSelectors, true⟩
-  let allocated : ConstraintSystem F :=
-    { afterFixed with
-      numSelectors := afterFixed.numSelectors + 1 }
+  simp only [gateSelectorsAllocated_run_bind,
+    gateSelectorsAllocated_run_pure]
+  let complex := (Halo2.complexSelector (F := F) cs).1
+  let afterComplex := (Halo2.complexSelector (F := F) cs).2
+  let fixed := (Halo2.fixedColumn (F := F) afterComplex).1
+  let afterFixed := (Halo2.fixedColumn (F := F) afterComplex).2
+  let simple := (Halo2.selector (F := F) afterFixed).1
+  let allocated := (Halo2.selector (F := F) afterFixed).2
   let afterLookup :=
     (Halo2.lookup (queriedCells complex fixed simple)
       (tableMap complex fixed simple) allocated).2
@@ -866,10 +934,9 @@ theorem complexFixedSimpleLookupTwoGates
     · exact
         (lookup (queriedCells complex fixed simple)
           (tableMap complex fixed simple)).run allocated
-          (ConstraintSystem.GateSelectorsAllocated.mono
-            hcs (by
-              simp [allocated, afterFixed, afterComplex]
-              omega))
+          (PreservesGateSelectorsAllocated.selector.run afterFixed
+            (PreservesGateSelectorsAllocated.fixedColumn.run afterComplex
+              (PreservesGateSelectorsAllocated.complexSelector.run cs hcs)))
     · apply Gate.SelectorsAllocated.of_owned
         (hfirstOwned complex fixed simple)
       rw [hfirstSelector]
@@ -926,9 +993,10 @@ theorem selectorProgramGate
       return result selector value) := by
   constructor
   intro cs hcs
-  let selector : Selector := ⟨cs.numSelectors, true⟩
-  let allocated : ConstraintSystem F :=
-    { cs with numSelectors := cs.numSelectors + 1 }
+  simp only [gateSelectorsAllocated_run_bind,
+    gateSelectorsAllocated_run_pure]
+  let selector := (Halo2.selector (F := F) cs).1
+  let allocated := (Halo2.selector (F := F) cs).2
   let value := ((program selector) allocated).1
   let afterProgram := ((program selector) allocated).2
   change ConstraintSystem.GateSelectorsAllocated
@@ -937,8 +1005,7 @@ theorem selectorProgramGate
   rw [ConstraintSystem.gateSelectorsAllocated_createGate]
   constructor
   · apply hprogram selector allocated
-    · exact ConstraintSystem.GateSelectorsAllocated.mono
-        hcs (by simp [allocated])
+    · exact PreservesGateSelectorsAllocated.selector.run cs hcs
     · simp [selector, allocated]
   · apply Gate.SelectorsAllocated.of_owned
       (howned selector allocated)
@@ -1765,6 +1832,7 @@ end Halo2.Layout
 
 namespace Zcash.Snark
 
+open Zcash.Arithmetic (scalarFieldOrder)
 open Halo2
 open Halo2.Layout
 

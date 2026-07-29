@@ -71,12 +71,11 @@ def aProgramBase : Circuit Fp Unit := do
 /-! ## The reconstructed layout products vs the ported Action stack (ironwood)
 
 All checks live in ONE `#eval` so the shared reconstruction (ops → regions → copy list →
-σ → fixed) evaluates exactly once; the fixture is loaded from `actionLayout.json`
-(pinned content hash — see `Fixtures/Json.lean`). Split into per-product checks
-temporarily when debugging a mismatch. -/
+σ → fixed) evaluates exactly once; the fixture is loaded by name through its SHA-256 pin
+(see `Fixtures/Json.lean`). Split into per-product checks temporarily when debugging a
+mismatch. -/
 #eval show IO Unit from do
-  let fx ← Json.loadLayoutFixture "Zcash/Circuits/Fixtures/actionLayout.json"
-    0x51cd2f7ce66a8c7
+  let fx ← Json.loadLayoutFixture "actionLayout.json"
   let ops : Operations Fp := aProgram.operations
   let regions : List (ℕ × RegionOperations Fp) := (indexedRegions ops 0).1
   -- Region starts from the fixture placements (the single `generator_table` slot is the

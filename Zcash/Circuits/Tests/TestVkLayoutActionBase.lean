@@ -17,10 +17,10 @@ open Fixtures.Test.LayoutAction (aProgramBase)
 
 /-! All checks live in ONE `#eval` so the shared reconstruction (ops → regions → copy
 list → σ → fixed) evaluates exactly once; the fixture is loaded from
-`actionBaseLayout.json` (pinned content hash — see `Fixtures/Json.lean`). -/
+`actionBaseLayout.json`, loaded by name through its SHA-256 pin (see
+`Fixtures/Json.lean`). -/
 #eval show IO Unit from do
-  let fx ← Json.loadLayoutFixture "Zcash/Circuits/Fixtures/actionBaseLayout.json"
-    0x193f3922aa59191e
+  let fx ← Json.loadLayoutFixture "actionBaseLayout.json"
   let ops : Operations Fp := aProgramBase.operations
   let regions : List (ℕ × RegionOperations Fp) := (indexedRegions ops 0).1
   let starts : List ℕ := ((fx.regions.filter (·.name ≠ "generator_table")).map (·.start))

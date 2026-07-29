@@ -1,6 +1,6 @@
 import Clean.Halo2.Keygen.Semantics
-import Zcash.Snark.Soundness.LookupInstantiation
-import Zcash.Snark.Soundness.PermutationInstantiation
+import Zcash.Snark.Soundness.Canonical.LookupInstantiation
+import Zcash.Snark.Soundness.Canonical.PermutationInstantiation
 import Zcash.Circuits.Integration.PolynomialEnvironment
 
 /-!

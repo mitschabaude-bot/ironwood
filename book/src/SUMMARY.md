@@ -12,7 +12,6 @@
 - [Formal Verification](formal-verification.md)
   - [Proof Journey](formal-verification/proof-journey.md)
   - [Proof Map](formal-verification/proof-map.md)
+  - [Source Map](formal-verification/source-map.md)
   - [Security Definitions](formal-verification/security-definitions.md)
-  - [Action Circuit Integration Spike](formal-verification/action-circuit-integration.md)
-  - [The Clean Boundary](formal-verification/clean-boundary.md)
   - [Glossary](formal-verification/glossary.md)

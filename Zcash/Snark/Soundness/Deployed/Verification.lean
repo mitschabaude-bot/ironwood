@@ -20,6 +20,8 @@ and ties that equation to the deployed accept condition:
 
 namespace Zcash.Snark
 
+open Zcash.Arithmetic (Msm Msm.zero)
+
 variable {F G : Type*} [Field F] [AddCommGroup G] [Module F G]
 
 omit [Field F] [AddCommGroup G] [Module F G] in

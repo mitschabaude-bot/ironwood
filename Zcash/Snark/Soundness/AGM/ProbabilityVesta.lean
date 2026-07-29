@@ -5,8 +5,9 @@ import Zcash.Snark.Soundness.AGM.Capstone
 /-!
 # Vesta AGM probability bounds
 
-This module applies the generic relation-to-DL probability proof to Vesta and the deployed augmented
-basis `(g, U, W)`.
+`Soundness.AGM.Probability` specialized to Vesta and the deployed augmented basis `(g, U, W)`:
+relation finding costs the textbook DL advantage plus `1/|Fp|`, with no augmented-basis
+cardinality factor.
 
 The reduction samples a basis as uniform scalar multiples of `B`.
 `OrchardUniformURSIdentification` says that the deployed setup has the same distribution.
@@ -21,12 +22,14 @@ open scoped ENNReal
 
 namespace Zcash.Snark
 
+open Zcash.Arithmetic (card_Fp)
+
 open CompElliptic.Curves.Pasta CompElliptic.CurveForms.ShortWeierstrass CompElliptic.CurveOrder
 
 /-- Run the computed opening-or-DL endpoint over Vesta. All transcript and AGM data are explicit. -/
-def orchardDeployedAlgebraicForkingFixedSlot
-    (urs : URS VestaG) (B : VestaG) (challenge : AugmentedIndex (2 ^ urs.k))
-    (embedding : FixedSlotEmbedding (F := Fp) B (augmentedBasis urs.g urs.u urs.w) challenge)
+def orchardDeployedAlgebraicForkingProgrammed
+    (urs : URS VestaG) (B C : VestaG)
+    (embedding : ProgrammedBasisEmbedding (F := Fp) B C (augmentedBasis urs.g urs.u urs.w))
     (b : Fin (2 ^ urs.k) → Fp) (v ξ z blind : Fp) (aMulti aDep s : Fin (2 ^ urs.k) → Fp)
     (cert : AlgebraicDForkCert (F := Fp) (augmentedBasis urs.g urs.u urs.w) urs.k)
     (hz : z ≠ 0) (hb0 : b 0 = 1)
@@ -34,9 +37,10 @@ def orchardDeployedAlgebraicForkingFixedSlot
     (hvalid : DeployedForkValid urs.g b urs.u urs.w z
       (commit urs aDep + (z * 0) • urs.u + blind • urs.w) cert.toDForkCert) :
     (Σ' a, IpaRelation urs (commit urs aMulti) b (v - ξ * innerProduct s b) a)
-      ⊕' FixedSlotRelationOutcome (F := Fp) B (augmentedBasis urs.g urs.u urs.w) challenge := by
+      ⊕' ProgrammedRelationOutcome (F := Fp) B C (augmentedBasis urs.g urs.u urs.w)
+          embedding.y := by
   letI : Inhabited VestaG := ⟨0⟩
-  exact deployedAlgebraicForkingFixedSlot urs B challenge embedding b v ξ z blind
+  exact deployedAlgebraicForkingProgrammed urs B C embedding b v ξ z blind
     aMulti aDep s cert hz hb0 hP hvalid
 
 /-! ## Exact deployed-producer event -/
@@ -60,18 +64,6 @@ theorem orchard_deployed_relation_set_eq_relSet (k : ℕ) (B : VestaG)
   simp only [orchardDeployedRelationSet, relSet, Finset.mem_filter, Finset.mem_univ, true_and]
   exact (deployedAlgebraicRelationFinder_isSome_iff instances (scalarBasis B scalars)).symm
 
-/-- Apply the fixed-slot probability bound to the supplied deployed Vesta instances. -/
-theorem orchard_deployed_reduction_advantage_ge (k : ℕ) (B : VestaG)
-    (instances : ∀ basis : AugmentedIndex (2 ^ k) → VestaG,
-      Option (DeployedAlgebraicForkingInstance (G := VestaG) k basis)) :
-    (1 : ℝ≥0∞) / Fintype.card (AugmentedIndex (2 ^ k)) *
-        (PMF.uniformOfFintype (AugmentedIndex (2 ^ k) → Fp)).toOuterMeasure
-          (relSet B (deployedAlgebraicRelationFinder instances))
-      ≤ (PMF.uniformOfFintype
-          ((AugmentedIndex (2 ^ k) → Fp) × AugmentedIndex (2 ^ k))).toOuterMeasure
-          (succSet B (deployedAlgebraicRelationFinder instances)) :=
-  reduction_advantage_ge B (deployedAlgebraicRelationFinder instances)
-
 /-- Bound the supplied instances' relation probability by textbook DL hardness. -/
 theorem orchard_deployed_relation_prob_le_of_textbookDL (k : ℕ) (B : VestaG)
     (instances : ∀ basis : AugmentedIndex (2 ^ k) → VestaG,
@@ -80,7 +72,7 @@ theorem orchard_deployed_relation_prob_le_of_textbookDL (k : ℕ) (B : VestaG)
     (hDL : TextbookDLAdvantageLE B (deployedAlgebraicRelationFinder instances) bound) :
     (PMF.uniformOfFintype (AugmentedIndex (2 ^ k) → Fp)).toOuterMeasure
         (relSet B (deployedAlgebraicRelationFinder instances))
-      ≤ Fintype.card (AugmentedIndex (2 ^ k)) * bound :=
+      ≤ bound + 1 / Fintype.card Fp :=
   relation_prob_le_of_textbookDL B (deployedAlgebraicRelationFinder instances) hDL
 
 /-- State the textbook-DL bound directly on the supplied instances' computed relation event. -/
@@ -91,11 +83,12 @@ theorem orchard_deployed_relation_event_prob_le_of_textbookDL (k : ℕ) (B : Ves
     (hDL : TextbookDLAdvantageLE B (deployedAlgebraicRelationFinder instances) bound) :
     (PMF.uniformOfFintype (AugmentedIndex (2 ^ k) → Fp)).toOuterMeasure
         (orchardDeployedRelationSet k B instances)
-      ≤ Fintype.card (AugmentedIndex (2 ^ k)) * bound := by
+      ≤ bound + 1 / Fintype.card Fp := by
   rw [orchard_deployed_relation_set_eq_relSet]
   exact orchard_deployed_relation_prob_le_of_textbookDL k B instances hDL
 
-/-- The deployed setup and fixed-slot reduction produce the same augmented-basis distribution. -/
+/-- The deployed setup and programmed-basis reduction produce the same augmented-basis
+distribution. -/
 def OrchardUniformURSIdentification {Ω : Type*} (setup : PMF Ω) (k : ℕ) (B : VestaG)
     (basisOf : Ω → AugmentedIndex (2 ^ k) → VestaG) : Prop :=
   setup.map basisOf =
@@ -185,7 +178,7 @@ theorem orchard_deployed_relation_prob_le_of_uniformURS_textbookDL {Ω : Type*} 
     {bound : ℝ≥0∞} (hURS : OrchardUniformURSIdentification setup k B basisOf)
     (hDL : TextbookDLAdvantageLE B (deployedAlgebraicRelationFinder instances) bound) :
     setup.toOuterMeasure (basisOf ⁻¹' deployedAlgebraicRelationEvent instances) ≤
-      Fintype.card (AugmentedIndex (2 ^ k)) * bound := by
+      bound + 1 / Fintype.card Fp := by
   rw [orchard_deployed_relation_prob_eq_of_uniformURS setup k B basisOf instances hURS]
   exact orchard_deployed_relation_event_prob_le_of_textbookDL k B instances hDL
 
@@ -199,35 +192,13 @@ theorem orchard_deployed_relation_prob_le_of_generatorRO_textbookDL
     (hDL : TextbookDLAdvantageLE B (deployedAlgebraicRelationFinder instances) bound) :
     (orchardGeneratorROSetup query).toOuterMeasure
         (orchardGeneratorROBasis query ⁻¹' deployedAlgebraicRelationEvent instances) ≤
-      Fintype.card (AugmentedIndex (2 ^ k)) * bound :=
+      bound + 1 / Fintype.card Fp :=
   orchard_deployed_relation_prob_le_of_uniformURS_textbookDL
     (orchardGeneratorROSetup query) k B (orchardGeneratorROBasis query) instances
     (orchard_uniformURSIdentification_of_generatorRO k B hB query hquery) hDL
 
-/-- Over Vesta's augmented basis, embedded-DL hardness bounds relation finding by `|ι| · bound`. -/
-theorem orchard_relation_prob_le_of_DL
-    (urs : URS VestaG) (B : VestaG)
-    (A : (b : AugmentedIndex (2 ^ urs.k) → VestaG) →
-      Option (AlgebraicRelationWitness (F := Fp) b))
-    {bound : ℝ≥0∞} (h : DLAdvantageLE B A bound) :
-    (PMF.uniformOfFintype (AugmentedIndex (2 ^ urs.k) → Fp)).toOuterMeasure (relSet B A)
-      ≤ Fintype.card (AugmentedIndex (2 ^ urs.k)) * bound :=
-  relation_prob_le_of_DL B A h
-
-/-- Over Vesta's augmented basis, DL-solving probability is at least relation probability divided by
-`|ι|`. -/
-theorem orchard_reduction_advantage_ge
-    (urs : URS VestaG) (B : VestaG)
-    (A : (b : AugmentedIndex (2 ^ urs.k) → VestaG) →
-      Option (AlgebraicRelationWitness (F := Fp) b)) :
-    (1 : ℝ≥0∞) / Fintype.card (AugmentedIndex (2 ^ urs.k))
-        * (PMF.uniformOfFintype (AugmentedIndex (2 ^ urs.k) → Fp)).toOuterMeasure (relSet B A)
-      ≤ (PMF.uniformOfFintype ((AugmentedIndex (2 ^ urs.k) → Fp) × AugmentedIndex (2 ^ urs.k))).toOuterMeasure
-          (succSet B A) :=
-  reduction_advantage_ge B A
-
 /-- Over the Vesta URS-generator basis, textbook DL hardness bounds relation finding by
-`2^urs.k · bound`.
+`bound + 1/|Fp|`.
 
 A commitment collision yields such a relation through `relationWitnessOfCollision`. The deployed
 reading also requires the URS distribution described in the module documentation. -/
@@ -236,17 +207,18 @@ theorem commitment_binding_prob_le_of_textbookDL
     (A : (b : Fin (2 ^ urs.k) → VestaG) → Option (AlgebraicRelationWitness (F := Fp) b))
     {bound : ℝ≥0∞} (h : TextbookDLAdvantageLE B A bound) :
     (PMF.uniformOfFintype (Fin (2 ^ urs.k) → Fp)).toOuterMeasure (relSet B A)
-      ≤ Fintype.card (Fin (2 ^ urs.k)) * bound :=
+      ≤ bound + 1 / Fintype.card Fp :=
   relation_prob_le_of_textbookDL B A h
 
-/-- Over Vesta's augmented basis, textbook DL hardness bounds relation finding by `|ι| · bound`. -/
+/-- Over Vesta's augmented basis, textbook DL hardness bounds relation finding by
+`bound + 1/|Fp|`. -/
 theorem orchard_relation_prob_le_of_textbookDL
     (urs : URS VestaG) (B : VestaG)
     (A : (b : AugmentedIndex (2 ^ urs.k) → VestaG) →
       Option (AlgebraicRelationWitness (F := Fp) b))
     {bound : ℝ≥0∞} (h : TextbookDLAdvantageLE B A bound) :
     (PMF.uniformOfFintype (AugmentedIndex (2 ^ urs.k) → Fp)).toOuterMeasure (relSet B A)
-      ≤ Fintype.card (AugmentedIndex (2 ^ urs.k)) * bound :=
+      ≤ bound + 1 / Fintype.card Fp :=
   relation_prob_le_of_textbookDL B A h
 
 end Zcash.Snark

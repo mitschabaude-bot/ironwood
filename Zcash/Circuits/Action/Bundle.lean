@@ -4,13 +4,20 @@ import Zcash.Circuits.Action.CircuitPreIronwood
 # The Orchard Action circuit: bundle contract (spec / extract / elaborated)
 
 The e2e statement (protocol spec §4.17.4) over the *extracted* public inputs and
-witness data — knowledge-sound at the extracted window scalars, with the Sinsemilla
-incomplete-addition escapes carried as data (`SpecOrBreak`, zcash/ironwood#45):
+witness data — knowledge-sound at the extracted window scalars, with every Sinsemilla
+hash stated in the specification's guarded ⊥-model (`HashGuarded`, the literal
+`∈ {…, ⊥}` escapes of §4.17.4):
 
 - value-commitment integrity, nullifier integrity, spend authority (total);
-- diversified-address integrity, old/new note-commitment integrity (breaks-as-data);
-- Merkle path validity and the four `q_orchard` value checks (knowledge-sound at the
+- diversified-address integrity, old/new note-commitment integrity (guarded);
+- Merkle path validity as the exact raw-encoding chain (`ExactMerklePathData`,
+  zcash/ironwood#97) and the four `q_orchard` value checks (knowledge-sound at the
   extracted root cell).
+
+The exported statement contains no or-break disjunctions: escapes of the witnessed
+hash queries are recomputed and consumed as breaks by the security layer
+(`Zcash/Security/Ledger/Bridge.lean`), where the reduction to computed break data
+lives.
 -/
 
 open ProvableStruct.Halo2 (eval_cells_eq_eval)
@@ -19,7 +26,7 @@ namespace Zcash.Circuits.Action.Circuit
 
 open Halo2
 open Ecc.MulFixed (FixedBase)
-open Specs.Sinsemilla (Generators hashToPoint hashToPointB SpecOrBreak
+open Specs.Sinsemilla (Generators hashToPoint HashGuarded
   commitIvkChunks)
 open CompElliptic.Fields.Pasta (Fq)
 
@@ -155,8 +162,8 @@ theorem main_regionCount (G : Generators) (B : Bases) (cfg : Config)
 /-! ## The extracted data -/
 
 /-- Everything the Action statement speaks about, read off a satisfying assignment:
-the nine public-input rows, the private witness cells, the six witnessed points, and
-the five fixed-base window scalars. -/
+the ten public-input rows (zcash/orchard#504), the private witness cells, the six
+witnessed points, and the five fixed-base window scalars. -/
 structure ActionData where
   anchor : Fp
   cvX : Fp
@@ -182,6 +189,13 @@ structure ActionData where
   pkdOld : Point Fp
   gdNew : Point Fp
   pkdNew : Point Fp
+  /-- The literal 255-bit representatives consumed by each Merkle hash.  These are
+  reconstructed from the three decomposition pieces, rather than from the reduced
+  node field elements. -/
+  leftEncoding : Fin 32 → ℕ
+  rightEncoding : Fin 32 → ℕ
+  /-- The cond-swap position flag (`true` means the running node is the right child). -/
+  merkleSide : Fin 32 → Bool
   merklePath : ℕ → Fp × Fp
   rcv : Vector Fp 85 × Fq
   alpha : Vector Fp 85 × Fq
@@ -230,6 +244,27 @@ def extract (cfg : Config) (_ : Var PrivateInputs Fp) (i₀ : RegionIndex)
             cellRead env (i₀ + 347) 0 cfg.eccConfig.witnessPoint.y⟩
   pkdNew := ⟨cellRead env (i₀ + 348) 0 cfg.eccConfig.witnessPoint.x,
              cellRead env (i₀ + 348) 0 cfg.eccConfig.witnessPoint.y⟩
+  leftEncoding := fun j =>
+    let k := j.val
+    let mcfg := if k < 16 then cfg.merkle1 else cfg.merkle2
+    let base := if k < 16 then i₀ + 8 + 8 * k else i₀ + 136 + 8 * (k - 16)
+    let a := (cellRead env (base + 1) 0 mcfg.sinsemilla.witnessPieces).val
+    let b := (cellRead env (base + 4) 0 mcfg.sinsemilla.witnessPieces).val
+    let b1 := (cellRead env (base + 2) 0 cfg.lookupConfig.runningSum).val
+    a / 2 ^ 10 + 2 ^ 240 * (b % 2 ^ 10 + 2 ^ 10 * b1)
+  rightEncoding := fun j =>
+    let k := j.val
+    let mcfg := if k < 16 then cfg.merkle1 else cfg.merkle2
+    let base := if k < 16 then i₀ + 8 + 8 * k else i₀ + 136 + 8 * (k - 16)
+    let c := (cellRead env (base + 5) 0 mcfg.sinsemilla.witnessPieces).val
+    let b2 := (cellRead env (base + 3) 0 cfg.lookupConfig.runningSum).val
+    b2 + 2 ^ 5 * c
+  merkleSide := fun j =>
+    let k := j.val
+    if k < 16 then
+      cellRead env (i₀ + 8 + 8 * k) 0 cfg.merkle1.condSwap.swap = 1
+    else
+      cellRead env (i₀ + 136 + 8 * (k - 16)) 0 cfg.merkle2.condSwap.swap = 1
   merklePath := fun j =>
     if j < 16 then
       (cellRead env (i₀ + 8 + 8 * j) 0 cfg.merkle1.condSwap.b,
@@ -251,6 +286,18 @@ def extractBase (cfg : Config) (_ : Var unit Fp) (i₀ : RegionIndex)
 /-! ## The statement (§4.17.4, knowledge-sound, breaks-as-data) -/
 
 open NoteCommit (noteScalars)
+
+/-- Total views of the Action's fixed-size Merkle exports.  Values beyond depth
+32 are irrelevant to `ExactMerklePathData`, but the total functions make its
+interface directly usable by the ledger bridge. -/
+def merkleLeftEncoding (wit : ActionData) : ℕ → ℕ := fun i =>
+  if h : i < 32 then wit.leftEncoding ⟨i, h⟩ else 0
+
+def merkleRightEncoding (wit : ActionData) : ℕ → ℕ := fun i =>
+  if h : i < 32 then wit.rightEncoding ⟨i, h⟩ else 0
+
+def merkleSide (wit : ActionData) : ℕ → Bool := fun i =>
+  if h : i < 32 then wit.merkleSide ⟨i, h⟩ else false
 
 /-- The Orchard Action statement over the extracted data: every §4.17.4 clause, with
 the Sinsemilla escapes exhibited as data and the fixed-base scalars knowledge-sound at
@@ -277,30 +324,27 @@ def SpecBase (G : Generators) (B : Bases) (wit : ActionData) : Prop :=
   -- spend authority: `rk = [α] SpendAuthG + ak_P`
   (⟨wit.rkX, wit.rkY⟩ : Point Fp)
     = wit.alpha.2 • B.spendAuthG + wit.akP ∧
-  -- diversified-address integrity: `ivk ∈ {Commit^ivk, ⊥}` (break exhibited) and
+  -- diversified-address integrity: `ivk ∈ {Commit^ivk, ⊥}` (guarded ⊥-model) and
   -- `pk_d_old = [ivk] g_d_old`
   (∃ ivk : Fp,
-    SpecOrBreak G.S B.ivkQ
-      (fun bp => ivk = (bp + wit.rivk.2 • B.commitIvkR).x)
-      (hashToPointB G.S B.ivkQ (commitIvkChunks wit.akP.x.val wit.nk.val)) ∧
+    HashGuarded G.S B.ivkQ (commitIvkChunks wit.akP.x.val wit.nk.val)
+      (fun bp => ivk = (bp + wit.rivk.2 • B.commitIvkR).x) ∧
     wit.pkdOld = ivk.val • wit.gdOld) ∧
-  -- old note-commitment integrity: `NoteCommit(…) ∈ {cm_old, ⊥}` (break exhibited)
-  SpecOrBreak G.S B.noteQ
-    (fun bp => wit.cmOld = bp + wit.rcmOld.2 • B.noteCommitR)
-    (hashToPointB G.S B.noteQ
-      (noteScalars wit.gdOld wit.pkdOld wit.vOld wit.rhoOld wit.psiOld).chunks) ∧
+  -- old note-commitment integrity: `NoteCommit(…) ∈ {cm_old, ⊥}` (guarded ⊥-model)
+  HashGuarded G.S B.noteQ
+    (noteScalars wit.gdOld wit.pkdOld wit.vOld wit.rhoOld wit.psiOld).chunks
+    (fun bp => wit.cmOld = bp + wit.rcmOld.2 • B.noteCommitR) ∧
   -- new note-commitment integrity, `ρ_new = nf_old`:
-  -- `Extract(NoteCommit(…)) ∈ {cmx, ⊥}` (break exhibited)
-  SpecOrBreak G.S B.noteQ
-    (fun bp => wit.cmx = (bp + wit.rcmNew.2 • B.noteCommitR).x)
-    (hashToPointB G.S B.noteQ
-      (noteScalars wit.gdNew wit.pkdNew wit.vNew wit.nfOld wit.psiNew).chunks) ∧
-  -- Merkle path validity, tied through the `q_orchard` anchor check. The strict-or-break
-  -- refinement exhibits any Sinsemilla escape as data, as requested by zcash/ironwood#45.
+  -- `Extract(NoteCommit(…)) ∈ {cmx, ⊥}` (guarded ⊥-model)
+  HashGuarded G.S B.noteQ
+    (noteScalars wit.gdNew wit.pkdNew wit.vNew wit.nfOld wit.psiNew).chunks
+    (fun bp => wit.cmx = (bp + wit.rcmNew.2 • B.noteCommitR).x) ∧
+  -- Merkle path validity, tied through the `q_orchard` anchor check: the exact
+  -- raw-encoding chain of the witnessed path cells (zcash/ironwood#97), each layer's
+  -- hash in the guarded ⊥-model.
   (∃ root : Fp,
-    Sinsemilla.Merkle.MerkleRoot G B.merkleQ 0 wit.cmOld.x 32 root ∧
-    (Sinsemilla.Merkle.MerkleRootStrict G B.merkleQ 0 wit.cmOld.x 32 root ∨
-      Sinsemilla.Merkle.MerkleBreakAt G B.merkleQ 0 32) ∧
+    Sinsemilla.Merkle.ExactMerklePathData G B.merkleQ 0 32 wit.cmOld.x root
+      (merkleLeftEncoding wit) (merkleRightEncoding wit) (merkleSide wit) ∧
     wit.vOld * (root - wit.anchor) = 0) ∧
   -- the remaining `q_orchard` value checks
   wit.vOld - wit.vNew = wit.magnitude * wit.sign ∧
@@ -316,35 +360,72 @@ def Spec (G : Generators) (B : Bases)
   SpecBase G B wit ∧ out.gdOld = wit.gdOld ∧ out.pkdOld = wit.pkdOld ∧
   out.gdNew = wit.gdNew ∧ out.pkdNew = wit.pkdNew
 
-/-- The generator table holds *exactly* the `load` contents (block + default fill) —
-the completeness-side strengthening of `GeneratorTableLoaded` (the honest env is one
-that ran the load). Stated as the load's own constraint set (place-independent). -/
-def GeneratorTableExact (G : Generators) (cfg : Sinsemilla.GeneratorTableConfig)
-    (env : Environment Fp) : Prop :=
-  Halo2.Constraints (fun _ => 0) env
-    ((Sinsemilla.load G cfg).operations 0) 0
-
-private theorem generatorTableExact_constraints (G : Generators)
-    (cfg : Sinsemilla.GeneratorTableConfig) (env : Environment Fp)
-    (h : GeneratorTableExact G cfg env) (place : RegionIndex → ℕ) (i : RegionIndex) :
-    Halo2.Constraints place env ((Sinsemilla.load G cfg).operations i) i := by
-  simp only [GeneratorTableExact, Sinsemilla.load, circuit_norm] at h ⊢
-  exact h
-
-/-- Env preconditions: the loaded tables and selector-distinctness every child asserts. -/
-def EnvAssumptions (G : Generators) (cfg : Config)
+/--
+Layout and configuration facts that neither constraint satisfaction nor honest
+witness extension establishes.
+-/
+def EnvAssumptions (cfg : Config)
     (env : Placed Environment Fp) : Prop :=
-  GeneratorTableExact G cfg.sinsemilla1.generatorTable env.env ∧
-  Sinsemilla.GeneratorTableLoaded G cfg.sinsemilla1.generatorTable env.env ∧
-  Sinsemilla.GeneratorTableLoaded G cfg.sinsemilla2.generatorTable env.env ∧
-  Sinsemilla.GeneratorTableLoaded G cfg.merkle1.sinsemilla.generatorTable env.env ∧
-  Sinsemilla.GeneratorTableLoaded G cfg.merkle2.sinsemilla.generatorTable env.env ∧
+  2 ^ Specs.K ≤ env.env.usableRows ∧
+  cfg.sinsemilla2.generatorTable = cfg.sinsemilla1.generatorTable ∧
+  cfg.merkle1.sinsemilla.generatorTable = cfg.sinsemilla1.generatorTable ∧
+  cfg.merkle2.sinsemilla.generatorTable = cfg.sinsemilla1.generatorTable ∧
+  cfg.lookupConfig.tableIdx = cfg.sinsemilla1.generatorTable.tableIdx ∧
   Ecc.MulFixed.FullWidth.EnvAssumptions cfg.eccConfig.mulFixedFull env ∧
   Ecc.MulFixed.Short.EnvAssumptions cfg.eccConfig.mulFixedShort env ∧
-  Ecc.MulFixed.BaseFieldElem.EnvAssumptions cfg.eccConfig.mulFixedBaseField env ∧
-  Ecc.Mul.EnvAssumptions cfg.eccConfig.mul env ∧
-  LookupRangeCheck.TableLoaded 10 cfg.lookupConfig env.env ∧
+  Ecc.MulFixed.BaseFieldElem.InnerEnvAssumptions
+    cfg.eccConfig.mulFixedBaseField env ∧
+  cfg.eccConfig.mulFixedBaseField.lookupConfig = cfg.lookupConfig ∧
+  cfg.eccConfig.mul.overflowConfig.lookupConfig = cfg.lookupConfig ∧
   cfg.lookupConfig.qLookup.index ≠ cfg.lookupConfig.qRunning.index
+
+private theorem rangeLoad_constraints_of_generatorLoad
+    (G : Generators) (gcfg : Sinsemilla.GeneratorTableConfig)
+    (lcfg : LookupRangeCheck.Config 10)
+    (htable : lcfg.tableIdx = gcfg.tableIdx)
+    (i : RegionIndex) (env : Placed Environment Fp)
+    (h : Constraints env.place env.env
+      ((Sinsemilla.load G gcfg).operations i) i) :
+    Constraints env.place env.env
+      ((LookupRangeCheck.load 10 lcfg).operations i) i := by
+  simp only [Sinsemilla.load, LookupRangeCheck.load, circuit_norm] at h ⊢
+  rw [htable]
+  exact ⟨h.1, h.2.1⟩
+
+private theorem loadedChildEnvFacts
+    (G : Generators) (cfg : Config)
+    (i : RegionIndex) (env : Placed Environment Fp)
+    (hEnv : EnvAssumptions cfg env)
+    (hload : Constraints env.place env.env
+      ((Sinsemilla.load G cfg.sinsemilla1.generatorTable).operations i) i) :
+    Sinsemilla.GeneratorTableLoaded G cfg.sinsemilla1.generatorTable env.env ∧
+    Sinsemilla.GeneratorTableLoaded G cfg.sinsemilla2.generatorTable env.env ∧
+    Sinsemilla.GeneratorTableLoaded G
+      cfg.merkle1.sinsemilla.generatorTable env.env ∧
+    Sinsemilla.GeneratorTableLoaded G
+      cfg.merkle2.sinsemilla.generatorTable env.env ∧
+    Ecc.MulFixed.BaseFieldElem.EnvAssumptions
+      cfg.eccConfig.mulFixedBaseField env ∧
+    Ecc.Mul.EnvAssumptions cfg.eccConfig.mul env ∧
+    LookupRangeCheck.TableLoaded 10 cfg.lookupConfig env.env := by
+  obtain ⟨hUsable, hs2, hm1, hm2, hlookup, -, -, hBfInner,
+    hBfLookup, hMulLookup, hDist⟩ := hEnv
+  have hT1 := Sinsemilla.load_generatorTableLoaded G
+    cfg.sinsemilla1.generatorTable env.place env.env i hUsable hload
+  have hTL := LookupRangeCheck.load_tableLoaded 10 cfg.lookupConfig
+    env.place env.env i (by norm_num) hUsable
+    (rangeLoad_constraints_of_generatorLoad G
+      cfg.sinsemilla1.generatorTable cfg.lookupConfig hlookup i env hload)
+  refine ⟨hT1, ?_, ?_, ?_, ?_, ?_, hTL⟩
+  · simpa only [hs2] using hT1
+  · simpa only [hm1] using hT1
+  · simpa only [hm2] using hT1
+  · simp only [Ecc.MulFixed.BaseFieldElem.EnvAssumptions]
+    rw [hBfLookup]
+    exact ⟨hBfInner, hTL, hDist⟩
+  · simp only [Ecc.Mul.EnvAssumptions, Ecc.MulOverflow.EnvAssumptions]
+    rw [hMulLookup]
+    exact ⟨hTL, hDist⟩
 
 /-- Witness-consistency bridge: the honest prover's evaluated point hint equals the point
 read from the witnessed output cells. From the region's `ExtendsWitnesses` alone (no gate
@@ -703,11 +784,9 @@ instance elaborated (G : Generators) (B : Bases) (cfg : Config) :
 
 /-! ## Soundness -/
 
-open Sinsemilla.Merkle (MerkleRoot)
-
 theorem soundness (G : Generators) (B : Bases) (cfg : Config) :
     FormalCircuit.Soundness (Witness := fun _ => ActionData)
-      (main G B cfg) (extractBase cfg) (EnvAssumptions G cfg) (fun _ => True)
+      (main G B cfg) (extractBase cfg) (EnvAssumptions cfg) (fun _ => True)
       (Spec G B) := by
   circuit_proof_start
   let input_var_rcv := hintWitnesses.rcv
@@ -715,12 +794,19 @@ theorem soundness (G : Generators) (B : Bases) (cfg : Config) :
   let input_var_rivk := hintWitnesses.rivk
   let input_var_rcmOld := hintWitnesses.rcmOld
   let input_var_rcmNew := hintWitnesses.rcmNew
-  obtain ⟨hTE, hT1, hT2, hTM1, hTM2, hFw, hSh, hBf, hMulE, hTL, hDist⟩ := _hE
   simp only [CircuitPreIronwood.synthesize, synthesizeBase, circuit_norm] at hc
   have hW := hc.1
   have hCk := hc.2.1
   have hN := hc.2.2
   clear hc
+  have hLoad := hW
+  simp only [synthWitness, Circuit.operations_bind, Circuit.operations_pure,
+    List.append_nil] at hLoad
+  rw [constraints_append] at hLoad
+  obtain ⟨hT1, hT2, hTM1, hTM2, hBf, hMulE, hTL⟩ :=
+    loadedChildEnvFacts G cfg i₀
+      (⟨place, env⟩ : Placed Environment Fp) _hE hLoad.1
+  obtain ⟨-, -, -, -, -, hFw, hSh, -, -, -, hDist⟩ := _hE
   -- ── stage A: the witness regions ──
   simp only [synthWitness, loadPrivate, Sinsemilla.load, circuit_norm] at hW
   have hCm := hW.2.2.2.2.2.2.1
@@ -928,7 +1014,7 @@ theorem soundness (G : Generators) (B : Bases) (cfg : Config) :
   · -- diversified-address integrity
     with_unfolding_all exact ⟨_, by exact hCIS, by exact hAIS.2⟩
   · -- old note-commitment integrity
-    refine Specs.Sinsemilla.SpecOrBreak.mono ?_
+    refine Specs.Sinsemilla.HashGuarded.mono ?_
       (by with_unfolding_all exact hNCoS.2)
     intro bp hbp
     have hcmP : ({ x := env.advice cfg.eccConfig.witnessPoint.x ((place (i₀ + 2) : ℕ) : ℤ),
@@ -958,32 +1044,45 @@ theorem soundness (G : Generators) (B : Bases) (cfg : Config) :
     exact hbp
   · -- new note-commitment integrity
     rw [← hInf]
-    refine Specs.Sinsemilla.SpecOrBreak.mono ?_
+    refine Specs.Sinsemilla.HashGuarded.mono ?_
       (by with_unfolding_all exact hNCnS.2)
     intro bp hbp
     rw [← hIcmx]
     with_unfolding_all exact congrArg Point.x hbp
   · -- Merkle path validity + the anchor check
     obtain ⟨hOv, hOn, hOm, hOs, hOr, hOa, hOes, hOeo, hGate⟩ := hOrch
-    have hRoot := Sinsemilla.Merkle.MerkleRoot.trans G B.merkleQ hM1S.1 hM2S.1
-    simp only [orchardGate, Constraints.withSelector, circuit_norm, List.Forall] at hGate
+    have hExact := Sinsemilla.Merkle.ExactMerklePathData.trans G B.merkleQ
+      0 16 16 _ _ _ _ _ _ _ _ _ hM1S hM2S
+    norm_num at hExact
+    simp only [orchardGate, Gate.withSelector, circuit_norm, List.Forall] at hGate
     have h := hGate.2.1
     rw [hOv, hOr, hOa] at h
-    refine ⟨_, by with_unfolding_all exact hRoot, ?_, by with_unfolding_all exact h⟩
-    rcases hM1S.2 with hM1Strict | hM1Break
-    · rcases hM2S.2 with hM2Strict | hM2Break
-      · with_unfolding_all exact Or.inl (Sinsemilla.Merkle.MerkleRootStrict.trans G B.merkleQ hM1Strict hM2Strict)
-      · exact Or.inr (Sinsemilla.Merkle.MerkleBreakAt.shift G B.merkleQ (l := 0) (k := 16) (k' := 16) hM2Break)
-    · exact Or.inr (Sinsemilla.Merkle.MerkleBreakAt.mono G B.merkleQ (by omega) hM1Break)
+    refine ⟨_, ?_, by with_unfolding_all exact h⟩
+    · rcases hExact with ⟨nodes, h0, hd, hs⟩
+      refine ⟨nodes, by with_unfolding_all exact h0,
+        by with_unfolding_all exact hd, ?_⟩
+      intro i hi
+      have hstep := hs i hi
+      by_cases h16 : i < 16
+      · simp only [merkleLeftEncoding, merkleRightEncoding, merkleSide,
+          dif_pos hi, h16, if_true] at ⊢
+        simpa [Sinsemilla.Merkle.CalculateRoot.circuit,
+          Sinsemilla.Merkle.HashLayer.circuit, Sinsemilla.Merkle.HashLayer.leftEncoding,
+          Sinsemilla.Merkle.HashLayer.rightEncoding, circuit_norm, Nat.add_assoc, h16] using hstep
+      · simp only [merkleLeftEncoding, merkleRightEncoding, merkleSide,
+          dif_pos hi, h16, if_false] at ⊢
+        simpa [Sinsemilla.Merkle.CalculateRoot.circuit,
+          Sinsemilla.Merkle.HashLayer.circuit, Sinsemilla.Merkle.HashLayer.leftEncoding,
+          Sinsemilla.Merkle.HashLayer.rightEncoding, circuit_norm, Nat.add_assoc, h16] using hstep
   · -- `v_old − v_new = magnitude · sign`
     obtain ⟨hOv, hOn, hOm, hOs, hOr, hOa, hOes, hOeo, hGate⟩ := hOrch
-    simp only [orchardGate, Constraints.withSelector, circuit_norm, List.Forall] at hGate
+    simp only [orchardGate, Gate.withSelector, circuit_norm, List.Forall] at hGate
     have h := hGate.1
     rw [hOv, hOn, hOm, hOs] at h
     linear_combination h
   · -- the enable-flag checks
     obtain ⟨hOv, hOn, hOm, hOs, hOr, hOa, hOes, hOeo, hGate⟩ := hOrch
-    simp only [orchardGate, Constraints.withSelector, circuit_norm, List.Forall] at hGate
+    simp only [orchardGate, Gate.withSelector, circuit_norm, List.Forall] at hGate
     refine ⟨?_, ?_⟩
     · have h := hGate.2.2.1
       rw [hOv, hOes] at h
@@ -1081,11 +1180,10 @@ private theorem buildWitness (G : Generators) (W : Witnesses Fp) (cfg : Config)
 
 theorem completeness (G : Generators) (B : Bases) (cfg : Config) :
     FormalCircuit.Completeness (Witness := fun _ => ActionData)
-      (main G B cfg) (extractBase cfg) (EnvAssumptions G cfg) (fun _ => True)
+      (main G B cfg) (extractBase cfg) (EnvAssumptions cfg) (fun _ => True)
       (ProverAssumptions G B) (fun _ _ _ _ => True) := by
   circuit_proof_start
   simp only [extractBase] at hPA
-  obtain ⟨hTE, hT1, hT2, hTM1, hTM2, hFw, hSh, hBf, hMulE, hTL, hDist⟩ := _hE
   obtain ⟨hVcm, hVgd, hVak, hVpk, hVgdn, hVpkn, hWrcv, hWal, hWri, hWro, hWrn,
     hMag, hSign, hV64o, hV64n, ⟨mid, hMid, root, hRootP, hVanch⟩,
     ⟨Bi, hBi, hPkd⟩, ⟨Bo, hBo, hCmOld⟩, ⟨Bn, hBn, hCmx⟩,
@@ -1120,6 +1218,18 @@ theorem completeness (G : Generators) (B : Bases) (cfg : Config) :
   have hWc := hwit.2.1
   have hWn := hwit.2.2
   clear hwit
+  have hLoadWitnesses := hWw
+  simp only [synthWitness, Circuit.operations_bind, Circuit.operations_pure,
+    List.append_nil] at hLoadWitnesses
+  rw [extendsWitnesses_append] at hLoadWitnesses
+  have hLoad : Constraints place env.toEnvironment
+      ((Sinsemilla.load G cfg.sinsemilla1.generatorTable).operations i₀) i₀ := by
+    simp only [Sinsemilla.load, circuit_norm] at hLoadWitnesses ⊢
+    exact hLoadWitnesses.1
+  obtain ⟨hT1, hT2, hTM1, hTM2, hBf, hMulE, hTL⟩ :=
+    loadedChildEnvFacts G cfg i₀
+      (⟨place, env.toEnvironment⟩ : Placed Environment Fp) _hE hLoad
+  obtain ⟨-, -, -, -, -, hFw, hSh, -, -, -, hDist⟩ := _hE
   -- ── stage A witnesses: the shared cells are the programs' honest values ──
   simp only [synthWitness, loadPrivate, Sinsemilla.load, circuit_norm] at hWw
   obtain ⟨-, -, -, -, -, -, hwPsi, hwRho, hWcm, hWgd, hWak, hwNk, hwVo, hwVn⟩ := hWw
@@ -1130,7 +1240,7 @@ theorem completeness (G : Generators) (B : Bases) (cfg : Config) :
       input_var_gdNew, input_var_pkdNew, input_var_rcv, input_var_alpha,
       input_var_rivk, input_var_rcmOld, input_var_rcmNew,
       input_var_merkleSib, input_var_merkleSwap⟩ cfg i₀ place _
-    (generatorTableExact_constraints G _ _ hTE place i₀) ?_ ?_ ?_, ?_⟩
+    hLoad ?_ ?_ ?_, ?_⟩
   · exact Halo2.SubcircuitRw.layouter_completeness_leaf
       Ecc.WitnessPoint.pointFormal
       cfg.eccConfig.witnessPoint (i₀ + 2) place env _ hWcm
@@ -1199,16 +1309,14 @@ theorem completeness (G : Generators) (B : Bases) (cfg : Config) :
           { node := AssignedCell.of (i₀ + 2) 0 cfg.eccConfig.witnessPoint.x }
           (i₀ + 8)) : Fp) = mid := by
       refine hM1der.2 mid ?_
-      rw [show ((Sinsemilla.Merkle.CalculateRoot.circuit G B.merkleQ B.merkleQ_onCurve
+      rw [show (fun j => ((Sinsemilla.Merkle.CalculateRoot.circuit G B.merkleQ B.merkleQ_onCurve
           0 16 (by norm_num) input_var_merkleSib input_var_merkleSwap).extract
           (cfg.merkle1.condSwap, cfg.merkle1, cfg.lookupConfig) _ (i₀ + 8)
-          (⟨place, env.toEnvironment⟩ : Placed Environment Fp))
+          (⟨place, env.toEnvironment⟩ : Placed Environment Fp) j).pair)
         = fun j => ((eval (⟨place, env.toEnvironment⟩ : Placed Environment Fp)
-            (AssignedCell.of (i₀ + 8 + 8 * j) 0 cfg.merkle1.condSwap.b
-              : Var field Fp) : Fp),
+            (AssignedCell.of (i₀ + 8 + 8 * j) 0 cfg.merkle1.condSwap.b : Var field Fp) : Fp),
           (eval (⟨place, env.toEnvironment⟩ : Placed Environment Fp)
-            (AssignedCell.of (i₀ + 8 + 8 * j) 0 cfg.merkle1.condSwap.swap
-              : Var field Fp) : Fp)) from by
+            (AssignedCell.of (i₀ + 8 + 8 * j) 0 cfg.merkle1.condSwap.swap : Var field Fp) : Fp)) from by
         funext j
         with_unfolding_all rfl]
       rw [Sinsemilla.Merkle.CalculateRoot.pathNode_congr G B.merkleQ 0 _ 16
@@ -1265,17 +1373,15 @@ theorem completeness (G : Generators) (B : Bases) (cfg : Config) :
               (i₀ + 8) }
           (i₀ + 136)) : Fp) = root := by
       refine hM2der.2 root ?_
-      rw [show ((Sinsemilla.Merkle.CalculateRoot.circuit G B.merkleQ B.merkleQ_onCurve
+      rw [show (fun j => ((Sinsemilla.Merkle.CalculateRoot.circuit G B.merkleQ B.merkleQ_onCurve
           16 16 (by norm_num) (fun i => input_var_merkleSib (16 + i))
           (fun i => input_var_merkleSwap (16 + i))).extract
           (cfg.merkle2.condSwap, cfg.merkle2, cfg.lookupConfig) _ (i₀ + 136)
-          (⟨place, env.toEnvironment⟩ : Placed Environment Fp))
+          (⟨place, env.toEnvironment⟩ : Placed Environment Fp) j).pair)
         = fun j => ((eval (⟨place, env.toEnvironment⟩ : Placed Environment Fp)
-            (AssignedCell.of (i₀ + 136 + 8 * j) 0 cfg.merkle2.condSwap.b
-              : Var field Fp) : Fp),
+            (AssignedCell.of (i₀ + 136 + 8 * j) 0 cfg.merkle2.condSwap.b : Var field Fp) : Fp),
           (eval (⟨place, env.toEnvironment⟩ : Placed Environment Fp)
-            (AssignedCell.of (i₀ + 136 + 8 * j) 0 cfg.merkle2.condSwap.swap
-              : Var field Fp) : Fp)) from by
+            (AssignedCell.of (i₀ + 136 + 8 * j) 0 cfg.merkle2.condSwap.swap : Var field Fp) : Fp)) from by
         funext j
         with_unfolding_all rfl]
       rw [Sinsemilla.Merkle.CalculateRoot.pathNode_congr₂ G B.merkleQ 16 16
@@ -1344,10 +1450,9 @@ theorem completeness (G : Generators) (B : Bases) (cfg : Config) :
       rw [civkInputs_eval_eq] at hCIder
       simp only [circuit_norm,
         Nat.add_zero] at hCIder
-      rw [Specs.Sinsemilla.hashToPointB_inl_of_some
-        (show hashToPoint G.S B.ivkQ _ = some Bi from by
-          with_unfolding_all exact hBi)] at hCIder
-      simp only [circuit_norm, explicit_provable_type]; exact hCIder
+      have hCIval := hCIder Bi (show hashToPoint G.S B.ivkQ _ = some Bi from by
+        with_unfolding_all exact hBi)
+      simp only [circuit_norm, explicit_provable_type]; exact hCIval
     -- ── stage C witnesses and contracts ──
     simp only [synthChecks_output, synthChecks_nextRegionIndex,
       synthChecks_regionCount, Nat.add_assoc, Nat.reduceAdd] at hWn
@@ -1489,11 +1594,9 @@ theorem completeness (G : Generators) (B : Bases) (cfg : Config) :
             (⟨place, env.toEnvironment⟩ : Placed Environment Fp)).cmOld := by
       rw [NoteCommit.Main.circuit_spec_eq, NoteCommit.Main.circuit_extract_eq] at hNCoDer
       rw [ncInputs_eval_eq] at hNCoDer
-      rw [Specs.Sinsemilla.hashToPointB_inl_of_some
-        (show hashToPoint G.S B.noteQ _ = some Bo from by
-          exact hBo)] at hNCoDer
       rw [hCmOld]
-      exact hNCoDer.2
+      exact hNCoDer.2 _ (show hashToPoint G.S B.noteQ _ = some Bo from by
+        exact hBo)
     have hNCnval : (eval (⟨place, env.toEnvironment⟩ : Placed Environment Fp)
         ((NoteCommit.Main.circuit G B.noteCommitR B.noteQ
           B.noteQ_onCurve).output
@@ -1537,10 +1640,8 @@ theorem completeness (G : Generators) (B : Bases) (cfg : Config) :
           = (extract cfg input_var i₀
               (⟨place, env.toEnvironment⟩ : Placed Environment Fp)).nfOld
           from by with_unfolding_all exact hDNval] at hNCnDer
-      rw [Specs.Sinsemilla.hashToPointB_inl_of_some
-        (show hashToPoint G.S B.noteQ _ = some Bn from by
-          exact hBn)] at hNCnDer
-      exact hNCnDer.2
+      exact hNCnDer.2 _ (show hashToPoint G.S B.noteQ _ = some Bn from by
+        exact hBn)
     -- ── assemble the stage-B and stage-C constraints ──
     simp only [synthWitness_output, synthWitness_nextRegionIndex,
       synthWitness_regionCount, synthChecks_output, synthChecks_nextRegionIndex,
@@ -1766,7 +1867,7 @@ theorem completeness (G : Generators) (B : Bases) (cfg : Config) :
         · exact hOa
         · exact hOes
         · exact hOeo
-        · simp only [orchardGate, Constraints.withSelector, circuit_norm,
+        · simp only [orchardGate, Gate.withSelector, circuit_norm,
             List.Forall]
           refine ⟨?_, ?_, ?_, ?_⟩
           · rw [hOv, hOn, hOm, hOs]
@@ -1804,7 +1905,7 @@ def baseCircuit (G : Generators) (B : Bases) :
   elaborated := fun cfg => elaborated G B cfg
   Witness := fun _ => ActionData
   extract := extractBase
-  EnvAssumptions := EnvAssumptions G
+  EnvAssumptions := EnvAssumptions
   Assumptions := fun _ => True
   Spec := Spec G B
   ProverAssumptions := ProverAssumptions G B
@@ -1851,6 +1952,59 @@ def extractPost (cfg : Config) (_ : Var unit Fp) (i : RegionIndex)
     (env : Placed Environment Fp) : ActionData :=
   extractBase cfg () i env
 
+@[simp] theorem extractPost_anchor (cfg : Config) (i : RegionIndex)
+    (env : Placed Environment Fp) :
+    (extractPost cfg () i env).anchor = env.env.get cfg.primary (ANCHOR : ℤ) :=
+  rfl
+
+@[simp] theorem extractPost_cvX (cfg : Config) (i : RegionIndex)
+    (env : Placed Environment Fp) :
+    (extractPost cfg () i env).cvX = env.env.get cfg.primary (CV_NET_X : ℤ) :=
+  rfl
+
+@[simp] theorem extractPost_cvY (cfg : Config) (i : RegionIndex)
+    (env : Placed Environment Fp) :
+    (extractPost cfg () i env).cvY = env.env.get cfg.primary (CV_NET_Y : ℤ) :=
+  rfl
+
+@[simp] theorem extractPost_nfOld (cfg : Config) (i : RegionIndex)
+    (env : Placed Environment Fp) :
+    (extractPost cfg () i env).nfOld = env.env.get cfg.primary (NF_OLD : ℤ) :=
+  rfl
+
+@[simp] theorem extractPost_rkX (cfg : Config) (i : RegionIndex)
+    (env : Placed Environment Fp) :
+    (extractPost cfg () i env).rkX = env.env.get cfg.primary (RK_X : ℤ) :=
+  rfl
+
+@[simp] theorem extractPost_rkY (cfg : Config) (i : RegionIndex)
+    (env : Placed Environment Fp) :
+    (extractPost cfg () i env).rkY = env.env.get cfg.primary (RK_Y : ℤ) :=
+  rfl
+
+@[simp] theorem extractPost_cmx (cfg : Config) (i : RegionIndex)
+    (env : Placed Environment Fp) :
+    (extractPost cfg () i env).cmx = env.env.get cfg.primary (CMX : ℤ) :=
+  rfl
+
+@[simp] theorem extractPost_enableSpend (cfg : Config) (i : RegionIndex)
+    (env : Placed Environment Fp) :
+    (extractPost cfg () i env).enableSpend =
+      env.env.get cfg.primary (ENABLE_SPEND : ℤ) :=
+  rfl
+
+@[simp] theorem extractPost_enableOutput (cfg : Config) (i : RegionIndex)
+    (env : Placed Environment Fp) :
+    (extractPost cfg () i env).enableOutput =
+      env.env.get cfg.primary (ENABLE_OUTPUT : ℤ) :=
+  rfl
+
+@[simp] theorem extractPost_disableCrossAddress (cfg : Config) (i : RegionIndex)
+    (env : Placed Environment Fp) :
+    (extractPost cfg () i env).disableCrossAddress =
+      env.env.get cfg.primary (DISABLE_CROSS_ADDRESS : ℤ) :=
+  rfl
+
 /-- The ironwood Action statement: the base §4.17.4 statement, plus the post-NU 6.3
 cross-address binding — a nonzero `DISABLE_CROSS_ADDRESS` instance row forces the new
 note's diversified address to equal the old note's. -/
@@ -1867,9 +2021,15 @@ def ProverAssumptionsPost (G : Generators) (B : Bases)
   ProverAssumptions G B () wit hint ∧
   (wit.disableCrossAddress = 0 ∨ (wit.gdOld = wit.gdNew ∧ wit.pkdOld = wit.pkdNew))
 
-theorem soundnessPost (G : Generators) (B : Bases) (cfg : Config) :
+/--
+Action soundness derives every table-content fact from the circuit constraints;
+only the residual layout/configuration contract is assumed.
+-/
+theorem soundnessPost
+    (G : Generators) (B : Bases) (cfg : Config) :
     FormalCircuit.Soundness (Witness := fun _ => ActionData)
-      (mainPost G B cfg) (extractPost cfg) (EnvAssumptions G cfg) (fun _ => True)
+      (mainPost G B cfg) (extractPost cfg)
+      (EnvAssumptions cfg) (fun _ => True)
       (SpecPost G B) := by
   circuit_proof_start
   set input_var : Witnesses Fp := hintWitnesses
@@ -1900,7 +2060,7 @@ theorem soundnessPost (G : Generators) (B : Bases) (cfg : Config) :
   obtain ⟨ha10, -, -, -, ha14, ha15, -, -, -, -, hG1⟩ := h1
   obtain ⟨ha20, -, -, -, ha24, ha25, -, -, -, -, hG2⟩ := h2
   obtain ⟨ha30, -, -, -, ha34, ha35, -, -, -, -, hG3⟩ := h3
-  simp only [orchardGate, Constraints.withSelector, circuit_norm,
+  simp only [orchardGate, Gate.withSelector, circuit_norm,
     List.Forall] at hG0 hG1 hG2 hG3
   have e0 := hG0.2.1
   have e1 := hG1.2.1
@@ -1941,9 +2101,15 @@ theorem soundnessPost (G : Generators) (B : Bases) (cfg : Config) :
     rw [hpx, hpy]
     rfl
 
-theorem completenessPost (G : Generators) (B : Bases) (cfg : Config) :
+/--
+Action completeness derives the same table-content facts from honest witness
+extension; only the shared residual contract is assumed.
+-/
+theorem completenessPost
+    (G : Generators) (B : Bases) (cfg : Config) :
     FormalCircuit.Completeness (Witness := fun _ => ActionData)
-      (mainPost G B cfg) (extractPost cfg) (EnvAssumptions G cfg) (fun _ => True)
+      (mainPost G B cfg) (extractPost cfg)
+      (EnvAssumptions cfg) (fun _ => True)
       (ProverAssumptionsPost G B) (fun _ _ _ _ => True) := by
   circuit_proof_start
   obtain ⟨hPA, hDca⟩ := hPA
@@ -2028,7 +2194,7 @@ theorem completenessPost (G : Generators) (B : Bases) (cfg : Config) :
       Nat.mul_one, Nat.add_zero]
     · obtain ⟨w0, w1, w2, w3, w4, w5, w6, w7, w8, w9⟩ := hw0
       refine ⟨w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, ?_⟩
-      simp only [orchardGate, Constraints.withSelector, circuit_norm, List.Forall]
+      simp only [orchardGate, Gate.withSelector, circuit_norm, List.Forall]
       refine ⟨?_, ?_, ?_, ?_⟩
       · rw [w2, w3, w1, w0]
         ring
@@ -2040,7 +2206,7 @@ theorem completenessPost (G : Generators) (B : Bases) (cfg : Config) :
         ring
     · obtain ⟨w0, w1, w2, w3, w4, w5, w6, w7, w8, w9⟩ := hw1
       refine ⟨w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, ?_⟩
-      simp only [orchardGate, Constraints.withSelector, circuit_norm, List.Forall]
+      simp only [orchardGate, Gate.withSelector, circuit_norm, List.Forall]
       refine ⟨?_, ?_, ?_, ?_⟩
       · rw [w2, w3, w1, w0]
         ring
@@ -2052,7 +2218,7 @@ theorem completenessPost (G : Generators) (B : Bases) (cfg : Config) :
         ring
     · obtain ⟨w0, w1, w2, w3, w4, w5, w6, w7, w8, w9⟩ := hw2
       refine ⟨w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, ?_⟩
-      simp only [orchardGate, Constraints.withSelector, circuit_norm, List.Forall]
+      simp only [orchardGate, Gate.withSelector, circuit_norm, List.Forall]
       refine ⟨?_, ?_, ?_, ?_⟩
       · rw [w2, w3, w1, w0]
         ring
@@ -2064,7 +2230,7 @@ theorem completenessPost (G : Generators) (B : Bases) (cfg : Config) :
         ring
     · obtain ⟨w0, w1, w2, w3, w4, w5, w6, w7, w8, w9⟩ := hw3
       refine ⟨w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, ?_⟩
-      simp only [orchardGate, Constraints.withSelector, circuit_norm, List.Forall]
+      simp only [orchardGate, Gate.withSelector, circuit_norm, List.Forall]
       refine ⟨?_, ?_, ?_, ?_⟩
       · rw [w2, w3, w1, w0]
         ring
@@ -2086,7 +2252,7 @@ def circuit (G : Generators) (B : Bases) :
   elaborated := fun cfg => elaboratedPost G B cfg
   Witness := fun _ => ActionData
   extract := extractPost
-  EnvAssumptions := EnvAssumptions G
+  EnvAssumptions := EnvAssumptions
   Assumptions := fun _ => True
   Spec := SpecPost G B
   ProverAssumptions := ProverAssumptionsPost G B

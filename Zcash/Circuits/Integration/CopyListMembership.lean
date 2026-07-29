@@ -285,13 +285,13 @@ theorem operationConstSites_map_snd (ops : Operations Fp) :
 
 /-- If V1 found enough positions for every collected value, projecting the value
 field from its allocation output recovers the original value stream. -/
-theorem V1_constants_map_fst
-    (toNat : Fp → ℕ) (ops : Operations Fp) (constantColumns : List ℕ)
+theorem V1_constantAssignments_map_fst
+    (ops : Operations Fp) (constantColumns : List ℕ)
     (hfull :
       (FloorPlanner.V1.constantValues ops).length ≤
-        (FloorPlanner.V1.constants toNat ops constantColumns).length) :
-    (FloorPlanner.V1.constants toNat ops constantColumns).map Prod.fst =
-      (FloorPlanner.V1.constantValues ops).map toNat := by
+        (FloorPlanner.V1.constantAssignments ops constantColumns).length) :
+    (FloorPlanner.V1.constantAssignments ops constantColumns).map Prod.fst =
+      FloorPlanner.V1.constantValues ops := by
   let allocations := (FloorPlanner.V1.planOperations ops).2
   let endRow := FloorPlanner.V1.firstUnassignedRow allocations
   let positions : List (ℕ × ℕ) := constantColumns.flatMap fun column =>
@@ -299,19 +299,17 @@ theorem V1_constants_map_fst
       (column, row)
   have hpositions :
       (FloorPlanner.V1.constantValues ops).length ≤ positions.length := by
-    have hlength := hfull
-    simp only [FloorPlanner.V1.constants, List.length_map,
-      List.length_zip] at hlength
-    change (FloorPlanner.V1.constantValues ops).length ≤
-      min positions.length (FloorPlanner.V1.constantValues ops).length at hlength
+    have hlength :
+        (FloorPlanner.V1.constantValues ops).length ≤
+          min positions.length
+            (FloorPlanner.V1.constantValues ops).length := by
+      simpa only [FloorPlanner.V1.constantAssignments,
+        List.length_map, List.length_zip] using hfull
     omega
-  unfold FloorPlanner.V1.constants
+  unfold FloorPlanner.V1.constantAssignments
   simp only [List.map_map]
-  change
-    (List.zip positions (FloorPlanner.V1.constantValues ops)).map
-        (toNat ∘ Prod.snd) =
-      (FloorPlanner.V1.constantValues ops).map toNat
-  rw [← List.map_map, List.map_snd_zip hpositions]
+  simpa only [Function.comp_apply] using
+    List.map_snd_zip hpositions
 
 /-- Positional V1 allocation preserves each constant site's value. The only premise
 is allocation completeness; no concrete circuit computation is involved. -/
@@ -320,31 +318,42 @@ theorem constantAllocation_value
     {site : Cell × Fp} {entry : ℕ × ℕ × ℕ}
     (hfit :
       (operationConstSites ops).length ≤
-        (FloorPlanner.V1.constants ZMod.val ops constantColumns).length)
+        (FloorPlanner.V1.constantAssignments ops constantColumns).length)
     (hallocation :
       (site, entry) ∈
         (operationConstSites ops).zip
-          (FloorPlanner.V1.constants ZMod.val ops constantColumns)) :
+          ((FloorPlanner.V1.constantAssignments ops constantColumns).map
+            fun (value, column, row) => (value.val, column, row))) :
     entry.1 = site.2.val := by
   have hvalues := operationConstSites_map_snd ops
   have hfull :
       (FloorPlanner.V1.constantValues ops).length ≤
-        (FloorPlanner.V1.constants ZMod.val ops constantColumns).length := by
+        (FloorPlanner.V1.constantAssignments ops constantColumns).length := by
     rw [← hvalues]
     simpa only [List.length_map] using hfit
   have hallocations :=
-    V1_constants_map_fst ZMod.val ops constantColumns hfull
+    V1_constantAssignments_map_fst ops constantColumns hfull
+  have hallocationValues :
+      ((FloorPlanner.V1.constantAssignments ops constantColumns).map
+        fun (value, column, row) => (value.val, column, row)).map Prod.fst =
+          (FloorPlanner.V1.constantValues ops).map ZMod.val := by
+    simpa only [List.map_map, Function.comp_apply] using
+      congrArg (List.map ZMod.val) hallocations
   have hmapped :
       (site.2, entry.1) ∈
         ((operationConstSites ops).zip
-          (FloorPlanner.V1.constants ZMod.val ops constantColumns)).map
+          ((FloorPlanner.V1.constantAssignments ops constantColumns).map
+            fun (value, column, row) => (value.val, column, row))).map
             (fun allocation => (allocation.1.2, allocation.2.1)) :=
     List.mem_map.mpr ⟨(site, entry), hallocation, rfl⟩
-  change (site.2, entry.1) ∈
-    ((operationConstSites ops).zip
-      (FloorPlanner.V1.constants ZMod.val ops constantColumns)).map
-        (Prod.map Prod.snd Prod.fst) at hmapped
-  rw [← List.zip_map, hvalues, hallocations] at hmapped
+  have hmapped' :
+      (site.2, entry.1) ∈
+        ((operationConstSites ops).map Prod.snd).zip
+          (((FloorPlanner.V1.constantAssignments ops constantColumns).map
+            fun (value, column, row) => (value.val, column, row)).map
+              Prod.fst) := by
+    simpa only [List.zip_map] using hmapped
+  rw [hvalues, hallocationValues] at hmapped'
   have hzipped :
       (FloorPlanner.V1.constantValues ops).zip
           ((FloorPlanner.V1.constantValues ops).map ZMod.val) =
@@ -357,8 +366,8 @@ theorem constantAllocation_value
             (id value, ZMod.val value) :=
       List.zip_map'
     simpa only [List.map_id, id_eq] using hmap
-  rw [hzipped] at hmapped
-  rcases List.mem_map.mp hmapped with ⟨value, -, hvalue⟩
+  rw [hzipped] at hmapped'
+  rcases List.mem_map.mp hmapped' with ⟨value, -, hvalue⟩
   have hsite : value = site.2 :=
     congrArg Prod.fst hvalue
   have hentry : value.val = entry.1 :=

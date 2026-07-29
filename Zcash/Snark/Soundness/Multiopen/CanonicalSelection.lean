@@ -41,7 +41,7 @@ variable {shape : Shape}
   (hLayout :
     vk.adviceQueryLayout.length = shape.numAdviceQueries)
 
-omit [AddCommGroup G] [Module Fp G] in
+omit [DecidableEq G] [AddCommGroup G] [Module Fp G] in
 private theorem adviceQueryExists
     (hLayout :
       vk.adviceQueryLayout.length = shape.numAdviceQueries)
@@ -53,10 +53,10 @@ private theorem adviceQueryExists
       query.point =
         rotateOmega vk.omega ch.x
           (vk.adviceQueryLayout.getD queryIndex (0, 0)).2 := by
-  apply advice_query_mem_assembleQueries
-  · rw [hLayout]
-    exact queryIndex.isLt
-  · simp
+  obtain ⟨query, hmem, hid, hpt, -⟩ :=
+    advice_query_mem_assembleQueries_eval vk instanceCommitment ps ch proofIndex
+      (by rw [hLayout]; exact queryIndex.isLt) queryIndex.isLt
+  exact ⟨query, hmem, hid, hpt⟩
 
 private noncomputable def acceptedAdviceQuery
     (hLayout :
@@ -67,7 +67,7 @@ private noncomputable def acceptedAdviceQuery
     (adviceQueryExists vk instanceCommitment ps ch proofIndex hLayout
       queryIndex)
 
-omit [AddCommGroup G] [Module Fp G] in
+omit [DecidableEq G] [AddCommGroup G] [Module Fp G] in
 private theorem acceptedAdviceQuery_mem
     (hLayout :
       vk.adviceQueryLayout.length = shape.numAdviceQueries)
@@ -79,7 +79,7 @@ private theorem acceptedAdviceQuery_mem
     (adviceQueryExists vk instanceCommitment ps ch proofIndex hLayout
       queryIndex)).1
 
-omit [AddCommGroup G] [Module Fp G] in
+omit [DecidableEq G] [AddCommGroup G] [Module Fp G] in
 private theorem acceptedAdviceQuery_id
     (hLayout :
       vk.adviceQueryLayout.length = shape.numAdviceQueries)
@@ -283,7 +283,7 @@ variable {shape : Shape}
   (hLayout :
     vk.instanceQueryLayout.length = shape.numInstanceQueries)
 
-omit [AddCommGroup G] [Module Fp G] in
+omit [DecidableEq G] [AddCommGroup G] [Module Fp G] in
 private theorem instanceQueryExists
     (hLayout :
       vk.instanceQueryLayout.length = shape.numInstanceQueries)
@@ -295,10 +295,10 @@ private theorem instanceQueryExists
       query.point =
         rotateOmega vk.omega ch.x
           (vk.instanceQueryLayout.getD queryIndex (0, 0)).2 := by
-  apply instance_query_mem_assembleQueries
-  · rw [hLayout]
-    exact queryIndex.isLt
-  · simp
+  obtain ⟨query, hmem, hid, hpt, -⟩ :=
+    instance_query_mem_assembleQueries_eval vk instanceCommitment ps ch proofIndex
+      (by rw [hLayout]; exact queryIndex.isLt) queryIndex.isLt
+  exact ⟨query, hmem, hid, hpt⟩
 
 private noncomputable def acceptedInstanceQuery
     (hLayout :
@@ -309,7 +309,7 @@ private noncomputable def acceptedInstanceQuery
     (instanceQueryExists vk instanceCommitment ps ch proofIndex hLayout
       queryIndex)
 
-omit [AddCommGroup G] [Module Fp G] in
+omit [DecidableEq G] [AddCommGroup G] [Module Fp G] in
 private theorem acceptedInstanceQuery_mem
     (hLayout :
       vk.instanceQueryLayout.length = shape.numInstanceQueries)
@@ -321,7 +321,7 @@ private theorem acceptedInstanceQuery_mem
     (instanceQueryExists vk instanceCommitment ps ch proofIndex hLayout
       queryIndex)).1
 
-omit [AddCommGroup G] [Module Fp G] in
+omit [DecidableEq G] [AddCommGroup G] [Module Fp G] in
 private theorem acceptedInstanceQuery_id
     (hLayout :
       vk.instanceQueryLayout.length = shape.numInstanceQueries)

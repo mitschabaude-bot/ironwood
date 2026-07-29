@@ -135,15 +135,197 @@ theorem closeWithOperations_permutationColumns
 /-- Closing a top-level circuit under its synthesis operations leaves the
 permutation columns computed by `configure` unchanged. -/
 theorem _root_.Halo2.TopLevelCircuit.constraintSystem_permutationColumns
-    {F ConfigInput Config : Type} [FiniteField F]
-    {Output : TypeMap} [CircuitType Output]
-    (top : TopLevelCircuit F ConfigInput Config Output) :
+    {F Config : Type} [FiniteField F]
+    {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit F Config PublicInput) :
     top.constraintSystem.permutationColumns =
       (top.formalCircuit.configure
-        top.configInput {}).2.permutationColumns :=
+        () {}).2.permutationColumns :=
   closeWithOperations_permutationColumns _ _
 
 namespace Configure
+
+/-- Interpreting an append-only configure delta preserves the initial
+permutation-column list as a prefix. -/
+private theorem apply_permutationColumns_prefix
+    {F : Type}
+    (delta : ConfigureDelta F) (initial : ConstraintSystem F)
+    (counts : ConfigureCounts) :
+    List.IsPrefix initial.permutationColumns
+      (delta.apply initial counts).permutationColumns := by
+  change List.IsPrefix initial.permutationColumns
+    (delta.permutationRequests.foldl
+      (fun accumulated request =>
+        if request ∈ accumulated then accumulated
+        else accumulated ++ [request])
+      initial.permutationColumns)
+  induction delta.permutationRequests generalizing initial with
+  | nil => exact List.prefix_refl _
+  | cons request requests ih =>
+      rw [List.foldl_cons]
+      by_cases hrequest : request ∈ initial.permutationColumns
+      · simpa [hrequest] using ih initial
+      · exact
+          (List.prefix_append initial.permutationColumns [request]).trans
+            (by simpa [hrequest] using
+              ih { initial with
+                permutationColumns :=
+                  initial.permutationColumns ++ [request] })
+
+/-- Interpreting a configure delta appends no more permutation columns than
+the number of raw requests it records. -/
+private theorem apply_permutationColumns_length_le
+    {F : Type}
+    (delta : ConfigureDelta F) (initial : ConstraintSystem F)
+    (counts : ConfigureCounts) :
+    (delta.apply initial counts).permutationColumns.length ≤
+      initial.permutationColumns.length +
+        delta.permutationRequests.length := by
+  change
+    (delta.permutationRequests.foldl
+      (fun accumulated request =>
+        if request ∈ accumulated then accumulated
+        else accumulated ++ [request])
+      initial.permutationColumns).length ≤
+      initial.permutationColumns.length +
+        delta.permutationRequests.length
+  induction delta.permutationRequests generalizing initial with
+  | nil => simp
+  | cons request requests ih =>
+      rw [List.foldl_cons]
+      by_cases hrequest : request ∈ initial.permutationColumns
+      · simp only [hrequest, if_pos]
+        have hbound := ih initial
+        exact hbound.trans (by simp)
+      · simp only [hrequest, if_false]
+        have hbound :=
+          ih { initial with
+            permutationColumns :=
+              initial.permutationColumns ++ [request] }
+        simpa [Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using hbound
+
+/-- Membership in a configure program's final permutation columns is exactly
+membership in the initial list or in its append-only request log. -/
+theorem mem_permutationColumns_run_iff
+    {F A : Type}
+    (program : Configure F A) (initial : ConstraintSystem F)
+    (column : AnyColumn) :
+    column ∈ (program.run initial).2.permutationColumns ↔
+      column ∈ initial.permutationColumns ∨
+        column ∈
+          (program.delta
+            (ConfigureCounts.ofConstraintSystem initial)).permutationRequests := by
+  simp only [Configure.run, Configure.delta, ConfigureDelta.apply,
+    mem_appendFirstEncounters]
+
+@[simp] private theorem ConfigureDelta.queriedCell_permutationRequests
+    {F : Type} (owner : String) (cell : Expression F Query) :
+    (ConfigureDelta.queriedCell owner cell).permutationRequests = [] := by
+  cases cell with
+  | var query => cases query <;> rfl
+  | const => rfl
+  | add => rfl
+  | mul => rfl
+
+@[simp] private theorem ConfigureDelta.append_permutationRequests
+    {F : Type} (left right : ConfigureDelta F) :
+    (left.append right).permutationRequests =
+      left.permutationRequests ++ right.permutationRequests :=
+  rfl
+
+private theorem foldl_append_permutationRequests
+    {F Item : Type} (items : List Item)
+    (request : Item → ConfigureDelta F)
+    (hrequest :
+      ∀ item, (request item).permutationRequests = [])
+    (initial : ConfigureDelta F) :
+    (items.foldl
+      (fun delta item => delta.append (request item))
+      initial).permutationRequests =
+        initial.permutationRequests := by
+  induction items generalizing initial with
+  | nil => rfl
+  | cons item items ih =>
+      rw [List.foldl_cons, ih]
+      simp [hrequest]
+
+@[simp] private theorem ConfigureDelta.queriedCells_permutationRequests
+    {F : Type} (owner : String) (cells : List (Expression F Query)) :
+    (ConfigureDelta.queriedCells owner cells).permutationRequests = [] := by
+  unfold ConfigureDelta.queriedCells
+  exact foldl_append_permutationRequests cells
+    (ConfigureDelta.queriedCell owner)
+    (ConfigureDelta.queriedCell_permutationRequests owner) {}
+
+@[simp] private theorem ConfigureDelta.queryAny_permutationRequests
+    {F : Type} (column : AnyColumn) :
+    (ConfigureDelta.queryAny (F := F) column).permutationRequests = [] := by
+  obtain ⟨kind, index⟩ := column
+  cases kind <;> rfl
+
+@[simp] private theorem delta_adviceColumn_permutationRequests
+    {F : Type} (counts : ConfigureCounts) :
+    (Configure.delta (Halo2.adviceColumn : Configure F _) counts).permutationRequests =
+      [] :=
+  rfl
+
+@[simp] private theorem delta_fixedColumn_permutationRequests
+    {F : Type} (counts : ConfigureCounts) :
+    (Configure.delta (Halo2.fixedColumn : Configure F _) counts).permutationRequests =
+      [] :=
+  rfl
+
+@[simp] private theorem delta_instanceColumn_permutationRequests
+    {F : Type} (counts : ConfigureCounts) :
+    (Configure.delta (Halo2.instanceColumn : Configure F _) counts).permutationRequests =
+      [] :=
+  rfl
+
+@[simp] private theorem delta_selector_permutationRequests
+    {F : Type} (counts : ConfigureCounts) :
+    (Configure.delta (Halo2.selector : Configure F _) counts).permutationRequests =
+      [] :=
+  rfl
+
+@[simp] private theorem delta_complexSelector_permutationRequests
+    {F : Type} (counts : ConfigureCounts) :
+    (Configure.delta (Halo2.complexSelector : Configure F _) counts).permutationRequests =
+      [] :=
+  rfl
+
+@[simp] private theorem delta_enableEquality_permutationRequests
+    {F : Type} (column : AnyColumn) (counts : ConfigureCounts) :
+    (Configure.delta (Halo2.enableEquality (F := F) column) counts).permutationRequests =
+      [column] := by
+  simp [Configure.delta, Halo2.enableEquality, ConfigureDelta.append]
+
+@[simp] private theorem delta_enableConstant_permutationRequests
+    {F : Type} (column : Column .fixed) (counts : ConfigureCounts) :
+    (Configure.delta (Halo2.enableConstant (F := F) column) counts).permutationRequests =
+      [column.toAny] :=
+  rfl
+
+@[simp] private theorem delta_createGate_permutationRequests
+    {F : Type} (gate : Gate F) (counts : ConfigureCounts) :
+    (Configure.delta (Halo2.createGate gate) counts).permutationRequests = [] := by
+  simp [Configure.delta, Halo2.createGate, ConfigureDelta.append]
+
+@[simp] private theorem delta_lookup_permutationRequests
+    {F : Type} (queriedCells : List (Expression F Query))
+    (tableMap : List (Expression F Query × TableColumn))
+    (counts : ConfigureCounts) :
+    (Configure.delta (Halo2.lookup queriedCells tableMap) counts).permutationRequests =
+      [] := by
+  have htables :
+      ((tableMap.map Prod.snd).foldl
+        (fun (delta : ConfigureDelta F) (table : TableColumn) =>
+          delta.append { fixedQueries := [(table.inner, 0)] })
+        {}).permutationRequests = [] :=
+    foldl_append_permutationRequests _ _ (fun _ => rfl) {}
+  simp only [Configure.delta, Halo2.lookup,
+    ConfigureDelta.append_permutationRequests,
+    ConfigureDelta.queriedCells_permutationRequests, htables,
+    List.append_nil]
 
 /-- A configure program only appends to the equality-enabled column list, and
 appends at most `bound` entries. This syntactic compiler invariant is
@@ -151,14 +333,29 @@ deliberately weaker than column lawfulness: it counts possible appends without
 deciding whether duplicate suppression makes them inert. -/
 structure PermutationGrowthAtMost
     {F A : Type} (program : Configure F A) (bound : ℕ) : Prop where
-  preservesPrefix : ∀ cs,
-    List.IsPrefix cs.permutationColumns
-      (program cs).2.permutationColumns
-  upper : ∀ cs,
-    (program cs).2.permutationColumns.length ≤
-      cs.permutationColumns.length + bound
+  requestBound : ∀ counts,
+    (program.delta counts).permutationRequests.length ≤ bound
 
 namespace PermutationGrowthAtMost
+
+theorem preservesPrefix
+    {F A : Type} {program : Configure F A} {bound : ℕ}
+    (_ : PermutationGrowthAtMost program bound)
+    (cs : ConstraintSystem F) :
+    List.IsPrefix cs.permutationColumns
+      (program cs).2.permutationColumns :=
+  apply_permutationColumns_prefix _ _ _
+
+theorem upper
+    {F A : Type} {program : Configure F A} {bound : ℕ}
+    (hprogram : PermutationGrowthAtMost program bound)
+    (cs : ConstraintSystem F) :
+    (program cs).2.permutationColumns.length ≤
+      cs.permutationColumns.length + bound := by
+  exact (apply_permutationColumns_length_le _ _ _).trans
+    (Nat.add_le_add_left
+      (hprogram.requestBound
+        (ConfigureCounts.ofConstraintSystem cs)) _)
 
 theorem weaken
     {F A : Type} {program : Configure F A} {small large : ℕ}
@@ -166,17 +363,15 @@ theorem weaken
     (hbound : small ≤ large) :
     PermutationGrowthAtMost program large := by
   constructor
-  · exact hprogram.preservesPrefix
-  · intro cs
-    exact (hprogram.upper cs).trans
-      (Nat.add_le_add_left hbound _)
+  intro counts
+  exact (hprogram.requestBound counts).trans hbound
 
 theorem pure {F A : Type} (value : A) :
     PermutationGrowthAtMost
       (pure value : Configure F A) 0 := by
-  constructor <;> intro cs
-  · exact List.prefix_refl _
-  · rfl
+  constructor
+  intro counts
+  simp
 
 theorem bind
     {F A B : Type} {first : Configure F A}
@@ -185,86 +380,73 @@ theorem bind
     (hnext : ∀ value, PermutationGrowthAtMost (next value) right) :
     PermutationGrowthAtMost (first >>= next) (left + right) := by
   constructor
-  · intro cs
-    exact (hfirst.preservesPrefix cs).trans
-      ((hnext (first cs).1).preservesPrefix (first cs).2)
-  · intro cs
-    have hleft := hfirst.upper cs
-    have hright :=
-      (hnext (first cs).1).upper (first cs).2
-    change
-      (next (first cs).1 (first cs).2).2.permutationColumns.length ≤
-        cs.permutationColumns.length + (left + right)
-    omega
+  intro counts
+  rw [Configure.delta_bind]
+  simp only [ConfigureDelta.append]
+  rw [List.length_append]
+  exact Nat.add_le_add
+    (hfirst.requestBound counts)
+    ((hnext (first.output counts)).requestBound
+      (first.finalCounts counts))
 
 theorem adviceColumn {F : Type} :
     PermutationGrowthAtMost (Halo2.adviceColumn : Configure F _) 0 := by
-  constructor <;> intro cs
-  · exact List.prefix_refl _
-  · rfl
+  constructor
+  intro counts
+  simp
 
 theorem fixedColumn {F : Type} :
     PermutationGrowthAtMost (Halo2.fixedColumn : Configure F _) 0 := by
-  constructor <;> intro cs
-  · exact List.prefix_refl _
-  · rfl
+  constructor
+  intro counts
+  simp
 
 theorem instanceColumn {F : Type} :
     PermutationGrowthAtMost (Halo2.instanceColumn : Configure F _) 0 := by
-  constructor <;> intro cs
-  · exact List.prefix_refl _
-  · rfl
+  constructor
+  intro counts
+  simp
 
 theorem selector {F : Type} :
     PermutationGrowthAtMost (Halo2.selector : Configure F _) 0 := by
-  constructor <;> intro cs
-  · exact List.prefix_refl _
-  · rfl
+  constructor
+  intro counts
+  simp
 
 theorem complexSelector {F : Type} :
     PermutationGrowthAtMost (Halo2.complexSelector : Configure F _) 0 := by
-  constructor <;> intro cs
-  · exact List.prefix_refl _
-  · rfl
+  constructor
+  intro counts
+  simp
 
 theorem enableEquality {F : Type} (column : AnyColumn) :
     PermutationGrowthAtMost
       (Halo2.enableEquality (F := F) column) 1 := by
-  constructor <;> intro cs
-  · simp only [Halo2.enableEquality]
-    rw [queryAnyIndex_permutationColumns]
-    split
-    · exact List.prefix_refl _
-    · exact List.prefix_append _ _
-  · simp only [Halo2.enableEquality]
-    rw [queryAnyIndex_permutationColumns]
-    split <;> simp_all
+  constructor
+  intro counts
+  simp
 
 /-- Enabling equality leaves at least its requested column in the permutation
 list, whether it was already present or has just been appended. -/
 theorem enableEquality_nonempty
     {F : Type} (column : AnyColumn) (cs : ConstraintSystem F) :
     ((Halo2.enableEquality (F := F) column) cs).2.permutationColumns ≠ [] := by
-  simp only [Halo2.enableEquality]
-  rw [queryAnyIndex_permutationColumns]
-  split
-  · intro hempty
-    rw [hempty] at ‹column ∈ cs.permutationColumns›
-    simp_all
-  · simp
+  intro hempty
+  have hmem :
+      column ∈
+        ((Halo2.enableEquality (F := F) column) cs).2.permutationColumns := by
+    rw [mem_permutationColumns_run_iff]
+    right
+    simp [Configure.delta, Halo2.enableEquality,
+      ConfigureDelta.append]
+  simp [hempty] at hmem
 
 theorem enableConstant {F : Type} (column : Column .fixed) :
     PermutationGrowthAtMost
       (Halo2.enableConstant (F := F) column) 1 := by
-  constructor <;> intro cs
-  · simp only [Halo2.enableConstant]
-    rw [queryFixedIndex_permutationColumns]
-    split
-    · exact List.prefix_refl _
-    · exact List.prefix_append _ _
-  · simp only [Halo2.enableConstant]
-    rw [queryFixedIndex_permutationColumns]
-    split <;> simp_all
+  constructor
+  intro counts
+  simp
 
 theorem lookupTableColumn {F : Type} :
     PermutationGrowthAtMost
@@ -276,50 +458,18 @@ theorem lookupTableColumn {F : Type} :
 theorem createGate {F : Type} (gate : Gate F) :
     PermutationGrowthAtMost
       (Halo2.createGate gate) 0 := by
-  constructor <;> intro cs
-  · simp only [Halo2.createGate]
-    rw [registerQueriedCells_permutationColumns]
-  · simp only [Halo2.createGate]
-    rw [registerQueriedCells_permutationColumns]
-    omega
+  constructor
+  intro counts
+  simp
 
 theorem lookup {F : Type}
     (queriedCells : List (Expression F Query))
     (tableMap : List (Expression F Query × TableColumn)) :
     PermutationGrowthAtMost
       (Halo2.lookup queriedCells tableMap) 0 := by
-  have heq (cs : ConstraintSystem F) :
-      ((Halo2.lookup queriedCells tableMap) cs).2.permutationColumns =
-        cs.permutationColumns := by
-    simp only [Halo2.lookup]
-    let registered := cs.registerQueriedCells "lookup" queriedCells
-    have hregistered :
-        registered.permutationColumns = cs.permutationColumns :=
-      registerQueriedCells_permutationColumns _ _ _
-    have hfold :
-        ∀ (items : List (Expression F Query × TableColumn))
-          (current : ConstraintSystem F),
-          (items.foldl
-            (fun state item => state.queryFixedIndex item.2.inner)
-            current).permutationColumns =
-              current.permutationColumns := by
-      intro items
-      induction items with
-      | nil => intro current; rfl
-      | cons item items ih =>
-          intro current
-          rw [List.foldl_cons, ih,
-            queryFixedIndex_permutationColumns]
-    change
-      (tableMap.foldl
-        (fun state item => state.queryFixedIndex item.2.inner)
-        registered).permutationColumns =
-          cs.permutationColumns
-    rw [hfold, hregistered]
-  constructor <;> intro cs
-  · rw [heq]
-  · rw [heq]
-    omega
+  constructor
+  intro counts
+  simp
 
 end PermutationGrowthAtMost
 
@@ -403,62 +553,78 @@ instance lookup {F : Type}
 
 end HasPermutationGrowthAtMost
 
-/-- A configure program is guaranteed to leave a nonempty permutation-column
-list. Instance synthesis finds an equality/constant enablement in the program
-and uses the compositional prefix invariant for everything that follows it. -/
+/-- A configure program is guaranteed to request at least one permutation
+column. The append-only interpreter turns this local syntactic fact into
+nonemptiness of the final permutation-column list. -/
 class GuaranteesPermutationNonempty
     {F A : Type} (program : Configure F A) : Prop where
-  nonempty : ∀ cs,
-    (program cs).2.permutationColumns ≠ []
+  requests_nonempty : ∀ counts,
+    (program.delta counts).permutationRequests ≠ []
 
 namespace GuaranteesPermutationNonempty
+
+theorem nonempty
+    {F A : Type} {program : Configure F A}
+    (hprogram : GuaranteesPermutationNonempty program)
+    (cs : ConstraintSystem F) :
+    (program cs).2.permutationColumns ≠ [] := by
+  obtain ⟨column, hcolumn⟩ :=
+    List.exists_mem_of_ne_nil
+      _
+      (hprogram.requests_nonempty
+        (ConfigureCounts.ofConstraintSystem cs))
+  intro hempty
+  have hmem : column ∈ (program cs).2.permutationColumns :=
+    (mem_permutationColumns_run_iff program cs column).2
+      (Or.inr hcolumn)
+  simp [hempty] at hmem
 
 instance enableEquality {F : Type} (column : AnyColumn) :
     GuaranteesPermutationNonempty
       (Halo2.enableEquality (F := F) column) :=
-  ⟨PermutationGrowthAtMost.enableEquality_nonempty column⟩
+  ⟨by
+    intro counts
+    simp [Configure.delta, Halo2.enableEquality,
+      ConfigureDelta.append]⟩
 
 instance enableConstant {F : Type} (column : Column .fixed) :
     GuaranteesPermutationNonempty
       (Halo2.enableConstant (F := F) column) := by
   constructor
-  intro cs
-  simp only [Halo2.enableConstant]
-  rw [queryFixedIndex_permutationColumns]
-  split
-  · intro hempty
-    rw [hempty] at ‹column.toAny ∈ cs.permutationColumns›
-    simp_all
-  · simp
+  intro counts
+  simp [Configure.delta, Halo2.enableConstant]
 
-/-- Once the first action has produced a column, the continuation's prefix
-property prevents it from being erased. -/
+/-- A request made by the first program remains in the bind's concatenated
+request log. -/
 instance (priority := 100) bindOfFirst
     {F A B : Type} {first : Configure F A}
-    {next : A → Configure F B} {right : ℕ}
+    {next : A → Configure F B}
     [hfirst : GuaranteesPermutationNonempty first]
-    [hnext : ∀ value,
-      HasPermutationGrowthAtMost (next value) right] :
+    :
     GuaranteesPermutationNonempty (first >>= next) := by
   constructor
-  intro cs
-  have hsource := hfirst.nonempty cs
-  have hprefix :=
-    (hnext (first cs).1).law.preservesPrefix (first cs).2
-  apply List.ne_nil_of_length_pos
-  exact lt_of_lt_of_le
-    (List.length_pos_iff_ne_nil.mpr hsource)
-    hprefix.length_le
+  intro counts
+  rw [Configure.delta_bind]
+  simp only [ConfigureDelta.append]
+  exact List.append_ne_nil_of_left_ne_nil
+    (hfirst.requests_nonempty counts) _
 
-/-- Otherwise instance synthesis may find the first guaranteed enablement in
-the continuation. -/
+/-- Otherwise instance synthesis may find the first request in the
+continuation. -/
 instance (priority := 90) bindOfNext
     {F A B : Type} {first : Configure F A}
     {next : A → Configure F B}
     [hnext : ∀ value,
       GuaranteesPermutationNonempty (next value)] :
-    GuaranteesPermutationNonempty (first >>= next) :=
-  ⟨fun cs => (hnext (first cs).1).nonempty (first cs).2⟩
+    GuaranteesPermutationNonempty (first >>= next) := by
+  constructor
+  intro counts
+  rw [Configure.delta_bind]
+  simp only [ConfigureDelta.append]
+  exact List.append_ne_nil_of_right_ne_nil
+    _
+    ((hnext (first.output counts)).requests_nonempty
+      (first.finalCounts counts))
 
 end GuaranteesPermutationNonempty
 
@@ -555,21 +721,21 @@ theorem decodedChunkAddress_eq_sourceColumn
 /-- The verifier query reference assigned by the permutation compiler to one
 concrete column. -/
 def permutationQueryReference
-    (projected : CsFixture Fp) : AnyColumn → ColumnRef
+    (pinnedCS : PinnedConstraintSystem Fp) : AnyColumn → ColumnRef
   | ⟨.advice, index⟩ =>
-      .advice (projected.adviceQueryLayout.findIdx (· = (index, 0)))
+      .advice (pinnedCS.adviceQueryLayout.findIdx (· = (index, 0)))
   | ⟨.fixed, index⟩ =>
-      .fixed (projected.fixedQueryLayout.findIdx (· = (index, 0)))
+      .fixed (pinnedCS.fixedQueryLayout.findIdx (· = (index, 0)))
   | ⟨.instance, index⟩ =>
-      .instance (projected.instanceQueryLayout.findIdx (· = (index, 0)))
+      .instance (pinnedCS.instanceQueryLayout.findIdx (· = (index, 0)))
 
 /-- The compiler's variable-width chunking preserves its indexed reference
 stream exactly. -/
 theorem permutationChunksOf_flatten
-    (map : SelCompressMap) (cs : ConstraintSystem Fp) :
-    (Keygen.permutationChunksOf map cs).flatten =
-      (cs.permutationColumns.map
-        (permutationQueryReference (projectCS map cs))).zipIdx := by
+    (pinnedCS : PinnedConstraintSystem Fp) (chunkLen : ℕ) :
+    (Keygen.permutationChunksOf pinnedCS chunkLen).flatten =
+      (pinnedCS.permutationColumns.map
+        (permutationQueryReference pinnedCS)).zipIdx := by
   unfold Keygen.permutationChunksOf
   rw [listToChunks_flatten]
   congr 2
@@ -598,20 +764,21 @@ theorem constraintSystem_chunkLen_pos (cs : ConstraintSystem Fp) :
 
 /-- The compiler emits exactly the ceiling number of chunks recorded in `Shape`. -/
 theorem permutationChunksOf_length
-    (map : SelCompressMap) (cs : ConstraintSystem Fp) :
-    (Keygen.permutationChunksOf map cs).length =
-      (cs.permutationColumns.length + cs.chunkLen - 1) / cs.chunkLen := by
+    (pinnedCS : PinnedConstraintSystem Fp) (cs : ConstraintSystem Fp) :
+    (Keygen.permutationChunksOf pinnedCS cs.chunkLen).length =
+      (pinnedCS.permutationColumns.length + cs.chunkLen - 1) / cs.chunkLen := by
   unfold Keygen.permutationChunksOf
   rw [listToChunks_length _ _ (constraintSystem_chunkLen_pos cs)]
   simp
 
 /-- Each compiler chunk has the standard full-or-final-remainder width. -/
 theorem permutationChunksOf_getD_length
-    (map : SelCompressMap) (cs : ConstraintSystem Fp)
-    (i : ℕ) (hi : i < (Keygen.permutationChunksOf map cs).length) :
-    ((Keygen.permutationChunksOf map cs).getD i []).length =
+    (pinnedCS : PinnedConstraintSystem Fp) (cs : ConstraintSystem Fp)
+    (i : ℕ)
+    (hi : i < (Keygen.permutationChunksOf pinnedCS cs.chunkLen).length) :
+    ((Keygen.permutationChunksOf pinnedCS cs.chunkLen).getD i []).length =
       min cs.chunkLen
-        (cs.permutationColumns.length - i * cs.chunkLen) := by
+        (pinnedCS.permutationColumns.length - i * cs.chunkLen) := by
   unfold Keygen.permutationChunksOf at hi ⊢
   rw [listToChunks_getD_length _ _
     (constraintSystem_chunkLen_pos cs) i hi]
@@ -620,9 +787,10 @@ theorem permutationChunksOf_getD_length
 /-- Every prefix ending before a valid compiler chunk contains `i * chunkLen`
 permutation columns. -/
 theorem permutationChunksOf_take_flatten_length
-    (map : SelCompressMap) (cs : ConstraintSystem Fp)
-    (i : ℕ) (hi : i < (Keygen.permutationChunksOf map cs).length) :
-    ((Keygen.permutationChunksOf map cs).take i).flatten.length =
+    (pinnedCS : PinnedConstraintSystem Fp) (cs : ConstraintSystem Fp)
+    (i : ℕ)
+    (hi : i < (Keygen.permutationChunksOf pinnedCS cs.chunkLen).length) :
+    ((Keygen.permutationChunksOf pinnedCS cs.chunkLen).take i).flatten.length =
       i * cs.chunkLen := by
   unfold Keygen.permutationChunksOf at hi ⊢
   apply take_flatten_length_of_dropLast_full
@@ -634,24 +802,24 @@ theorem permutationChunksOf_take_flatten_length
 proofs to unfold a concrete circuit or verifying-key constructor. -/
 theorem topLevelPermutationChunks_take_flatten_length
     {G : Type} [AddCommGroup G] [Inhabited G]
-    {ConfigInput Config : Type} {Output : TypeMap} [CircuitType Output]
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
     (pp : Keygen.ProofParams) (urs : URS G)
     (i : ℕ) (hi : i < (top.toVerifierKey pp urs).permutationChunks.length) :
     (((top.toVerifierKey pp urs).permutationChunks.take i).flatten.length) =
       i * (top.toVerifierKey pp urs).chunkLen := by
   exact permutationChunksOf_take_flatten_length
-    top.selectorMap top.constraintSystem i hi
+    top.pinnedCS top.constraintSystem i hi
 
 /-- The compiler's chunk family has enough total slots for every permutation
 column, without requiring the family itself to be nonempty. -/
 theorem permutationColumns_length_le_chunks_mul
-    (map : SelCompressMap) (cs : ConstraintSystem Fp) :
-    cs.permutationColumns.length ≤
-      (Keygen.permutationChunksOf map cs).length * cs.chunkLen := by
+    (pinnedCS : PinnedConstraintSystem Fp) (cs : ConstraintSystem Fp) :
+    pinnedCS.permutationColumns.length ≤
+      (Keygen.permutationChunksOf pinnedCS cs.chunkLen).length * cs.chunkLen := by
   let source :=
-    (cs.permutationColumns.map
-      (permutationQueryReference (projectCS map cs))).zipIdx
+    (pinnedCS.permutationColumns.map
+      (permutationQueryReference pinnedCS)).zipIdx
   have hall :
       (source.toChunks cs.chunkLen).Forall
         fun chunk => chunk.length ≤ cs.chunkLen :=
@@ -662,7 +830,7 @@ theorem permutationColumns_length_le_chunks_mul
       (source.toChunks cs.chunkLen) cs.chunkLen hall
   rw [listToChunks_flatten] at hbound
   have hchunks :
-      Keygen.permutationChunksOf map cs =
+      Keygen.permutationChunksOf pinnedCS cs.chunkLen =
         source.toChunks cs.chunkLen := by
     simp only [Keygen.permutationChunksOf, source]
     apply congrArg (List.toChunks cs.chunkLen)
@@ -677,38 +845,39 @@ theorem permutationColumns_length_le_chunks_mul
 which the compiler created it. -/
 theorem permutationColumnAddress_queryReference
     {shape : Shape} {F G : Type}
-    (vk : VerifyingKey shape F G) (projected : CsFixture Fp)
+    (vk : VerifyingKey shape F G)
+    (pinnedCS : PinnedConstraintSystem Fp)
     (hadvice :
-      vk.adviceQueryLayout = projected.adviceQueryLayout)
+      vk.adviceQueryLayout = pinnedCS.adviceQueryLayout)
     (hfixed :
-      vk.fixedQueryLayout = projected.fixedQueryLayout)
+      vk.fixedQueryLayout = pinnedCS.fixedQueryLayout)
     (hinstance :
-      vk.instanceQueryLayout = projected.instanceQueryLayout)
+      vk.instanceQueryLayout = pinnedCS.instanceQueryLayout)
     (column : AnyColumn)
     (hcoherent :
       PermutationColumnRef.Coherent vk
-        (permutationQueryReference projected column)) :
+        (permutationQueryReference pinnedCS column)) :
     permutationColumnAddress vk
-        (permutationQueryReference projected column) = column := by
+        (permutationQueryReference pinnedCS column) = column := by
   rcases column with ⟨kind, index⟩
   cases kind with
   | advice =>
       rcases hcoherent with ⟨-, hin, -⟩
       simp only [permutationQueryReference, permutationColumnAddress]
       rw [hadvice] at hin ⊢
-      rw [getD_findIdx_eq_target projected.adviceQueryLayout
+      rw [getD_findIdx_eq_target pinnedCS.adviceQueryLayout
         (index, 0) (0, 0) hin]
   | fixed =>
       rcases hcoherent with ⟨-, hin, -⟩
       simp only [permutationQueryReference, permutationColumnAddress]
       rw [hfixed] at hin ⊢
-      rw [getD_findIdx_eq_target projected.fixedQueryLayout
+      rw [getD_findIdx_eq_target pinnedCS.fixedQueryLayout
         (index, 0) (0, 0) hin]
   | «instance» =>
       rcases hcoherent with ⟨-, hin, -⟩
       simp only [permutationQueryReference, permutationColumnAddress]
       rw [hinstance] at hin ⊢
-      rw [getD_findIdx_eq_target projected.instanceQueryLayout
+      rw [getD_findIdx_eq_target pinnedCS.instanceQueryLayout
         (index, 0) (0, 0) hin]
 
 /--
@@ -717,13 +886,13 @@ compiler's column encoding a round trip.
 -/
 theorem topLevelPermutationColumnAddresses_eq
     {G : Type} [AddCommGroup G] [Inhabited G]
-    {ConfigInput Config : Type} {Output : TypeMap} [CircuitType Output]
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
     (pp : Keygen.ProofParams) (urs : URS G)
     (hcoherent :
       PermutationChunkRoutingCoherent (top.toVerifierKey pp urs)) :
     (Keygen.permutationChunksOf
-        top.selectorMap top.constraintSystem).flatten.map
+        top.pinnedCS top.constraintSystem.chunkLen).flatten.map
           (fun reference =>
             permutationColumnAddress (top.toVerifierKey pp urs) reference.1) =
       (Keygen.permColsOf top.constraintSystem).map
@@ -739,24 +908,24 @@ theorem topLevelPermutationColumnAddresses_eq
   apply List.map_congr_left
   intro column hcolumn
   simp only [Function.comp_apply]
-  let projected :=
-    projectCS top.selectorMap top.constraintSystem
   let reference :=
-    permutationQueryReference projected column
+    permutationQueryReference top.pinnedCS column
   have hreference :
       reference ∈
-        top.constraintSystem.permutationColumns.map
-          (permutationQueryReference projected) :=
-    List.mem_map.mpr ⟨column, hcolumn, rfl⟩
+        top.pinnedCS.permutationColumns.map
+          (permutationQueryReference top.pinnedCS) :=
+    by
+      rw [top.pinnedCS_permutationColumns]
+      exact List.mem_map.mpr ⟨column, hcolumn, rfl⟩
   have hindexed :
       ∃ indexed ∈
-          (top.constraintSystem.permutationColumns.map
-            (permutationQueryReference projected)).zipIdx,
+          (top.pinnedCS.permutationColumns.map
+            (permutationQueryReference top.pinnedCS)).zipIdx,
         indexed.1 = reference := by
     have hfst :
         reference ∈
-          ((top.constraintSystem.permutationColumns.map
-            (permutationQueryReference projected)).zipIdx).map Prod.fst := by
+          ((top.pinnedCS.permutationColumns.map
+            (permutationQueryReference top.pinnedCS)).zipIdx).map Prod.fst := by
       rw [List.zipIdx_map_fst]
       exact hreference
     simpa only using List.mem_map.mp hfst
@@ -764,15 +933,15 @@ theorem topLevelPermutationColumnAddresses_eq
   have hindexedFlat :
       indexed ∈
         (Keygen.permutationChunksOf
-          top.selectorMap top.constraintSystem).flatten := by
+          top.pinnedCS top.constraintSystem.chunkLen).flatten := by
     rw [permutationChunksOf_flatten]
-    simpa only [projected] using hindexed
+    exact hindexed
   obtain ⟨chunk, hchunk, hindexedChunk⟩ :=
     List.mem_flatten.mp hindexedFlat
   have hvkChunks :
       (top.toVerifierKey pp urs).permutationChunks =
         Keygen.permutationChunksOf
-          top.selectorMap top.constraintSystem := by
+          top.pinnedCS top.constraintSystem.chunkLen := by
     rfl
   have hrouted := hcoherent chunk (by
     rw [hvkChunks]
@@ -786,23 +955,14 @@ theorem topLevelPermutationColumnAddresses_eq
       permutationColumnAddress (top.toVerifierKey pp urs) reference =
         column :=
     permutationColumnAddress_queryReference
-      (top.toVerifierKey pp urs) projected
-      (by
-        simpa only [projected, top.pinnedCS_eq_derive_fp,
-          PinnedConstraintSystem.derive] using
-          top.toVerifierKey_adviceQueryLayout_derived pp urs)
-      (by
-        simpa only [projected, top.pinnedCS_eq_derive_fp,
-          PinnedConstraintSystem.derive] using
-          top.toVerifierKey_fixedQueryLayout_derived pp urs)
-      (by
-        simpa only [projected, top.pinnedCS_eq_derive_fp,
-          PinnedConstraintSystem.derive] using
-          top.toVerifierKey_instanceQueryLayout_derived pp urs)
+      (top.toVerifierKey pp urs) top.pinnedCS
+      (top.toVerifierKey_adviceQueryLayout_derived pp urs)
+      (top.toVerifierKey_fixedQueryLayout_derived pp urs)
+      (top.toVerifierKey_instanceQueryLayout_derived pp urs)
       column hreferenceCoherent
   rcases column with ⟨kind, index⟩
   cases kind <;>
-    simpa [reference, projected, permutationQueryReference,
+    simpa [reference, permutationQueryReference,
       Halo2.Layout.ColRef.toAny] using hdecoded
 
 end Zcash.Snark

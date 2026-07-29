@@ -24,27 +24,4 @@ namespace Zcash.Snark
 
 variable {F G : Type*} [Field F] [AddCommGroup G] [Module F G]
 
-/-- **The augmented binding reduction, as a computed relation.** Two `(g, U, W)`-combinations
-equal as group elements, with coordinates that do not all agree, compute a nontrivial
-discrete-log relation: the coordinate differences `(a − a', α − α', β − β')`. -/
-def NontrivialRelation.ofCombinationCollision [DecidableEq F] {n : ℕ} {g : Fin n → G} {U W : G}
-    {a a' : Fin n → F} {α α' β β' : F}
-    (e : commitGen g a + α • U + β • W = commitGen g a' + α' • U + β' • W)
-    (hne : ¬(a = a' ∧ α = α' ∧ β = β')) : NontrivialRelation (F := F) g U W where
-  a := a - a'
-  α := α - α'
-  β := β - β'
-  nontrivial := by
-    by_cases ha : a = a'
-    · by_cases hα : α = α'
-      · exact Or.inr (Or.inr (sub_ne_zero.mpr (fun hβ => hne ⟨ha, hα, hβ⟩)))
-      · exact Or.inr (Or.inl (sub_ne_zero.mpr hα))
-    · exact Or.inl (sub_ne_zero.mpr ha)
-  relation := by
-    show commitGen g (a - a') + (α - α') • U + (β - β') • W = 0
-    have hrw : commitGen g (a - a') + (α - α') • U + (β - β') • W
-        = (commitGen g a + α • U + β • W) - (commitGen g a' + α' • U + β' • W) := by
-      rw [commitGen_sub, sub_smul, sub_smul]; abel
-    rw [hrw, e, sub_self]
-
 end Zcash.Snark

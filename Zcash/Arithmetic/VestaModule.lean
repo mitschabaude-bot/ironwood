@@ -1,9 +1,5 @@
-/-
-Copyright (c) 2026 Ironwood Contributors.
-Released under the Apache License, Version 2.0.
--/
-import Zcash.Vendor.CompElliptic.Projective
-import Zcash.Snark.Core.Field
+import CompElliptic.Curves.Pasta.Fast.Projective
+import Zcash.Arithmetic.Field
 import CompElliptic.Curves.PastaOrder
 
 /-!
@@ -23,11 +19,10 @@ instance search is what guarantees no second `Module Fp (SWPoint Vesta.curve)` c
 with `Soundness.Vesta`'s in a module that reaches both.
 -/
 
-namespace Zcash.Snark.Keygen.Fast
+namespace Zcash.Arithmetic
 
-open Zcash.Snark
 open CompElliptic.Curves.Pasta
-open Zcash.Snark.Keygen.Fast.Projective
+open CompElliptic.Curves.Pasta.Fast.Projective
 
 /-- Every Vesta point is `p`-torsion, from CompElliptic's pinned `Vesta.card_eq` and the fact
 that a finite group is annihilated by its cardinality.  Mirrors `Zcash.Snark.vestaOrder`. -/
@@ -41,4 +36,4 @@ docstring; introduce it with `haveI` inside a proof that needs it. -/
 @[implicit_reducible]
 def vestaFpModuleDef : Module Fp G := AddCommGroup.zmodModule vestaGroupOrder
 
-end Zcash.Snark.Keygen.Fast
+end Zcash.Arithmetic

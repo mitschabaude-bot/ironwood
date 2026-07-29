@@ -1,5 +1,6 @@
 import Mathlib
-import Zcash.Snark.Soundness.LookupInstantiation
+import Zcash.Common.RelationWitness
+import Zcash.Snark.Soundness.Canonical.LookupInstantiation
 import Zcash.Snark.Soundness.Multiopen.NodeBinding
 
 /-!
@@ -14,7 +15,7 @@ those two views:
   by `constraintModelOfResolver` (unrouted identifiers map to zero);
 * `decodedPolynomialResolver_opens_or_relation` converts member-node binding and routing
   faithfulness into the uniform assembled-query opening fact, retaining the binding reduction's
-  `HasNontrivialRelation` alternative;
+  computed `NontrivialRelation` alternative;
 * `eval_lookupEntriesOfDecodedResolver_or_relation` feeds that fact directly into the lookup
   instantiation layer.
 
@@ -24,6 +25,8 @@ member-node binding.
 -/
 
 namespace Zcash.Snark
+
+open Zcash.Arithmetic (Msm)
 
 open Polynomial
 
@@ -482,7 +485,7 @@ lemma assembledQueryRoutingConditions_of_assemble?_eq_some
 
 /-- If every routed member is node-bound, the decoded resolver opens every query in `queries`;
 otherwise the existing augmented-basis relation branch is retained. -/
-theorem decodedPolynomialResolver_opens_or_relation [DecidableEq G] [Inhabited G]
+def decodedPolynomialResolver_opens_or_relation [DecidableEq G] [Inhabited G]
     (urs : URS G) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp G) (ps : ProofString shape Fp G)
     (ch : Challenges shape.k Fp)
@@ -507,24 +510,21 @@ theorem decodedPolynomialResolver_opens_or_relation [DecidableEq G] [Inhabited G
           urs hk vk ps ch memberDecode slot).eval point
           = deployedMemberClaim (instanceCommitment := instanceCommitment)
               vk ps ch slot point
-        ∨ HasNontrivialRelation (F := Fp) urs.g urs.u urs.w) :
+        ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w) :
     (∀ q ∈ queries,
       (decodedPolynomialResolver (instanceCommitment := instanceCommitment)
         urs hk vk ps ch memberDecode route q.commId).eval q.point = q.eval)
-      ∨ HasNontrivialRelation (F := Fp) urs.g urs.u urs.w := by
-  classical
-  by_cases hrel : HasNontrivialRelation (F := Fp) urs.g urs.u urs.w
-  · exact Or.inr hrel
-  · refine Or.inl (fun q hq => ?_)
-    have hroute := hrouted q hq
-    have hb := hbind hroute.slot q.point hroute.point_mem
-    rw [decodedPolynomialResolver, hroute.route_eq]
-    exact (hb.resolve_right hrel).trans hroute.claim_eq
+      ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w :=
+  listForallOrRelationWitness queries fun q hq =>
+    let hroute := hrouted q hq
+    bindOrRelationWitness (hbind hroute.slot q.point hroute.point_mem) fun hb => by
+      rw [decodedPolynomialResolver, hroute.route_eq]
+      exact hb.trans hroute.claim_eq
 
 /-- The decoded-member bridge specialized to the lookup instantiation: either all coherent lookup
 entries evaluate to the proof's five claimed lookup values, or commitment binding has produced a
 nontrivial augmented-basis relation. -/
-theorem eval_lookupEntriesOfDecodedResolver_or_relation
+noncomputable def eval_lookupEntriesOfDecodedResolver_or_relation
     [DecidableEq G] [Inhabited G]
     (urs : URS G) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp G) (ps : ProofString shape Fp G)
@@ -550,7 +550,7 @@ theorem eval_lookupEntriesOfDecodedResolver_or_relation
           urs hk vk ps ch memberDecode slot).eval point
           = deployedMemberClaim (instanceCommitment := instanceCommitment)
               vk ps ch slot point
-        ∨ HasNontrivialRelation (F := Fp) urs.g urs.u urs.w)
+        ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w)
     (p : Fin shape.numProofs) :
     (lookupEntriesOfResolver vk
         (decodedPolynomialResolver (instanceCommitment := instanceCommitment)
@@ -559,8 +559,9 @@ theorem eval_lookupEntriesOfDecodedResolver_or_relation
             vk ps ch hcount hdup)) p).map
         (fun lk => (lk.1.map (fun q => q.eval ch.x), lk.2.1, lk.2.2))
         = subProofLookups vk ps p
-      ∨ HasNontrivialRelation (F := Fp) urs.g urs.u urs.w := by
-  rcases decodedPolynomialResolver_opens_or_relation
+      ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w :=
+  bindOrRelationWitness
+    (decodedPolynomialResolver_opens_or_relation
       (instanceCommitment := instanceCommitment)
       urs hk vk ps ch memberDecode
       (assembledQueryMemberRoute (instanceCommitment := instanceCommitment)
@@ -568,13 +569,12 @@ theorem eval_lookupEntriesOfDecodedResolver_or_relation
       (assembleQueries vk instanceCommitment ps ch)
       (fun q hq => assembledQueryMemberRoute_faithful
         (instanceCommitment := instanceCommitment) vk ps ch hcount hdup q hq)
-      hbind with hopen | hrel
-  · exact Or.inl (eval_lookupEntriesOfResolver_of_assembleQueries
+      hbind)
+    fun hopen => eval_lookupEntriesOfResolver_of_assembleQueries
       vk instanceCommitment ps ch
       (decodedPolynomialResolver (instanceCommitment := instanceCommitment)
         urs hk vk ps ch memberDecode
         (assembledQueryMemberRoute (instanceCommitment := instanceCommitment)
-          vk ps ch hcount hdup)) p hopen)
-  · exact Or.inr hrel
+          vk ps ch hcount hdup)) p hopen
 
 end Zcash.Snark

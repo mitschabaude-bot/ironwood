@@ -1,5 +1,5 @@
-import Zcash.Snark.Soundness.CanonicalVesta
-import Zcash.Circuits.Integration.ActionInstanceCommitment
+import Zcash.Snark.Soundness.TopLevelVesta
+import Zcash.Circuits.Integration.ActionCorrectness
 
 /-!
 # Action soundness over a circuit-derived Vesta verifying key
@@ -10,6 +10,12 @@ derived from the supplied proof parameters, URS, and public inputs.
 
 In particular, the statement is not tied to a captured fixture and does not
 assume that `numProofs = 1`.
+
+This is the **rewind-based** route: the caller supplies an `OpenedBatchOpenings`, which in practice
+comes from `x₄` rewinding against an accept measure.  The rewind-free route to the same conclusion
+is `Circuits.Integration.StraightLineActionTerminal`, which builds that object from one execution's
+AGM coordinates instead.  Both are kept because they assume different things — rewinds and accept
+measures here, a represented decode there — not because one supersedes the other.
 -/
 
 namespace Zcash.Snark
@@ -18,10 +24,9 @@ open Polynomial
 open Classical
 open scoped ENNReal
 
-open Halo2 Keygen
+open Keygen
 open Zcash.Circuits
 open Zcash.Circuits.Action
-open ActionInstanceCommitment
 
 set_option maxHeartbeats 20000
 
@@ -40,119 +45,119 @@ determine their verifier commitments. If all challenge exclusions hold, the
 accepted proof bundle satisfies the Action specification, unless the supplied
 URS admits a nontrivial discrete-log relation.
 -/
-theorem actionBundleStatement_or_relation_of_vestaTerminal
+noncomputable def action_bundleStatement_or_relation_of_deployedAccepts
     (pp : ProofParams) (urs : URS VestaG)
     (hk :
-      (pp.mergeDerived orchardActionTopLevelCircuit).k = urs.k)
+      (pp.mergeDerived actionCircuit).k = urs.k)
     (inputs :
-      Fin (pp.mergeDerived orchardActionTopLevelCircuit).numProofs →
-        PublicInputs)
+      Fin (pp.mergeDerived actionCircuit).numProofs →
+        PublicInputs Fp)
     (ps :
-      ProofString (pp.mergeDerived orchardActionTopLevelCircuit) Fp VestaG)
+      ProofString (pp.mergeDerived actionCircuit) Fp VestaG)
     (ch :
-      Challenges (pp.mergeDerived orchardActionTopLevelCircuit).k Fp)
+      Challenges (pp.mergeDerived actionCircuit).k Fp)
     (pU pW : Fp)
     (hpoly : Polynomial Fp)
     {a₀ : Fin (2 ^ urs.k) → Fp}
     (pbatch :
       OpenedBatchOpenings urs (evalVector urs.k ch.x3)
         (x4BatchCommitments
-          (instanceCommitment := commitment pp urs inputs)
-          urs hk (orchardActionTopLevelCircuit.toVerifierKey pp urs) ps ch)
+          (instanceCommitment := actionCircuit.instanceCommitment pp urs inputs)
+          urs hk (actionCircuit.toVerifierKey pp urs) ps ch)
         (x4BatchEvals
-          (instanceCommitment := commitment pp urs inputs)
-          (orchardActionTopLevelCircuit.toVerifierKey pp urs) ps ch)
+          (instanceCommitment := actionCircuit.instanceCommitment pp urs inputs)
+          (actionCircuit.toVerifierKey pp urs) ps ch)
         a₀ pU pW)
     (hξcur : pbatch.batchChallenge pbatch.current = ch.x4)
     (hlen : ∀ i, i <
         deployedX4PairCount
-          (orchardActionTopLevelCircuit.toVerifierKey pp urs)
-          (commitment pp urs inputs) ps ch →
+          (actionCircuit.toVerifierKey pp urs)
+          (actionCircuit.instanceCommitment pp urs inputs) ps ch →
       0 < (deployedSetQueries
-        (orchardActionTopLevelCircuit.toVerifierKey pp urs)
-        (commitment pp urs inputs) ps ch i).length)
+        (actionCircuit.toVerifierKey pp urs)
+        (actionCircuit.instanceCommitment pp urs inputs) ps ch i).length)
     (hprob1 : ∀ i, i <
         deployedX4PairCount
-          (orchardActionTopLevelCircuit.toVerifierKey pp urs)
-          (commitment pp urs inputs) ps ch →
+          (actionCircuit.toVerifierKey pp urs)
+          (actionCircuit.instanceCommitment pp urs inputs) ps ch →
       (((deployedSetQueries
-          (orchardActionTopLevelCircuit.toVerifierKey pp urs)
-          (commitment pp urs inputs) ps ch i).length - 1 : ℕ) : ℝ≥0∞) /
+          (actionCircuit.toVerifierKey pp urs)
+          (actionCircuit.instanceCommitment pp urs inputs) ps ch i).length - 1 : ℕ) : ℝ≥0∞) /
           Fintype.card Fp
         < (PMF.uniformOfFintype Fp).toOuterMeasure
           (Finset.univ.filter
             (OpenedX1Accept urs hk
-              (orchardActionTopLevelCircuit.toVerifierKey pp urs)
-              (commitment pp urs inputs) ps ch)))
+              (actionCircuit.toVerifierKey pp urs)
+              (actionCircuit.instanceCommitment pp urs inputs) ps ch)))
     (haccepts :
       DeployedAccepts urs hk
-        (orchardActionTopLevelCircuit.toVerifierKey pp urs)
-        (commitment pp urs inputs) ps ch)
+        (actionCircuit.toVerifierKey pp urs)
+        (actionCircuit.instanceCommitment pp urs inputs) ps ch)
     (i m : ℕ)
     (hm : m < (deployedSetQueries
-      (orchardActionTopLevelCircuit.toVerifierKey pp urs)
-      (commitment pp urs inputs) ps ch i).length)
+      (actionCircuit.toVerifierKey pp urs)
+      (actionCircuit.instanceCommitment pp urs inputs) ps ch i).length)
     (colPoly : Fin (deployedSetQueries
-      (orchardActionTopLevelCircuit.toVerifierKey pp urs)
-      (commitment pp urs inputs) ps ch i).length → Polynomial Fp)
+      (actionCircuit.toVerifierKey pp urs)
+      (actionCircuit.instanceCommitment pp urs inputs) ps ch i).length → Polynomial Fp)
     (hbindAll : ∀ (idx : Fin ((constructIntermediateSets
           (assembleQueries
-            (orchardActionTopLevelCircuit.toVerifierKey pp urs)
-            (commitment pp urs inputs) ps ch)).points.getD i []).length)
+            (actionCircuit.toVerifierKey pp urs)
+            (actionCircuit.instanceCommitment pp urs inputs) ps ch)).points.getD i []).length)
         (m₀ : Fin (deployedSetQueries
-          (orchardActionTopLevelCircuit.toVerifierKey pp urs)
-          (commitment pp urs inputs) ps ch i).length),
+          (actionCircuit.toVerifierKey pp urs)
+          (actionCircuit.instanceCommitment pp urs inputs) ps ch i).length),
       (colPoly m₀).eval
           (((constructIntermediateSets
             (assembleQueries
-              (orchardActionTopLevelCircuit.toVerifierKey pp urs)
-              (commitment pp urs inputs) ps ch)).points.getD i [])[idx]) =
+              (actionCircuit.toVerifierKey pp urs)
+              (actionCircuit.instanceCommitment pp urs inputs) ps ch)).points.getD i [])[idx]) =
         ((deployedSetQueries
-          (orchardActionTopLevelCircuit.toVerifierKey pp urs)
-          (commitment pp urs inputs) ps ch i).getD
-            (m₀ : ℕ) (.point 0, [])).2.getD (idx : ℕ) 0
-        ∨ HasNontrivialRelation (F := Fp) urs.g urs.u urs.w)
+          (actionCircuit.toVerifierKey pp urs)
+          (actionCircuit.instanceCommitment pp urs inputs) ps ch i).getD
+            (m₀ : ℕ) (.point 0, [])).2.getD (idx : ℕ) 0 ⊕'
+        NontrivialRelation (F := Fp) urs.g urs.u urs.w)
     (hquot : hpoly = colPoly ⟨m, hm⟩)
     (hroute : (constructIntermediateSets
       (assembleQueries
-        (orchardActionTopLevelCircuit.toVerifierKey pp urs)
-        (commitment pp urs inputs) ps ch)).points.getD i [] = [ch.x])
+        (actionCircuit.toVerifierKey pp urs)
+        (actionCircuit.instanceCommitment pp urs inputs) ps ch)).points.getD i [] = [ch.x])
     (hevals : ∀ d₀,
       ((deployedSetQueries
-        (orchardActionTopLevelCircuit.toVerifierKey pp urs)
-        (commitment pp urs inputs) ps ch i).getD m d₀).2 =
+        (actionCircuit.toVerifierKey pp urs)
+        (actionCircuit.instanceCommitment pp urs inputs) ps ch i).getD m d₀).2 =
         [expectedHEval
           (allExpressions
-            (orchardActionTopLevelCircuit.toVerifierKey pp urs) ps ch
+            (actionCircuit.toVerifierKey pp urs) ps ch
             (lagrangeBasis
-              (orchardActionTopLevelCircuit.toVerifierKey pp urs).omega
-              (orchardActionTopLevelCircuit.toVerifierKey pp urs).n
-              (orchardActionTopLevelCircuit.toVerifierKey pp urs).blindingFactors
+              (actionCircuit.toVerifierKey pp urs).omega
+              (actionCircuit.toVerifierKey pp urs).n
+              (actionCircuit.toVerifierKey pp urs).blindingFactors
               (ch.x ^
-                (orchardActionTopLevelCircuit.toVerifierKey pp urs).n)
+                (actionCircuit.toVerifierKey pp urs).n)
               ch.x).1
             (lagrangeBasis
-              (orchardActionTopLevelCircuit.toVerifierKey pp urs).omega
-              (orchardActionTopLevelCircuit.toVerifierKey pp urs).n
-              (orchardActionTopLevelCircuit.toVerifierKey pp urs).blindingFactors
+              (actionCircuit.toVerifierKey pp urs).omega
+              (actionCircuit.toVerifierKey pp urs).n
+              (actionCircuit.toVerifierKey pp urs).blindingFactors
               (ch.x ^
-                (orchardActionTopLevelCircuit.toVerifierKey pp urs).n)
+                (actionCircuit.toVerifierKey pp urs).n)
               ch.x).2.1
             (lagrangeBasis
-              (orchardActionTopLevelCircuit.toVerifierKey pp urs).omega
-              (orchardActionTopLevelCircuit.toVerifierKey pp urs).n
-              (orchardActionTopLevelCircuit.toVerifierKey pp urs).blindingFactors
+              (actionCircuit.toVerifierKey pp urs).omega
+              (actionCircuit.toVerifierKey pp urs).n
+              (actionCircuit.toVerifierKey pp urs).blindingFactors
               (ch.x ^
-                (orchardActionTopLevelCircuit.toVerifierKey pp urs).n)
+                (actionCircuit.toVerifierKey pp urs).n)
               ch.x).2.2)
           ch.y
-          (ch.x ^ (orchardActionTopLevelCircuit.toVerifierKey pp urs).n)])
+          (ch.x ^ (actionCircuit.toVerifierKey pp urs).n)])
     (claimed :
       AcceptedModelClaimedEvaluations
         (memberDecode :=
           vestaExtractedMemberDecode urs hk
-            (orchardActionTopLevelCircuit.toVerifierKey pp urs)
-            (commitment pp urs inputs) ps ch
+            (actionCircuit.toVerifierKey pp urs)
+            (actionCircuit.instanceCommitment pp urs inputs) ps ch
             pbatch hlen hprob1 haccepts)
         (hblinding := ActionPermutationDomain.blindingFactors_lt pp urs)
         haccepts)
@@ -162,8 +167,8 @@ theorem actionBundleStatement_or_relation_of_vestaTerminal
           CanonicalMemberConstraintRelation.acceptedModel
             (memberDecode :=
               vestaExtractedMemberDecode urs hk
-                (orchardActionTopLevelCircuit.toVerifierKey pp urs)
-                (commitment pp urs inputs) ps ch
+                (actionCircuit.toVerifierKey pp urs)
+                (actionCircuit.instanceCommitment pp urs inputs) ps ch
                 pbatch hlen hprob1 haccepts)
             (hblinding := ActionPermutationDomain.blindingFactors_lt pp urs)
             haccepts
@@ -172,64 +177,65 @@ theorem actionBundleStatement_or_relation_of_vestaTerminal
           model.beta model.gamma model.delta model.theta ch.y model.chunkLen
           model.l0 model.lLast model.lBlind -
             hpoly *
-              (X ^ (orchardActionTopLevelCircuit.toVerifierKey pp urs).n - 1)))
+              (X ^ (actionCircuit.toVerifierKey pp urs).n - 1)))
     (hgoodY : ∀ j,
       ch.y ∉ szBadSet
         (foldSplitWitness
           (CanonicalMemberConstraintRelation.acceptedModel
             (memberDecode :=
               vestaExtractedMemberDecode urs hk
-                (orchardActionTopLevelCircuit.toVerifierKey pp urs)
-                (commitment pp urs inputs) ps ch
+                (actionCircuit.toVerifierKey pp urs)
+                (actionCircuit.instanceCommitment pp urs inputs) ps ch
                 pbatch hlen hprob1 haccepts)
             (hblinding := ActionPermutationDomain.blindingFactors_lt pp urs)
             haccepts).constraints
-          (orchardActionTopLevelCircuit.toVerifierKey pp urs).n j))
+          (actionCircuit.toVerifierKey pp urs).n j))
     (permutationExclusions :
       ResolverPermutationChallengeExclusions
-        (orchardActionTopLevelCircuit.toVerifierKey pp urs)
+        (actionCircuit.toVerifierKey pp urs)
         ch
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode :=
             vestaExtractedMemberDecode urs hk
-              (orchardActionTopLevelCircuit.toVerifierKey pp urs)
-              (commitment pp urs inputs) ps ch
+              (actionCircuit.toVerifierKey pp urs)
+              (actionCircuit.instanceCommitment pp urs inputs) ps ch
               pbatch hlen hprob1 haccepts)
           haccepts)
         actionActiveRows)
     (lookupExclusions :
       TopLevelLookupCoherence.TopLevelLookupChallengeExclusions
-        orchardActionTopLevelCircuit pp urs ch
+        actionCircuit pp urs ch
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode :=
             vestaExtractedMemberDecode urs hk
-              (orchardActionTopLevelCircuit.toVerifierKey pp urs)
-              (commitment pp urs inputs) ps ch
+              (actionCircuit.toVerifierKey pp urs)
+              (actionCircuit.instanceCommitment pp urs inputs) ps ch
               pbatch hlen hprob1 haccepts)
           haccepts)) :
-    BundleStatement Specs.Sinsemilla.orchardGenerators orchardBases inputs ∨
-      HasNontrivialRelation (F := Fp) urs.g urs.u urs.w := by
-  let vk := orchardActionTopLevelCircuit.toVerifierKey pp urs
-  let instanceCommitment := commitment pp urs inputs
+    BundleStatement inputs ⊕'
+      NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
+  let vk := actionCircuit.toVerifierKey pp urs
+  let instanceCommitment := actionCircuit.instanceCommitment pp urs inputs
   let memberDecode :=
     vestaExtractedMemberDecode urs hk vk instanceCommitment ps ch
       pbatch hlen hprob1 haccepts
-  have hterminal :=
-    vestaTerminal_circuitSat_or_relation_of_acceptedSelections
-      urs hk vk instanceCommitment ps ch pU pW hpoly
-      pbatch hξcur hlen hprob1 haccepts
+  have hgeneric :=
+    topLevelStatements_or_relation_of_deployedAccepts
+      actionCircuit pp urs hk inputs
+      ps ch pU pW hpoly pbatch hξcur hlen hprob1 haccepts
       (ActionPermutationDomain.blindingFactors_lt pp urs)
-      (orchardActionTopLevelCircuit.toVerifierKey_adviceQueryCount pp urs)
-      (orchardActionTopLevelCircuit.toVerifierKey_instanceQueryCount pp urs)
-      i m hm colPoly hbindAll hquot hroute hevals claimed hxgood
-  rcases hterminal with hsatisfied | hrelation
-  · exact
-      actionBundleStatement_or_relation_of_acceptedCircuitSat
-        pp urs hk inputs ps ch vk rfl pU pW a₀ pbatch memberDecode
-        haccepts (ActionPermutationDomain.blindingFactors_lt pp urs)
-        hpoly hsatisfied hgoodY permutationExclusions lookupExclusions
-  · exact Or.inr hrelation
+      (ActionGateCoherence.topLevelGateCoherence pp urs)
+      i m hm colPoly hbindAll hquot hroute hevals claimed hxgood hgoodY
+      (cell := FlatCell actionNumPermCols actionDomainSize)
+      (fun hsatisfied =>
+        ActionCorrectness.ofAcceptedCircuitSat
+          pp urs hk inputs ps ch pU pW a₀ pbatch memberDecode
+          haccepts hpoly hsatisfied hgoodY
+          permutationExclusions lookupExclusions)
+  rcases hgeneric with hstatements | hrelation
+  · exact PSum.inl (by simpa only [BundleStatement] using hstatements)
+  · exact PSum.inr hrelation
 
-assert_no_sorry actionBundleStatement_or_relation_of_vestaTerminal
+assert_no_sorry action_bundleStatement_or_relation_of_deployedAccepts
 
 end Zcash.Snark

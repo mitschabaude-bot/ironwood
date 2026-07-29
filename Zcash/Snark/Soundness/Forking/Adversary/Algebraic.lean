@@ -3,6 +3,8 @@ import Zcash.Snark.Soundness.AGM.ProbabilityVesta
 import Zcash.Snark.Soundness.AGM.ProbabilityCoins
 import Zcash.Snark.Soundness.Forking.Adversary.PreIpa
 import Zcash.Snark.Soundness.Forking.Adversary.Recursive
+import Zcash.Snark.Soundness.Forking.Adversary.ExpectedRuns
+import Zcash.Snark.Soundness.Forking.Adversary.ExpectedRunsPoly
 import Zcash.Snark.Soundness.Forking.Adversary.DomainReduction
 
 /-!
@@ -10,9 +12,20 @@ import Zcash.Snark.Soundness.Forking.Adversary.DomainReduction
 
 Run the recursive extractor on a bounded-query adversary and package its certificate for the AGM
 reduction. Acceptance with an opening mismatch yields a relation.
+
+## Why the route ends in several endpoints
+
+The `snarkFailure_prob_le_of_*` bounds are a cross-product, not restatements of one another: the
+discrete-log flavour (textbook, folded, uniform-URS, generator-RO) against the adversary model
+(query-bounded, unbounded, privately randomized). Each names a different hypothesis set, so a caller
+picks the one whose assumptions it can actually supply. A handful of endpoints here is the intended
+shape; what is not intended is two endpoints proving the same thing because a stacked branch left an
+earlier form behind.
 -/
 
 namespace Zcash.Snark
+
+open Zcash.Arithmetic (Msm Msm.zero)
 
 open scoped ENNReal
 
@@ -889,14 +902,14 @@ def snarkRelationFinder (family : ComputedAlgebraicFSFamily shape) :
       | PSum.inr rel => some rel
       | PSum.inl _ => none
 
-/-- Bound the direct relation branch by `|basis|` times the textbook-DL advantage. -/
+/-- Bound the direct relation branch by the textbook-DL advantage plus `1/|Fp|`. -/
 theorem snarkRelation_prob_le_of_textbookDL
     (B : VestaG) (family : ComputedAlgebraicFSFamily shape) {bound : ℝ≥0∞}
     (hDL : TextbookDLWithCoinsAdvantageLE B family.snarkRelationFinder bound) :
     (PMF.uniformOfFintype
         ((AugmentedIndex (2 ^ shape.k) → Fp) × family.Coins)).toOuterMeasure
         (relSetWithCoins B family.snarkRelationFinder)
-      ≤ Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound :=
+      ≤ (bound + 1 / Fintype.card Fp) :=
   relationWithCoins_prob_le_of_textbookDL B family.snarkRelationFinder hDL
 
 /-- The modeled deployed binding-attack event for one oracle table. -/
@@ -1057,12 +1070,12 @@ theorem successfulBinding_prob_le_of_textbookDL
     (PMF.uniformOfFintype
         ((AugmentedIndex (2 ^ shape.k) → Fp) × family.Coins)).toOuterMeasure
         (successfulBindingSet B family)
-      ≤ Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+      ≤ (bound + 1 / Fintype.card Fp) := by
   refine le_trans (MeasureTheory.measure_mono (successfulBindingSet_subset_relSet B family)) ?_
   exact relationWithCoins_prob_le_of_textbookDL B family.relationFinder hDL
 
 /-- Composed probability bound: the modeled deployed binding event is at most the
-recursive query loss, the adaptive `z = 0` loss, and the fixed-slot plain-DL term. -/
+recursive query loss, the adaptive `z = 0` loss, and the programmed-basis plain-DL term. -/
 theorem binding_prob_le_of_textbookDL
     (B : VestaG) (family : ComputedAlgebraicFSFamily shape) {bound : ℝ≥0∞}
     (hDL : TextbookDLWithCoinsAdvantageLE B family.relationFinder bound) :
@@ -1071,7 +1084,7 @@ theorem binding_prob_le_of_textbookDL
         (bindingSet B family)
       ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
         (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+        (bound + 1 / Fintype.card Fp) := by
   refine le_trans (MeasureTheory.measure_mono
     (bindingSet_subset_success_union_failure B family)) ?_
   refine le_trans (MeasureTheory.measure_union_le _ _) ?_
@@ -1136,7 +1149,7 @@ theorem binding_prob_le_of_uniformURS_textbookDL {Ω : Type*} (setup : PMF Ω)
         ((fun p => (basisOf p.1, p.2)) ⁻¹' family.bindingEvent)
       ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
         (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+        (bound + 1 / Fintype.card Fp) := by
   rw [binding_prob_eq_of_uniformURS setup B family basisOf hURS]
   exact binding_prob_le_of_textbookDL B family hDL
 
@@ -1151,7 +1164,7 @@ theorem binding_prob_le_of_generatorRO_textbookDL
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹' family.bindingEvent)
       ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
         (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound :=
+        (bound + 1 / Fintype.card Fp) :=
   binding_prob_le_of_uniformURS_textbookDL (orchardGeneratorROSetup query) B family
     (orchardGeneratorROBasis query)
     (orchard_uniformURSIdentification_of_generatorRO shape.k B hB query hquery) hDL
@@ -1165,6 +1178,39 @@ Charge missing clean openings to extraction failure or a direct relation. -/
 def hasCleanOpening (family : ComputedAlgebraicFSFamily shape)
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG) (coins : family.Coins) : Prop :=
   ∃ x, (family.instanceAttempt basis coins).output = some x ∧ ∃ o, x.run = PSum.inl o
+
+/-- The clean opening the family's run *computes*, together with the instance it opens.
+
+`hasCleanOpening` states that an opening exists; this returns it. Nothing along the path is chosen
+from an existential: the certificate arrives as data from `instanceAttempt`, and
+`DeployedAlgebraicForkingInstance.run` computes the opening from it, so the coefficient vector `a`
+survives the probabilistic layer instead of being forgotten to `∃ a, …`. -/
+def cleanOpening (family : ComputedAlgebraicFSFamily shape)
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG) (coins : family.Coins) :
+    Option (Σ x : DeployedAlgebraicForkingInstance (G := VestaG) shape.k basis, x.Opening) :=
+  match (family.instanceAttempt basis coins).output with
+  | none => none
+  | some x =>
+    match x.run with
+    | PSum.inl o => some ⟨x, o⟩
+    | PSum.inr _ => none
+
+/-- The computed opening is available exactly on the `hasCleanOpening` event.
+
+This is what lets the capstones be read constructively: their bound is on `¬ hasCleanOpening`, so
+off that priced event `cleanOpening` is `some` and the opening can be taken by `Option.get`. -/
+theorem cleanOpening_isSome_iff (family : ComputedAlgebraicFSFamily shape)
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG) (coins : family.Coins) :
+    (family.cleanOpening basis coins).isSome ↔ family.hasCleanOpening basis coins := by
+  unfold cleanOpening hasCleanOpening
+  cases hout : (family.instanceAttempt basis coins).output with
+  | none => simp
+  | some x =>
+      cases hrun : x.run with
+      | inl o =>
+          simp [hrun]
+          exact ⟨o.1, o.2, rfl⟩
+      | inr r => simp [hrun]
 
 /-- Nonzero-challenge accepting runs on which the producer returns no instance. -/
 def acceptExtractionFailure (family : ComputedAlgebraicFSFamily shape)
@@ -1215,7 +1261,7 @@ theorem snarkNonRelationFailure_measure_le (family : ComputedAlgebraicFSFamily s
     (family.queryBound basis)
 
 /-- On `z ≠ 0` accepting runs, bound failure to return a clean opening by
-`(Q+k)·3/|Fp| + |basis|·DLadv`. -/
+`(Q+k)·3/|Fp| + DLadv + 1/|Fp|`. -/
 theorem snarkFailure_prob_le_of_textbookDL
     (B : VestaG) (family : ComputedAlgebraicFSFamily shape) {bound : ℝ≥0∞}
     (hDL : TextbookDLWithCoinsAdvantageLE B family.snarkRelationFinder bound) :
@@ -1226,7 +1272,7 @@ theorem snarkFailure_prob_le_of_textbookDL
               (algebraicFullPrefixesPre family.init) (algebraicFullPrefixes family.init) p.2.1 ∧
             ¬ family.hasCleanOpening (scalarBasis B p.1) p.2}
       ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+        (bound + 1 / Fintype.card Fp) := by
   refine le_trans (MeasureTheory.measure_mono
     (show {p : (AugmentedIndex (2 ^ shape.k) → Fp) × family.Coins |
         fsWinsFull (family.adversary (scalarBasis B p.1))
@@ -1268,7 +1314,7 @@ theorem snarkFailure_prob_le_of_textbookDL_full
             ¬ family.hasCleanOpening (scalarBasis B p.1) p.2}
       ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
         (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+        (bound + 1 / Fintype.card Fp) := by
   refine le_trans (MeasureTheory.measure_mono
     (show {p : (AugmentedIndex (2 ^ shape.k) → Fp) × family.Coins |
         fsWinsFull (family.adversary (scalarBasis B p.1))
@@ -1377,7 +1423,7 @@ theorem snarkFailure_prob_le_of_uniformURS_textbookDL {Ω : Type*} (setup : PMF 
         ((fun p => (basisOf p.1, p.2)) ⁻¹' family.snarkFailureEvent)
       ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
         (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+        (bound + 1 / Fintype.card Fp) := by
   rw [snarkFailure_prob_eq_of_uniformURS setup B family basisOf hURS]
   exact snarkFailure_prob_le_of_textbookDL_full B family hDL
 
@@ -1392,15 +1438,19 @@ theorem snarkFailure_prob_le_of_generatorRO_textbookDL
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹' family.snarkFailureEvent)
       ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
         (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound :=
+        (bound + 1 / Fintype.card Fp) :=
   snarkFailure_prob_le_of_uniformURS_textbookDL (orchardGeneratorROSetup query) B family
     (orchardGeneratorROBasis query)
     (orchard_uniformURSIdentification_of_generatorRO shape.k B hB query hquery) hDL
 
 /-! ### Discrete-log hardness and runtime
 
-Probability bounds need no runtime premise. The DL-hardness endpoint still needs a polynomial AFK
-black-box call bound; adversary PPT time remains external. -/
+Probability bounds need no runtime premise. A time-success DLOG endpoint additionally needs an
+explicit black-box call bound; adversary PPT time remains external.
+
+`reductionEfficient_poly` supplies that call bound unconditionally from the adversary's existing
+query bound.  `reductionEfficient_of_forkSpread` remains as an optional density-sensitive bound,
+while `reductionEfficient_exponential` records the older coarse field-dependent analysis. -/
 
 /-- The extractor makes at most `R` expected black-box adversary calls for every basis. -/
 def ReductionEfficient (family : ComputedAlgebraicFSFamily shape) (R : ℕ) : Prop :=
@@ -1434,6 +1484,46 @@ theorem instanceAttempt_runs_eq (family : ComputedAlgebraicFSFamily shape)
   · rfl
   · split <;> rfl
 
+/-- Fork spread for this family's extractor, at every basis: every reachable extractor node offers
+at least `σ₀` nonzero trunk-stable successful continuations.
+
+It is not required by the unconditional AFK bound; it supports the separate density-sensitive
+geometric estimate below. -/
+def FamilyForkSpread (family : ComputedAlgebraicFSFamily shape) (σ₀ : ℕ) : Prop :=
+  ∀ basis : AugmentedIndex (2 ^ shape.k) → VestaG,
+    ForkSpread basis shape.k (family.adversary basis) (algebraicFullPrefixes family.init)
+      (fun p => p.rounds) (fun p => (p.proof.1.ipaC, p.proof.1.ipaF))
+      (algebraicTableAcceptZ basis (family.vk basis) (family.instanceCommitment basis) family.init)
+      (fun O p => by
+        unfold algebraicTableAcceptZ fullAlgebraicAcceptZ DeployedIpaVerifierEq
+        infer_instance)
+      σ₀
+
+/-- Under fork spread at `σ₀`, any `R` dominating the geometric ratio `(6·|F|)^k / (σ₀−1)^k`
+discharges the extractor call bound.
+
+With fork spread of density `δ = (σ₀−1)/|F|`, the call bound is `(6/δ)^k`.  This theorem is
+retained as a potentially sharper conditional alternative to `reductionEfficient_poly`. -/
+theorem reductionEfficient_of_forkSpread (family : ComputedAlgebraicFSFamily shape) {σ₀ R : ℕ}
+    (h2 : 2 ≤ σ₀) (hspread : family.FamilyForkSpread σ₀)
+    (hR : (6 * Fintype.card Fp) ^ shape.k ≤ (σ₀ - 1) ^ shape.k * R) :
+    family.ReductionEfficient R := by
+  intro basis
+  rw [Finset.sum_congr rfl (fun coins _ => family.instanceAttempt_runs_eq basis coins)]
+  have hsum := recursiveAlgebraicFork_oracle_tape_sum_runs_le_of_forkSpread basis shape.k
+    (family.adversary basis) (algebraicFullPrefixes family.init) (fun p => p.rounds)
+    (fun p => (p.proof.1.ipaC, p.proof.1.ipaF))
+    (algebraicTableAcceptZ basis (family.vk basis) (family.instanceCommitment basis) family.init)
+    _ h2 (hspread basis)
+  refine Nat.le_of_mul_le_mul_left ?_ (pow_pos (show 0 < σ₀ - 1 by omega) shape.k)
+  calc (σ₀ - 1) ^ shape.k * ∑ coins : family.Coins,
+          (algebraicForkCertAttempt basis (family.vk basis) (family.instanceCommitment basis)
+            family.init (family.adversary basis) coins.1 coins.2.toCoins).runs
+      ≤ (6 * Fintype.card Fp) ^ shape.k * Fintype.card family.Coins := hsum
+    _ ≤ ((σ₀ - 1) ^ shape.k * R) * Fintype.card family.Coins :=
+        Nat.mul_le_mul_right _ hR
+    _ = (σ₀ - 1) ^ shape.k * (R * Fintype.card family.Coins) := by ring
+
 /-- The unconditional call bound `(2·|F|+1)^k` is not field-independent polynomial AFK. -/
 theorem reductionEfficient_exponential (family : ComputedAlgebraicFSFamily shape) :
     family.ReductionEfficient ((2 * Fintype.card Fp + 1) ^ shape.k) := by
@@ -1444,7 +1534,19 @@ theorem reductionEfficient_exponential (family : ComputedAlgebraicFSFamily shape
     (fun p => (p.proof.1.ipaC, p.proof.1.ipaF))
     (algebraicTableAcceptZ basis (family.vk basis) (family.instanceCommitment basis) family.init) _
 
-/-- Fixed-slot DL hardness at advantage `ε`, as it applies to *one* reduction family with expected
+/-- The unconditional AFK analysis turns the family's query bound into a field-independent
+polynomial expected call bound. -/
+theorem reductionEfficient_poly (family : ComputedAlgebraicFSFamily shape) :
+    family.ReductionEfficient (afkRunBound family.Q shape.k) := by
+  intro basis
+  rw [Finset.sum_congr rfl (fun coins _ ↦ family.instanceAttempt_runs_eq basis coins)]
+  exact recursiveAlgebraicFork_oracle_tape_sum_runs_le_poly basis shape.k
+    (family.adversary basis) (algebraicFullPrefixes family.init) (fun p ↦ p.rounds)
+    (fun p ↦ (p.proof.1.ipaC, p.proof.1.ipaF))
+    (algebraicTableAcceptZ basis (family.vk basis) (family.instanceCommitment basis) family.init)
+    _ (family.queryBound basis)
+
+/-- Textbook DL hardness at advantage `ε`, as it applies to *one* reduction family with expected
 call bound `R`: if the family's extractor meets the call bound, its two derived solvers have
 advantage at most `ε`.  Stated per family, not `∀`-quantified over families: a family's adversary
 is an arbitrary Lean function whose own running time is not encoded, so a family-universal form
@@ -1458,7 +1560,8 @@ def DiscreteLogRelationHardFor (B : VestaG) (family : ComputedAlgebraicFSFamily 
     TextbookDLWithCoinsAdvantageLE B family.snarkRelationFinder ε
 
 /-- Under DL hardness for this family and call bound `R`, bound clean-opening failure by the
-recursive losses and `|basis|·ε`; a polynomial AFK instantiation of `R` remains open. -/
+recursive losses and `ε + 1/|Fp|`. `reductionEfficient_poly` supplies the unconditional
+polynomial instantiation of `R`. -/
 theorem knowledgeSoundness_under_DL
     (B : VestaG) (family : ComputedAlgebraicFSFamily shape) {R : ℕ} {ε : ℝ≥0∞}
     (hHard : DiscreteLogRelationHardFor B family R ε)
@@ -1471,8 +1574,72 @@ theorem knowledgeSoundness_under_DL
             ¬ family.hasCleanOpening (scalarBasis B p.1) p.2}
       ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
         (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * ε :=
+        (ε + 1 / Fintype.card Fp) :=
   snarkFailure_prob_le_of_textbookDL_full B family (hHard hEff).2
+
+/-- `knowledgeSoundness_under_DL` with the unconditional AFK call bound discharged. -/
+theorem knowledgeSoundness_under_DL_poly
+    (B : VestaG) (family : ComputedAlgebraicFSFamily shape) {ε : ℝ≥0∞}
+    (hHard : DiscreteLogRelationHardFor B family (afkRunBound family.Q shape.k) ε) :
+    (PMF.uniformOfFintype
+        ((AugmentedIndex (2 ^ shape.k) → Fp) × family.Coins)).toOuterMeasure
+        {p | fsWinsFull (family.adversary (scalarBasis B p.1))
+              (fullAlgebraicAccept (scalarBasis B p.1) (family.vk (scalarBasis B p.1))
+                (family.instanceCommitment (scalarBasis B p.1)))
+              (algebraicFullPrefixesPre family.init) (algebraicFullPrefixes family.init) p.2.1 ∧
+            ¬ family.hasCleanOpening (scalarBasis B p.1) p.2}
+      ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
+        (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
+        (ε + 1 / Fintype.card Fp) :=
+  knowledgeSoundness_under_DL B family hHard family.reductionEfficient_poly
+
+/-- `knowledgeSoundness_under_DL` stated on the *computed* opening.
+
+Same bound, with the failure event phrased as "the run returns no opening" rather than "no opening
+exists". Off this priced event `cleanOpening` is `some` and the extracted coefficient vector is
+available as data, which is what the propositional `∃ a, …` form of the legacy ladder gives up. -/
+theorem knowledgeSoundness_under_DL_computed
+    (B : VestaG) (family : ComputedAlgebraicFSFamily shape) {R : ℕ} {ε : ℝ≥0∞}
+    (hHard : DiscreteLogRelationHardFor B family R ε)
+    (hEff : family.ReductionEfficient R) :
+    (PMF.uniformOfFintype
+        ((AugmentedIndex (2 ^ shape.k) → Fp) × family.Coins)).toOuterMeasure
+        {p | fsWinsFull (family.adversary (scalarBasis B p.1))
+              (fullAlgebraicAccept (scalarBasis B p.1) (family.vk (scalarBasis B p.1)) (family.instanceCommitment (scalarBasis B p.1)))
+              (algebraicFullPrefixesPre family.init) (algebraicFullPrefixes family.init) p.2.1 ∧
+            ¬ (family.cleanOpening (scalarBasis B p.1) p.2).isSome}
+      ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
+        (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
+        (ε + 1 / Fintype.card Fp) := by
+  have hset : {p : (AugmentedIndex (2 ^ shape.k) → Fp) × family.Coins |
+        fsWinsFull (family.adversary (scalarBasis B p.1))
+          (fullAlgebraicAccept (scalarBasis B p.1) (family.vk (scalarBasis B p.1)) (family.instanceCommitment (scalarBasis B p.1)))
+          (algebraicFullPrefixesPre family.init) (algebraicFullPrefixes family.init) p.2.1 ∧
+        ¬ (family.cleanOpening (scalarBasis B p.1) p.2).isSome}
+      = {p | fsWinsFull (family.adversary (scalarBasis B p.1))
+            (fullAlgebraicAccept (scalarBasis B p.1) (family.vk (scalarBasis B p.1)) (family.instanceCommitment (scalarBasis B p.1)))
+            (algebraicFullPrefixesPre family.init) (algebraicFullPrefixes family.init) p.2.1 ∧
+          ¬ family.hasCleanOpening (scalarBasis B p.1) p.2} := by
+    ext p
+    simp only [Set.mem_setOf_eq, family.cleanOpening_isSome_iff (scalarBasis B p.1) p.2]
+  rw [hset]
+  exact knowledgeSoundness_under_DL B family hHard hEff
+
+/-- Computed-opening form with the unconditional AFK call bound discharged. -/
+theorem knowledgeSoundness_under_DL_computed_poly
+    (B : VestaG) (family : ComputedAlgebraicFSFamily shape) {ε : ℝ≥0∞}
+    (hHard : DiscreteLogRelationHardFor B family (afkRunBound family.Q shape.k) ε) :
+    (PMF.uniformOfFintype
+        ((AugmentedIndex (2 ^ shape.k) → Fp) × family.Coins)).toOuterMeasure
+        {p | fsWinsFull (family.adversary (scalarBasis B p.1))
+              (fullAlgebraicAccept (scalarBasis B p.1) (family.vk (scalarBasis B p.1))
+                (family.instanceCommitment (scalarBasis B p.1)))
+              (algebraicFullPrefixesPre family.init) (algebraicFullPrefixes family.init) p.2.1 ∧
+            ¬ (family.cleanOpening (scalarBasis B p.1) p.2).isSome}
+      ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
+        (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
+        (ε + 1 / Fintype.card Fp) :=
+  knowledgeSoundness_under_DL_computed B family hHard family.reductionEfficient_poly
 
 /-- Binding dual of `knowledgeSoundness_under_DL`. -/
 theorem binding_under_DL
@@ -1484,8 +1651,20 @@ theorem binding_under_DL
         (bindingSet B family)
       ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
         (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * ε :=
+        (ε + 1 / Fintype.card Fp) :=
   binding_prob_le_of_textbookDL B family (hHard hEff).1
+
+/-- Binding form with the unconditional AFK call bound discharged. -/
+theorem binding_under_DL_poly
+    (B : VestaG) (family : ComputedAlgebraicFSFamily shape) {ε : ℝ≥0∞}
+    (hHard : DiscreteLogRelationHardFor B family (afkRunBound family.Q shape.k) ε) :
+    (PMF.uniformOfFintype
+        ((AugmentedIndex (2 ^ shape.k) → Fp) × family.Coins)).toOuterMeasure
+        (bindingSet B family)
+      ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
+        (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
+        (ε + 1 / Fintype.card Fp) :=
+  binding_under_DL B family hHard family.reductionEfficient_poly
 
 end ComputedAlgebraicFSFamily
 
@@ -1573,7 +1752,7 @@ theorem binding_prob_le_of_textbookDL_rand [Fintype R] [Nonempty R]
             Set ((AugmentedIndex (2 ^ shape.k) → Fp) × fam.Coins))}
       ≤ (fam.Q + shape.k) * (3 / Fintype.card Fp) +
         (fam.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+        (bound + 1 / Fintype.card Fp) := by
   apply uniformOfFintype_prod_fiber_bound
     (fun r => (ComputedAlgebraicFSFamily.bindingSet B (fam.determinize r) :
       Set ((AugmentedIndex (2 ^ shape.k) → Fp) × fam.Coins)))
@@ -1597,7 +1776,7 @@ theorem binding_prob_le_of_foldedTextbookDL_rand [Fintype R] [Nonempty R]
             (scalarBasis B p.1) p.2.1}
       ≤ (fam.Q + shape.k) * (3 / Fintype.card Fp) +
         (fam.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+        (bound + 1 / Fintype.card Fp) := by
   refine le_trans (MeasureTheory.measure_mono
     (show {p : (AugmentedIndex (2 ^ shape.k) → Fp) × (fam.Coins × R) |
         ComputedAlgebraicFSFamily.bindingWin (fam.determinize p.2.2)
@@ -1622,7 +1801,7 @@ theorem binding_prob_le_of_foldedTextbookDL_rand [Fintype R] [Nonempty R]
             (scalarBasis B p.1) p.2.1 ∧
           (ComputedAlgebraicFSFamily.instanceAttempt (fam.determinize p.2.2)
             (scalarBasis B p.1) p.2.1).output.isSome}
-      ≤ Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+      ≤ (bound + 1 / Fintype.card Fp) := by
     refine le_trans (MeasureTheory.measure_mono ?_)
       (relationWithCoins_prob_le_of_textbookDL B fam.foldedRelationFinder hDL)
     intro p hp
@@ -1671,7 +1850,7 @@ theorem snarkFailure_prob_le_of_textbookDL_rand [Fintype R] [Nonempty R]
           ¬ (fam.determinize p.2).hasCleanOpening (scalarBasis B p.1.1) p.1.2}
       ≤ (fam.Q + shape.k) * (3 / Fintype.card Fp) +
         (fam.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+        (bound + 1 / Fintype.card Fp) := by
   apply uniformOfFintype_prod_fiber_bound
     (fun r => {q : (AugmentedIndex (2 ^ shape.k) → Fp) × fam.Coins |
       fsWinsFull ((fam.determinize r).adversary (scalarBasis B q.1))
@@ -1704,7 +1883,7 @@ theorem snarkFailure_prob_le_of_foldedTextbookDL_rand [Fintype R] [Nonempty R]
           ¬ (fam.determinize p.2.2).hasCleanOpening (scalarBasis B p.1) p.2.1}
       ≤ (fam.Q + shape.k) * (3 / Fintype.card Fp) +
         (fam.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+        (bound + 1 / Fintype.card Fp) := by
   refine le_trans (MeasureTheory.measure_mono
     (show {p : (AugmentedIndex (2 ^ shape.k) → Fp) × (fam.Coins × R) |
         fsWinsFull ((fam.determinize p.2.2).adversary (scalarBasis B p.1))
@@ -1753,7 +1932,7 @@ theorem snarkFailure_prob_le_of_foldedTextbookDL_rand [Fintype R] [Nonempty R]
 
 end ComputedAlgebraicFSFamilyRand
 
-/-! ## Unbounded-domain fixed-slot endpoint
+/-! ## Unbounded-domain programmed-basis endpoint
 
 A common reachable-support split makes the finite junk table private randomness. The endpoint uses
 one private-coin-folded DL solver, not a separate assumption for each junk table. -/
@@ -1878,7 +2057,7 @@ theorem binding_prob_le_of_unbounded_foldedTextbookDL
         (family.splitFamilyRand.determinize p.2.2) (scalarBasis B p.1) p.2.1}
       ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
         (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+        (bound + 1 / Fintype.card Fp) := by
   exact ComputedAlgebraicFSFamilyRand.binding_prob_le_of_foldedTextbookDL_rand
     B family.splitFamilyRand hDL
 
@@ -1901,7 +2080,7 @@ theorem snarkFailure_prob_le_of_unbounded_foldedTextbookDL
         ¬ (family.splitFamilyRand.determinize p.2.2).hasCleanOpening (scalarBasis B p.1) p.2.1}
       ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
         (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+        (bound + 1 / Fintype.card Fp) := by
   exact ComputedAlgebraicFSFamilyRand.snarkFailure_prob_le_of_foldedTextbookDL_rand
     B family.splitFamilyRand hDL
 
@@ -1932,7 +2111,7 @@ theorem snarkFailure_prob_le_of_unbounded_uniformURS_textbookDL {Ω : Type*} (se
         ((fun p => (basisOf p.1, p.2)) ⁻¹' family.snarkFailureEventUnbounded)
       ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
         (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+        (bound + 1 / Fintype.card Fp) := by
   rw [uniformURS_basis_transfer setup B basisOf family.snarkFailureEventUnbounded hURS]
   exact snarkFailure_prob_le_of_unbounded_foldedTextbookDL B family hDL
 
@@ -1950,7 +2129,7 @@ theorem snarkFailure_prob_le_of_unbounded_generatorRO_textbookDL
           family.snarkFailureEventUnbounded)
       ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
         (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound :=
+        (bound + 1 / Fintype.card Fp) :=
   snarkFailure_prob_le_of_unbounded_uniformURS_textbookDL (orchardGeneratorROSetup query) B family
     (orchardGeneratorROBasis query)
     (orchard_uniformURSIdentification_of_generatorRO shape.k B hB query hquery) hDL
@@ -1974,7 +2153,7 @@ theorem binding_prob_le_of_unbounded_uniformURS_textbookDL {Ω : Type*} (setup :
         ((fun p => (basisOf p.1, p.2)) ⁻¹' family.bindingEventUnbounded)
       ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
         (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+        (bound + 1 / Fintype.card Fp) := by
   rw [uniformURS_basis_transfer setup B basisOf family.bindingEventUnbounded hURS]
   exact binding_prob_le_of_unbounded_foldedTextbookDL B family hDL
 
@@ -1992,7 +2171,7 @@ theorem binding_prob_le_of_unbounded_generatorRO_textbookDL
           family.bindingEventUnbounded)
       ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
         (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound :=
+        (bound + 1 / Fintype.card Fp) :=
   binding_prob_le_of_unbounded_uniformURS_textbookDL (orchardGeneratorROSetup query) B family
     (orchardGeneratorROBasis query)
     (orchard_uniformURSIdentification_of_generatorRO shape.k B hB query hquery) hDL
@@ -2101,7 +2280,7 @@ theorem binding_prob_le_of_unboundedRand_foldedTextbookDL [Fintype R] [Nonempty 
         (family.splitFamilyRand.determinize p.2.2) (scalarBasis B p.1) p.2.1}
       ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
         (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+        (bound + 1 / Fintype.card Fp) := by
   exact ComputedAlgebraicFSFamilyRand.binding_prob_le_of_foldedTextbookDL_rand
     B family.splitFamilyRand hDL
 
@@ -2126,7 +2305,7 @@ theorem snarkFailure_prob_le_of_unboundedRand_foldedTextbookDL [Fintype R] [None
         ¬ (family.splitFamilyRand.determinize p.2.2).hasCleanOpening (scalarBasis B p.1) p.2.1}
       ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
         (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+        (bound + 1 / Fintype.card Fp) := by
   exact ComputedAlgebraicFSFamilyRand.snarkFailure_prob_le_of_foldedTextbookDL_rand
     B family.splitFamilyRand hDL
 
@@ -2158,7 +2337,7 @@ theorem snarkFailure_prob_le_of_unboundedRand_uniformURS_textbookDL [Fintype R] 
         ((fun p => (basisOf p.1, p.2)) ⁻¹' family.snarkFailureEventUnboundedRand)
       ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
         (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+        (bound + 1 / Fintype.card Fp) := by
   rw [uniformURS_basis_transfer setup B basisOf family.snarkFailureEventUnboundedRand hURS]
   exact snarkFailure_prob_le_of_unboundedRand_foldedTextbookDL B family hDL
 
@@ -2176,7 +2355,7 @@ theorem snarkFailure_prob_le_of_unboundedRand_generatorRO_textbookDL [Fintype R]
           family.snarkFailureEventUnboundedRand)
       ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
         (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound :=
+        (bound + 1 / Fintype.card Fp) :=
   snarkFailure_prob_le_of_unboundedRand_uniformURS_textbookDL (orchardGeneratorROSetup query)
     B family (orchardGeneratorROBasis query)
     (orchard_uniformURSIdentification_of_generatorRO shape.k B hB query hquery) hDL
@@ -2203,7 +2382,7 @@ theorem binding_prob_le_of_unboundedRand_uniformURS_textbookDL [Fintype R] [None
         ((fun p => (basisOf p.1, p.2)) ⁻¹' family.bindingEventUnboundedRand)
       ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
         (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound := by
+        (bound + 1 / Fintype.card Fp) := by
   rw [uniformURS_basis_transfer setup B basisOf family.bindingEventUnboundedRand hURS]
   exact binding_prob_le_of_unboundedRand_foldedTextbookDL B family hDL
 
@@ -2221,7 +2400,7 @@ theorem binding_prob_le_of_unboundedRand_generatorRO_textbookDL [Fintype R] [Non
           family.bindingEventUnboundedRand)
       ≤ (family.Q + shape.k) * (3 / Fintype.card Fp) +
         (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-        Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound :=
+        (bound + 1 / Fintype.card Fp) :=
   binding_prob_le_of_unboundedRand_uniformURS_textbookDL (orchardGeneratorROSetup query)
     B family (orchardGeneratorROBasis query)
     (orchard_uniformURSIdentification_of_generatorRO shape.k B hB query hquery) hDL
@@ -2355,6 +2534,12 @@ private theorem eval_urs_eta (m : Msm shape.k Fp VestaG) :
 
 attribute [local irreducible] multiopenCommitment Msm.eval
 
+/-- Representations for every point appended by an arbitrary MSM. -/
+structure RepresentedMsm (m : Msm shape.k Fp VestaG)
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG) where
+  reps : List (Fp × AlgebraicPoint (F := Fp) basis)
+  covers : m.other = reps.map (fun t => (t.1, t.2.point))
+
 /-- Representations for every point appended by the multiopen assembly. -/
 structure RepresentedMultiopen
     (vk : VerifyingKey shape Fp VestaG) (instanceCommitment : Fin shape.numProofs → ℕ → VestaG) (ps : ProofString shape Fp VestaG)
@@ -2380,6 +2565,21 @@ private theorem list_eq_map_pmap_lookup {β : Type*} (point : β → VestaG)
           (H pr (List.mem_cons_self ..))) = pr.2 := by
         simpa using hp
       exact Prod.ext rfl hpt.symm
+
+/-- Build an arbitrary represented MSM from a list covering every appended point. -/
+def RepresentedMsm.ofCoveredList (m : Msm shape.k Fp VestaG)
+    (L : List (AlgebraicPoint (F := Fp) basis))
+    (hcover : ∀ pr ∈ m.other, ∃ ap ∈ L, ap.point = pr.2) :
+    RepresentedMsm m basis :=
+  have H : ∀ pr ∈ m.other,
+      (L.find? (fun ap => ap.point = pr.2)).isSome := by
+    intro pr hpr
+    rw [List.find?_isSome]
+    obtain ⟨ap, hapL, hap⟩ := hcover pr hpr
+    exact ⟨ap, hapL, by simp [hap]⟩
+  { reps := m.other.pmap
+      (fun pr h => (pr.1, (L.find? (fun ap => ap.point = pr.2)).get h)) H
+    covers := list_eq_map_pmap_lookup AlgebraicPoint.point L _ H }
 
 /-- Build the represented assembly from a list covering every appended point. -/
 def RepresentedMultiopen.ofCoveredList

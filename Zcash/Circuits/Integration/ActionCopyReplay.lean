@@ -1,6 +1,7 @@
 import Zcash.Circuits.Integration.ActionPermutationCycle
+import Zcash.Common.RelationWitness
 import Zcash.Circuits.Integration.FixedColumns
-import Zcash.Snark.Soundness.PermutationChallengePricing
+import Zcash.Snark.Soundness.ChallengePricing
 
 /-!
 # Action copy witness from verifier permutation semantics
@@ -16,7 +17,7 @@ namespace Zcash.Snark
 
 open Halo2 Polynomial
 open ActionPermutationDomain
-open Zcash.Circuits.Action (orchardActionTopLevelCircuit)
+open Zcash.Circuits.Action (actionCircuit)
 
 set_option maxHeartbeats 20000
 
@@ -27,7 +28,7 @@ variable {G : Type} [AddCommGroup G] [Module Fp G]
 Construct the complete Action copy witness for one proof from the accepted
 canonical relation, or retain the shared augmented-commitment relation branch.
 -/
-theorem actionCopyReplayWitness_or_relation
+noncomputable def actionCopyReplayWitness_or_relation
     (pp : Keygen.ProofParams) (urs : URS G)
     (hk : (actionShape pp).k = urs.k)
     {instanceCommitment :
@@ -61,22 +62,21 @@ theorem actionCopyReplayWitness_or_relation
         (foldSplitWitness relation.model.constraints
           (actionVk pp urs).n j))
     (fixedCoherence :
-      TopLevelFixedCoherence orchardActionTopLevelCircuit pp urs)
+      TopLevelFixedCoherence actionCircuit pp urs)
     (exclusions : ResolverPermutationChallengeExclusions
       (actionVk pp urs) ch relation.polynomial actionActiveRows)
     (proofIndex : Fin (actionShape pp).numProofs) :
-    Nonempty
-        (CopyReplayWitness orchardActionTopLevelCircuit.placement
-          (resolverEnvironment
-            (actionVk pp urs) relation.polynomial proofIndex
-              actionActiveRows)
-          (orchardActionTopLevelCircuit.operations 0)
-          (FlatCell actionNumPermCols actionDomainSize)
-          (HasNontrivialRelation (F := Fp) urs.g urs.u urs.w)) ∨
-      HasNontrivialRelation (F := Fp) urs.g urs.u urs.w := by
+    CopyReplayWitness actionCircuit.placement
+        (resolverEnvironment
+          (actionVk pp urs) relation.polynomial proofIndex
+            actionActiveRows)
+        (actionCircuit.operations)
+        (FlatCell actionNumPermCols actionDomainSize)
+        (NontrivialRelation (F := Fp) urs.g urs.u urs.w) ⊕'
+      NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
   classical
   have hn : (actionVk pp urs).n ≠ 0 := by
-    change 2 ^ orchardActionTopLevelCircuit.domainExponent ≠ 0
+    change 2 ^ actionCircuit.domainExponent ≠ 0
     positivity
   have hsatisfaction :=
     relation.constraintSatisfaction hn hgoodY
@@ -91,7 +91,11 @@ theorem actionCopyReplayWitness_or_relation
     actionResolverPermutationCycle_or_relation
       pp urs hk relation proofIndex
   rcases hcycleResult with hcycle | hbad
-  · rcases hcycle with ⟨cycle, hcycleSigma⟩
+  swap
+  · exact PSum.inr hbad
+  -- `hcycle` is an `∃`; the witness it feeds is data, so the cycle is recovered by choice.
+  · let cycle := Classical.choose hcycle
+    have hcycleSigma := Classical.choose_spec hcycle
     have hpairval :=
       actionCopyPairValue_of_resolverPermutation
         pp urs ch relation.polynomial
@@ -101,16 +105,16 @@ theorem actionCopyReplayWitness_or_relation
     have hdomainSize :
         (actionVk pp urs).n = 2 ^ urs.k := by
       change
-        2 ^ orchardActionTopLevelCircuit.domainExponent = 2 ^ urs.k
+        2 ^ actionCircuit.domainExponent = 2 ^ urs.k
       exact congrArg (2 ^ ·) hk
     have hfixedRead : ∀ {column row value : ℕ},
         (column, row, value) ∈
-            topLevelRequiredFixedEntries orchardActionTopLevelCircuit →
+            topLevelRequiredFixedEntries actionCircuit →
           (resolverEnvironment
             (actionVk pp urs) relation.polynomial proofIndex
               actionActiveRows).fixed
-              ⟨column⟩ (row : ℤ) = (value : Fp) ∨
-            HasNontrivialRelation (F := Fp) urs.g urs.u urs.w := by
+              ⟨column⟩ (row : ℤ) = (value : Fp) ⊕'
+            NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
       intro column row value hentry
       have source :=
         relation.topLevelFixedEntryRead_or_relation
@@ -123,8 +127,7 @@ theorem actionCopyReplayWitness_or_relation
         (resolverEnvironment
           (actionVk pp urs) relation.polynomial proofIndex
             actionActiveRows)
-        (fun pair hpair => Or.inl (hpairval pair hpair))
+        (fun pair hpair => PSum.inl (hpairval pair hpair))
         hfixedRead
-  · exact Or.inr hbad
 
 end Zcash.Snark

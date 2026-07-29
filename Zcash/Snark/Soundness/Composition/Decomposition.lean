@@ -20,8 +20,8 @@ quantified term: `hExtract` held exactly when the residual is empty; here it is 
 functions of the coins. The bridge is a distributional coupling — the shape proven for the IPA
 rounds by `roChallenges_ipaRound_uniform` — and a genuine modelling step, not a composition of
 existing lemmas. It is deliberately not assumed here: a premise bounding the residual would restate
-the conclusion. Everything above `hExtract` is discharged (`Soundness.VestaBudget`,
-`Multiopen.BudgetedExtraction`); this file isolates the one coupling that remains.
+the conclusion. This legacy decomposition is retained as a generic event identity; the deployed
+path now uses direct pinned-root containment instead of the former budgeted-rewinding discharge.
 -/
 
 namespace Zcash.Snark
@@ -79,7 +79,7 @@ theorem snarkExtraction_prob_le_of_generatorRO_textbookDL_decomposed {shape : Sh
           family.snarkExtractionFailureEvent extracted)
       ≤ ((family.Q + shape.k) * (3 / Fintype.card Fp) +
           (family.Q + 1 : ℕ) * (1 / Fintype.card Fp) +
-          Fintype.card (AugmentedIndex (2 ^ shape.k)) * bound)
+          (bound + 1 / Fintype.card Fp))
         + (independentProductPMF (orchardGeneratorROSetup query)
             (PMF.uniformOfFintype family.Coins)).toOuterMeasure
               ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'

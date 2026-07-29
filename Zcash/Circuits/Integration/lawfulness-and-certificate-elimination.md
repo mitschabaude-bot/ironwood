@@ -25,6 +25,13 @@ obligations. The count excludes the intentional deployed-VK equality and does no
 double-count the bundle's `K = 11`, which is already represented by
 `domainExponent_eq`.
 
+Two further synthesis laws, `LookupRelevantSelectorActivationsExact` and
+`LookupInputsNoSimpleSelectors`, were once proved here — at the wrong abstraction
+layer, as fields of `TopLevelCircuit` rather than of `FormalCircuit`, backed by a
+roughly 3,000-line Action/NoteCommit proof stack. Since nothing consumed them they
+have been withdrawn rather than relocated; the residual fidelity gap that leaves is
+recorded below. They were never included in the count of 26.
+
 The guiding rule is:
 
 > A concrete VK comparison may establish deployment identity. It must not establish
@@ -105,7 +112,7 @@ and should normally be discharged by default tactics and compositional theorems.
 
 | # | Current computation | Class | Structural replacement | Expected difficulty |
 |---:|---|:---:|---|---|
-| 1 | `queryCoverageFailures_eq_nil` | L | Gate and lookup query-support laws, plus generic registration/projection theorems. Narrow fixed coverage from “every allocated fixed column” to every semantically consumed fixed column. | Medium |
+| 1 | `queryCoverageFailures_eq_nil` | L | Gate and lookup query-support laws, plus generic registration/projection theorems. The current diagnostic checks both that every allocated fixed column is queried and that every queried column is allocated; replace both directions structurally, while narrowing coverage to semantically consumed columns. | Medium |
 | 2 | `realizationFailures_eq_nil` | L | Region-local fixed-write consistency, table-load consistency, constant-allocation consistency, and selector-packing consistency; compose them using V1 shared-column non-overlap. | Hard |
 | 3 | `actionNumPermCols_pos` | R | Let generic replay accept an empty permutation family; derive positivity only in branches that consume a copy edge. | Easy |
 | 4 | `actionCopyBounds` | L | Every copied cell is allocated and both endpoint columns are equality-enabled; derive encoded address bounds generically. | Medium |
@@ -153,7 +160,7 @@ All R/G rows are now closed. Every listed L row remains a design input for the n
 | # | Current location or hidden behavior | Class | Structural replacement | Expected difficulty |
 |---:|---|:---:|---|---|
 | 24 | `action_queriedCells_wellFormed` in the VK-match bundle | L | Gate/lookup query declarations consist only of valid query atoms and match expression support. This belongs in argument lawfulness, not in a concrete capture. | Easy–medium |
-| 25 | `action_gates_selectorsCovered` in the VK-match bundle | L | Lawful selector allocation is the missing local premise; selector-compression coverage then follows from a generic compiler theorem. | Medium |
+| 25 | `action_gates_selectorsCovered` in the VK-match bundle, currently replaced by the Action-specific `Action/SelectorCoherence.lean` sidecar | L | Move gate-selector allocation into the `FormalCircuit` lawfulness package or enforce it through the configure API. The existing compositional proof can discharge that packaged law during migration; selector-compression coverage then follows from a generic compiler theorem. | Medium |
 | 26 | lookup component of closure inactivity | L | Every synthesis-enabled lookup is present in the raw configure lookup list. This is currently repaired by `closeWithOperations` and is not directly proved for Action. | Medium |
 
 Together with rows 12a and 12b, these bring the inventory to 26 atomic obligations.
@@ -163,6 +170,45 @@ The old `invalidQueriedCells = []` check was previously easy to dismiss because 
 was not imported by the capstone. It belongs here nevertheless: this arc is about the
 correctness of the formal-circuit/keygen interface, not only the minimum imports of one
 terminal theorem.
+
+`Action/SelectorCoherence.lean` is an improvement over a whole-circuit
+`native_decide`: it proves selector allocation compositionally through the configure
+program. It remains architectural debt because the result lives beside the Action
+formal circuit rather than in the circuit package or the construction API whose
+lawfulness it establishes. It is therefore an interim implementation of obligation
+25, not the endpoint.
+
+## Withdrawn synthesis-law sidecars and the residual fidelity gap
+
+`TopLevelCircuit` once carried two static synthesis obligations:
+
+* `LookupRelevantSelectorActivationsExact`: every lookup operation's recorded enabled
+  selectors exactly match the relevant selectors activated in its complete region at
+  that row; and
+* `LookupInputsNoSimpleSelectors`: lookup input expressions contain no simple
+  selectors.
+
+Both fields, together with the sidecars that discharged them for Action
+(`Action/SynthesisLaws.lean`, `NoteCommit/SynthesisLaws.lean`, and
+`Action/TopLevelSynthesisLaws.lean`, which retraced the entire Action and NoteCommit
+synthesis call graphs because circuit and subcircuit constructors do not preserve
+this evidence), have been withdrawn as consumerless: no keygen or verifier theorem
+ever read them. Lookup projection coverage is established independently, by counting
+selector indices rather than by appealing to a region-local activation law.
+
+That withdrawal leaves a known fidelity gap. Halo 2 rejects simple selectors supplied
+to a lookup argument — lookup registration panics on one — and Clean no longer models
+that rejection anywhere. Nothing in the present chain becomes unsound as a result,
+because nothing claims it; but a keygen-fidelity theorem relating Clean's
+`configure`/`synthesize` output to halo2's own key generation cannot be stated
+faithfully without it. Such a theorem will need a no-simple-selectors premise
+reintroduced explicitly.
+
+When that happens, the premise should not be reinstated in the withdrawn shape. The
+lesson of the sidecars is that these are laws of `FormalCircuit.synthesize`: the
+obligation belongs locally on lookup-emitting bundles, preserved compositionally by
+the circuit combinators, rather than reproved across a whole synthesis call graph and
+reattached at the top-level wrapper.
 
 ## Current compile-cost baseline
 
@@ -296,7 +342,9 @@ showing that its writes do not conflict with region writes or with the other sta
 
 ### 6. Operation-stream lawfulness
 
-The existing Action synthesis laws should grow or be generalized to cover:
+Move the two existing lookup synthesis laws from `TopLevelCircuit` to
+`FormalCircuit`, with compositional support in circuit and subcircuit constructors.
+The same formal-circuit lawfulness package should grow to cover:
 
 * table loads for the same destination are consistent;
 * constants are allocatable;
@@ -383,6 +431,8 @@ This arc is complete when:
 
 * the canonical Clean keygen pipeline does not repair configure/synthesis mismatch;
 * all 26 lawfulness obligations are discharged generically or compositionally;
+* lookup synthesis laws are carried by every `FormalCircuit`, rather than proved by
+  Action/NoteCommit sidecars and attached only at `TopLevelCircuit`;
 * the Action integration capstone imports none of the listed concrete certificate
   theorems;
 * no whole-Action `native_decide` remains for circuit correctness, layout

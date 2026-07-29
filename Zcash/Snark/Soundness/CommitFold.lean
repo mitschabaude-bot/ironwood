@@ -1,5 +1,6 @@
 import Mathlib
 import Zcash.Snark.Soundness.InnerProduct
+import Zcash.Common.DiscreteLogRelation
 
 /-!
 # The commitment respects the IPA round fold
@@ -20,34 +21,13 @@ namespace Zcash.Snark
 
 variable {F G : Type*} [Field F] [AddCommGroup G] [Module F G]
 
-/-- The commitment over arbitrary generators `g`: `⟨a, g⟩ = Σᵢ aᵢ • gᵢ`. Specialises to the URS
-commitment: `commit urs = commitGen urs.g`. -/
-def commitGen {n : ℕ} (g : Fin n → G) (a : Fin n → F) : G := ∑ i, a i • g i
-
 /-- The fingerprint/URS commitment is the generator-commitment at the URS generators. -/
 theorem commit_eq_commitGen (urs : URS G) (a : Fin (2 ^ urs.k) → F) :
     commit urs a = commitGen urs.g a := rfl
 
-/-- Additivity in the witness. -/
-theorem commitGen_add_left {n : ℕ} (g : Fin n → G) (a a' : Fin n → F) :
-    commitGen g (a + a') = commitGen g a + commitGen g a' := by
-  simp only [commitGen, Pi.add_apply, add_smul, Finset.sum_add_distrib]
 
-/-- Homogeneity in the witness. -/
-theorem commitGen_smul_left {n : ℕ} (g : Fin n → G) (c : F) (a : Fin n → F) :
-    commitGen g (c • a) = c • commitGen g a := by
-  simp only [commitGen, Pi.smul_apply, smul_eq_mul, mul_smul, Finset.smul_sum]
 
-/-- Additivity in the generators. -/
-theorem commitGen_add_gen {n : ℕ} (g g' : Fin n → G) (a : Fin n → F) :
-    commitGen (g + g') a = commitGen g a + commitGen g' a := by
-  simp only [commitGen, Pi.add_apply, smul_add, Finset.sum_add_distrib]
 
-/-- Homogeneity in the generators. -/
-theorem commitGen_smul_gen {n : ℕ} (c : F) (g : Fin n → G) (a : Fin n → F) :
-    commitGen (c • g) a = c • commitGen g a := by
-  simp only [commitGen, Pi.smul_apply, Finset.smul_sum]
-  exact Finset.sum_congr rfl fun i _ => smul_comm (a i) c (g i)
 
 /-- **One IPA round's commitment fold (completeness).** Folding the witness by `u⁻¹` and the generators
 by `u` sends the parent commitment to the folded commitment plus the two cross terms `⟨aLo, gHi⟩` and
@@ -104,10 +84,6 @@ reduction extends this to the augmented `(g, U, W)` generators
 computational/AGM layer — is outside this
 development. -/
 
-/-- Additivity over subtraction in the witness. -/
-theorem commitGen_sub {n : ℕ} (g : Fin n → G) (a a' : Fin n → F) :
-    commitGen g (a - a') = commitGen g a - commitGen g a' := by
-  simp only [commitGen, Pi.sub_apply, sub_smul, Finset.sum_sub_distrib]
 
 /-- A nontrivial discrete-log relation among the URS generators, as data: a nonzero coefficient
 vector the generators send to `0`. DLR hardness is the assumption that no feasible adversary can

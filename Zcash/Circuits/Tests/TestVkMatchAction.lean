@@ -13,8 +13,8 @@ EQUAL to the fixture dumped from the actual Rust circuit after `compress_selecto
 (`actionPost.json`). `configure` is version-independent (post-NU 6.2 and 6.3 share the
 CS), so this single test covers both top-level circuits.
 
-The fixtures are JSON data files loaded at `#eval` time (see `Fixtures/Json.lean` for
-the codec, the pinned-content-hash scheme, and why the data is not a Lean term); a
+The fixtures are JSON data files loaded by name at `#eval` time (see `Fixtures/Json.lean`
+for the codec, the SHA-256 pinning scheme, and why the data is not a Lean term); a
 mismatch or failed load is a build failure, exactly like the former `#guard`s.
 -/
 
@@ -27,7 +27,7 @@ def actionCS : ConstraintSystem Fp :=
   (Action.Circuit.configure Specs.Sinsemilla.orchardGenerators {}).2
 
 #eval show IO Unit from do
-  let actionPost ← loadCsFixture "Zcash/Circuits/Fixtures/actionPost.json" 0xdb884f3c3174a41b
+  let actionPost ← loadCsFixture "actionPost.json"
   runChecks [
     -- Every gate's/lookup's `queriedCells` registered faithfully; the layout equality
     -- below then certifies the recorded order against the Rust dump.

@@ -1,5 +1,5 @@
 import Zcash.Snark.Keygen.Derivation
-import Zcash.Snark.Soundness.PermutationInstantiation
+import Zcash.Snark.Soundness.Canonical.PermutationInstantiation
 import Zcash.Circuits.Integration.ActionGateCoherenceCompute
 
 /-!
@@ -7,72 +7,72 @@ import Zcash.Circuits.Integration.ActionGateCoherenceCompute
 
 This small module isolates the native computation certificates used by the semantic
 Action permutation-domain package.  Every statement is against keygen data derived
-from `orchardActionTopLevelCircuit`, never the captured verifying-key fixture.
+from `actionCircuit`, never the captured verifying-key fixture.
 -/
 
 namespace Zcash.Snark
 
-open Zcash.Circuits.Action (orchardActionTopLevelCircuit)
+open Zcash.Circuits.Action (actionCircuit)
 
 namespace ActionPermutationDomain
 
 /-- The circuit-derived Action domain exponent is within Pasta's supported range. -/
 theorem domainExponent_lt :
-    orchardActionTopLevelCircuit.domainExponent < 33 :=
+    actionCircuit.domainExponent < 33 :=
   ActionGateCoherence.domainExponent_lt
 
 def ColumnRefCoherent : ColumnRef → Prop
   | .advice i =>
-      i < orchardActionTopLevelCircuit.pinnedCS.adviceQueryLayout.length ∧
-        (orchardActionTopLevelCircuit.pinnedCS.adviceQueryLayout.getD i (0, 0)).2 = 0
+      i < actionCircuit.pinnedCS.adviceQueryLayout.length ∧
+        (actionCircuit.pinnedCS.adviceQueryLayout.getD i (0, 0)).2 = 0
   | .fixed i =>
-      i < orchardActionTopLevelCircuit.pinnedCS.fixedQueryLayout.length ∧
-        (orchardActionTopLevelCircuit.pinnedCS.fixedQueryLayout.getD i (0, 0)).2 = 0
+      i < actionCircuit.pinnedCS.fixedQueryLayout.length ∧
+        (actionCircuit.pinnedCS.fixedQueryLayout.getD i (0, 0)).2 = 0
   | .instance i =>
-      i < orchardActionTopLevelCircuit.pinnedCS.instanceQueryLayout.length ∧
-        (orchardActionTopLevelCircuit.pinnedCS.instanceQueryLayout.getD i (0, 0)).2 = 0
+      i < actionCircuit.pinnedCS.instanceQueryLayout.length ∧
+        (actionCircuit.pinnedCS.instanceQueryLayout.getD i (0, 0)).2 = 0
 
 /-- Executable form of one reference's L-classified routing obligations. -/
 def routingCoherentBool (ref : ColumnRef × ℕ) : Bool :=
   match ref.1 with
   | .advice i =>
-      decide (i < orchardActionTopLevelCircuit.pinnedCS.adviceQueryLayout.length) &&
+      decide (i < actionCircuit.pinnedCS.adviceQueryLayout.length) &&
       decide
-        ((orchardActionTopLevelCircuit.pinnedCS.adviceQueryLayout.getD
+        ((actionCircuit.pinnedCS.adviceQueryLayout.getD
           i (0, 0)).2 = 0) &&
       decide
         (ref.2 <
-          orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length)
+          actionCircuit.constraintSystem.permutationColumns.length)
   | .fixed i =>
-      decide (i < orchardActionTopLevelCircuit.pinnedCS.fixedQueryLayout.length) &&
+      decide (i < actionCircuit.pinnedCS.fixedQueryLayout.length) &&
       decide
-        ((orchardActionTopLevelCircuit.pinnedCS.fixedQueryLayout.getD
+        ((actionCircuit.pinnedCS.fixedQueryLayout.getD
           i (0, 0)).2 = 0) &&
       decide
         (ref.2 <
-          orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length)
+          actionCircuit.constraintSystem.permutationColumns.length)
   | .instance i =>
-      decide (i < orchardActionTopLevelCircuit.pinnedCS.instanceQueryLayout.length) &&
+      decide (i < actionCircuit.pinnedCS.instanceQueryLayout.length) &&
       decide
-        ((orchardActionTopLevelCircuit.pinnedCS.instanceQueryLayout.getD
+        ((actionCircuit.pinnedCS.instanceQueryLayout.getD
           i (0, 0)).2 = 0) &&
       decide
         (ref.2 <
-          orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length)
+          actionCircuit.constraintSystem.permutationColumns.length)
 
 theorem routingCoherentBool_eq_true_iff (ref : ColumnRef × ℕ) :
     routingCoherentBool ref = true ↔
       ColumnRefCoherent ref.1 ∧
         ref.2 <
-          orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length := by
+          actionCircuit.constraintSystem.permutationColumns.length := by
   rcases ref with ⟨ref, common⟩
   cases ref <;> simp [routingCoherentBool, ColumnRefCoherent]
 
 /-- Compiled Action references that fail either query routing or global-index
 bounds. This remains the L-classified routing diagnostic. -/
 def routingFailures : List (ColumnRef × ℕ) :=
-  (Keygen.permutationChunksOf orchardActionTopLevelCircuit.selectorMap
-    orchardActionTopLevelCircuit.constraintSystem).flatten.filter fun ref =>
+  (Keygen.permutationChunksOf
+          actionCircuit.pinnedCS actionCircuit.constraintSystem.chunkLen).flatten.filter fun ref =>
       !routingCoherentBool ref
 
 theorem routingFailures_eq_nil : routingFailures = [] := by
@@ -82,12 +82,12 @@ theorem routingFailures_eq_nil : routingFailures = [] := by
 every accompanying common-permutation index is in range. -/
 theorem routingCoherent :
     ∀ chunk ∈
-        Keygen.permutationChunksOf orchardActionTopLevelCircuit.selectorMap
-          orchardActionTopLevelCircuit.constraintSystem,
+        Keygen.permutationChunksOf
+          actionCircuit.pinnedCS actionCircuit.constraintSystem.chunkLen,
       ∀ ref ∈ chunk,
         ColumnRefCoherent ref.1 ∧
           ref.2 <
-            orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length := by
+            actionCircuit.constraintSystem.permutationColumns.length := by
   intro chunk hchunk ref href
   by_contra hfailure
   have hmem :

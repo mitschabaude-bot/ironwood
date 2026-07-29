@@ -10,11 +10,9 @@ import Zcash.Snark.Soundness.Forking.Assembly
 /-!
 # Conditional soundness and deployed acceptance
 
-This module has two soundness layers:
-
-* `_conditional` theorems assume an opaque acceptance and extraction interface.
-* deployed theorems start from `DeployedAccepts`, where `assemble?` succeeds and the resulting MSM
-  evaluates to zero.
+Soundness here starts from `DeployedAccepts`: `assemble?` succeeds and the resulting MSM evaluates
+to zero. An earlier layer took an opaque `accepts : Prop` together with an assumed extraction
+interface; both are retired, since the computed route now derives what they assumed.
 
 ## The deployed route
 
@@ -32,30 +30,15 @@ In a prime-order group, a nontrivial relation exists mathematically. The securit
 its coefficients. `NontrivialRelation` therefore carries those coefficients as data, and the
 reductions return it explicitly instead of asserting that one exists.
 
-## Assumptions (the conditional family)
-
-* **Opaque accept.** `accepts` is a free `Prop`, so `orchard_verifier_sound_conditional` says
-  nothing about the fingerprint. The `_deployed` variants take `DeployedAccepts` instead.
-* **Extraction bundled with Fiat–Shamir.** `ExtractableFromAcceptance` assumes the IPA
-  knowledge-soundness conclusion, so the proven extraction lemmas (`accepting_fold_eq`,
-  `extract_correct`) are off this path.
-* **Circuit satisfaction assumed.** It also supplies `circuitSat a` rather than deriving it from
-  the deployed gate check (`constraint_identity_of_accept` + the multiopen decode).
-
-This conditional family leaves those components opaque. The computed route is in
-`Forking.Adversary.Algebraic`; `KnowledgeSoundness` records its computational boundary.
+The computed route is in `Forking.Adversary.Algebraic`; `KnowledgeSoundness` records its
+computational boundary.
 -/
 
 namespace Zcash.Snark
 
-variable {G : Type*} [AddCommGroup G] [Module Fp G]
+open Zcash.Arithmetic (Msm)
 
-/-- Conditional interface: acceptance supplies a consistent transcript, IPA opening, and circuit
-witness. -/
-def ExtractableFromAcceptance (urs : URS G) (P : G) (b : Fin (2 ^ urs.k) → Fp) (v : Fp)
-    (circuitSat : (Fin (2 ^ urs.k) → Fp) → Prop) (accepts : Prop) : Prop :=
-  accepts → ∃ (t : Tree Fp urs.k) (a : Fin (2 ^ urs.k) → Fp),
-    Consistent t a ∧ IpaRelation urs P b v a ∧ circuitSat a
+variable {G : Type*} [AddCommGroup G] [Module Fp G]
 
 -- Tracked semantic-adequacy gap: `S` is a free `Prop` and `hencodes` an assumed hypothesis, so
 -- the chain stops at "the extracted witness satisfies the gates" (`SnarkRelation`) and never
@@ -63,17 +46,6 @@ def ExtractableFromAcceptance (urs : URS G) (P : G) (b : Fin (2 ^ urs.k) → Fp)
 -- correctly derived, spend authorized). Closing it means instantiating `S` to the concrete
 -- Orchard statement and proving `hencodes` — the output-side dual of the input-side
 -- VK-correctness gap (see `Verifier/Assemble.lean`). Large; not started.
-/-- If opaque acceptance supplies the extraction data, derive `S` through `hencodes`. -/
-theorem orchard_verifier_sound_conditional (urs : URS G)
-    {P : G} {b : Fin (2 ^ urs.k) → Fp} {v : Fp} {circuitSat : (Fin (2 ^ urs.k) → Fp) → Prop}
-    {accepts : Prop} (haccepts : accepts)
-    (hextract : ExtractableFromAcceptance urs P b v circuitSat accepts)
-    {S : Prop} (hencodes : ∀ a, SnarkRelation urs P b v circuitSat a → S) :
-    S := by
-  obtain ⟨t, a, hcons, hopen, hsat⟩ := hextract haccepts
-  exact hencodes a (knowledge_sound urs hcons hopen hsat).2
-
-/-- The rejecting assembler succeeds and its final MSM evaluates to zero against the URS. -/
 def DeployedAccepts [DecidableEq G] [Inhabited G] {shape : Shape} (urs : URS G)
     (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → ℕ → G) (ps : ProofString shape Fp G)
     (ch : Challenges shape.k Fp) : Prop :=

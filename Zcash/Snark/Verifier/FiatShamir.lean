@@ -19,6 +19,8 @@ field conversion with it is external. Fixtures use trusted typed captures, not t
 
 namespace Zcash.Snark
 
+open Zcash.Arithmetic (Msm)
+
 /-- A point, scalar, or challenge-domain marker written to the Fiat–Shamir transcript.
 
 The constructors correspond to halo2's three Blake2b domain prefixes. A squeeze absorbs `challenge`;

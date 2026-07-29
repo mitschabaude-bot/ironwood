@@ -17,13 +17,13 @@ separately pins the derived placements against the layout fixture's.)
 
 namespace Zcash.Circuits.Fixtures.Test.SelMapDerivation
 
-open Zcash.Circuits.Action (orchardActionTopLevelCircuit)
+open Zcash.Circuits.Action (actionCircuit)
 
 -- The fully derived map (the one wired into `actionPinnedCs`) equals the Rust dump.
-#guard orchardActionTopLevelCircuit.selectorMap == actionSelMap
+#guard actionCircuit.selectorMap == actionSelMap
 
 -- The derived domain exponent (`minimalK`, the keygen fit condition) equals orchard's
 -- pinned `K = 11` (`circuit.rs:76`) — so the check above also covers the derived size.
-#guard orchardActionTopLevelCircuit.domainExponent == 11
+#guard actionCircuit.domainExponent == 11
 
 end Zcash.Circuits.Fixtures.Test.SelMapDerivation

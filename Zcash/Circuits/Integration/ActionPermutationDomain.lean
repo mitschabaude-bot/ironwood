@@ -1,7 +1,7 @@
 import Zcash.Circuits.Integration.ActionPermutationDomainCompute
 import Zcash.Circuits.Integration.ActionPermutationColumns
 import Zcash.Circuits.Integration.PermutationCompiler
-import Zcash.Snark.Soundness.CanonicalConstraintModel
+import Zcash.Snark.Soundness.Canonical.ConstraintModel
 import Zcash.Circuits.Integration.TopLevelAssignment
 
 /-!
@@ -9,7 +9,7 @@ import Zcash.Circuits.Integration.TopLevelAssignment
 
 This module discharges the domain and chunk-layout premises retained by the
 generic permutation semantics for the verifying key derived from
-`orchardActionTopLevelCircuit`.
+`actionCircuit`.
 
 The keygen permutation itself belongs to the separate replay/assembly layer.
 `cycleOfKeygenColumns` therefore accepts `fullSigma`, its active restriction,
@@ -20,19 +20,22 @@ namespace Zcash.Snark
 
 open Polynomial
 open Halo2
-open Zcash.Circuits.Action (orchardActionTopLevelCircuit)
+open Zcash.Arithmetic
+  (deltaFp deltaFp_ne_zero deltaFpOrder deltaFp_isPrimitiveRoot
+    deltaFp_powers_injective omegaOf omegaOf_isPrimitiveRoot scalarFieldOrder)
+open Zcash.Circuits.Action (actionCircuit)
 
 namespace ActionPermutationDomain
 
 variable {G : Type} [AddCommGroup G] [Inhabited G]
 
 abbrev actionShape (pp : Keygen.ProofParams) : Shape :=
-  pp.mergeDerived orchardActionTopLevelCircuit
+  pp.mergeDerived actionCircuit
 
 abbrev actionVk (pp : Keygen.ProofParams) (urs : URS G) :
     VerifyingKey (actionShape pp) Zcash.Circuits.Fp G :=
   Halo2.TopLevelCircuit.toVerifierKey
-    orchardActionTopLevelCircuit pp urs
+    actionCircuit pp urs
 
 set_option maxRecDepth 100000 in
 /-- The derived Action VK has one verifier permutation set per chunk. -/
@@ -41,11 +44,10 @@ theorem chunkCount (pp : Keygen.ProofParams) (urs : URS G) :
       (actionShape pp).numPermutationSets := by
   change
     (Keygen.permutationChunksOf
-      orchardActionTopLevelCircuit.selectorMap
-      orchardActionTopLevelCircuit.constraintSystem).length =
-    (orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length +
-      orchardActionTopLevelCircuit.constraintSystem.chunkLen - 1) /
-      orchardActionTopLevelCircuit.constraintSystem.chunkLen
+          actionCircuit.pinnedCS actionCircuit.constraintSystem.chunkLen).length =
+    (actionCircuit.pinnedCS.permutationColumns.length +
+      actionCircuit.constraintSystem.chunkLen - 1) /
+      actionCircuit.constraintSystem.chunkLen
   exact permutationChunksOf_length _ _
 
 set_option maxRecDepth 100000 in
@@ -57,14 +59,12 @@ theorem chunkLength_le (pp : Keygen.ProofParams) (urs : URS G) :
   intro i hi
   change
     ((Keygen.permutationChunksOf
-      orchardActionTopLevelCircuit.selectorMap
-      orchardActionTopLevelCircuit.constraintSystem).getD i []).length ≤
-      orchardActionTopLevelCircuit.constraintSystem.chunkLen
+          actionCircuit.pinnedCS actionCircuit.constraintSystem.chunkLen).getD i []).length ≤
+      actionCircuit.constraintSystem.chunkLen
   have hiChunks :
       i <
         (Keygen.permutationChunksOf
-          orchardActionTopLevelCircuit.selectorMap
-          orchardActionTopLevelCircuit.constraintSystem).length := by
+          actionCircuit.pinnedCS actionCircuit.constraintSystem.chunkLen).length := by
     rw [permutationChunksOf_length]
     exact hi
   rw [permutationChunksOf_getD_length _ _ i hiChunks]
@@ -91,25 +91,23 @@ theorem resolverPairsLength_eq_min
     (chunk : Fin (actionShape pp).numPermutationSets) :
     (ResolverPermutationPairs (actionVk pp urs) poly p chunk).length =
       min (actionVk pp urs).chunkLen
-        (orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length -
+        (actionCircuit.pinnedCS.permutationColumns.length -
           (chunk : ℕ) * (actionVk pp urs).chunkLen) := by
   simp only [ResolverPermutationPairs,
     permutationChunkPairsOfResolver, List.length_map]
   have hi :
       (chunk : ℕ) <
         (Keygen.permutationChunksOf
-          orchardActionTopLevelCircuit.selectorMap
-          orchardActionTopLevelCircuit.constraintSystem).length := by
+          actionCircuit.pinnedCS actionCircuit.constraintSystem.chunkLen).length := by
     rw [permutationChunksOf_length]
     exact chunk.isLt
   change
     ((Keygen.permutationChunksOf
-      orchardActionTopLevelCircuit.selectorMap
-      orchardActionTopLevelCircuit.constraintSystem).getD chunk []).length =
-      min orchardActionTopLevelCircuit.constraintSystem.chunkLen
-        (orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length -
+          actionCircuit.pinnedCS actionCircuit.constraintSystem.chunkLen).getD chunk []).length =
+      min actionCircuit.constraintSystem.chunkLen
+        (actionCircuit.pinnedCS.permutationColumns.length -
           (chunk : ℕ) *
-            orchardActionTopLevelCircuit.constraintSystem.chunkLen)
+            actionCircuit.constraintSystem.chunkLen)
   exact permutationChunksOf_getD_length _ _ chunk hi
 
 set_option maxRecDepth 100000 in
@@ -120,16 +118,16 @@ theorem routingCoherent_of_derived
     PermutationChunkRoutingCoherent (actionVk pp urs) := by
   have hadviceLayout :
       (actionVk pp urs).adviceQueryLayout =
-        orchardActionTopLevelCircuit.pinnedCS.adviceQueryLayout :=
-    orchardActionTopLevelCircuit.toVerifierKey_adviceQueryLayout_derived pp urs
+        actionCircuit.pinnedCS.adviceQueryLayout :=
+    actionCircuit.toVerifierKey_adviceQueryLayout_derived pp urs
   have hfixedLayout :
       (actionVk pp urs).fixedQueryLayout =
-        orchardActionTopLevelCircuit.pinnedCS.fixedQueryLayout :=
-    orchardActionTopLevelCircuit.toVerifierKey_fixedQueryLayout_derived pp urs
+        actionCircuit.pinnedCS.fixedQueryLayout :=
+    actionCircuit.toVerifierKey_fixedQueryLayout_derived pp urs
   have hinstanceLayout :
       (actionVk pp urs).instanceQueryLayout =
-        orchardActionTopLevelCircuit.pinnedCS.instanceQueryLayout :=
-    orchardActionTopLevelCircuit.toVerifierKey_instanceQueryLayout_derived pp urs
+        actionCircuit.pinnedCS.instanceQueryLayout :=
+    actionCircuit.toVerifierKey_instanceQueryLayout_derived pp urs
   rintro chunk hchunk ⟨ref, common⟩ href
   have hroute := routingCoherent chunk hchunk (ref, common) href
   rcases hroute with ⟨hrefCoherent, hcommon⟩
@@ -141,7 +139,7 @@ theorem routingCoherent_of_derived
           (actionVk pp urs) (.advice i)
         simp only [PermutationColumnRef.Coherent]
         refine ⟨?_, ?_, ?_⟩
-        · rw [← orchardActionTopLevelCircuit.toVerifierKey_adviceQueryCount
+        · rw [← actionCircuit.toVerifierKey_adviceQueryCount
             pp urs, hadviceLayout]
           exact hi
         · simpa only [hadviceLayout] using hi
@@ -152,7 +150,7 @@ theorem routingCoherent_of_derived
           (actionVk pp urs) (.fixed i)
         simp only [PermutationColumnRef.Coherent]
         refine ⟨?_, ?_, ?_⟩
-        · rw [← orchardActionTopLevelCircuit.toVerifierKey_fixedQueryCount
+        · rw [← actionCircuit.toVerifierKey_fixedQueryCount
             pp urs, hfixedLayout]
           exact hi
         · simpa only [hfixedLayout] using hi
@@ -163,7 +161,7 @@ theorem routingCoherent_of_derived
           (actionVk pp urs) (.instance i)
         simp only [PermutationColumnRef.Coherent]
         refine ⟨?_, ?_, ?_⟩
-        · rw [← orchardActionTopLevelCircuit.toVerifierKey_instanceQueryCount
+        · rw [← actionCircuit.toVerifierKey_instanceQueryCount
             pp urs, hinstanceLayout]
           exact hi
         · simpa only [hinstanceLayout] using hi
@@ -180,10 +178,10 @@ theorem permutationColumnAddresses_eq
         (fun reference =>
           permutationColumnAddress (actionVk pp urs) reference.1)) =
       (Keygen.permColsOf
-        orchardActionTopLevelCircuit.constraintSystem).map
+        actionCircuit.constraintSystem).map
           Halo2.Layout.ColRef.toAny := by
   exact topLevelPermutationColumnAddresses_eq
-    orchardActionTopLevelCircuit pp urs
+    actionCircuit pp urs
       (routingCoherent_of_derived pp urs)
 
 /-! ## Pasta permutation-name cosets -/
@@ -250,21 +248,21 @@ theorem rowsInjective (pp : Keygen.ProofParams) (urs : URS G) :
     Function.Injective fun i : Fin (actionVk pp urs).n =>
       (actionVk pp urs).omega ^ (i : ℕ) := by
   change Function.Injective fun i :
-      Fin (2 ^ orchardActionTopLevelCircuit.domainExponent) =>
-    omegaOf orchardActionTopLevelCircuit.domainExponent ^ (i : ℕ)
+      Fin (2 ^ actionCircuit.domainExponent) =>
+    omegaOf actionCircuit.domainExponent ^ (i : ℕ)
   exact TopLevelAssignment.domainRowsInjective domainExponent_lt
 
 theorem root (pp : Keygen.ProofParams) (urs : URS G) :
     (actionVk pp urs).omega ^ (actionVk pp urs).n = 1 := by
-  change omegaOf orchardActionTopLevelCircuit.domainExponent ^
-    (2 ^ orchardActionTopLevelCircuit.domainExponent) = 1
+  change omegaOf actionCircuit.domainExponent ^
+    (2 ^ actionCircuit.domainExponent) = 1
   exact TopLevelAssignment.domainRoot domainExponent_lt
 
 theorem blindingFactors_lt (pp : Keygen.ProofParams) (urs : URS G) :
     (actionVk pp urs).blindingFactors < (actionVk pp urs).n := by
-  change orchardActionTopLevelCircuit.blindingFactors <
-    2 ^ orchardActionTopLevelCircuit.domainExponent
-  exact TopLevelAssignment.blindingFactors_lt_domainSize domainExponent_lt
+  change actionCircuit.blindingFactors <
+    2 ^ actionCircuit.domainExponent
+  exact actionCircuit.blindingFactors_lt_domainSize
 
 /-- The active permutation prefix ends at the last usable Action row. -/
 abbrev activeRows (pp : Keygen.ProofParams) (urs : URS G) : ℕ :=
@@ -339,9 +337,7 @@ theorem namesInjective
     apply chunkRowName_injective_of_actual_coset
     · intro j
       apply pow_ne_zero
-      change deltaFp ≠ 0
-      rw [deltaFp, powFast_eq_pow]
-      exact pow_ne_zero _ (by decide : (5 : Fp) ≠ 0)
+      exact deltaFp_ne_zero
     · exact root pp urs
     · intro i i' hi hi' heq
       have hfin :
@@ -353,126 +349,126 @@ theorem namesInjective
       change
         deltaFp ^
             ((j.1 : ℕ) *
-              orchardActionTopLevelCircuit.constraintSystem.chunkLen +
+              actionCircuit.constraintSystem.chunkLen +
               (j.2 : ℕ)) =
-          omegaOf orchardActionTopLevelCircuit.domainExponent ^ t *
+          omegaOf actionCircuit.domainExponent ^ t *
             deltaFp ^
               ((j'.1 : ℕ) *
-                orchardActionTopLevelCircuit.constraintSystem.chunkLen +
+                actionCircuit.constraintSystem.chunkLen +
                 (j'.2 : ℕ)) at hcoset
       have hjWidth :
           (j.2 : ℕ) <
             min (actionVk pp urs).chunkLen
-              (orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length -
+              (actionCircuit.constraintSystem.permutationColumns.length -
                 (j.1 : ℕ) * (actionVk pp urs).chunkLen) := by
         simpa only [resolverPairsLength_eq_min pp urs poly p j.1] using
           j.2.isLt
       have hj'Width :
           (j'.2 : ℕ) <
             min (actionVk pp urs).chunkLen
-              (orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length -
+              (actionCircuit.constraintSystem.permutationColumns.length -
                 (j'.1 : ℕ) * (actionVk pp urs).chunkLen) := by
         simpa only [resolverPairsLength_eq_min pp urs poly p j'.1] using
           j'.2.isLt
       change
         (j.2 : ℕ) <
-          min orchardActionTopLevelCircuit.constraintSystem.chunkLen
-            (orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length -
+          min actionCircuit.constraintSystem.chunkLen
+            (actionCircuit.constraintSystem.permutationColumns.length -
               (j.1 : ℕ) *
-                orchardActionTopLevelCircuit.constraintSystem.chunkLen) at hjWidth
+                actionCircuit.constraintSystem.chunkLen) at hjWidth
       change
         (j'.2 : ℕ) <
-          min orchardActionTopLevelCircuit.constraintSystem.chunkLen
-            (orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length -
+          min actionCircuit.constraintSystem.chunkLen
+            (actionCircuit.constraintSystem.permutationColumns.length -
               (j'.1 : ℕ) *
-                orchardActionTopLevelCircuit.constraintSystem.chunkLen) at hj'Width
+                actionCircuit.constraintSystem.chunkLen) at hj'Width
       have hj :
           (j.1 : ℕ) *
-                orchardActionTopLevelCircuit.constraintSystem.chunkLen +
+                actionCircuit.constraintSystem.chunkLen +
               (j.2 : ℕ) <
-            orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length := by
+            actionCircuit.constraintSystem.permutationColumns.length := by
         omega
       have hj' :
           (j'.1 : ℕ) *
-                orchardActionTopLevelCircuit.constraintSystem.chunkLen +
+                actionCircuit.constraintSystem.chunkLen +
               (j'.2 : ℕ) <
-            orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length := by
+            actionCircuit.constraintSystem.permutationColumns.length := by
         omega
       have hsupported :
-          orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length ≤
+          actionCircuit.constraintSystem.permutationColumns.length ≤
             pastaOddFactor :=
         permutationColumns_le_delta
       have hglobal :
           (⟨(j.1 : ℕ) *
-                orchardActionTopLevelCircuit.constraintSystem.chunkLen +
+                actionCircuit.constraintSystem.chunkLen +
               (j.2 : ℕ), hj⟩ :
-              Fin orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length) =
+              Fin actionCircuit.constraintSystem.permutationColumns.length) =
             ⟨(j'.1 : ℕ) *
-                orchardActionTopLevelCircuit.constraintSystem.chunkLen +
+                actionCircuit.constraintSystem.chunkLen +
               (j'.2 : ℕ), hj'⟩ :=
         deltaFp_domainCosets
-          (k := orchardActionTopLevelCircuit.domainExponent)
+          (k := actionCircuit.domainExponent)
           (n :=
-            orchardActionTopLevelCircuit.constraintSystem.permutationColumns.length)
+            actionCircuit.constraintSystem.permutationColumns.length)
           (Nat.le_of_lt_succ domainExponent_lt) hsupported
           ⟨_, hj⟩ ⟨_, hj'⟩ t hcoset
       have hindex :
           (j.1 : ℕ) *
-                orchardActionTopLevelCircuit.constraintSystem.chunkLen +
+                actionCircuit.constraintSystem.chunkLen +
               (j.2 : ℕ) =
             (j'.1 : ℕ) *
-                orchardActionTopLevelCircuit.constraintSystem.chunkLen +
+                actionCircuit.constraintSystem.chunkLen +
               (j'.2 : ℕ) :=
         congrArg Fin.val hglobal
       have hchunkLen :
-          0 < orchardActionTopLevelCircuit.constraintSystem.chunkLen :=
+          0 < actionCircuit.constraintSystem.chunkLen :=
         constraintSystem_chunkLen_pos
-          orchardActionTopLevelCircuit.constraintSystem
+          actionCircuit.constraintSystem
       have hjColumn :
           (j.2 : ℕ) <
-            orchardActionTopLevelCircuit.constraintSystem.chunkLen :=
+            actionCircuit.constraintSystem.chunkLen :=
         lt_of_lt_of_le j.2.isLt
           (resolverPairsLength_le pp urs poly p j.1 j.1.isLt)
       have hj'Column :
           (j'.2 : ℕ) <
-            orchardActionTopLevelCircuit.constraintSystem.chunkLen :=
+            actionCircuit.constraintSystem.chunkLen :=
         lt_of_lt_of_le j'.2.isLt
           (resolverPairsLength_le pp urs poly p j'.1 j'.1.isLt)
       have hchunk :
           (j.1 : ℕ) = (j'.1 : ℕ) := by
         have hjDiv :
             ((j.1 : ℕ) *
-                  orchardActionTopLevelCircuit.constraintSystem.chunkLen +
+                  actionCircuit.constraintSystem.chunkLen +
                 (j.2 : ℕ)) /
-                orchardActionTopLevelCircuit.constraintSystem.chunkLen =
+                actionCircuit.constraintSystem.chunkLen =
               (j.1 : ℕ) := by
           calc
             _ =
-                (orchardActionTopLevelCircuit.constraintSystem.chunkLen *
+                (actionCircuit.constraintSystem.chunkLen *
                     (j.1 : ℕ) + (j.2 : ℕ)) /
-                  orchardActionTopLevelCircuit.constraintSystem.chunkLen := by
+                  actionCircuit.constraintSystem.chunkLen := by
                     rw [Nat.mul_comm]
             _ = (j.1 : ℕ) +
                 (j.2 : ℕ) /
-                  orchardActionTopLevelCircuit.constraintSystem.chunkLen :=
+                  actionCircuit.constraintSystem.chunkLen :=
               Nat.mul_add_div hchunkLen _ _
             _ = (j.1 : ℕ) := by
               rw [Nat.div_eq_of_lt hjColumn, Nat.add_zero]
         have hj'Div :
             ((j'.1 : ℕ) *
-                  orchardActionTopLevelCircuit.constraintSystem.chunkLen +
+                  actionCircuit.constraintSystem.chunkLen +
                 (j'.2 : ℕ)) /
-                orchardActionTopLevelCircuit.constraintSystem.chunkLen =
+                actionCircuit.constraintSystem.chunkLen =
               (j'.1 : ℕ) := by
           calc
             _ =
-                (orchardActionTopLevelCircuit.constraintSystem.chunkLen *
+                (actionCircuit.constraintSystem.chunkLen *
                     (j'.1 : ℕ) + (j'.2 : ℕ)) /
-                  orchardActionTopLevelCircuit.constraintSystem.chunkLen := by
+                  actionCircuit.constraintSystem.chunkLen := by
                     rw [Nat.mul_comm]
             _ = (j'.1 : ℕ) +
                 (j'.2 : ℕ) /
-                  orchardActionTopLevelCircuit.constraintSystem.chunkLen :=
+                  actionCircuit.constraintSystem.chunkLen :=
               Nat.mul_add_div hchunkLen _ _
             _ = (j'.1 : ℕ) := by
               rw [Nat.div_eq_of_lt hj'Column, Nat.add_zero]
@@ -481,13 +477,13 @@ theorem namesInjective
       have hcolumn : (j.2 : ℕ) = (j'.2 : ℕ) := by
         have hprefix :
             (j.1 : ℕ) *
-                orchardActionTopLevelCircuit.constraintSystem.chunkLen =
+                actionCircuit.constraintSystem.chunkLen =
               (j'.1 : ℕ) *
-                orchardActionTopLevelCircuit.constraintSystem.chunkLen :=
+                actionCircuit.constraintSystem.chunkLen :=
           congrArg
             (fun chunk =>
               chunk *
-                orchardActionTopLevelCircuit.constraintSystem.chunkLen)
+                actionCircuit.constraintSystem.chunkLen)
             hchunk
         apply Nat.add_left_cancel
         exact hindex.trans (by rw [hprefix])

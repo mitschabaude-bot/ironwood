@@ -8,6 +8,8 @@ Every point appended by the deployed multiopen MSM comes from the proof or verif
 
 namespace Zcash.Snark
 
+open Zcash.Arithmetic (Msm)
+
 /-- The first component of a zipped pair is a member of the first list. -/
 private theorem mem_of_mem_zip_fst {α β : Type*} {a : α} {b : β}
     {l₁ : List α} {l₂ : List β} (h : (a, b) ∈ l₁.zip l₂) : a ∈ l₁ := by
@@ -27,19 +29,23 @@ section MsmPoints
 
 variable {k : ℕ} {F G : Type*}
 
+-- `Msm` lives in `Zcash.Arithmetic`, so these accessors have to be declared into its own
+-- namespace (`_root_.`) for generalized field notation to find them.
+
 /-- The group points an MSM's appended terms reference. -/
-def Msm.otherPoints (m : Msm k F G) : List G := m.other.map Prod.snd
+def _root_.Zcash.Arithmetic.Msm.otherPoints (m : Msm k F G) : List G := m.other.map Prod.snd
 
-theorem Msm.otherPoints_zero [Zero F] : (Msm.zero k F G).otherPoints = [] := rfl
+theorem _root_.Zcash.Arithmetic.Msm.otherPoints_zero [Zero F] :
+    (Msm.zero k F G).otherPoints = [] := rfl
 
-theorem Msm.otherPoints_appendTerm (c : F) (P : G) (m : Msm k F G) :
+theorem _root_.Zcash.Arithmetic.Msm.otherPoints_appendTerm (c : F) (P : G) (m : Msm k F G) :
     (m.appendTerm c P).otherPoints = P :: m.otherPoints := rfl
 
-theorem Msm.otherPoints_scale [Mul F] (c : F) (m : Msm k F G) :
+theorem _root_.Zcash.Arithmetic.Msm.otherPoints_scale [Mul F] (c : F) (m : Msm k F G) :
     (m.scale c).otherPoints = m.otherPoints := by
   simp [Msm.otherPoints, Msm.scale, List.map_map, Function.comp_def]
 
-theorem Msm.otherPoints_add [Add F] (m₁ m₂ : Msm k F G) :
+theorem _root_.Zcash.Arithmetic.Msm.otherPoints_add [Add F] (m₁ m₂ : Msm k F G) :
     (m₁.add m₂).otherPoints = m₁.otherPoints ++ m₂.otherPoints := by
   simp [Msm.otherPoints, Msm.add]
 

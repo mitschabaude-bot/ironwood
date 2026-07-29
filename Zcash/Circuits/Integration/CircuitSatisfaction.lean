@@ -1,6 +1,6 @@
 import Mathlib
 import Clean.Halo2.Operations
-import Zcash.Snark.Core.Field
+import Zcash.Arithmetic
 
 /-!
 # Full Halo2 circuit satisfaction, split by constraint family
@@ -185,20 +185,21 @@ theorem iff_constraints
   ⟨constraints, of_constraints⟩
 
 /-- Reassemble independently proved semantic families while preserving one shared exceptional
-event from the permutation/lookup arguments. -/
-theorem of_components_or_bad
+event from the permutation/lookup arguments. The event is carried as data: a caller that fails to
+reassemble hands back the break it computed, not a proof that one exists. -/
+def of_components_or_bad
     {place : RegionIndex → ℕ} {env : Environment F}
-    {ops : Operations F} {i : RegionIndex} {Bad : Prop}
+    {ops : Operations F} {i : RegionIndex} {Bad : Type}
     (hgates : CircuitConstraintFamily.constraints .gate place env ops i)
-    (hcopies : CircuitConstraintFamily.constraints .copy place env ops i ∨ Bad)
-    (hlookups : CircuitConstraintFamily.constraints .lookup place env ops i ∨ Bad)
+    (hcopies : CircuitConstraintFamily.constraints .copy place env ops i ⊕' Bad)
+    (hlookups : CircuitConstraintFamily.constraints .lookup place env ops i ⊕' Bad)
     (hfixed : CircuitConstraintFamily.constraints .fixed place env ops i) :
-    FullCircuitSatisfaction place env ops i ∨ Bad := by
+    FullCircuitSatisfaction place env ops i ⊕' Bad := by
   rcases hcopies with hcopies | hbad
   · rcases hlookups with hlookups | hbad
-    · exact Or.inl ⟨hgates, hcopies, hlookups, hfixed⟩
-    · exact Or.inr hbad
-  · exact Or.inr hbad
+    · exact PSum.inl ⟨hgates, hcopies, hlookups, hfixed⟩
+    · exact PSum.inr hbad
+  · exact PSum.inr hbad
 
 end FullCircuitSatisfaction
 

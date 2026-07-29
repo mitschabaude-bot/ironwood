@@ -48,30 +48,6 @@ theorem claimedEval_of_x3Prob {points evals : List Fp} {col : Polynomial Fp}
     (fun j j' h => Fin.cast_injective hn (hξinj h))
     (fun j => hconsistent _ (hξacc (Fin.cast hn j))) i
 
-/-- **The `x₂` set-separation counting floor.** Given per-run vanishing
-`multiopenEval χ x₃ sets = 0` and an accept measure beating `(|sets| − 1) / p`, the counting floor
-yields `|sets|` distinct samples, and `multiopenEval_perSet_zero_of_samples` forces each set's
-cleared contribution to vanish. Caveat: deployed acceptance supplies the vanishing only through the
-`x₃`-rewind's fixed-`q′` binding, not directly; the end-to-end derivation is
-`deployed_value_check_node_binding` (`Multiopen.NodeBinding`). -/
-theorem claimedCombined_of_x2Prob {x3 : Fp} {sets : List (List Fp × List Fp × Fp)}
-    (hlen : 0 < sets.length)
-    (acc : Fp → Prop) [DecidablePred acc]
-    (hvanish : ∀ χ, acc χ → multiopenEval χ x3 sets = 0)
-    {x₀ : Fp} (hx₀ : acc x₀)
-    (hprob : (((sets.length - 1 : ℕ)) : ℝ≥0∞) / Fintype.card Fp
-      < (PMF.uniformOfFintype Fp).toOuterMeasure (Finset.univ.filter acc))
-    (j : Fin sets.length) :
-    ((sets.reverse.getD j ([], [], 0)).2.2
-        - lagrangeEval x3 (sets.reverse.getD j ([], [], 0)).1 (sets.reverse.getD j ([], [], 0)).2.1)
-      * ∏ m ∈ Finset.range (sets.reverse.getD j ([], [], 0)).1.length,
-          (x3 - (sets.reverse.getD j ([], [], 0)).1.getD m 0)⁻¹ = 0 := by
-  have hn : sets.length = sets.length - 1 + 1 := (Nat.succ_pred_eq_of_pos hlen).symm
-  obtain ⟨ξ, hξinj, _hξ0, hξacc⟩ :=
-    exists_injective_accepting_of_measure (acc := acc) hx₀ hprob
-  exact multiopenEval_perSet_zero_of_samples (fun r => ξ (Fin.cast hn r))
-    (fun r r' h => Fin.cast_injective hn (hξinj h))
-    (fun r => hvanish _ (hξacc (Fin.cast hn r))) j
 
 /-- **Gate `x`→`x₃` transport, grounded on the deployed `x`-squeeze.** With the decoded columns'
 claimed evaluations pinned (`claimedEval_of_x3Prob`), the gate-check difference `C` is a fixed
@@ -84,16 +60,5 @@ theorem gateGood_of_xProb {acc : Fp → Prop} [DecidablePred acc] (C : Polynomia
     ∃ xv, acc xv ∧ xv ∉ szBadSet C :=
   exists_accepting_good_challenge C hprob
 
-/-- **F6: `hgood` is derived from the `x`-accept measure, not assumed.** Composing `gateGood_of_xProb`
-with `not_mem_szBadSet`: an accept measure over the deployed `x`-squeeze beating `natDegree C / p`
-yields an accepting challenge `xv` at which the gate-check difference `C` satisfies exactly the `hgood`
-shape — if the identity fails as polynomials, its evaluation at `xv` is nonzero. So the terminal's
-`hgood` premise is dischargeable at the good challenge produced by the floor. -/
-theorem hgood_of_xProb {acc : Fp → Prop} [DecidablePred acc] (C : Polynomial Fp)
-    (hprob : (C.natDegree : ℝ≥0∞) / (Fintype.card Fp : ℝ≥0∞)
-      < uniformChallenge.toOuterMeasure (Finset.univ.filter acc)) :
-    ∃ xv, acc xv ∧ (C ≠ 0 → C.eval xv ≠ 0) := by
-  obtain ⟨xv, hacc, hxv⟩ := gateGood_of_xProb C hprob
-  exact ⟨xv, hacc, not_mem_szBadSet.mp hxv⟩
 
 end Zcash.Snark

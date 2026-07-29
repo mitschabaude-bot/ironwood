@@ -32,10 +32,8 @@ def addGate (cfg : Config) : Gate Fp :=
   let a : Expression Fp Query := queryAdvice cfg.a 0
   let b : Expression Fp Query := queryAdvice cfg.b 0
   let c : Expression Fp Query := queryAdvice cfg.c 0
-  { name := "Field element addition: c = a + b"
-    selector := cfg.qAdd
-    queriedCells := [a, b, c]
-    constraints := Constraints.withSelector cfg.qAdd [("", a + b - c)] }
+  Gate.withSelector "Field element addition: c = a + b" cfg.qAdd
+    [a, b, c] [("", a + b - c)]
 
 /-- Rust `AddChip::configure` (`add_chip.rs:43-61`), VK-exact: the fresh `q_add`
 selector, then the gate. -/
@@ -44,6 +42,11 @@ def configure (a b c : Column .advice) : Configure Fp Config := do
   let cfg : Config := { a, b, c, qAdd }
   createGate (addGate cfg)
   return cfg
+
+instance (a b c : Column .advice) :
+    ElaboratedConfigure (configure a b c) := by
+  unfold configure
+  infer_instance
 
 /-- The two summand cells (copied in). -/
 structure Inputs (F : Type) where

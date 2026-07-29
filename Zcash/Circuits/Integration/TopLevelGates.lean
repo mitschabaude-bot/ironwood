@@ -1,9 +1,9 @@
 import Zcash.Snark.Keygen.Pipeline
-import Zcash.Snark.Core.Domain
+import Zcash.Arithmetic.Domain
 import Zcash.Circuits.Integration.ResolverGates
 import Zcash.Circuits.Integration.ResolverQueryEnvironment
 import Zcash.Circuits.Integration.SelectorCoherence
-import Zcash.Snark.Soundness.CanonicalConstraintModel
+import Zcash.Snark.Soundness.Canonical.ConstraintModel
 
 /-!
 # Generic top-level gate bridge
@@ -20,9 +20,26 @@ polynomial witness consumed by the generic constraint-satisfaction split.
 
 namespace Zcash.Snark
 
+open Zcash.Arithmetic (omegaOf scalarFieldOrder)
+
 open Halo2 Polynomial Keygen
 
 set_option maxHeartbeats 20000
+
+/-- The circuit-owned pinned query layouts extend the gate-erasure query
+state. -/
+theorem topLevelPinnedQueryState_extends_gates
+    {F Config : Type} [FiniteField F]
+    {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit F Config PublicInput) :
+    (pinnedQueryState top.pinnedCS).Extends
+      (eraseGates
+        ((flatGates top.constraintSystem).map
+          (substSelectorMap top.selectorMap.lookup))
+        (queryWalkInit top.selectorMap top.constraintSystem)).2 := by
+  rw [top.pinnedCS_eq_derive]
+  exact PinnedConstraintSystem.derive_queryState_extends_gates
+    top.constraintSystem top.selectorMap
 
 /--
 Static coherence for a top-level circuit's own derived verifying key.
@@ -35,11 +52,10 @@ construction.
 -/
 structure TopLevelGateCoherence
     {G : Type} [AddCommGroup G] [Inhabited G]
-    {ConfigInput Config : Type} {Output : TypeMap}
-    [CircuitType Output]
-    (top : TopLevelCircuit Fp ConfigInput Config Output)
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G) : Prop where
-  gatesWellFormed : top.constraintSystem.GatesWellFormed
   gateSelectorsAllocated :
     top.constraintSystem.GateSelectorsAllocated
   adviceQueryCount :
@@ -59,9 +75,9 @@ namespace TopLevelGateCoherence
 
 variable
     {G : Type} [AddCommGroup G] [Inhabited G]
-    {ConfigInput Config : Type} {Output : TypeMap}
-    [CircuitType Output]
-    {top : TopLevelCircuit Fp ConfigInput Config Output}
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
+    {top : TopLevelCircuit Fp Config PublicInput}
     {pp : ProofParams} {urs : URS G}
 
 /--
@@ -96,35 +112,53 @@ theorem resolverInterpretsGates
           (top.toVerifierKey pp urs) poly proofIndex usableRows)
         (fun _ => 0) row) := by
   have homega : (top.toVerifierKey pp urs).omega ≠ 0 := by
-    change Zcash.Snark.omegaOf top.domainExponent ≠ 0
+    change Zcash.Arithmetic.omegaOf top.domainExponent ≠ 0
     have hk : top.domainExponent ≤ 32 :=
       Nat.le_of_lt_succ (by simpa using coherence.domainExponent_lt)
     exact
-      (Zcash.Snark.omegaOf_isPrimitiveRoot
+      (Zcash.Arithmetic.omegaOf_isPrimitiveRoot
         top.domainExponent hk).isUnit (by positivity) |>.ne_zero
   have hfinal := resolverQueryFeeds_interpret
     (top.toVerifierKey pp urs) poly proofIndex usableRows
     (fun _ => 0) row
     homega
-    (pinnedQueryState
-      (PinnedConstraintSystem.derive
-        top.constraintSystem top.selectorMap))
+    (pinnedQueryState top.pinnedCS)
     (by
-      simpa [pinnedQueryState, top.pinnedCS_eq_derive_fp] using
+      simpa [pinnedQueryState] using
         (top.toVerifierKey_adviceQueryLayout_derived pp urs).symm)
     (by
-      simpa [pinnedQueryState, top.pinnedCS_eq_derive_fp] using
+      simpa [pinnedQueryState] using
         (top.toVerifierKey_fixedQueryLayout_derived pp urs).symm)
     (by
-      simpa [pinnedQueryState, top.pinnedCS_eq_derive_fp] using
+      simpa [pinnedQueryState] using
         (top.toVerifierKey_instanceQueryLayout_derived pp urs).symm)
     coherence.adviceQueryCount
     coherence.fixedQueryCount
     coherence.instanceQueryCount
   apply hfinal.mono
-  exact
-    PinnedConstraintSystem.derive_queryState_extends_gates
-      top.constraintSystem top.selectorMap
+  have hdec :
+      (FiniteField.instDecidableEq : DecidableEq Fp) =
+        instDecidableEqF :=
+    Subsingleton.elim _ _
+  have hfield :
+      (FiniteField.toField : Field Fp) =
+        CompElliptic.Fields.Pasta.instFieldPallasBaseField := by
+    rfl
+  have herase :
+      (@eraseGates Fp FiniteField.toField
+        FiniteField.instDecidableEq
+        ((flatGates top.constraintSystem).map
+          (substSelectorMap top.selectorMap.lookup))
+        (queryWalkInit top.selectorMap top.constraintSystem)).2 =
+      (eraseGates
+        ((flatGates top.constraintSystem).map
+          (substSelectorMap top.selectorMap.lookup))
+        (queryWalkInit top.selectorMap top.constraintSystem)).2 := by
+    rw [hfield, hdec]
+  rw [← herase, top.pinnedCS_eq_derive]
+  exact @PinnedConstraintSystem.derive_queryState_extends_gates
+    Fp FiniteField.toField FiniteField.instDecidableEq
+    top.constraintSystem top.selectorMap
 
 /--
 Every enabled constraint in the top-level operation stream has the corresponding
@@ -148,7 +182,7 @@ noncomputable def polynomialWitness
         (top.toVerifierKey pp urs) poly proofIndex usableRows))
     (enabled : EnabledGate Fp)
     (henabled :
-      enabled ∈ operationEnabledGates (top.operations 0) 0)
+      enabled ∈ operationEnabledGates (top.operations) 0)
     (constraint : Constraint Fp)
     (hconstraint : constraint ∈ enabled.gate.constraints) :
     EnabledGate.PolynomialWitness
@@ -208,11 +242,22 @@ noncomputable def polynomialWitness
         coherence.gateSelectorsAllocated
   have hgates :
       (top.toVerifierKey pp urs).gates =
-        (PinnedConstraintSystem.derive
-          top.constraintSystem top.selectorMap).gates.map
-            RichExpression.toExpr := by
-    simpa only [top.pinnedCS_eq_derive_fp] using
-      top.toVerifierKey_gates_derived pp urs
+        top.pinnedCS.gates.map RichExpression.toExpr :=
+    top.toVerifierKey_gates_derived pp urs
+  have hgateCount :
+      top.pinnedCS.gates.length =
+        (flatGates top.constraintSystem).length := by
+    calc
+      top.pinnedCS.gates.length =
+          (@PinnedConstraintSystem.derive Fp
+            FiniteField.toField FiniteField.instDecidableEq
+            top.constraintSystem top.selectorMap).gates.length :=
+        congrArg (fun pinned => pinned.gates.length)
+          top.pinnedCS_eq_derive
+      _ = (flatGates top.constraintSystem).length :=
+        @PinnedConstraintSystem.derive_gates_length
+          Fp FiniteField.toField FiniteField.instDecidableEq
+          top.constraintSystem top.selectorMap
   have hinterpret := coherence.resolverInterpretsGates
     poly proofIndex usableRows
     (top.placement enabled.region + enabled.row)
@@ -224,7 +269,7 @@ noncomputable def polynomialWitness
           (fun _ => 0)
           (top.placement enabled.region + enabled.row)) ≠ 0 := by
     apply selectorScale_ne_zero_of_enabledGate
-      top.selectorMap top.regionStarts (top.operations 0) 0
+      top.selectorMap top.regionStarts (top.operations) 0
       (resolverEnvironment
         (top.toVerifierKey pp urs) poly proofIndex usableRows)
       (fun _ => 0) hroots
@@ -233,11 +278,80 @@ noncomputable def polynomialWitness
     · exact hcompressed
   exact enabledGatePolynomialWitnessOfResolver
     (top.toVerifierKey pp urs)
-    top.constraintSystem top.selectorMap ch poly sets chunks
+    top.constraintSystem top.selectorMap top.pinnedCS.gates
+    ch poly sets chunks
     l0 lLast lBlind proofIndex top.placement usableRows
     enabled constraint hgate hconstraint
-    coherence.gatesWellFormed hgates hcoverage
-    compressed hcompressed hinterpret hscale
+    hgates hgateCount
+    compressed hcompressed
+    (by
+      intro j hj hp
+      have hpinnedGates := congrArg PinnedConstraintSystem.gates
+        top.pinnedCS_eq_derive
+      rw [List.getElem_of_eq hpinnedGates hj]
+      have hdec :
+          (FiniteField.instDecidableEq : DecidableEq Fp) =
+            instDecidableEqF :=
+        Subsingleton.elim _ _
+      have hfield :
+          (FiniteField.toField : Field Fp) =
+            CompElliptic.Fields.Pasta.instFieldPallasBaseField := by
+        rfl
+      have hinterpretCanonical :
+          Interprets
+            (@eraseGates Fp FiniteField.toField
+              FiniteField.instDecidableEq
+              ((flatGates top.constraintSystem).map
+                (substSelectorMap top.selectorMap.lookup))
+              (queryWalkInit top.selectorMap
+                top.constraintSystem)).2
+            (fun query =>
+              (fixedQueryFeedOfResolver
+                (top.toVerifierKey pp urs) poly query).eval
+                ((top.toVerifierKey pp urs).omega ^
+                  (top.placement enabled.region + enabled.row)))
+            (fun query =>
+              (adviceQueryFeedOfResolver
+                (top.toVerifierKey pp urs) poly proofIndex query).eval
+                ((top.toVerifierKey pp urs).omega ^
+                  (top.placement enabled.region + enabled.row)))
+            (fun query =>
+              (instanceQueryFeedOfResolver
+                (top.toVerifierKey pp urs) poly proofIndex query).eval
+                ((top.toVerifierKey pp urs).omega ^
+                  (top.placement enabled.region + enabled.row)))
+            (Query.eval
+              (resolverEnvironment
+                (top.toVerifierKey pp urs) poly proofIndex usableRows)
+              (fun _ => 0)
+              (top.placement enabled.region + enabled.row)) := by
+        rw [hfield, hdec]
+        exact hinterpret
+      exact @PinnedConstraintSystem.derive_gates_eval
+        Fp FiniteField.toField FiniteField.instDecidableEq
+        top.constraintSystem top.selectorMap
+        (fun query =>
+          (fixedQueryFeedOfResolver
+            (top.toVerifierKey pp urs) poly query).eval
+            ((top.toVerifierKey pp urs).omega ^
+              (top.placement enabled.region + enabled.row)))
+        (fun query =>
+          (adviceQueryFeedOfResolver
+            (top.toVerifierKey pp urs) poly proofIndex query).eval
+            ((top.toVerifierKey pp urs).omega ^
+              (top.placement enabled.region + enabled.row)))
+        (fun query =>
+          (instanceQueryFeedOfResolver
+            (top.toVerifierKey pp urs) poly proofIndex query).eval
+            ((top.toVerifierKey pp urs).omega ^
+              (top.placement enabled.region + enabled.row)))
+        (Query.eval
+          (resolverEnvironment
+            (top.toVerifierKey pp urs) poly proofIndex usableRows)
+          (fun _ => 0)
+          (top.placement enabled.region + enabled.row))
+        hcoverage hinterpretCanonical j hj hp)
+    hscale
 
 /--
 Deployed gate divisibility therefore supplies the complete gate component of the
@@ -269,7 +383,7 @@ theorem constraints
     CircuitConstraintFamily.constraints .gate top.placement
       (resolverEnvironment
         (top.toVerifierKey pp urs) poly proofIndex usableRows)
-      (top.operations 0) 0 := by
+      (top.operations) 0 := by
   apply gate_constraints_of_polynomial_witnesses
     (constraintModelOfResolver
       (top.toVerifierKey pp urs) ch poly sets chunks
@@ -277,7 +391,7 @@ theorem constraints
     proofIndex (top.toVerifierKey pp urs).omega top.placement
     (resolverEnvironment
       (top.toVerifierKey pp urs) poly proofIndex usableRows)
-    (top.operations 0) 0 satisfaction domain
+    (top.operations) 0 satisfaction domain
   intro enabled henabled constraint hconstraint
   exact coherence.polynomialWitness
     ch poly sets chunks l0 lLast lBlind proofIndex usableRows
@@ -315,7 +429,7 @@ theorem canonicalConstraints
       (resolverEnvironment
         (top.toVerifierKey pp urs) poly proofIndex
         (top.usableRowsAt top.domainExponent))
-      (top.operations 0) 0 := by
+      (top.operations) 0 := by
   let selectors :=
     canonicalLagrangePolynomials
       (top.toVerifierKey pp urs).omega hblinding

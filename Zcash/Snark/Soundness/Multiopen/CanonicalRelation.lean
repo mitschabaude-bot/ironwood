@@ -1,5 +1,6 @@
-import Zcash.Snark.Soundness.CanonicalConstraintModel
-import Zcash.Snark.Soundness.ConstraintSatisfaction
+import Zcash.Common.RelationWitness
+import Zcash.Snark.Soundness.Canonical.ConstraintModel
+import Zcash.Snark.Soundness.Canonical.ConstraintSatisfaction
 import Zcash.Snark.Soundness.Multiopen.ConstraintResolver
 
 /-!
@@ -170,12 +171,12 @@ noncomputable def acceptedPolynomial
 
 /--
 Member-node binding opens every assembled query through the accepting run's
-canonical resolver, or produces the existing augmented-basis relation.
+canonical resolver, or computes the existing augmented-basis relation.
 
 This is the verifier-native source of the uniform opening family used by the
 canonical constraint terminal; no caller-selected route or resolver remains.
 -/
-theorem acceptedPolynomial_opens_or_relation
+noncomputable def acceptedPolynomial_opens_or_relation
     (haccepts :
       DeployedAccepts urs hk vk instanceCommitment ps ch)
     (hbind : ∀
@@ -191,12 +192,12 @@ theorem acceptedPolynomial_opens_or_relation
           deployedMemberClaim
             (instanceCommitment := instanceCommitment)
             vk ps ch slot point
-        ∨ HasNontrivialRelation (F := Fp) urs.g urs.u urs.w) :
+        ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w) :
     (∀ query ∈ assembleQueries vk instanceCommitment ps ch,
       (acceptedPolynomial
         (memberDecode := memberDecode) haccepts query.commId).eval
           query.point = query.eval)
-      ∨ HasNontrivialRelation (F := Fp) urs.g urs.u urs.w := by
+      ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
   let routing :=
     canonicalRoutingConditions_of_accepts
       urs hk vk instanceCommitment ps ch haccepts

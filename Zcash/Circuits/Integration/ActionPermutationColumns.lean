@@ -1,5 +1,6 @@
 import Zcash.Circuits.Integration.PermutationCompiler
 import Zcash.Circuits.Action.TopLevel
+import Zcash.Arithmetic.Domain
 
 /-!
 # Action permutation-column compiler bounds
@@ -17,6 +18,7 @@ namespace Zcash.Snark.ActionPermutationDomain
 
 open Halo2
 open Configure
+open Zcash.Arithmetic (deltaFpOrder scalarFieldOrder)
 
 set_option maxHeartbeats 20000
 set_option synthInstance.maxHeartbeats 20000
@@ -245,6 +247,25 @@ local instance noteCommitGrowth
   unfold Zcash.Circuits.NoteCommit.configure
   infer_instance
 
+local instance mulFixedProgramGrowth
+    (window : Column .advice) (qRunningSum : Selector) :
+    HasPermutationGrowthAtMost
+      (Zcash.Circuits.Ecc.MulFixed.configureProgram
+        window qRunningSum) 1 := by
+  unfold Zcash.Circuits.Ecc.MulFixed.configureProgram
+  infer_instance
+
+local instance mulFixedTailGrowth
+    (lagrangeCoeffs : Fin 8 → Column .fixed)
+    (window u : Column .advice)
+    (addConfig : Zcash.Circuits.Ecc.Add.Config)
+    (addIncompleteConfig : Zcash.Circuits.Ecc.AddIncomplete.Config) :
+    HasPermutationGrowthAtMost
+      (Zcash.Circuits.Ecc.MulFixed.configureTail lagrangeCoeffs
+        window u addConfig addIncompleteConfig) 1 := by
+  unfold Zcash.Circuits.Ecc.MulFixed.configureTail
+  infer_instance
+
 local instance mulFixedGrowth
     (lagrangeCoeffs : Fin 8 → Column .fixed)
     (window u : Column .advice)
@@ -318,33 +339,31 @@ private theorem configuredPermutationColumns_nonempty :
     Zcash.Circuits.Specs.Sinsemilla.orchardGenerators).nonempty _
 
 @[simp]
-theorem topLevelCircuit_configure
-    (G : Zcash.Circuits.Specs.Sinsemilla.Generators)
-    (B : Zcash.Circuits.Action.Circuit.Bases) :
-    (Zcash.Circuits.Action.topLevelCircuit G B).formalCircuit.configure () =
-      Zcash.Circuits.Action.Circuit.configure G := by
+theorem actionCircuit_configure :
+    Zcash.Circuits.Action.actionCircuit.formalCircuit.configure () =
+      Zcash.Circuits.Action.Circuit.configure
+        Zcash.Circuits.Specs.Sinsemilla.orchardGenerators := by
   rfl
 
 /-- The closed deployed Action CS has exactly the permutation columns produced
 by its raw configure program. -/
 theorem permutationColumns_eq_configure :
-    (Zcash.Circuits.Action.orchardActionTopLevelCircuit.constraintSystem).permutationColumns =
+    (Zcash.Circuits.Action.actionCircuit.constraintSystem).permutationColumns =
       (Zcash.Circuits.Action.Circuit.configure
         Zcash.Circuits.Specs.Sinsemilla.orchardGenerators
         ({} : ConstraintSystem Fp)).2.permutationColumns := by
   calc
     _ =
-        (Zcash.Circuits.Action.orchardActionTopLevelCircuit.formalCircuit.configure
+        (Zcash.Circuits.Action.actionCircuit.formalCircuit.configure
           () {}).2.permutationColumns :=
       Halo2.TopLevelCircuit.constraintSystem_permutationColumns _
     _ = _ := by
-      rw [Zcash.Circuits.Action.orchardActionTopLevelCircuit,
-        topLevelCircuit_configure]
+      rw [actionCircuit_configure]
 
 /-- Action's derived permutation-column family is nonempty because its
 configure program equality-enables the primary column. -/
 theorem permutationColumns_nonempty :
-    (Zcash.Circuits.Action.orchardActionTopLevelCircuit.constraintSystem).permutationColumns ≠
+    (Zcash.Circuits.Action.actionCircuit.constraintSystem).permutationColumns ≠
       [] := by
   rw [permutationColumns_eq_configure]
   exact configuredPermutationColumns_nonempty
@@ -352,7 +371,7 @@ theorem permutationColumns_nonempty :
 /-- Action's derived column-name prefix fits inside the certified order of
 `deltaFp`. The proof uses the syntactic budget 53, not the actual list. -/
 theorem permutationColumns_le_delta :
-    (Zcash.Circuits.Action.orchardActionTopLevelCircuit.constraintSystem).permutationColumns.length ≤
+    (Zcash.Circuits.Action.actionCircuit.constraintSystem).permutationColumns.length ≤
       deltaFpOrder := by
   rw [permutationColumns_eq_configure]
   have hsmall :=

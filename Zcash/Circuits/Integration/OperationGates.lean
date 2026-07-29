@@ -1,5 +1,5 @@
 import Zcash.Circuits.Integration.CircuitSatisfaction
-import Zcash.Snark.Soundness.ConstraintSatisfaction
+import Zcash.Snark.Soundness.Canonical.ConstraintSatisfaction
 import Clean.Halo2.Keygen.GateProjection
 import Zcash.Snark.Soundness.PermutationRows
 
@@ -11,12 +11,10 @@ This file is the gate analogue of `OperationLookups`.  It extracts every
 those activations is exactly the gate field of `FullCircuitSatisfaction`.
 
 `EnabledGate.PolynomialWitness` is the representation boundary to the deployed
-constraint split.  For each enabled Clean constraint it identifies a member of the
-selected proof's polynomial gate family and proves that its evaluation is a nonzero
-multiple of the Clean evaluation.  The scale is necessary: selector compression
-replaces an enabled selector by its packed root-finding polynomial, whose value at
-the selector's row is nonzero but need not be one.  Divisibility by `X^n - 1` then
-makes the Clean constraint zero on every domain row.
+constraint split. For each enabled Clean constraint it identifies a member of the
+selected proof's polynomial gate family and transports verifier-side vanishing to
+the Clean enabled-gate semantics. Divisibility by `X^n - 1` then supplies that
+verifier-side vanishing on every domain row.
 -/
 
 namespace Zcash.Snark
@@ -104,24 +102,19 @@ end CircuitConstraintFamily
 
 namespace EnabledGate
 
-/--
-One enabled Clean constraint identified, up to a nonzero selector-compression
-scale, with a deployed gate-family polynomial.
--/
+/-- One enabled Clean constraint represented by a deployed gate-family polynomial. -/
 structure PolynomialWitness
     {np : ℕ} (M : ConstraintPolyModel np) (proofIndex : Fin np)
     (omega : Fp) (place : RegionIndex → ℕ) (env : Environment Fp)
     (enabled : EnabledGate Fp) (constraint : Constraint Fp) where
   polynomial : Polynomial Fp
   member : polynomial ∈ M.gateConstraints proofIndex
-  scale : Fp
-  scale_ne_zero : scale ≠ 0
-  evaluation :
-    polynomial.eval (omega ^ (place enabled.region + enabled.row)) =
-      scale * constraint.poly.eval
+  zero_imp :
+    polynomial.eval (omega ^ (place enabled.region + enabled.row)) = 0 →
+      constraint.poly.eval
         (Query.eval env
           (fun index => if index = enabled.gate.selector.index then 1 else 0)
-          (place enabled.region + enabled.row : ℕ))
+          (place enabled.region + enabled.row : ℕ)) = 0
 
 /-- Deployed gate divisibility plus evaluation coherence satisfies one Clean activation. -/
 theorem satisfied_of_polynomial_witnesses
@@ -141,8 +134,7 @@ theorem satisfied_of_polynomial_witnesses
     eval_eq_zero_of_dvd_vanishing
     (satisfaction.gates proofIndex w.polynomial w.member)
     (domain (place enabled.region + enabled.row))
-  rw [w.evaluation] at hpoly
-  exact (mul_eq_zero.mp hpoly).resolve_left w.scale_ne_zero
+  exact w.zero_imp hpoly
 
 end EnabledGate
 
