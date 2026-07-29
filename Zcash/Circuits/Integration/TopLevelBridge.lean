@@ -41,7 +41,7 @@ only the representation boundaries that genuinely come from other streams:
 * copy replay from keygen's cell permutation;
 * one bundle-wide record of lookup challenge exclusions.
 -/
-noncomputable def ofTopLevelCanonical
+def ofTopLevelCanonical
     (gateCoherence : TopLevelGateCoherence top pp urs)
     (ch : Challenges (pp.mergeDerived top).k Fp)
     (poly : CommitmentId → Polynomial Fp)

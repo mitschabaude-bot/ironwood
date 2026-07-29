@@ -43,7 +43,7 @@ This is the Action-specific constructor for the generic top-level soundness
 interface.  It does not mention the Action statement or its public-input
 presentation.
 -/
-noncomputable def actionTopLevelCircuitCorrectness
+def actionTopLevelCircuitCorrectness
     (pp : Keygen.ProofParams) (urs : URS G)
     (hk :
       (pp.mergeDerived actionCircuit).k = urs.k)

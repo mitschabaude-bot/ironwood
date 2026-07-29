@@ -4,6 +4,7 @@ import Zcash.Snark.Soundness.Multiopen.Decode
 import Zcash.Snark.Soundness.Multiopen.Deployed
 import Zcash.Snark.Soundness.Multiopen.Compat
 import Zcash.Snark.Soundness.GoodChallenge
+import Zcash.Common.ComputablePolynomial
 
 /-!
 # The opened `x₄` chain: batch decode through the declared `U`/`W` components
@@ -796,10 +797,15 @@ with its layout rotation — `col_j ∘ (ω^rot_j · X)` — makes its value at 
 `col_j (ω^rot_j·x)`, which the multiopen binds to `advice_evals[query_index]`
 (`Soundness.Multiopen.RPoly.col_eval_node_eq_claimed`). The rotation `rot_j` is read from the
 verifying key's query layout (`(column, rotation)` list), so it is not a free choice. -/
-noncomputable def rotatedFeed {n : ℕ} (omega : Fp) (layout : List (ℕ × ℤ))
+def rotatedFeed {n : ℕ} (omega : Fp) (layout : List (ℕ × ℤ))
     (col : Fin n → Polynomial Fp) : ℕ → Polynomial Fp :=
-  finFn fun j : Fin n =>
-    (col j).comp (Polynomial.C (omega ^ (layout.getD (j : ℕ) (0, 0)).2) * Polynomial.X)
+  fun j =>
+    if hj : j < n then
+      ComputablePolynomial.comp (col ⟨j, hj⟩)
+        (ComputablePolynomial.mul
+          (ComputablePolynomial.const (omega ^ (layout.getD j (0, 0)).2))
+          ComputablePolynomial.X)
+    else ComputablePolynomial.zero
 
 open Polynomial in
 /-- The SNARK relation with the circuit side fed by decoded *member* columns — the actual queried

@@ -225,6 +225,24 @@ def zeroBatchWitness
     (zeroFamily_run_aMulti basis vkS hfixed hperm O)
     (zeroFamily_run_multiU basis vkS hfixed hperm O)
     (zeroFamily_run_multiBlind basis vkS hfixed hperm O)
+  x4Source :=
+    { coeffs := fun _ _ => 0
+      uComp := fun _ => 0
+      wComp := fun _ => 0
+      commitment := by
+        intro i
+        change _ = x4BatchCommitments (ursOfAugmentedBasis shape.k basis) rfl vkS
+          (fun _ _ => 0)
+          ((wrappedAdversary (zeroOnlineMemberFamily vkS hfixed hperm).toFamily
+            basis).run O).1.proof.1
+          (wrappedPreIpaRecord
+            ((wrappedAdversary (zeroOnlineMemberFamily vkS hfixed hperm).toFamily
+              basis).run O)) i
+        rw [zeroFamily_run_x4BatchCommitments basis vkS hfixed hperm O i]
+        simp [commit] }
+  x4Coeffs := rfl
+  x4U := rfl
+  x4W := rfl
   memberCoeffs := by
     intro i hi
     funext m

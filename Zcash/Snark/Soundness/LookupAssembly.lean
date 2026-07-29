@@ -76,12 +76,14 @@ hypotheses `run_structure` consumes. -/
 
 /-- The lookup evaluations as polynomials: the running product with its next-row rotation, and the
 permuted input with its previous-row rotation. -/
-noncomputable def lookupEvalPolys (omega : Fp) (z aP sP : Polynomial Fp) :
+def lookupEvalPolys (omega : Fp) (z aP sP : Polynomial Fp) :
     LookupEval (Polynomial Fp) :=
   { productEval := z
-    productNextEval := z.comp (C omega * X)
+    productNextEval := ComputablePolynomial.comp z
+      (ComputablePolynomial.mul (ComputablePolynomial.const omega) ComputablePolynomial.X)
     permutedInputEval := aP
-    permutedInputInvEval := aP.comp (C omega⁻¹ * X)
+    permutedInputInvEval := ComputablePolynomial.comp aP
+      (ComputablePolynomial.mul (ComputablePolynomial.const omega⁻¹) ComputablePolynomial.X)
     permutedTableEval := sP }
 
 /-- The last-row rule in the lookup's order, `ℓ_last·(z² − z)`. -/
@@ -175,7 +177,8 @@ theorem lookup_rules_dvd_of_identity (omega beta gamma delta theta y : Fp) (chun
     hall v (mem_constraintPolys_of_mem_lookupExpressions fixedCols adviceCols instanceCols gates
       sets chunks lookups beta gamma delta theta chunkLen l0P lLastP lBlindP p hlk hv)
   refine ⟨hmem _ ?_, hmem _ ?_, hmem _ ?_, hmem _ ?_, hmem _ ?_⟩ <;>
-    simp [lookupExpressions_eq, lookupEvalPolys]
+    simp [lookupExpressions_eq, lookupEvalPolys, ComputablePolynomial.comp_eq,
+      ComputablePolynomial.mul_eq, ComputablePolynomial.const_eq, ComputablePolynomial.X_eq]
 
 open Finset in
 /-- **The lookup relation from the constraint identity.** Every hypothesis is either the verifier's
@@ -325,7 +328,7 @@ back to the tuples: the compression is the `foldPoly` of the row's expression va
 outside each pair's collision root set turns compressed equality into tuple equality. -/
 
 /-- The values of a row of expressions at `ωⁱ` — the tuple the compression folds. -/
-noncomputable def rowTuple (fixedCols adviceCols instanceCols : ℕ → Polynomial Fp) (omega : Fp)
+def rowTuple (fixedCols adviceCols instanceCols : ℕ → Polynomial Fp) (omega : Fp)
     (exprs : List (Expr Fp)) (i : ℕ) : List Fp :=
   exprs.map (fun e => e.eval (fun t => (fixedCols t).eval (omega ^ i))
     (fun t => (adviceCols t).eval (omega ^ i)) (fun t => (instanceCols t).eval (omega ^ i)))

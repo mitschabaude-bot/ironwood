@@ -31,10 +31,40 @@ namespace Zcash.Snark
 
 open Polynomial
 
+def encPairData (p : Fp × Fp) : Polynomial Fp :=
+  ComputablePolynomial.add (ComputablePolynomial.const p.1)
+    (ComputablePolynomial.mul (ComputablePolynomial.const p.2) ComputablePolynomial.X)
+
+theorem encPairData_eq (p : Fp × Fp) : encPairData p = encPair p := by
+  rw [encPairData, ComputablePolynomial.add_eq, ComputablePolynomial.const_eq,
+    ComputablePolynomial.mul_eq, ComputablePolynomial.const_eq,
+    ComputablePolynomial.X_eq]
+  rfl
+
 /-- The difference of the two pair-encoded products, a polynomial in `γ` with coefficients in
 `Fp[β]`. -/
 noncomputable def pairProdDiff (sp tp : Multiset (Fp × Fp)) : Polynomial (Polynomial Fp) :=
   (sp.map (fun p => X + C (encPair p))).prod - (tp.map (fun p => X + C (encPair p))).prod
+
+/-- The `j`-th `γ` coefficient, computed directly as an elementary symmetric polynomial in
+the `β`-linear pair encodings. -/
+def pairProdDiffCoeffData (sp tp : Multiset (Fp × Fp)) (j : Nat) : Polynomial Fp :=
+  ComputablePolynomial.sub
+    (ComputablePolynomial.esymm (sp.map encPairData) (sp.card - j))
+    (ComputablePolynomial.esymm (tp.map encPairData) (tp.card - j))
+
+theorem pairProdDiffCoeffData_eq (sp tp : Multiset (Fp × Fp)) (j : Nat)
+    (hsp : j ≤ sp.card) (htp : j ≤ tp.card) :
+    pairProdDiffCoeffData sp tp j = (pairProdDiff sp tp).coeff j := by
+  rw [pairProdDiffCoeffData, ComputablePolynomial.sub_eq,
+    ComputablePolynomial.esymm_eq, ComputablePolynomial.esymm_eq, pairProdDiff,
+    Polynomial.coeff_sub, Multiset.prod_X_add_C_coeff' sp encPair hsp,
+    Multiset.prod_X_add_C_coeff' tp encPair htp]
+  congr 1 <;>
+    apply congrArg (fun m : Multiset (Polynomial Fp) => m.esymm _ ) <;>
+    apply Multiset.map_congr rfl <;>
+    intro p _ <;>
+    exact encPairData_eq p
 
 /-- The difference is nonzero whenever the multisets of pairs differ — this is `prod_pair_inj` read
 contrapositively, and it is what makes the `β` bad set below a genuine root set. -/
@@ -43,8 +73,15 @@ theorem pairProdDiff_ne_zero {sp tp : Multiset (Fp × Fp)} (h : sp ≠ tp) :
   fun h0 => h (prod_pair_inj (sub_eq_zero.mp h0))
 
 /-- The difference of the two `γ`-products once `β` is fixed. -/
-noncomputable def linProdDiff (s t : Multiset Fp) : Polynomial Fp :=
-  (s.map (fun u => X + C u)).prod - (t.map (fun u => X + C u)).prod
+def linProdDiff (s t : Multiset Fp) : Polynomial Fp :=
+  ComputablePolynomial.sub (ComputablePolynomial.xAddProduct s)
+    (ComputablePolynomial.xAddProduct t)
+
+theorem linProdDiff_eq (s t : Multiset Fp) :
+    linProdDiff s t =
+      (s.map (fun u => X + C u)).prod - (t.map (fun u => X + C u)).prod := by
+  rw [linProdDiff, ComputablePolynomial.sub_eq,
+    ComputablePolynomial.xAddProduct_eq, ComputablePolynomial.xAddProduct_eq]
 
 /-- **The `γ` step.** A challenge outside the difference's roots turns the verifier's field product
 identity into equality of the multisets of `value + β·name`. -/
@@ -57,11 +94,14 @@ theorem map_eq_of_prod_eval_eq {sp tp : Multiset (Fp × Fp)} {β γ : Fp}
   set s := sp.map (fun p => p.1 + p.2 * β) with hs
   set t := tp.map (fun p => p.1 + p.2 * β) with ht
   by_contra hne
-  have hD : linProdDiff s t ≠ 0 := fun h0 => hne (prod_X_add_u_inj (sub_eq_zero.mp h0))
+  have hD : linProdDiff s t ≠ 0 := fun h0 => by
+    rw [linProdDiff_eq] at h0
+    exact hne (prod_X_add_u_inj (sub_eq_zero.mp h0))
   refine (not_mem_szBadSet.mp hgoodγ) hD ?_
   have hsv : (s.map (fun x => γ + x)).prod = (t.map (fun x => γ + x)).prod := by
     simpa [hs, ht, Multiset.map_map, Function.comp_def] using h
-  rw [linProdDiff, eval_sub, eval_prod_X_add_u s γ, eval_prod_X_add_u t γ, hsv, sub_self]
+  rw [linProdDiff_eq, eval_sub, eval_prod_X_add_u s γ, eval_prod_X_add_u t γ, hsv,
+    sub_self]
 
 /-- **The `β` step.** A challenge outside the roots of every coefficient of `pairProdDiff` turns
 equality of the `value + β·name` multisets into equality of the `(value, name)` pairs. -/
@@ -104,6 +144,7 @@ theorem multiset_pair_eq_of_prod_eval_eq {sp tp : Multiset (Fp × Fp)} {β γ : 
 theorem szBadSet_linProdDiff_card_le (s t : Multiset Fp) :
     (szBadSet (linProdDiff s t)).card ≤ max (Multiset.card s) (Multiset.card t) := by
   refine (szBadSet_card_le _).trans ?_
+  rw [linProdDiff_eq]
   refine (natDegree_sub_le _ _).trans ?_
   rw [natDegree_prod_X_add_u s, natDegree_prod_X_add_u t]
 
@@ -122,6 +163,69 @@ constants in `γ`; the table columns as the linear factors. -/
 noncomputable def lookupProdDiff (a s inp tbl : Multiset Fp) : Polynomial (Polynomial Fp) :=
   C (a.map (fun u => X + C u)).prod * (s.map (fun u => X + C (C u))).prod
     - C (inp.map (fun u => X + C u)).prod * (tbl.map (fun u => X + C (C u))).prod
+
+/-- A lookup-difference `γ` coefficient computed without constructing a nested polynomial. -/
+def lookupProdDiffCoeffData
+    (a s inp tbl : Multiset Fp) (j : Nat) : Polynomial Fp :=
+  ComputablePolynomial.sub
+    (ComputablePolynomial.mul (ComputablePolynomial.xAddProduct a)
+      (ComputablePolynomial.esymm
+        (s.map fun u => ComputablePolynomial.const u) (s.card - j)))
+    (ComputablePolynomial.mul (ComputablePolynomial.xAddProduct inp)
+      (ComputablePolynomial.esymm
+        (tbl.map fun u => ComputablePolynomial.const u) (tbl.card - j)))
+
+theorem lookupProdDiffCoeffData_eq
+    (a s inp tbl : Multiset Fp) (j : Nat) (hs : j ≤ s.card) (htbl : j ≤ tbl.card) :
+    lookupProdDiffCoeffData a s inp tbl j = (lookupProdDiff a s inp tbl).coeff j := by
+  rw [lookupProdDiffCoeffData, ComputablePolynomial.sub_eq,
+    ComputablePolynomial.mul_eq, ComputablePolynomial.mul_eq,
+    ComputablePolynomial.xAddProduct_eq, ComputablePolynomial.xAddProduct_eq,
+    ComputablePolynomial.esymm_eq, ComputablePolynomial.esymm_eq, lookupProdDiff,
+    Polynomial.coeff_sub, Polynomial.coeff_C_mul, Polynomial.coeff_C_mul,
+    Multiset.prod_X_add_C_coeff' s (fun u => C u) hs,
+    Multiset.prod_X_add_C_coeff' tbl (fun u => C u) htbl]
+  congr 2 <;>
+    apply congrArg (fun m : Multiset (Polynomial Fp) => m.esymm _) <;>
+    apply Multiset.map_congr rfl <;>
+    intro u _ <;>
+    rw [ComputablePolynomial.const_eq]
+
+/-- The lookup difference after fixing `β`, computed directly as a polynomial in `γ`. -/
+def lookupProdDiffGammaData
+    (a s inp tbl : Multiset Fp) (beta : Fp) : Polynomial Fp :=
+  ComputablePolynomial.sub
+    (ComputablePolynomial.mul
+      (ComputablePolynomial.const
+        (polynomialEvalData (ComputablePolynomial.xAddProduct a) beta))
+      (ComputablePolynomial.xAddProduct s))
+    (ComputablePolynomial.mul
+      (ComputablePolynomial.const
+        (polynomialEvalData (ComputablePolynomial.xAddProduct inp) beta))
+      (ComputablePolynomial.xAddProduct tbl))
+
+theorem lookupProdDiffGammaData_eq
+    (a s inp tbl : Multiset Fp) (beta : Fp) :
+    lookupProdDiffGammaData a s inp tbl beta =
+      (lookupProdDiff a s inp tbl).map (evalRingHom beta) := by
+  have hconv : ∀ m : Multiset Fp,
+      ((m.map (fun u => X + C (C u))).prod).map (evalRingHom beta) =
+        (m.map (fun u => X + C u)).prod := by
+    intro m
+    rw [Polynomial.map_multiset_prod, Multiset.map_map]
+    apply congrArg Multiset.prod
+    apply Multiset.map_congr rfl
+    intro u _
+    simp [Polynomial.map_add]
+  rw [lookupProdDiffGammaData, ComputablePolynomial.sub_eq,
+    ComputablePolynomial.mul_eq, ComputablePolynomial.mul_eq,
+    ComputablePolynomial.const_eq, ComputablePolynomial.const_eq,
+    ComputablePolynomial.xAddProduct_eq, ComputablePolynomial.xAddProduct_eq,
+    polynomialEvalData_eq_eval, polynomialEvalData_eq_eval,
+    ComputablePolynomial.xAddProduct_eq, ComputablePolynomial.xAddProduct_eq,
+    lookupProdDiff, Polynomial.map_sub, Polynomial.map_mul, Polynomial.map_mul,
+    hconv s, hconv tbl, map_C, map_C]
+  rfl
 
 /-- Evaluating the lookup difference at the sampled challenges is the verifier's own product
 comparison. -/
@@ -205,7 +309,7 @@ branch survives all the way: a vanishing factor, meaning the running product end
 `value + β·name + γ` collided. It stays in the conclusion rather than being assumed away. -/
 
 /-- The `(value, name)` pair of every cell of an `m × k` table. -/
-noncomputable def cellPairs (m k : ℕ) (value nm : ℕ → ℕ → Fp) : Multiset (Fp × Fp) :=
+def cellPairs (m k : ℕ) (value nm : ℕ → ℕ → Fp) : Multiset (Fp × Fp) :=
   (Finset.univ : Finset (Fin m × Fin k)).val.map
     (fun c => (value (c.1 : ℕ) (c.2 : ℕ), nm (c.1 : ℕ) (c.2 : ℕ)))
 
@@ -214,7 +318,7 @@ abbrev ChunkCell (nc m : ℕ) (width : ℕ → ℕ) :=
   Σ c : Fin nc, Fin m × Fin (width c)
 
 /-- The `(value, name)` pair of every cell across a variable-width chunked table. -/
-noncomputable def chunkedCellPairs (nc m : ℕ) (width : ℕ → ℕ)
+def chunkedCellPairs (nc m : ℕ) (width : ℕ → ℕ)
     (value nm : ℕ → ℕ → ℕ → Fp) : Multiset (Fp × Fp) :=
   (Finset.univ : Finset (ChunkCell nc m width)).val.map
     (fun c => (value c.1 c.2.1 c.2.2, nm c.1 c.2.1 c.2.2))

@@ -28,10 +28,11 @@ that is a total-variation distance of at most `|Fp| / 2^w` per squeeze, so a `q`
 at most `q · |Fp| / 2^w` — the same `q` that `Adversary.OracleComp` already charges query loss
 against.
 
-`badSet_measure_le_of_bias` is where the term attaches: it carries any bad-set bound proved
-against `uniformChallenge` over to a biased law at an additive `ε`. Instantiating `ε` needs `w`
-for the deployed transcript, a fact about halo2's transcript code recorded in the trust boundary
-rather than proved here.
+`PMFEventBiasLE` is the explicit boundary between that deployed distribution and an ideal
+experiment.  The consensus-generic Action endpoints consume this relation in their final conjunct
+and add its `ε` to the complete accepting-false-statement bound.  Instantiating `ε` still requires
+pinning the conversion width and transcript implementation; their ideal `generatorRO` conjuncts
+do not claim that implementation fact.
 
 ## What the adversary model still assumes
 
@@ -80,12 +81,11 @@ theorem reprogram_ne {O : List (TranscriptElt F G) → F} {t t' : List (Transcri
 
 /-! ## The uniform-challenge idealization -/
 
-/-- A fresh random-oracle squeeze, modeled as uniform over `Fp`.
+/-- A fresh random-oracle squeeze, modeled as exactly uniform over `Fp`.
 
-Halo2's real `Challenge255 → Fp` conversion is a modular reduction of a fixed-width byte string and
-so is only within total-variation distance `|Fp| / 2^w` of this law, for the conversion width `w`.
-`badSet_measure_le_of_bias` charges that deviation; no bound in this development silently assumes
-it away. -/
+This is the ideal law used by the unsuffixed and `generatorRO` theorems.  Halo2's deployed
+`Challenge255 → Fp` conversion is not definitionally this PMF; consumers making a deployed-law
+claim must cross `PMFEventBiasLE` explicitly. -/
 noncomputable def uniformChallenge : PMF Fp := PMF.uniformOfFintype Fp
 
 /-- A uniform challenge lands in `bad` with probability `|bad| / |Fp|`. -/
@@ -94,17 +94,17 @@ theorem uniformChallenge_badSet (bad : Finset Fp) :
   rw [uniformChallenge, PMF.toOuterMeasure_apply_finset]
   simp only [PMF.uniformOfFintype_apply, Finset.sum_const, nsmul_eq_mul, div_eq_mul_inv]
 
-/-- Charge the deployed conversion's reduction bias against a bad-set budget.
+/-- `actual` overshoots `ideal` by at most `ε` on every event.  This one-sided statistical-distance
+interface is the exact premise needed to transport a soundness upper bound; it may represent one
+squeeze or an entire adaptive transcript experiment. -/
+def PMFEventBiasLE {Ω : Type*} (actual ideal : PMF Ω) (ε : ℝ≥0∞) : Prop :=
+  ∀ S : Set Ω, actual.toOuterMeasure S ≤ ideal.toOuterMeasure S + ε
 
-If the real squeeze law `D` overshoots `uniformChallenge` by at most `ε` on every event — the
-`ε = |Fp| / 2^w` of the module doc, for a `w`-bit conversion — then every bad-set bound proved in
-the uniform model holds for `D` with `ε` added. The hypothesis is the assumption; the point of
-stating it is that the term now has a name and a home instead of living in the word "negligible". -/
-theorem badSet_measure_le_of_bias {D : PMF Fp} {ε : ℝ≥0∞}
-    (hbias : ∀ S : Set Fp, D.toOuterMeasure S ≤ uniformChallenge.toOuterMeasure S + ε)
-    (bad : Finset Fp) :
-    D.toOuterMeasure bad ≤ (bad.card : ℝ≥0∞) / Fintype.card Fp + ε := by
-  refine le_trans (hbias bad) (le_of_eq ?_)
-  rw [uniformChallenge_badSet]
+/-- Transport an ideal-experiment event bound to an explicitly related actual distribution. -/
+theorem event_measure_le_of_bias {Ω : Type*} {actual ideal : PMF Ω} {ε bound : ℝ≥0∞}
+    (hbias : PMFEventBiasLE actual ideal ε) (event : Set Ω)
+    (hideal : ideal.toOuterMeasure event ≤ bound) :
+    actual.toOuterMeasure event ≤ bound + ε := by
+  exact (hbias event).trans (add_le_add hideal le_rfl)
 
 end Zcash.Snark

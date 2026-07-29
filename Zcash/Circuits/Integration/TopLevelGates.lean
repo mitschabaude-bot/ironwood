@@ -61,6 +61,9 @@ structure TopLevelGateCoherence
   adviceQueryCount :
     (top.toVerifierKey pp urs).adviceQueryLayout.length =
       (pp.mergeDerived top).numAdviceQueries
+  adviceQueryColumnsAllocated :
+    ∀ entry ∈ (top.toVerifierKey pp urs).adviceQueryLayout,
+      entry.1 < (pp.mergeDerived top).numAdviceColumns
   fixedQueryCount :
     (top.toVerifierKey pp urs).fixedQueryLayout.length =
       (pp.mergeDerived top).numFixedQueries
@@ -164,7 +167,7 @@ theorem resolverInterpretsGates
 Every enabled constraint in the top-level operation stream has the corresponding
 resolver gate polynomial witness.
 -/
-noncomputable def polynomialWitness
+def polynomialWitness
     (coherence : TopLevelGateCoherence top pp urs)
     (ch : Challenges (pp.mergeDerived top).k Fp)
     (poly : CommitmentId → Polynomial Fp)
@@ -213,13 +216,10 @@ noncomputable def polynomialWitness
         enabled.gate.selector.index).isSome := by
     simpa using hlookupSome
   let compressed :=
-    Classical.choose
-      (Option.isSome_iff_exists.mp hlookupPresent)
+    (top.selectorMap.lookup enabled.gate.selector.index).get hlookupPresent
   have hcompressed :
       top.selectorMap.lookup enabled.gate.selector.index =
-        some compressed :=
-    Classical.choose_spec
-      (Option.isSome_iff_exists.mp hlookupPresent)
+        some compressed := (Option.some_get hlookupPresent).symm
   have hroots :
       SelectorRootsWellFormed top.selectorMap := by
     change SelectorRootsWellFormed

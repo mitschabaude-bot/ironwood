@@ -45,7 +45,7 @@ theorem pinnedPoints_injective (x : Fp) {n : Nat} (hn : n < scalarFieldOrder) :
 
 /-- Build an opened-batch compatibility object locally from a represented algebraic power batch,
 with one interpolation point pinned to the actual batching challenge. -/
-noncomputable def AlgebraicPowerBatch.toSyntheticOpened
+def AlgebraicPowerBatch.toSyntheticOpened
     {urs : URS G} {numColumns : Nat} {columnCommitments : Fin numColumns -> G}
     {aggregate : Fin (2 ^ urs.k) -> Fp} {aggregateU aggregateW challenge : Fp}
     (batch : AlgebraicPowerBatch urs columnCommitments aggregate aggregateU aggregateW challenge)

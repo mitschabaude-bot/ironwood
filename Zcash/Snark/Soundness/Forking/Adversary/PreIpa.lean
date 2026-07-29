@@ -77,6 +77,72 @@ def preIpaSqueezePoints {shape : Shape} (init : List (TranscriptElt Fp G))
   ![sqPt0 init ps, sqPt1 init ps, sqPt2 init ps, sqPt3 init ps, sqPt4 init ps, sqPt5 init ps,
     sqPt6 init ps, sqPt7 init ps, sqPt8 init ps, sqPt9 init ps, sqPt10 init ps]
 
+/-- Advice commitments are present before the first semantic squeeze `theta`. -/
+theorem adviceCommitment_mem_preIpaSqueezePoints_zero {shape : Shape}
+    (init : List (TranscriptElt Fp G)) (ps : ProofString shape Fp G)
+    (p : Fin shape.numProofs) (i : Fin shape.numAdviceColumns) :
+    TranscriptElt.point (ps.adviceCommitments p i) ∈ preIpaSqueezePoints init ps 0 := by
+  simp [preIpaSqueezePoints, sqPt0, absorbPoints2, absorbPoints]
+
+/-- Lookup-permuted commitments are present before the `beta` squeeze. -/
+theorem lookupPermutedInput_mem_preIpaSqueezePoints_one {shape : Shape}
+    (init : List (TranscriptElt Fp G)) (ps : ProofString shape Fp G)
+    (p : Fin shape.numProofs) (i : Fin shape.numLookups) :
+    TranscriptElt.point (ps.lookupPermutedInput p i) ∈ preIpaSqueezePoints init ps 1 := by
+  change TranscriptElt.point (ps.lookupPermutedInput p i) ∈ sqPt1 init ps
+  unfold sqPt1
+  apply List.mem_append_left
+  apply List.mem_append_right
+  unfold absorbLookupPermuted
+  refine List.mem_flatten.mpr ⟨_, List.mem_ofFn.mpr ⟨p, rfl⟩, ?_⟩
+  refine List.mem_flatten.mpr ⟨_, List.mem_ofFn.mpr ⟨i, rfl⟩, ?_⟩
+  simp
+
+theorem lookupPermutedTable_mem_preIpaSqueezePoints_one {shape : Shape}
+    (init : List (TranscriptElt Fp G)) (ps : ProofString shape Fp G)
+    (p : Fin shape.numProofs) (i : Fin shape.numLookups) :
+    TranscriptElt.point (ps.lookupPermutedTable p i) ∈ preIpaSqueezePoints init ps 1 := by
+  change TranscriptElt.point (ps.lookupPermutedTable p i) ∈ sqPt1 init ps
+  unfold sqPt1
+  apply List.mem_append_left
+  apply List.mem_append_right
+  unfold absorbLookupPermuted
+  refine List.mem_flatten.mpr ⟨_, List.mem_ofFn.mpr ⟨p, rfl⟩, ?_⟩
+  refine List.mem_flatten.mpr ⟨_, List.mem_ofFn.mpr ⟨i, rfl⟩, ?_⟩
+  simp
+
+/-- Product and vanishing-random commitments are present before the `y` squeeze. -/
+theorem permutationProduct_mem_preIpaSqueezePoints_three {shape : Shape}
+    (init : List (TranscriptElt Fp G)) (ps : ProofString shape Fp G)
+    (p : Fin shape.numProofs) (i : Fin shape.numPermutationSets) :
+    TranscriptElt.point (ps.permutationProduct p i) ∈ preIpaSqueezePoints init ps 3 := by
+  simp [preIpaSqueezePoints, sqPt3, sqPt2, sqPt1, sqPt0, absorbPoints2, absorbPoints]
+
+theorem lookupProduct_mem_preIpaSqueezePoints_three {shape : Shape}
+    (init : List (TranscriptElt Fp G)) (ps : ProofString shape Fp G)
+    (p : Fin shape.numProofs) (i : Fin shape.numLookups) :
+    TranscriptElt.point (ps.lookupProduct p i) ∈ preIpaSqueezePoints init ps 3 := by
+  simp [preIpaSqueezePoints, sqPt3, sqPt2, sqPt1, sqPt0, absorbPoints2, absorbPoints]
+
+theorem vanishingRandom_mem_preIpaSqueezePoints_three {shape : Shape}
+    (init : List (TranscriptElt Fp G)) (ps : ProofString shape Fp G) :
+    TranscriptElt.point ps.vanishingRandom ∈ preIpaSqueezePoints init ps 3 := by
+  simp [preIpaSqueezePoints, sqPt3]
+
+/-- Quotient pieces are present before the constraint-`x` squeeze. -/
+theorem hPiece_mem_preIpaSqueezePoints_four {shape : Shape}
+    (init : List (TranscriptElt Fp G)) (ps : ProofString shape Fp G)
+    (i : Fin shape.numQuotientPieces) :
+    TranscriptElt.point (ps.hPieces i) ∈ preIpaSqueezePoints init ps 4 := by
+  simp [preIpaSqueezePoints, sqPt4, absorbPoints]
+
+/-- Commit-before-challenge at `ξ`: the IPA `S` commitment is already in the index-nine
+squeeze input. -/
+theorem ipaS_mem_preIpaSqueezePoints_nine {shape : Shape}
+    (init : List (TranscriptElt Fp G)) (ps : ProofString shape Fp G) :
+    TranscriptElt.point ps.ipaS ∈ preIpaSqueezePoints init ps 9 := by
+  simp [preIpaSqueezePoints, sqPt9]
+
 /-- The last squeeze point (`z`) is the whole pre-IPA transcript. -/
 theorem preIpaSqueezePoints_last {shape : Shape} (init : List (TranscriptElt Fp G))
     (ps : ProofString shape Fp G) :
@@ -789,6 +855,64 @@ theorem preXSqueezePoint_inj {shape : Shape} (init : List (TranscriptElt Fp G))
     (by rw [length_absorbPoints2, length_absorbPoints2])
   have hAdv : ps.adviceCommitments = ps'.adviceCommitments := absorbPoints2_inj hAdva.2
   exact ⟨hAdv, hLPI, hLPT, hPP, hLP, hVR, hHP⟩
+
+/-- The `theta` squeeze pins every advice commitment already absorbed before it. -/
+theorem preThetaSqueezePoint_inj {shape : Shape} (init : List (TranscriptElt Fp G))
+    {ps ps' : ProofString shape Fp G}
+    (h : preIpaSqueezePoints init ps 0 = preIpaSqueezePoints init ps' 0) :
+    ps.adviceCommitments = ps'.adviceCommitments := by
+  have h0 : sqPt0 init ps = sqPt0 init ps' := h
+  have h0' := List.append_inj' h0 rfl
+  have hadvice := List.append_inj' h0'.1
+    (by rw [length_absorbPoints2, length_absorbPoints2])
+  exact absorbPoints2_inj hadvice.2
+
+/-- The `beta` squeeze additionally pins both lookup-permuted commitment families. -/
+theorem preBetaSqueezePoint_inj {shape : Shape} (init : List (TranscriptElt Fp G))
+    {ps ps' : ProofString shape Fp G}
+    (h : preIpaSqueezePoints init ps 1 = preIpaSqueezePoints init ps' 1) :
+    ps.adviceCommitments = ps'.adviceCommitments ∧
+      ps.lookupPermutedInput = ps'.lookupPermutedInput ∧
+      ps.lookupPermutedTable = ps'.lookupPermutedTable := by
+  have h1 : sqPt1 init ps = sqPt1 init ps' := h
+  have h1' := List.append_inj' h1 rfl
+  have hlookup := List.append_inj' h1'.1
+    (by rw [length_absorbLookupPermuted, length_absorbLookupPermuted])
+  obtain ⟨hinput, htable⟩ := absorbLookupPermuted_inj hlookup.2
+  exact ⟨preThetaSqueezePoint_inj init hlookup.1, hinput, htable⟩
+
+/-- Nothing is absorbed between `beta` and `gamma`, so the `gamma` squeeze pins the same
+commitment families. -/
+theorem preGammaSqueezePoint_inj {shape : Shape} (init : List (TranscriptElt Fp G))
+    {ps ps' : ProofString shape Fp G}
+    (h : preIpaSqueezePoints init ps 2 = preIpaSqueezePoints init ps' 2) :
+    ps.adviceCommitments = ps'.adviceCommitments ∧
+      ps.lookupPermutedInput = ps'.lookupPermutedInput ∧
+      ps.lookupPermutedTable = ps'.lookupPermutedTable := by
+  have h2 : sqPt2 init ps = sqPt2 init ps' := h
+  exact preBetaSqueezePoint_inj init (List.append_inj' h2 rfl).1
+
+/-- The `y` squeeze additionally pins permutation products, lookup products, and the vanishing
+random commitment. -/
+theorem preYSqueezePoint_inj {shape : Shape} (init : List (TranscriptElt Fp G))
+    {ps ps' : ProofString shape Fp G}
+    (h : preIpaSqueezePoints init ps 3 = preIpaSqueezePoints init ps' 3) :
+    ps.adviceCommitments = ps'.adviceCommitments ∧
+      ps.lookupPermutedInput = ps'.lookupPermutedInput ∧
+      ps.lookupPermutedTable = ps'.lookupPermutedTable ∧
+      ps.permutationProduct = ps'.permutationProduct ∧
+      ps.lookupProduct = ps'.lookupProduct ∧
+      ps.vanishingRandom = ps'.vanishingRandom := by
+  have h3 : sqPt3 init ps = sqPt3 init ps' := h
+  have h3' := List.append_inj' h3 rfl
+  have hrandom := List.append_inj' h3'.1 rfl
+  have hlookup := List.append_inj' hrandom.1
+    (by rw [length_absorbPoints2, length_absorbPoints2])
+  have hperm := List.append_inj' hlookup.1
+    (by rw [length_absorbPoints2, length_absorbPoints2])
+  obtain ⟨hadvice, hinput, htable⟩ := preGammaSqueezePoint_inj init hperm.1
+  exact ⟨hadvice, hinput, htable, absorbPoints2_inj hperm.2,
+    absorbPoints2_inj hlookup.2, singleton_point_inj hrandom.2⟩
 
 /-- **`x₁`-prefix injectivity.** Two well-formed proofs with the same `x₁` squeeze point agree on
 every field absorbed before `x₁` — only the multiopen and IPA fields are free. -/

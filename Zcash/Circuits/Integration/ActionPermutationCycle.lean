@@ -250,7 +250,7 @@ theorem actionRowsInjectiveAtUrs
   exact Fin.ext hval
 
 set_option maxRecDepth 100000 in
-noncomputable def actionResolverPermutationCycle_or_relation
+def actionResolverPermutationCycle_or_relation
     (pp : ProofParams) (urs : URS G)
     (hk : (actionShape pp).k = urs.k)
     {instanceCommitment :
@@ -280,10 +280,10 @@ noncomputable def actionResolverPermutationCycle_or_relation
       batchOpenings memberDecode
         (blindingFactors_lt pp urs) y hpoly deg)
     (proofIndex : Fin (actionShape pp).numProofs) :
-    (∃ cycle : ResolverPermutationCycle
-        (actionVk pp urs) relation.polynomial proofIndex actionActiveRows,
+    {cycle : ResolverPermutationCycle
+        (actionVk pp urs) relation.polynomial proofIndex actionActiveRows //
       cycle.sigma =
-        actionActiveSigma pp urs relation.polynomial proofIndex)
+        actionActiveSigma pp urs relation.polynomial proofIndex}
       ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
   classical
   have hkUrs : urs.k ≤ 32 := by
@@ -292,8 +292,7 @@ noncomputable def actionResolverPermutationCycle_or_relation
     rw [← hdomain]
     exact Nat.le_of_lt_succ domainExponent_lt
   let setup := LagrangePrefixSetup.ofDerived urs hkUrs
-  -- The cycle lives under an `∃`, so the per-chunk/column identifications are searched first and
-  -- the construction itself is then back in `Prop`.
+  -- The successful cycle is returned as data; only its sigma equality is proof-valued.
   refine bindOrRelationWitness
     (finForallOrRelationWitness fun chunk =>
       finForallOrRelationWitness fun column => ?_)

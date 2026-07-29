@@ -59,9 +59,24 @@ open CompElliptic.Curves.Pasta
 open CompElliptic.Curves.Pasta.Fast.NatKernel (P3)
 open CompElliptic.Curves.Pasta.Fast.Projective.PVes (ofAffine)
 
-/-- The Action circuit's proof-shape parameters — the only two `Shape` counts that are
-not circuit data (orchard: one Action proof per statement, five multiopen point sets). -/
-def actionProofParams : ProofParams := { numProofs := 1, numPointSets := 5 }
+/-- The Action circuit's proof-shape parameters at an arbitrary bundle size.  The proof count is
+the number of Actions carried by the Halo 2 proof; the five multiopen point sets are protocol
+constant. -/
+def actionProofParamsFor (numProofs : ℕ) : ProofParams :=
+  { numProofs, numPointSets := 5 }
+
+/-- The captured fixture's one-Action proof-shape parameters.  Keeping this name as the captured
+specialization lets the expensive certificate below remain a single computation; consensus-sized
+capstones transport its circuit-owned fields instead of re-running key generation. -/
+def actionProofParams : ProofParams := actionProofParamsFor 1
+
+@[simp] theorem actionProofParamsFor_numProofs (numProofs : ℕ) :
+    (actionProofParamsFor numProofs).numProofs = numProofs := rfl
+
+@[simp] theorem actionProofParamsFor_numPointSets (numProofs : ℕ) :
+    (actionProofParamsFor numProofs).numPointSets = 5 := rfl
+
+@[simp] theorem actionProofParamsFor_one : actionProofParamsFor 1 = actionProofParams := rfl
 
 /-- The MONOMIAL URS as canonical-`ℕ` triples — THE shared basis of every MSM in the bundle
 (all 44 columns and the 10 Lagrange-prefix generators). Nullary, so the coordinate conversion
@@ -143,6 +158,15 @@ theorem shape_eq_mergeDerived :
   have h := certificate
   simp only [Prod.mk.injEq] at h
   exact h.2.2.2.2.2.2.2.2
+
+/-- Changing the bundle size changes only the `numProofs` field of the captured Action shape.
+This is a definitional transport from the one expensive captured certificate, not a second keygen
+computation. -/
+theorem actionProofParamsFor_mergeDerived_eq (numProofs : ℕ) :
+    (actionProofParamsFor numProofs).mergeDerived actionCircuit =
+      { Zcash.Snark.Fixture.shape with numProofs := numProofs } := by
+  rw [← shape_eq_mergeDerived]
+  rfl
 
 /-- The keygen domain exponent the columns are built at IS the captured URS's `k`, so the
 column length the commitment families produce is the domain the committer's inverse DFT runs

@@ -6,7 +6,7 @@ import Zcash.Snark.Soundness.DegreeWalk
 # The single-Action captured key's static checks and degree budget
 
 The Action-level capstone lives at the circuit-derived shape — one Action proof — whose captured
-twin is this directory's fixture.  The eleven decided facts below mirror
+twin is this directory's fixture.  The twelve decided facts below mirror
 `Fixtures.MultiAction.{StaticChecks, Degree}` at that key: the query layouts cover the shape's
 counts, `ω` has order dividing `n`, `n` does not vanish in `𝔽`, and the degree caps that price
 the `x`-squeeze schedule at `D = Dq = 20470`.

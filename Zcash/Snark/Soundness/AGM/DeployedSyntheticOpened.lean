@@ -16,7 +16,7 @@ attribute [local irreducible] deployedSetQueries deployedX4PairCount x4BatchComm
   x4BatchEvals deployedSetMemberCommitments
 
 /-- A deployed `x4` algebraic batch presented through the legacy opened-batch interface. -/
-noncomputable def deployedSyntheticOpenedX4 [DecidableEq G] [Inhabited G] {shape : Shape}
+def deployedSyntheticOpenedX4 [DecidableEq G] [Inhabited G] {shape : Shape}
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → Nat → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
@@ -97,7 +97,7 @@ theorem deployedSyntheticOpenedX4_wComp [DecidableEq G] [Inhabited G] {shape : S
 
 /-- Adapt one deployed `x1` AGM member batch to `OpenedMemberDecode`.  Its reconstruction target is
 the `x4` AGM coordinate because the synthetic `x4` decode was identified above. -/
-noncomputable def deployedSyntheticMemberDecode [DecidableEq G] [Inhabited G] {shape : Shape}
+def deployedSyntheticMemberDecode [DecidableEq G] [Inhabited G] {shape : Shape}
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → Nat → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)

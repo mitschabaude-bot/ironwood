@@ -29,23 +29,48 @@ open Polynomial Finset
 
 /-- The `acc·y + v` fold read as a polynomial in `y`: `[c₀, …, c_{m-1}]` becomes
 `c₀·y^{m-1} + ⋯ + c_{m-1}`. -/
-noncomputable def foldPoly (l : List Fp) : Polynomial Fp :=
-  l.foldl (fun acc v => acc * X + C v) 0
+def foldPoly (l : List Fp) : Polynomial Fp :=
+  l.foldl (fun acc v =>
+    ComputablePolynomial.add
+      (ComputablePolynomial.mul acc ComputablePolynomial.X)
+      (ComputablePolynomial.const v)) ComputablePolynomial.zero
 
-@[simp] theorem foldPoly_nil : foldPoly [] = 0 := rfl
+theorem foldPoly_eq_foldl (l : List Fp) :
+    foldPoly l = l.foldl (fun acc v => acc * X + C v) 0 := by
+  suffices h : ∀ (t : List Fp) (acc : Polynomial Fp),
+      t.foldl (fun acc v =>
+        ComputablePolynomial.add
+          (ComputablePolynomial.mul acc ComputablePolynomial.X)
+          (ComputablePolynomial.const v)) acc =
+        t.foldl (fun acc v => acc * X + C v) acc by
+    rw [foldPoly, h, ComputablePolynomial.zero_eq]
+  intro t
+  induction t with
+  | nil => intro acc; rfl
+  | cons v t ih =>
+      intro acc
+      rw [List.foldl_cons, List.foldl_cons, ih,
+        ComputablePolynomial.add_eq, ComputablePolynomial.mul_eq,
+        ComputablePolynomial.X_eq, ComputablePolynomial.const_eq]
+
+@[simp] theorem foldPoly_nil : foldPoly [] = 0 := by
+  rw [foldPoly_eq_foldl]
+  rfl
 
 /-- The fold grows from the right: appending `v` multiplies by `y` and adds. -/
 theorem foldPoly_concat (l : List Fp) (v : Fp) :
     foldPoly (l ++ [v]) = foldPoly l * X + C v := by
-  simp [foldPoly, List.foldl_append]
+  rw [foldPoly_eq_foldl, foldPoly_eq_foldl, List.foldl_append]
+  rfl
 
 /-- Evaluating the fold polynomial at `y` is the verifier's fold. -/
 theorem eval_foldPoly (l : List Fp) (y : Fp) :
     (foldPoly l).eval y = l.foldl (fun acc v => acc * y + v) 0 := by
+  rw [foldPoly_eq_foldl]
   suffices h : ∀ (t : List Fp) (acc : Polynomial Fp),
       (t.foldl (fun acc v => acc * X + C v) acc).eval y
         = t.foldl (fun acc v => acc * y + v) (acc.eval y) by
-    simpa [foldPoly] using h l 0
+    simpa using h l 0
   intro t
   induction t with
   | nil => intro acc; simp
@@ -64,7 +89,7 @@ theorem natDegree_foldPoly_lt {l : List Fp} (hl : l ≠ []) : (foldPoly l).natDe
   | append_singleton t v ih =>
       rw [foldPoly_concat, List.length_append, List.length_singleton]
       rcases eq_or_ne t [] with rfl | ht
-      · simp [foldPoly]
+      · simp [foldPoly_eq_foldl]
       · refine Nat.lt_succ_of_le ((natDegree_add_le _ _).trans (max_le ?_ ?_))
         · exact (natDegree_mul_le).trans (by simpa using Nat.succ_le_of_lt (ih ht))
         · exact (natDegree_C v).le.trans (Nat.zero_le _)
@@ -131,12 +156,23 @@ theorem foldl_modByMonic (cs : List (Polynomial Fp)) (y : Fp) {r : Polynomial Fp
 /-- The `j`-th coefficient of the reduced constraints, folded as a polynomial in `y`. The combined
 check forces `y` to be one of its roots, so a nonzero witness is what makes splitting cost
 something. -/
-noncomputable def foldSplitWitness (cs : List (Polynomial Fp)) (n j : ℕ) : Polynomial Fp :=
-  foldPoly (cs.map (fun c => (c %ₘ (X ^ n - 1)).coeff j))
+def foldSplitWitness (cs : List (Polynomial Fp)) (n j : ℕ) : Polynomial Fp :=
+  foldPoly (cs.map (fun c =>
+    (ComputablePolynomial.modByMonic c
+      (ComputablePolynomial.sub
+        (ComputablePolynomial.pow ComputablePolynomial.X n)
+        (ComputablePolynomial.const 1))).coeff j))
+
+theorem foldSplitWitness_eq (cs : List (Polynomial Fp)) (n j : ℕ) :
+    foldSplitWitness cs n j =
+      foldPoly (cs.map (fun c => (c %ₘ (X ^ n - 1)).coeff j)) := by
+  simp [foldSplitWitness, ComputablePolynomial.modByMonic_eq, ComputablePolynomial.sub_eq,
+    ComputablePolynomial.pow_eq, ComputablePolynomial.X_eq, ComputablePolynomial.const_eq]
 
 /-- The witness has degree below the list length, so it excludes at most `length − 1` challenges. -/
 theorem natDegree_foldSplitWitness_lt {cs : List (Polynomial Fp)} (hcs : cs ≠ []) (n j : ℕ) :
     (foldSplitWitness cs n j).natDegree < cs.length := by
+  rw [foldSplitWitness_eq]
   have hne : cs.map (fun c => (c %ₘ (X ^ n - 1)).coeff j) ≠ [] := by
     simpa using hcs
   simpa using natDegree_foldPoly_lt hne
@@ -155,6 +191,7 @@ theorem exists_foldSplitWitness_ne_zero {cs : List (Polynomial Fp)} {n : ℕ} (h
     by_contra hall
     exact hres (Polynomial.ext fun j => by simpa using not_exists.mp hall j)
   refine ⟨j, fun h => hj ?_⟩
+  rw [foldSplitWitness_eq] at h
   exact (foldPoly_eq_zero_iff _).mp h _ (List.mem_map_of_mem hmem)
 
 /-- The combined check forces `y` to root every coefficient's witness. -/
@@ -169,7 +206,7 @@ theorem eval_foldSplitWitness_eq_zero {cs : List (Polynomial Fp)} {hq : Polynomi
   have hcoeff : (List.foldl (fun acc q => acc * C y + q) 0
       (cs.map (fun c => c %ₘ (X ^ n - 1)))).coeff j = 0 := by
     rw [hzero, coeff_zero]
-  rw [foldSplitWitness, eval_foldPoly]
+  rw [foldSplitWitness_eq, eval_foldPoly]
   have key : ∀ (t : List (Polynomial Fp)) (acc : Polynomial Fp),
       ((t.map (fun c => c %ₘ (X ^ n - 1))).foldl (fun acc q => acc * C y + q) acc).coeff j
         = (t.map (fun c => (c %ₘ (X ^ n - 1)).coeff j)).foldl (fun acc v => acc * y + v)

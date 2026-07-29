@@ -92,7 +92,7 @@ generic consequences of `TopLevelCircuit.toVerifierKey`.
 The remaining `hgenerators` premise is about the supplied URS, not the Action
 circuit layout.
 -/
-noncomputable def ofKeygen
+def ofKeygen
     (pp : ProofParams) (urs : URS G)
     (hk : actionCircuit.domainExponent = urs.k)
     (hlen : (derivedUrsGLagrange urs).length = 2 ^ urs.k)
@@ -122,7 +122,7 @@ Construct Action fixed coherence directly from the symbolically proved
 Lagrange-basis FFT specification. The only remaining computations are the
 prominently interim layout failure lists above.
 -/
-noncomputable def ofDerived
+def ofDerived
     (pp : ProofParams) (urs : URS G)
     (hk : actionCircuit.domainExponent = urs.k) :
     TopLevelFixedCoherence actionCircuit pp urs := by

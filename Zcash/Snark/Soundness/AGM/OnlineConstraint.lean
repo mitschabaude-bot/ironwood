@@ -68,8 +68,10 @@ def deployedConstraintSource (family : ComputedDeployedRootFSFamily shape)
     List (AlgebraicPoint (F := Fp) basis) :=
   pnu.1.algebraicProof.preX1AssemblySource (family.fixedRepresentations basis)
 
-/-- Polynomial of the first online representation of a committed point. -/
-noncomputable def deployedConstraintPointPolynomial
+/-- Polynomial of the first online representation of a committed point.  The first matching
+representation is selected by the online source's executable list search, and coefficient
+conversion is finite arithmetic over `Fp`. -/
+def deployedConstraintPointPolynomial
     (family : ComputedDeployedRootFSFamily shape)
     (basis : AugmentedIndex (2 ^ shape.k) -> VestaG)
     (pnu : WrappedAlgebraicOutput family.toFamily basis) (P : VestaG) : Polynomial Fp :=
@@ -412,11 +414,10 @@ theorem deployedConstraint_quotient_relation_eq_online
     · cases hinner
   · cases hrelation
 
-/-- Mathematical polynomial-witness adapter built from the actual online AGM source.  No arbitrary
+/-- Executable polynomial-witness adapter built from the actual online AGM source.  No arbitrary
 opening is chosen: its relation branch agrees with the separately executable
-`deployedConstraintQuotientFinder`.  It remains `noncomputable` only because the success branch
-materializes Mathlib `Polynomial Fp` values. -/
-noncomputable def deployedOnlineConstraintOutcomeOfDecode
+`deployedConstraintQuotientFinder`, and its polynomial branch is finite arithmetic over `Fp`. -/
+def deployedOnlineConstraintOutcomeOfDecode
     (family : ComputedDeployedRootFSFamily shape)
     (basis : AugmentedIndex (2 ^ shape.k) -> VestaG)
     (pnu : WrappedAlgebraicOutput family.toFamily basis)

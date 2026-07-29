@@ -36,7 +36,7 @@ private def bindOutcome {A : Sort u} {B : Sort v} {R : Sort w}
   | .inl value => next value
   | .inr bad => .inr bad
 
-noncomputable def topLevelBundleStatement_or_bad_of_components
+def topLevelBundleStatement_or_bad_of_components
     {G : Type} [AddCommGroup G] [Inhabited G]
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
@@ -86,7 +86,7 @@ Canonical constraint satisfaction plus the component-level circuit correctness
 package implies the circuit-owned statement for every proof, preserving the one
 shared exceptional event.
 -/
-noncomputable def topLevelBundleStatement_or_bad_of_constraintSatisfaction
+def topLevelBundleStatement_or_bad_of_constraintSatisfaction
     {G : Type} [AddCommGroup G] [Inhabited G]
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]

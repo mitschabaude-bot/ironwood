@@ -75,6 +75,13 @@ structure DeployedBatchWitness (family : ComputedAlgebraicFSFamily shape)
     (pnu.1.aMulti (wrappedPreIpaReads pnu))
     (pnu.1.multiU (wrappedPreIpaReads pnu))
     (pnu.1.multiBlind (wrappedPreIpaReads pnu))
+  x4Source : AlgebraicColumnRepresentations (ursOfAugmentedBasis shape.k basis)
+    (x4BatchCommitments (ursOfAugmentedBasis shape.k basis) rfl
+      (family.vk basis) (family.instanceCommitment basis) pnu.1.proof.1
+      (wrappedPreIpaRecord pnu))
+  x4Coeffs : batches.x4.coeffs = x4Source.coeffs
+  x4U : batches.x4.uComp = x4Source.uComp
+  x4W : batches.x4.wComp = x4Source.wComp
   memberCoeffs : forall i
       (hi : i < deployedX4PairCount (family.vk basis) (family.instanceCommitment basis)
         pnu.1.proof.1 (wrappedPreIpaRecord pnu)),
@@ -93,6 +100,32 @@ structure DeployedBatchWitness (family : ComputedAlgebraicFSFamily shape)
     (batches.x1 i hi).wComp =
       (deployedMemberRepresentationsOfCovered pnu.1 fixedRepresentations membersCovered
         (wrappedPreIpaReads pnu) i hi).wComp
+
+/-- The retained source columns reconstruct the exact aggregate coordinates carried by the
+successful executable batch. -/
+theorem DeployedBatchWitness.x4Source_reconstruct
+    {family : ComputedAlgebraicFSFamily shape}
+    {basis : AugmentedIndex (2 ^ shape.k) → VestaG}
+    {pnu : WrappedAlgebraicOutput family basis}
+    (witness : DeployedBatchWitness family basis pnu) :
+    (∑ j : Fin (deployedX4PairCount (family.vk basis) (family.instanceCommitment basis)
+        pnu.1.proof.1 (wrappedPreIpaRecord pnu) + 1),
+      (wrappedPreIpaRecord pnu).x4 ^ (j : Nat) • witness.x4Source.coeffs j) =
+      pnu.1.aMulti (wrappedPreIpaReads pnu) := by
+  rw [← witness.x4Coeffs]
+  exact witness.batches.x4.reconstruct.symm
+
+theorem DeployedBatchWitness.x4Source_reconstructU
+    {family : ComputedAlgebraicFSFamily shape}
+    {basis : AugmentedIndex (2 ^ shape.k) → VestaG}
+    {pnu : WrappedAlgebraicOutput family basis}
+    (witness : DeployedBatchWitness family basis pnu) :
+    (∑ j : Fin (deployedX4PairCount (family.vk basis) (family.instanceCommitment basis)
+        pnu.1.proof.1 (wrappedPreIpaRecord pnu) + 1),
+      (wrappedPreIpaRecord pnu).x4 ^ (j : Nat) * witness.x4Source.uComp j) =
+      pnu.1.multiU (wrappedPreIpaReads pnu) := by
+  rw [← witness.x4U]
+  exact witness.batches.x4.reconstructU.symm
 
 /-- Algebraic unbatching either supplies every deployed batch or returns a concrete augmented-basis
 relation. -/

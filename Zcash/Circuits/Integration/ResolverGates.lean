@@ -117,17 +117,34 @@ theorem selectorScale_ne_zero_of_enabledGate
     hvalue hpositive hrootBound hlengthBound
 
 /-- The polynomial obtained by evaluating one VK gate over the rotated resolver feeds. -/
-noncomputable def resolverGatePolynomial
+def resolverGatePolynomial
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → Polynomial Fp)
     (proofIndex : Fin shape.numProofs)
-    (gateIndex : ℕ) (hgateIndex : gateIndex < vk.gates.length) :
-    Polynomial Fp :=
-  (vk.gates[gateIndex].map C).eval
+    (gateIndex : Fin vk.gates.length) : Polynomial Fp :=
+  letI : CommRing (Polynomial Fp) := ComputablePolynomial.commRing
+  (vk.gates[gateIndex].map ComputablePolynomial.const).eval
     (fixedQueryFeedOfResolver vk poly)
     (adviceQueryFeedOfResolver vk poly proofIndex)
     (instanceQueryFeedOfResolver vk poly proofIndex)
+
+theorem resolverGatePolynomial_eq
+    {shape : Shape} {G : Type*}
+    (vk : VerifyingKey shape Fp G)
+    (poly : CommitmentId → Polynomial Fp)
+    (proofIndex : Fin shape.numProofs)
+    (gateIndex : Fin vk.gates.length) :
+    resolverGatePolynomial vk poly proofIndex gateIndex =
+      (vk.gates[gateIndex].map C).eval
+        (fixedQueryFeedOfResolver vk poly)
+        (adviceQueryFeedOfResolver vk poly proofIndex)
+        (instanceQueryFeedOfResolver vk poly proofIndex) := by
+  have hconst : (ComputablePolynomial.const : Fp → Polynomial Fp) = C := by
+    funext c
+    exact ComputablePolynomial.const_eq c
+  unfold resolverGatePolynomial
+  rw [← ComputablePolynomial.commRing_eq (R := Fp), hconst]
 
 /-- Polynomial evaluation commutes with lifting a verifier expression by `C`. -/
 private theorem eval_map_C
@@ -146,8 +163,8 @@ theorem resolverGatePolynomial_eval
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → Polynomial Fp)
     (proofIndex : Fin shape.numProofs)
-    (gateIndex : ℕ) (hgateIndex : gateIndex < vk.gates.length) (x : Fp) :
-    (resolverGatePolynomial vk poly proofIndex gateIndex hgateIndex).eval x =
+    (gateIndex : Fin vk.gates.length) (x : Fp) :
+    (resolverGatePolynomial vk poly proofIndex gateIndex).eval x =
       vk.gates[gateIndex].eval
         (fun query =>
           (fixedQueryFeedOfResolver vk poly query).eval x)
@@ -155,6 +172,7 @@ theorem resolverGatePolynomial_eval
           (adviceQueryFeedOfResolver vk poly proofIndex query).eval x)
         (fun query =>
           (instanceQueryFeedOfResolver vk poly proofIndex query).eval x) := by
+  rw [resolverGatePolynomial_eq]
   exact eval_map_C
     (fixedQueryFeedOfResolver vk poly)
     (adviceQueryFeedOfResolver vk poly proofIndex)
@@ -173,16 +191,15 @@ theorem resolverGatePolynomial_mem
         List (Polynomial Fp × Polynomial Fp)))
     (l0 lLast lBlind : Polynomial Fp)
     (proofIndex : Fin shape.numProofs)
-    (gateIndex : ℕ) (hgateIndex : gateIndex < vk.gates.length) :
-    resolverGatePolynomial vk poly proofIndex gateIndex hgateIndex ∈
+    (gateIndex : Fin vk.gates.length) :
+    resolverGatePolynomial vk poly proofIndex gateIndex ∈
       (constraintModelOfResolver vk ch poly sets chunks
         l0 lLast lBlind).gateConstraints proofIndex := by
-  rw [List.mem_iff_getElem]
+  rw [ConstraintPolyModel.gateConstraints_eq, List.mem_iff_getElem]
   refine ⟨gateIndex, ?_, ?_⟩
-  · simpa [ConstraintPolyModel.gateConstraints,
-      constraintModelOfResolver] using hgateIndex
-  · simp [ConstraintPolyModel.gateConstraints,
-      constraintModelOfResolver, resolverGatePolynomial]
+  · simp [
+      constraintModelOfResolver]
+  · simp [constraintModelOfResolver, resolverGatePolynomial_eq]
 
 /--
 One enabled Clean constraint produces its resolver-model polynomial witness.
@@ -196,7 +213,7 @@ The premises are exactly the static representation boundary:
 
 No circuit, placement algorithm, or concrete verification key is selected here.
 -/
-noncomputable def enabledGatePolynomialWitnessOfResolver
+def enabledGatePolynomialWitnessOfResolver
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (cs : ConstraintSystem Fp) (map : SelCompressMap)
@@ -254,19 +271,20 @@ noncomputable def enabledGatePolynomialWitnessOfResolver
     rw [flatGates, List.mem_flatMap]
     exact ⟨enabled.gate, hgate,
       List.mem_map.mpr ⟨constraint, hconstraint, rfl⟩⟩
-  let hindex := List.mem_iff_getElem.mp hflat
-  let gateIndex := Classical.choose hindex
-  let hindexData := Classical.choose_spec hindex
-  let hgateIndex := Classical.choose hindexData
-  have hsource := Classical.choose_spec hindexData
+  let gateIndex := (flatGates cs).idxOf constraint.poly
+  have hgateIndex : gateIndex < (flatGates cs).length :=
+    List.idxOf_lt_length_iff.mpr hflat
+  have hsource : (flatGates cs)[gateIndex] = constraint.poly :=
+    List.getElem_idxOf hgateIndex
   have hgateLength :
       vk.gates.length = (flatGates cs).length := by
     have hlength := congrArg List.length hgates
     simpa only [List.length_map, hgateCount] using hlength
   have hgateIndexVk : gateIndex < vk.gates.length := by
     omega
+  let index : Fin vk.gates.length := ⟨gateIndex, hgateIndexVk⟩
   let witnessPolynomial :=
-    resolverGatePolynomial vk poly proofIndex gateIndex hgateIndexVk
+    resolverGatePolynomial vk poly proofIndex index
   let valuation :=
     Query.eval
       (resolverEnvironment vk poly proofIndex usableRows)
@@ -277,10 +295,17 @@ noncomputable def enabledGatePolynomialWitnessOfResolver
       member := ?_
       zero_imp := ?_ }
   · exact resolverGatePolynomial_mem vk ch poly sets chunks
-      l0 lLast lBlind proofIndex gateIndex hgateIndexVk
+      l0 lLast lBlind proofIndex index
   · intro hzero
-    simp only [witnessPolynomial] at hzero
+    rw [show witnessPolynomial =
+      resolverGatePolynomial vk poly proofIndex index from rfl]
+      at hzero
     rw [resolverGatePolynomial_eval] at hzero
+    have hgateAt :
+        vk.gates[index] = pinnedGates[gateIndex].toExpr := by
+      change vk.gates[gateIndex] = pinnedGates[gateIndex].toExpr
+      rw [List.getElem_of_eq hgates hgateIndexVk, List.getElem_map]
+    rw [hgateAt] at hzero
     have hgateIndexPinned : gateIndex < pinnedGates.length := by
       simpa only [hgates, List.length_map] using hgateIndexVk
     have hderived := (RichExpression.eval_toExpr
@@ -295,8 +320,6 @@ noncomputable def enabledGatePolynomialWitnessOfResolver
           (vk.omega ^ (place enabled.region + enabled.row)))
       pinnedGates[gateIndex]).trans
         (hgateEval gateIndex hgateIndexPinned hgateIndex)
-    rw [List.getElem_of_eq hgates hgateIndexVk,
-      List.getElem_map] at hzero
     rw [hsource] at hderived
     apply Expression.eval_substSelectorMap_zero_imp_queryEval_zero
       map.lookup valuation

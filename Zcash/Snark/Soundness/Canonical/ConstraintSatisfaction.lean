@@ -39,33 +39,70 @@ structure ConstraintPolyModel (np : ℕ) where
 
 namespace ConstraintPolyModel
 
+private theorem computableConst_eq_C :
+    (ComputablePolynomial.const : Fp → Polynomial Fp) = Polynomial.C := by
+  funext c
+  exact ComputablePolynomial.const_eq c
+
 /-- One sub-proof's lifted custom-gate constraints. -/
-noncomputable def gateConstraints {np : ℕ} (M : ConstraintPolyModel np) (p : Fin np) :
+def gateConstraints {np : ℕ} (M : ConstraintPolyModel np) (p : Fin np) :
     List (Polynomial Fp) :=
-  (M.gates.map (Expr.map C)).map
+  letI : CommRing (Polynomial Fp) := ComputablePolynomial.commRing
+  (M.gates.map (Expr.map ComputablePolynomial.const)).map
     (fun g => g.eval M.fixedCols (M.adviceCols p) (M.instanceCols p))
 
 /-- One sub-proof's permutation constraints. -/
-noncomputable def permutationConstraints {np : ℕ} (M : ConstraintPolyModel np) (p : Fin np) :
+def permutationConstraints {np : ℕ} (M : ConstraintPolyModel np) (p : Fin np) :
     List (Polynomial Fp) :=
-  permutationExpressions (M.sets p) (M.chunks p) (C M.beta) (C M.gamma) X (C M.delta)
+  letI : CommRing (Polynomial Fp) := ComputablePolynomial.commRing
+  permutationExpressions (M.sets p) (M.chunks p)
+    (ComputablePolynomial.const M.beta) (ComputablePolynomial.const M.gamma)
+    ComputablePolynomial.X (ComputablePolynomial.const M.delta)
     M.chunkLen M.l0 M.lLast M.lBlind
 
 /-- One sub-proof's lookup constraints. -/
-noncomputable def lookupConstraints {np : ℕ} (M : ConstraintPolyModel np) (p : Fin np) :
+def lookupConstraints {np : ℕ} (M : ConstraintPolyModel np) (p : Fin np) :
     List (Polynomial Fp) :=
+  letI : CommRing (Polynomial Fp) := ComputablePolynomial.commRing
   ((M.lookups p).map fun lk =>
-    lookupExpressions lk.1 (lk.2.1.map (Expr.map C)) (lk.2.2.map (Expr.map C))
+    lookupExpressions lk.1
+      (lk.2.1.map (Expr.map ComputablePolynomial.const))
+      (lk.2.2.map (Expr.map ComputablePolynomial.const))
       M.fixedCols (M.adviceCols p) (M.instanceCols p)
-      (C M.theta) (C M.beta) (C M.gamma) M.l0 M.lLast M.lBlind).flatten
+      (ComputablePolynomial.const M.theta) (ComputablePolynomial.const M.beta)
+      (ComputablePolynomial.const M.gamma) M.l0 M.lLast M.lBlind).flatten
+
+theorem gateConstraints_eq {np : ℕ} (M : ConstraintPolyModel np) (p : Fin np) :
+    M.gateConstraints p =
+      (M.gates.map (Expr.map C)).map
+        (fun g => g.eval M.fixedCols (M.adviceCols p) (M.instanceCols p)) := by
+  unfold gateConstraints
+  rw [← ComputablePolynomial.commRing_eq (R := Fp), computableConst_eq_C]
+
+theorem permutationConstraints_eq {np : ℕ} (M : ConstraintPolyModel np) (p : Fin np) :
+    M.permutationConstraints p =
+      permutationExpressions (M.sets p) (M.chunks p) (C M.beta) (C M.gamma) X (C M.delta)
+        M.chunkLen M.l0 M.lLast M.lBlind := by
+  unfold permutationConstraints
+  rw [← ComputablePolynomial.commRing_eq (R := Fp), computableConst_eq_C,
+    ComputablePolynomial.X_eq]
+
+theorem lookupConstraints_eq {np : ℕ} (M : ConstraintPolyModel np) (p : Fin np) :
+    M.lookupConstraints p =
+      ((M.lookups p).map fun lk =>
+        lookupExpressions lk.1 (lk.2.1.map (Expr.map C)) (lk.2.2.map (Expr.map C))
+          M.fixedCols (M.adviceCols p) (M.instanceCols p)
+          (C M.theta) (C M.beta) (C M.gamma) M.l0 M.lLast M.lBlind).flatten := by
+  unfold lookupConstraints
+  rw [← ComputablePolynomial.commRing_eq (R := Fp), computableConst_eq_C]
 
 /-- One sub-proof's constraints, split into the same three consecutive families as the verifier. -/
-noncomputable def subProofConstraints {np : ℕ} (M : ConstraintPolyModel np) (p : Fin np) :
+def subProofConstraints {np : ℕ} (M : ConstraintPolyModel np) (p : Fin np) :
     List (Polynomial Fp) :=
   M.gateConstraints p ++ M.permutationConstraints p ++ M.lookupConstraints p
 
 /-- The complete flat constraint list across all sub-proofs. -/
-noncomputable def constraints {np : ℕ} (M : ConstraintPolyModel np) : List (Polynomial Fp) :=
+def constraints {np : ℕ} (M : ConstraintPolyModel np) : List (Polynomial Fp) :=
   (List.ofFn fun p => M.subProofConstraints p).flatten
 
 /-- The packaged list is definitionally the existing deployed polynomial builder. -/
@@ -76,8 +113,8 @@ theorem constraints_eq_constraintPolys {np : ℕ} (M : ConstraintPolyModel np) :
   unfold constraints constraintPolys allConstraints
   congr 2
   funext p
-  unfold ConstraintPolyModel.subProofConstraints gateConstraints permutationConstraints
-    lookupConstraints Zcash.Snark.subProofConstraints
+  unfold ConstraintPolyModel.subProofConstraints Zcash.Snark.subProofConstraints
+  rw [gateConstraints_eq, permutationConstraints_eq, lookupConstraints_eq]
   simp [List.map_map, Function.comp_def]
 
 /--
@@ -126,6 +163,7 @@ theorem lookupExpression_mem_lookupConstraints {np : ℕ} (M : ConstraintPolyMod
       M.fixedCols (M.adviceCols p) (M.instanceCols p)
       (C M.theta) (C M.beta) (C M.gamma) M.l0 M.lLast M.lBlind) :
     c ∈ M.lookupConstraints p := by
+  rw [lookupConstraints_eq]
   refine List.mem_flatten.mpr ⟨_, ?_, hc⟩
   exact List.mem_map.mpr ⟨lk, hlk, rfl⟩
 
@@ -179,6 +217,17 @@ theorem ConstraintSatisfaction.lookupExpression {np n : ℕ} {M : ConstraintPoly
       (C M.theta) (C M.beta) (C M.gamma) M.l0 M.lLast M.lBlind) :
     (X ^ n - 1 : Polynomial Fp) ∣ c :=
   h.lookups p c (M.lookupExpression_mem_lookupConstraints p hlk hc)
+
+/-- Use full satisfaction on a member of one selected permutation-expression list. -/
+theorem ConstraintSatisfaction.permutationExpression {np n : ℕ}
+    {M : ConstraintPolyModel np} (h : ConstraintSatisfaction M n) (p : Fin np)
+    {c : Polynomial Fp}
+    (hc : c ∈ permutationExpressions (M.sets p) (M.chunks p)
+      (C M.beta) (C M.gamma) X (C M.delta) M.chunkLen M.l0 M.lLast M.lBlind) :
+    (X ^ n - 1 : Polynomial Fp) ∣ c := by
+  apply h.permutation p c
+  rw [ConstraintPolyModel.permutationConstraints_eq]
+  exact hc
 
 /-! ## Named members of the permutation list -/
 

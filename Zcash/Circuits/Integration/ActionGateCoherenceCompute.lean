@@ -41,9 +41,16 @@ theorem domainExponent_lt :
     actionCircuit.domainExponent < 33 := by
   native_decide
 
+/-- Every derived advice query names a column allocated by Action's configure program. -/
+theorem adviceQueryColumnsAllocated :
+    ∀ entry ∈ actionCircuit.pinnedCS.adviceQueryLayout,
+      entry.1 < actionCircuit.constraintSystem.numAdviceColumns := by
+  native_decide
+
 assert_no_sorry gateData_eq
 assert_no_sorry selectorDegree
 assert_no_sorry domainExponent_lt
+assert_no_sorry adviceQueryColumnsAllocated
 
 end ActionGateCoherence
 

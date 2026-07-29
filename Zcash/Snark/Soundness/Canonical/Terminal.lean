@@ -150,7 +150,7 @@ facts.
 The fixed, advice, and instance feed equations are all reconstructed from the
 same opening family; they are not independent terminal premises.
 -/
-noncomputable def ofOpenings
+def ofOpenings
     {shape : Shape}
     {urs : URS G} {hk : shape.k = urs.k}
     {vk : VerifyingKey shape Fp G}
@@ -311,7 +311,7 @@ member-node binding, retaining the augmented-basis relation when binding fails.
 Compared with `ofOpenings`, this is the protocol-facing entry point: acceptance
 chooses the route, and node binding supplies all assembled openings.
 -/
-noncomputable def ofNodeBinding_or_relation
+def ofNodeBinding_or_relation
     {shape : Shape}
     {urs : URS G} {hk : shape.k = urs.k}
     {vk : VerifyingKey shape Fp G}
@@ -386,7 +386,7 @@ The deployed quotient-member binding, instantiated at the accepted canonical
 decoded model, proves that model's complete circuit identity or returns the shared
 augmented commitment relation.
 -/
-noncomputable def acceptedModel_circuitSat_or_relation
+def acceptedModel_circuitSat_or_relation
     {shape : Shape}
     (urs : URS G) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp G)
@@ -732,7 +732,7 @@ All query evaluations and the quotient carrier are fixed by the accepted
 `CommitmentId` resolver. The only exceptional branch is the existing
 augmented-basis relation produced by node binding.
 -/
-noncomputable def acceptedModel_circuitSat_or_relation_of_decodedMemberPolynomial_eq
+def acceptedModel_circuitSat_or_relation_of_decodedMemberPolynomial_eq
     {shape : Shape}
     (urs : URS G) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp G)

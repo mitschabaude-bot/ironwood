@@ -130,10 +130,30 @@ theorem permChunks_bind_of_feeds {shape : Shape} {G' : Type*}
   · exact hinstanceF i
 
 /-- The public Lagrange-basis polynomial. -/
-noncomputable def lagrangeBasisPoly (omega : Fp) (n : Nat) (i : Int) : Polynomial Fp :=
-  Polynomial.C (omega ^ i / (n : Fp)) *
-    ∑ k ∈ Finset.range n,
-      Polynomial.C ((omega ^ i) ^ (n - 1 - k)) * Polynomial.X ^ k
+def lagrangeBasisPoly (omega : Fp) (n : Nat) (i : Int) : Polynomial Fp :=
+  ComputablePolynomial.mul
+    (ComputablePolynomial.const (omega ^ i / (n : Fp)))
+    (ComputablePolynomial.sumList ((List.range n).map fun k =>
+      ComputablePolynomial.mul
+        (ComputablePolynomial.const ((omega ^ i) ^ (n - 1 - k)))
+        (ComputablePolynomial.pow ComputablePolynomial.X k)))
+
+private theorem sum_listRange_eq_finsetRange (f : Nat → Polynomial Fp) (n : Nat) :
+    ((List.range n).map f).sum = ∑ k ∈ Finset.range n, f k := by
+  induction n with
+  | zero => simp
+  | succ n ih => simp [List.range_succ, Finset.sum_range_succ, ih]
+
+theorem lagrangeBasisPoly_eq (omega : Fp) (n : Nat) (i : Int) :
+    lagrangeBasisPoly omega n i =
+      Polynomial.C (omega ^ i / (n : Fp)) *
+        ∑ k ∈ Finset.range n,
+          Polynomial.C ((omega ^ i) ^ (n - 1 - k)) * Polynomial.X ^ k := by
+  rw [lagrangeBasisPoly, ComputablePolynomial.mul_eq, ComputablePolynomial.const_eq,
+    ComputablePolynomial.sumList_eq]
+  simp only [ComputablePolynomial.mul_eq, ComputablePolynomial.const_eq,
+    ComputablePolynomial.pow_eq, ComputablePolynomial.X_eq,
+    sum_listRange_eq_finsetRange]
 
 /-- Closed-form evaluation of the basis polynomial away from the domain. -/
 theorem lagrangeBasisPoly_eval (omega : Fp) (n : Nat) (i : Int) (x : Fp)
@@ -169,7 +189,8 @@ theorem lagrangeBasisPoly_eval (omega : Fp) (n : Nat) (i : Int) (x : Fp)
   have heval : (lagrangeBasisPoly omega n i).eval x =
       (omega ^ i / (n : Fp)) *
         ∑ k ∈ Finset.range n, (omega ^ i) ^ (n - 1 - k) * x ^ k := by
-    simp [lagrangeBasisPoly, Polynomial.eval_finsetSum]
+    rw [lagrangeBasisPoly_eq]
+    simp [Polynomial.eval_finsetSum]
   have hsub : x - omega ^ i ≠ 0 := sub_ne_zero.mpr hxa
   have hsum : (∑ k ∈ Finset.range n, (omega ^ i) ^ (n - 1 - k) * x ^ k) =
       (x ^ n - 1) / (x - omega ^ i) := by

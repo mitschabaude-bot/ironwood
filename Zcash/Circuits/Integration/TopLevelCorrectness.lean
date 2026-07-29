@@ -132,7 +132,7 @@ Package one successful set of component witnesses behind abstract environment
 and operation values, retaining only their equalities to the circuit-derived
 values.
 -/
-noncomputable def bridgeWitness_of_components
+def bridgeWitness_of_components
     {G : Type} [AddCommGroup G] [Inhabited G]
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]

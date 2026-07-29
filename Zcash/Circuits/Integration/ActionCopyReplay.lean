@@ -28,7 +28,7 @@ variable {G : Type} [AddCommGroup G] [Module Fp G]
 Construct the complete Action copy witness for one proof from the accepted
 canonical relation, or retain the shared augmented-commitment relation branch.
 -/
-noncomputable def actionCopyReplayWitness_or_relation
+def actionCopyReplayWitness_or_relation
     (pp : Keygen.ProofParams) (urs : URS G)
     (hk : (actionShape pp).k = urs.k)
     {instanceCommitment :
@@ -74,7 +74,6 @@ noncomputable def actionCopyReplayWitness_or_relation
         (FlatCell actionNumPermCols actionDomainSize)
         (NontrivialRelation (F := Fp) urs.g urs.u urs.w) ⊕'
       NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
-  classical
   have hn : (actionVk pp urs).n ≠ 0 := by
     change 2 ^ actionCircuit.domainExponent ≠ 0
     positivity
@@ -93,9 +92,8 @@ noncomputable def actionCopyReplayWitness_or_relation
   rcases hcycleResult with hcycle | hbad
   swap
   · exact PSum.inr hbad
-  -- `hcycle` is an `∃`; the witness it feeds is data, so the cycle is recovered by choice.
-  · let cycle := Classical.choose hcycle
-    have hcycleSigma := Classical.choose_spec hcycle
+  · let cycle := hcycle.1
+    have hcycleSigma := hcycle.2
     have hpairval :=
       actionCopyPairValue_of_resolverPermutation
         pp urs ch relation.polynomial

@@ -22,13 +22,13 @@ open Polynomial
 variable {G : Type*} [AddCommGroup G] [Module Fp G]
 
 /-- The points of deployed point set `j`, as a finite set. -/
-noncomputable def deployedSetPts [DecidableEq G] [Inhabited G] {shape : Shape}
+def deployedSetPts [DecidableEq G] [Inhabited G] {shape : Shape}
     (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → ℕ → G) (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
     (j : ℕ) : Finset Fp :=
   ((constructIntermediateSets (assembleQueries vk instanceCommitment ps ch)).points.getD j []).toFinset
 
 /-- The union of all the deployed point sets — the roots of the vanishing polynomial `D`. -/
-noncomputable def deployedAllPts [DecidableEq G] [Inhabited G] {shape : Shape}
+def deployedAllPts [DecidableEq G] [Inhabited G] {shape : Shape}
     (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → ℕ → G) (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp) :
     Finset Fp :=
   (Finset.range (constructIntermediateSets (assembleQueries vk instanceCommitment ps ch)).points.length).biUnion

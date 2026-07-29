@@ -34,19 +34,32 @@ theorem natDegree_comp_rotate_le (col : Polynomial Fp) (w : Fp) {B : ℕ}
       ≤ B * 1 := Nat.mul_le_mul h (le_trans (natDegree_C_mul_le _ _) natDegree_X_le)
     _ = B := mul_one B
 
+/-- The executable polynomial wrapper for rotation has the same degree bound. -/
+theorem natDegree_comp_rotateData_le (col : Polynomial Fp) (w : Fp) {B : ℕ}
+    (h : col.natDegree ≤ B) :
+    (ComputablePolynomial.comp col
+      (ComputablePolynomial.mul (ComputablePolynomial.const w)
+        ComputablePolynomial.X)).natDegree ≤ B := by
+  rw [ComputablePolynomial.comp_eq, ComputablePolynomial.mul_eq,
+    ComputablePolynomial.const_eq, ComputablePolynomial.X_eq]
+  exact natDegree_comp_rotate_le col w h
+
 /-- A rotated feed keeps its columns' degree bound. -/
 theorem natDegree_rotatedFeed_le {n : ℕ} (omega : Fp) (layout : List (ℕ × ℤ))
     (col : Fin n → Polynomial Fp) {B : ℕ} (h : ∀ j, (col j).natDegree ≤ B) (i : ℕ) :
     (rotatedFeed omega layout col i).natDegree ≤ B := by
-  rw [rotatedFeed, finFn]
+  unfold rotatedFeed
   split
-  · exact natDegree_comp_rotate_le _ _ (h _)
-  · simp
+  · rw [ComputablePolynomial.comp_eq, ComputablePolynomial.mul_eq,
+      ComputablePolynomial.const_eq, ComputablePolynomial.X_eq]
+    exact natDegree_comp_rotate_le _ _ (h _)
+  · rw [ComputablePolynomial.zero_eq]
+    simp
 
 /-- The Lagrange basis polynomial has degree below the domain size. -/
 theorem natDegree_lagrangeBasisPoly_le (omega : Fp) (n : ℕ) (i : ℤ) :
     (lagrangeBasisPoly omega n i).natDegree ≤ n - 1 := by
-  rw [lagrangeBasisPoly]
+  rw [lagrangeBasisPoly_eq]
   refine le_trans (natDegree_C_mul_le _ _) (natDegree_sum_le_of_forall_le _ _ ?_)
   intro k hk
   refine le_trans (natDegree_C_mul_le _ _) ?_
@@ -91,11 +104,13 @@ theorem natDegree_preXQuotient_mul_le {d : ℕ} (n : ℕ) (hp : Fin d → Polyno
     rw [Nat.mul_succ]
     omega
 
+set_option maxHeartbeats 800000 in
 /-- **The committed constraint difference's degree cap.** With every point polynomial and
 quotient piece of degree `≤ B`, the selector degree `n − 1 ≤ B`, and the caps `D`/`Dq` dominating
 the constraint families and the quotient tail, the pre-`x` constraint difference has degree at
 most `max D Dq`. -/
 theorem natDegree_committedPreXConstraintDifference_le {G : Type*} [Inhabited G]
+    [AddCommGroup G] [Module Fp G]
     {shape : Shape} (poly : G → Polynomial Fp)
     (piecePoly : Fin shape.numQuotientPieces → Polynomial Fp)
     (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → ℕ → G)
@@ -121,11 +136,12 @@ theorem natDegree_committedPreXConstraintDifference_le {G : Type*} [Inhabited G]
     fun q i => natDegree_rotatedFeed_le _ _ _ (fun _ => hpoly _) i
   have hcommon : ∀ c, (committedPermCommonFeed poly vk c).natDegree ≤ B := by
     intro c
-    rw [committedPermCommonFeed]
+    unfold committedPermCommonFeed
     split
     · exact hpoly _
-    · simp
-  rw [committedPreXConstraintDifference]
+    · rw [ComputablePolynomial.zero_eq]
+      simp
+  rw [committedPreXConstraintDifference_eq]
   refine le_trans (natDegree_sub_le _ _) (max_le_max ?_ ?_)
   · refine natDegree_combineConstraints_le hB _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
       hfix hfeed hinstF hgates ?_ ?_ ?_
@@ -137,11 +153,13 @@ theorem natDegree_committedPreXConstraintDifference_le {G : Type*} [Inhabited G]
       dsimp only
       refine ⟨hpoly _, ?_⟩
       rcases (ps.permutationSetEvals p j).lastEval with _ | le
-      · simp
+      · change (0 : Polynomial Fp).natDegree ≤ B
+        simp
       · simp only [Option.map_some, Option.getD_some]
         split
-        · exact natDegree_comp_rotate_le _ _ (hpoly _)
-        · simp
+        · exact natDegree_comp_rotateData_le _ _ (hpoly _)
+        · rw [ComputablePolynomial.const_eq]
+          simp
     · -- permutation chunks
       intro p c hc
       obtain ⟨sc, hsc, rfl⟩ := List.mem_map.mp hc
@@ -150,7 +168,7 @@ theorem natDegree_committedPreXConstraintDifference_le {G : Type*} [Inhabited G]
       dsimp only
       refine ⟨?_, ?_, ?_⟩
       · obtain ⟨j, rfl⟩ := List.mem_ofFn.mp hs1
-        exact ⟨hpoly _, natDegree_comp_rotate_le _ _ (hpoly _)⟩
+        exact ⟨hpoly _, natDegree_comp_rotateData_le _ _ (hpoly _)⟩
       · simpa using hW _ hs2
       · intro pr hpr
         obtain ⟨cr, -, hpr'⟩ := List.mem_map.mp hpr
@@ -164,15 +182,15 @@ theorem natDegree_committedPreXConstraintDifference_le {G : Type*} [Inhabited G]
     · -- lookup carriers
       intro p lk hlk
       obtain ⟨l, rfl⟩ := List.mem_ofFn.mp hlk
-      exact ⟨⟨hpoly _, natDegree_comp_rotate_le _ _ (hpoly _), hpoly _,
-        natDegree_comp_rotate_le _ _ (hpoly _), hpoly _⟩, hlin l, hltab l⟩
+      exact ⟨⟨hpoly _, natDegree_comp_rotateData_le _ _ (hpoly _), hpoly _,
+        natDegree_comp_rotateData_le _ _ (hpoly _), hpoly _⟩, hlin l, hltab l⟩
     · -- the blind selector: a fold of Lagrange polynomials
       refine natDegree_foldl_add_le _ ?_
       intro q hq'
       obtain ⟨j, _, rfl⟩ := List.mem_map.mp hq'
       exact le_trans (natDegree_lagrangeBasisPoly_le _ _ _) hnB
   · -- the quotient tail
-    rw [committedPreXQuotient]
+    rw [committedPreXQuotient_eq]
     exact le_trans (natDegree_preXQuotient_mul_le _ _ hpiece) hq
 
 /-! ## The deployed constraint difference, collapsed across fork tapes -/

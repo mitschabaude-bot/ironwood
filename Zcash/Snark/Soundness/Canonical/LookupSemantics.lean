@@ -77,6 +77,68 @@ noncomputable def resolverLookupProductDifference
       (lookupColumnRows vk.omega
         (lookupTablePolyOfResolver vk ch poly p l) (u + 1)))
 
+/-- The selected lookup difference after fixing `β`, computed without constructing a nested
+polynomial. -/
+def resolverLookupProductDifferenceGammaData
+    {shape : Shape} {G : Type*}
+    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    (poly : CommitmentId → Polynomial Fp)
+    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u : ℕ) : Polynomial Fp :=
+  lookupProdDiffGammaData
+    (Finset.univ.val.map
+      (lookupColumnRows vk.omega (poly (.lookupPermInput p l)) (u + 1)))
+    (Finset.univ.val.map
+      (lookupColumnRows vk.omega (poly (.lookupPermTable p l)) (u + 1)))
+    (Finset.univ.val.map
+      (lookupColumnRows vk.omega
+        (lookupInputPolyOfResolver vk ch poly p l) (u + 1)))
+    (Finset.univ.val.map
+      (lookupColumnRows vk.omega
+        (lookupTablePolyOfResolver vk ch poly p l) (u + 1)))
+    ch.beta
+
+theorem resolverLookupProductDifferenceGammaData_eq
+    {shape : Shape} {G : Type*}
+    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    (poly : CommitmentId → Polynomial Fp)
+    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u : ℕ) :
+    resolverLookupProductDifferenceGammaData vk ch poly p l u =
+      (resolverLookupProductDifference vk ch poly p l u).map (evalRingHom ch.beta) := by
+  rw [resolverLookupProductDifferenceGammaData, resolverLookupProductDifference,
+    lookupProdDiffGammaData_eq]
+
+/-- One `γ` coefficient of the selected lookup difference, computed directly over `Fp`. -/
+def resolverLookupProductDifferenceCoeffData
+    {shape : Shape} {G : Type*}
+    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    (poly : CommitmentId → Polynomial Fp)
+    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u j : ℕ) : Polynomial Fp :=
+  lookupProdDiffCoeffData
+    (Finset.univ.val.map
+      (lookupColumnRows vk.omega (poly (.lookupPermInput p l)) (u + 1)))
+    (Finset.univ.val.map
+      (lookupColumnRows vk.omega (poly (.lookupPermTable p l)) (u + 1)))
+    (Finset.univ.val.map
+      (lookupColumnRows vk.omega
+        (lookupInputPolyOfResolver vk ch poly p l) (u + 1)))
+    (Finset.univ.val.map
+      (lookupColumnRows vk.omega
+        (lookupTablePolyOfResolver vk ch poly p l) (u + 1)))
+    j
+
+theorem resolverLookupProductDifferenceCoeffData_eq
+    {shape : Shape} {G : Type*}
+    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    (poly : CommitmentId → Polynomial Fp)
+    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u j : ℕ)
+    (hj : j ≤ u + 1) :
+    resolverLookupProductDifferenceCoeffData vk ch poly p l u j =
+      (resolverLookupProductDifference vk ch poly p l u).coeff j := by
+  rw [resolverLookupProductDifferenceCoeffData, resolverLookupProductDifference]
+  apply lookupProdDiffCoeffData_eq
+  · simpa using hj
+  · simpa using hj
+
 /-- All separately priced challenges used by the selected lookup endpoint, including the two
 row-factor exclusions that eliminate its residual zero-product branch. -/
 structure ResolverLookupGoodChallenges

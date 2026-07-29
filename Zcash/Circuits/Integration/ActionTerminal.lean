@@ -37,7 +37,7 @@ permutation, lookup, and selector claimed evaluations are reconstructed internal
 from the accepted assembled queries. No free semantic proposition, `hencodes`,
 constraint family, or decoded-column feed remains.
 -/
-noncomputable def action_bundleStatement_or_relation_of_decodedMemberPolynomial_eq
+def action_bundleStatement_or_relation_of_decodedMemberPolynomial_eq
     (pp : ProofParams) (urs : URS G)
     (hk :
       (pp.mergeDerived actionCircuit).k = urs.k)

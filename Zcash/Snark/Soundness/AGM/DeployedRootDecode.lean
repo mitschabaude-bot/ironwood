@@ -36,7 +36,7 @@ structure DeployedAlgebraicDecode [DecidableEq G] [Inhabited G] {shape : Shape}
         (idx : Nat) 0
 
 /-- Avoiding all explicit deployed root sets gives the complete member-value decode. -/
-noncomputable def deployedAlgebraicDecode_of_good_roots [DecidableEq G] [Inhabited G]
+def deployedAlgebraicDecode_of_good_roots [DecidableEq G] [Inhabited G]
     {shape : Shape}
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → Nat → G)

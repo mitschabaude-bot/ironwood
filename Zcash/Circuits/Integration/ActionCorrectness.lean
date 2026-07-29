@@ -31,7 +31,7 @@ This is the circuit-owned adapter consumed by the generic top-level Vesta
 capstone. It exposes gate, fixed/selector, copy, and lookup facts, but no Action
 statement.
 -/
-noncomputable def ofAcceptedCircuitSat
+def ofAcceptedCircuitSat
     (pp : ProofParams) (urs : URS G)
     (hk :
       (pp.mergeDerived actionCircuit).k = urs.k)

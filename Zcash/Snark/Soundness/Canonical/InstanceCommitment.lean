@@ -29,7 +29,7 @@ def polynomialCoefficients (n : ℕ) (p : Polynomial Fp) : Fin n → Fp :=
 theorem coeffsToPoly_polynomialCoefficients {n : ℕ} {p : Polynomial Fp}
     (hdegree : p.natDegree < n) :
     coeffsToPoly (polynomialCoefficients n p) = p := by
-  rw [coeffsToPoly]
+  rw [coeffsToPoly_eq_sum]
   simpa only [polynomialCoefficients, ← Fin.sum_univ_eq_sum_range] using
     (p.as_sum_range_C_mul_X_pow' hdegree).symm
 
@@ -40,6 +40,8 @@ theorem rowPolynomial_eq_sum_single {n : ℕ}
       ∑ i : Fin n, values i • rowPolynomial omega (Pi.single i 1) := by
   let interpolation :=
     Lagrange.interpolate Finset.univ (fun i : Fin n => omega ^ (i : ℕ))
+  rw [rowPolynomial_eq_lagrange]
+  simp_rw [rowPolynomial_eq_lagrange]
   change interpolation values =
     ∑ i : Fin n, values i • interpolation (Pi.single i 1)
   calc
@@ -73,7 +75,7 @@ theorem polynomialCoefficients_rowPolynomial_eq_sum_single {n : ℕ}
   simp [polynomialCoefficients]
 
 /-- The monomial coefficient vector of the zero-padded public-instance row polynomial. -/
-noncomputable def instanceCoefficients (n : ℕ)
+def instanceCoefficients (n : ℕ)
     (omega : Fp) (values : List Fp) : Fin n → Fp :=
   polynomialCoefficients n (instanceRowPolynomial n omega values)
 
@@ -129,7 +131,7 @@ Parameter fixtures only need to export generators reached by nonzero public rows
 prefix, this constructor fills the key with the canonical monomial-URS commitment itself, so the
 setup certificate has one obligation per exported generator rather than one per domain row.
 -/
-noncomputable def ofPrefix (urs : URS G) (omega : Fp) (generatorsPrefix : List G)
+def ofPrefix (urs : URS G) (omega : Fp) (generatorsPrefix : List G)
     (hprefix : ∀ i : Fin (2 ^ urs.k), (i : ℕ) < generatorsPrefix.length →
       generatorsPrefix.getD (i : ℕ) 0 =
         commit urs (polynomialCoefficients (2 ^ urs.k)
@@ -357,11 +359,11 @@ classical case split — `DecidableEq Fp` is pinned through `ZMod` so the `Fin (
 instance synthesises, and the refuted branch hands its disagreement to
 `NontrivialRelation.ofCombinationCollision`, which computes the coordinate differences.
 
-Still `noncomputable`, and so not yet `assert_computable`-pinnable: the comparison target
-`instanceCoefficients` is itself `noncomputable`. Giving it a computable twin over the Lagrange
-machinery in the arithmetic tier is what would close that gap.
+`instanceCoefficients` is executable, so the comparison and its collision branch are executable
+as well.  The polynomial interpolation is finite arithmetic over `Fp`; it does not select a
+propositional witness.
 -/
-noncomputable def instanceOpening_eq_or_relation
+def instanceOpening_eq_or_relation
     {urs : URS G} {omega : Fp}
     (key : LagrangeCommitmentKey urs omega)
     (values : List Fp) (blind : Fp)
@@ -389,7 +391,7 @@ noncomputable def instanceOpening_eq_or_relation
 At the polynomial interface, an augmented opening of the statement-derived instance commitment is
 the canonical zero-padded row polynomial, or it computes the same AGM relation.
 -/
-noncomputable def coeffsToPoly_eq_instanceRowPolynomial_or_relation
+def coeffsToPoly_eq_instanceRowPolynomial_or_relation
     {urs : URS G} {omega : Fp}
     (key : LagrangeCommitmentKey urs omega)
     (values : List Fp) (blind : Fp)

@@ -750,9 +750,20 @@ theorem polynomial_eq_zero_of_not_assembled
           q.commId = id) :
     relation.polynomial id = 0 := by
   unfold CanonicalMemberConstraintRelation.polynomial
-  unfold CanonicalMemberConstraintRelation.route
-  unfold assembledQueryMemberRoute
-  simp only [habsent, dite_false, decodedPolynomialResolver]
+  have hnone : relation.route id = none := by
+    unfold CanonicalMemberConstraintRelation.route
+    unfold assembledQueryMemberRoute
+    simp only
+    split
+    · rfl
+    · rename_i q hfind
+      exfalso
+      apply habsent
+      refine ⟨q, List.mem_of_find?_eq_some hfind, ?_⟩
+      simpa using List.find?_some hfind
+  unfold decodedPolynomialResolver
+  rw [hnone]
+  exact ComputablePolynomial.zero_eq
 
 /--
 A canonically routed fixed-column opening is the polynomial interpolating its
@@ -763,7 +774,7 @@ in the derived VK is the Lagrange commitment to `rows` with Halo 2's default bli
 `1`. It is independent of the proof and can be established once for the generic
 `TopLevelCircuit.toVerifierKey` construction.
 -/
-noncomputable def fixedColumn_eq_rowPolynomial_or_relation
+def fixedColumn_eq_rowPolynomial_or_relation
     (relation : CanonicalMemberConstraintRelation
       urs hk vk instanceCommitment ps ch pU pW a
       batchOpenings memberDecode hblinding y hpoly deg)
@@ -780,50 +791,48 @@ noncomputable def fixedColumn_eq_rowPolynomial_or_relation
     relation.polynomial (.fixedCol column) =
         instanceRowPolynomial (2 ^ urs.k) vk.omega rows ⊕'
       NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
-  classical
-  let q := Classical.choose hquery
-  have hq : q ∈ assembleQueries vk instanceCommitment ps ch :=
-    (Classical.choose_spec hquery).1
-  have hqid : q.commId = _ := (Classical.choose_spec hquery).2
-  have routed :=
-    assembledQueryMemberRoute_faithful
-      (instanceCommitment := instanceCommitment)
-      vk ps ch relation.groupingCount relation.noDuplicateQueries q hq
+  have hsome : (relation.route (.fixedCol column)).isSome := by
+    obtain ⟨q, hq, hqid⟩ := hquery
+    have routed := assembledQueryMemberRoute_faithful
+      (instanceCommitment := instanceCommitment) vk ps ch relation.groupingCount
+      relation.noDuplicateQueries q hq
+    unfold CanonicalMemberConstraintRelation.route
+    rw [← hqid, routed.route_eq]
+    rfl
+  let slot := (relation.route (.fixedCol column)).get hsome
   have routedFixed :
-      relation.route (.fixedCol column) = some routed.slot := by
-    rw [← hqid]
-    exact routed.route_eq
+      relation.route (.fixedCol column) = some slot := (Option.some_get hsome).symm
   have hid :
       (deployedSetCommIds (instanceCommitment := instanceCommitment)
-        vk ps ch routed.slot.setIndex).getD
-          (routed.slot.memberIndex : ℕ) .vanishingH =
+        vk ps ch slot.setIndex).getD
+          (slot.memberIndex : ℕ) .vanishingH =
         .fixedCol column := by
     apply assembledQueryMemberRoute_id
       (instanceCommitment := instanceCommitment)
       vk ps ch relation.groupingCount relation.noDuplicateQueries
-      (.fixedCol column) routed.slot
+      (.fixedCol column) slot
     simpa [CanonicalMemberConstraintRelation.route] using routedFixed
   have href :=
     deployedMemberRef_eq_fixedCommitment
       (instanceCommitment := instanceCommitment)
-      vk ps ch relation.groupingCount routed.slot column hid
+      vk ps ch relation.groupingCount slot column hid
   let decoded :=
-    memberDecode routed.slot.setIndex routed.slot.setIndex_lt
+    memberDecode slot.setIndex slot.setIndex_lt
   have hopen :
-      commit urs (decoded.cols routed.slot.memberIndex) +
-          decoded.uComp routed.slot.memberIndex • urs.u +
-          decoded.wComp routed.slot.memberIndex • urs.w =
+      commit urs (decoded.cols slot.memberIndex) +
+          decoded.uComp slot.memberIndex • urs.u +
+          decoded.wComp slot.memberIndex • urs.w =
         key.commitInstance rows 1 := by
     calc
-      commit urs (decoded.cols routed.slot.memberIndex) +
-            decoded.uComp routed.slot.memberIndex • urs.u +
-            decoded.wComp routed.slot.memberIndex • urs.w =
+      commit urs (decoded.cols slot.memberIndex) +
+            decoded.uComp slot.memberIndex • urs.u +
+            decoded.wComp slot.memberIndex • urs.w =
           ((deployedSetQueries
               (instanceCommitment := instanceCommitment)
-              vk ps ch routed.slot.setIndex).getD
-            (routed.slot.memberIndex : ℕ) (.point 0, [])).1.eval
+              vk ps ch slot.setIndex).getD
+            (slot.memberIndex : ℕ) (.point 0, [])).1.eval
               ⟨shape.k, hk ▸ urs.g, urs.w, urs.u⟩ :=
-        decoded.commitment routed.slot.memberIndex
+        decoded.commitment slot.memberIndex
       _ = vk.fixedCommitment column := by
         rw [href]
         rfl
@@ -831,9 +840,9 @@ noncomputable def fixedColumn_eq_rowPolynomial_or_relation
   have hbound :=
     coeffsToPoly_eq_instanceRowPolynomial_or_relation
       key rows 1
-      (decoded.cols routed.slot.memberIndex)
-      (decoded.uComp routed.slot.memberIndex)
-      (decoded.wComp routed.slot.memberIndex)
+      (decoded.cols slot.memberIndex)
+      (decoded.uComp slot.memberIndex)
+      (decoded.wComp slot.memberIndex)
       hrows hopen
   refine bindOrRelationWitness hbound fun heq => ?_
   rw [CanonicalMemberConstraintRelation.polynomial,
@@ -848,7 +857,7 @@ In-range columns use the circuit-derived fixed commitments. Out-of-range
 identities are absent from the bounded fixed-query layout, so both the resolver
 polynomial and the circuit's `getD` row vector are zero.
 -/
-noncomputable def fixedColumns_eq_rowPolynomials_or_relation
+def fixedColumns_eq_rowPolynomials_or_relation
     (relation : CanonicalMemberConstraintRelation
       urs hk vk instanceCommitment ps ch pU pW a
       batchOpenings memberDecode hblinding y hpoly deg)
@@ -907,14 +916,16 @@ noncomputable def fixedColumns_eq_rowPolynomials_or_relation
         rw [rowsLength]
         exact Nat.le_of_not_gt hcolumn
       rw [hrowsDefault]
-      simp [instanceRowPolynomial, zeroPaddedRows, rowPolynomial]
+      simp [instanceRowPolynomial, zeroPaddedRows, rowPolynomial,
+        ComputablePolynomial.sumList_eq, ComputablePolynomial.mul_eq,
+        ComputablePolynomial.const_eq]
 
 /--
 Circuit-derived fixed rows discharge both consumers of fixed-column semantics:
 packed selector activations and explicit fixed/table operations. Commitment binding
 is retained as an explicit alternative.
 -/
-noncomputable def topLevelFixedConstraints_or_relation
+def topLevelFixedConstraints_or_relation
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     {top : TopLevelCircuit Fp Config PublicInput}
@@ -988,7 +999,7 @@ Pointwise fixed-cell realization at the canonical decoded-member relation.
 Constants replay uses this theorem for the V1-allocated constants cells; selector
 and fixed/table family proofs use its bundled sibling above.
 -/
-noncomputable def topLevelFixedEntryRead_or_relation
+def topLevelFixedEntryRead_or_relation
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     {top : TopLevelCircuit Fp Config PublicInput}

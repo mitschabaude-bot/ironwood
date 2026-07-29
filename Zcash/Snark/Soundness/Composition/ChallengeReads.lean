@@ -73,21 +73,12 @@ theorem permutationColumnPolynomialOfResolver_congr
     permutationColumnPolynomialOfResolver vk poly₁ p cr =
       permutationColumnPolynomialOfResolver vk poly₂ p cr := by
   unfold permutationColumnPolynomialOfResolver
-  rw [show (finFn fun i : Fin shape.numInstanceQueries =>
-        poly₁ (permutationColumnCommitmentId vk p (.instance i))) =
-      (finFn fun i : Fin shape.numInstanceQueries =>
-        poly₂ (permutationColumnCommitmentId vk p (.instance i))) from
-    congrArg finFn (funext fun i => h _ trivial)]
-  rw [show (finFn fun i : Fin shape.numAdviceQueries =>
-        poly₁ (permutationColumnCommitmentId vk p (.advice i))) =
-      (finFn fun i : Fin shape.numAdviceQueries =>
-        poly₂ (permutationColumnCommitmentId vk p (.advice i))) from
-    congrArg finFn (funext fun i => h _ trivial)]
-  rw [show (finFn fun i : Fin shape.numFixedQueries =>
-        poly₁ (permutationColumnCommitmentId vk p (.fixed i))) =
-      (finFn fun i : Fin shape.numFixedQueries =>
-        poly₂ (permutationColumnCommitmentId vk p (.fixed i))) from
-    congrArg finFn (funext fun i => h _ trivial)]
+  cases cr <;> simp only [ColumnRef.resolve]
+  all_goals
+    unfold finFn
+    split
+    · exact h _ trivial
+    · rfl
 
 /-- **The permutation pairs read only the permutation input slots.** -/
 theorem resolverPermutationPairs_congr
@@ -284,6 +275,23 @@ theorem resolverEnvironment_congr
     (fun column => poly₂ (CommitmentId.adviceCol p column)) from funext fun _ => h _ trivial]
   rw [show (fun column => poly₁ (CommitmentId.instanceCol p column)) =
     (fun column => poly₂ (CommitmentId.instanceCol p column)) from funext fun _ => h _ trivial]
+
+/-- **The `θ` budget is a length count.**  Row count times input arity per activation — the
+polynomial map and the URS never enter, so the per-state `θ` epsilon is one number per
+circuit. -/
+theorem TopLevelLookupCoherence.topLevelLookupThetaBudget_eq
+    {G' : Type} [AddCommGroup G'] [Inhabited G']
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : Halo2.TopLevelCircuit Fp Config PublicInput)
+    (pp : Keygen.ProofParams) (urs : URS G')
+    (poly : CommitmentId → Polynomial Fp) :
+    TopLevelLookupCoherence.topLevelLookupThetaBudget top pp urs poly =
+      ∑ index : TopLevelLookupCoherence.TopLevelLookupActivationIndex top pp,
+        top.usableRowsAt top.domainExponent *
+          ((operationEnabledLookups top.operations 0).get index.2).argument.inputs.length := by
+  unfold TopLevelLookupCoherence.topLevelLookupThetaBudget
+  refine Finset.sum_congr rfl fun index _ => ?_
+  exact congrArg (top.usableRowsAt top.domainExponent * ·) (List.length_map _)
 
 /-- **The top-level `θ` exclusion reads only the query columns.** -/
 theorem TopLevelLookupCoherence.allTopLevelLookupThetaBadSet_congr

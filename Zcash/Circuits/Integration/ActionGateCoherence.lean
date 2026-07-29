@@ -87,6 +87,16 @@ private theorem adviceQueryCount
       (pp.mergeDerived actionCircuit).numAdviceQueries :=
   actionCircuit.toVerifierKey_adviceQueryCount pp urs
 
+private theorem verifierAdviceQueryColumnsAllocated
+    {G : Type} [AddCommGroup G] [Inhabited G]
+    (pp : ProofParams) (urs : URS G) :
+    ∀ entry ∈ (actionCircuit.toVerifierKey pp urs).adviceQueryLayout,
+      entry.1 < (pp.mergeDerived actionCircuit).numAdviceColumns := by
+  intro entry hentry
+  change entry.1 < actionCircuit.constraintSystem.numAdviceColumns
+  apply ActionGateCoherence.adviceQueryColumnsAllocated entry
+  simpa only [actionCircuit.toVerifierKey_adviceQueryLayout_derived] using hentry
+
 private theorem fixedQueryCount
     {G : Type} [AddCommGroup G] [Inhabited G]
     (pp : ProofParams) (urs : URS G) :
@@ -111,6 +121,7 @@ theorem topLevelGateCoherence
     TopLevelGateCoherence actionCircuit pp urs where
   gateSelectorsAllocated := gateSelectorsAllocated
   adviceQueryCount := adviceQueryCount pp urs
+  adviceQueryColumnsAllocated := verifierAdviceQueryColumnsAllocated pp urs
   fixedQueryCount := fixedQueryCount pp urs
   instanceQueryCount := instanceQueryCount pp urs
   domainExponent_lt := domainExponent_lt

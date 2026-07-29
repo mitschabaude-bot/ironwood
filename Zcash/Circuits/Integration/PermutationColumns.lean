@@ -181,7 +181,8 @@ theorem instanceRowPolynomial_eq_keygenSigmaColumn
         (sigma ⟨chunk, i, column⟩).2.2) :
     instanceRowPolynomial n omega rows =
       keygenSigmaColumn omega delta chunkLen sigma chunk column := by
-  unfold instanceRowPolynomial rowPolynomial keygenSigmaColumn zeroPaddedRows
+  unfold instanceRowPolynomial zeroPaddedRows keygenSigmaColumn
+  rw [rowPolynomial_eq_lagrange]
   exact congrArg _ (funext fun i => hval i)
 
 namespace CanonicalMemberConstraintRelation
@@ -223,7 +224,7 @@ blind `1`. It is independent of the proof and can be established once for the ge
 `TopLevelCircuit.toVerifierKey` construction. Query coverage is unconditional: every σ
 commitment is opened by the assembled queries.
 -/
-noncomputable def permCommon_eq_rowPolynomial_or_relation
+def permCommon_eq_rowPolynomial_or_relation
     (relation : CanonicalMemberConstraintRelation
       urs hk vk instanceCommitment ps ch pU pW a
       batchOpenings memberDecode hblinding y hpoly deg)
@@ -238,51 +239,49 @@ noncomputable def permCommon_eq_rowPolynomial_or_relation
     relation.polynomial (.permCommon (c : ℕ)) =
         instanceRowPolynomial (2 ^ urs.k) vk.omega rows ⊕'
       NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
-  classical
   have hquery := assembleQueries_permCommon_query vk instanceCommitment ps ch c
-  let q := Classical.choose hquery
-  have hq : q ∈ assembleQueries vk instanceCommitment ps ch :=
-    (Classical.choose_spec hquery).1
-  have hqid : q.commId = _ := (Classical.choose_spec hquery).2
-  have routed :=
-    assembledQueryMemberRoute_faithful
-      (instanceCommitment := instanceCommitment)
-      vk ps ch relation.groupingCount relation.noDuplicateQueries q hq
+  have hsome : (relation.route (.permCommon (c : Nat))).isSome := by
+    obtain ⟨q, hq, hqid⟩ := hquery
+    have routed := assembledQueryMemberRoute_faithful
+      (instanceCommitment := instanceCommitment) vk ps ch relation.groupingCount
+      relation.noDuplicateQueries q hq
+    unfold CanonicalMemberConstraintRelation.route
+    rw [← hqid, routed.route_eq]
+    rfl
+  let slot := (relation.route (.permCommon (c : Nat))).get hsome
   have routedCommon :
-      relation.route (.permCommon (c : ℕ)) = some routed.slot := by
-    rw [← hqid]
-    exact routed.route_eq
+      relation.route (.permCommon (c : ℕ)) = some slot := (Option.some_get hsome).symm
   have hid :
       (deployedSetCommIds (instanceCommitment := instanceCommitment)
-        vk ps ch routed.slot.setIndex).getD
-          (routed.slot.memberIndex : ℕ) .vanishingH =
+        vk ps ch slot.setIndex).getD
+          (slot.memberIndex : ℕ) .vanishingH =
         .permCommon (c : ℕ) := by
     apply assembledQueryMemberRoute_id
       (instanceCommitment := instanceCommitment)
       vk ps ch relation.groupingCount relation.noDuplicateQueries
-      (.permCommon (c : ℕ)) routed.slot
+      (.permCommon (c : ℕ)) slot
     simpa [CanonicalMemberConstraintRelation.route] using routedCommon
   have href :=
     deployedMemberRef_eq_permCommonCommitment
       (instanceCommitment := instanceCommitment)
-      vk ps ch relation.groupingCount routed.slot c hid
+      vk ps ch relation.groupingCount slot c hid
   let decoded :=
-    memberDecode routed.slot.setIndex routed.slot.setIndex_lt
+    memberDecode slot.setIndex slot.setIndex_lt
   have hopen :
-      commit urs (decoded.cols routed.slot.memberIndex) +
-          decoded.uComp routed.slot.memberIndex • urs.u +
-          decoded.wComp routed.slot.memberIndex • urs.w =
+      commit urs (decoded.cols slot.memberIndex) +
+          decoded.uComp slot.memberIndex • urs.u +
+          decoded.wComp slot.memberIndex • urs.w =
         key.commitInstance rows 1 := by
     calc
-      commit urs (decoded.cols routed.slot.memberIndex) +
-            decoded.uComp routed.slot.memberIndex • urs.u +
-            decoded.wComp routed.slot.memberIndex • urs.w =
+      commit urs (decoded.cols slot.memberIndex) +
+            decoded.uComp slot.memberIndex • urs.u +
+            decoded.wComp slot.memberIndex • urs.w =
           ((deployedSetQueries
               (instanceCommitment := instanceCommitment)
-              vk ps ch routed.slot.setIndex).getD
-            (routed.slot.memberIndex : ℕ) (.point 0, [])).1.eval
+              vk ps ch slot.setIndex).getD
+            (slot.memberIndex : ℕ) (.point 0, [])).1.eval
               ⟨shape.k, hk ▸ urs.g, urs.w, urs.u⟩ :=
-        decoded.commitment routed.slot.memberIndex
+        decoded.commitment slot.memberIndex
       _ = vk.permutationCommonCommitment c := by
         rw [href]
         rfl
@@ -290,9 +289,9 @@ noncomputable def permCommon_eq_rowPolynomial_or_relation
   have hbound :=
     coeffsToPoly_eq_instanceRowPolynomial_or_relation
       key rows 1
-      (decoded.cols routed.slot.memberIndex)
-      (decoded.uComp routed.slot.memberIndex)
-      (decoded.wComp routed.slot.memberIndex)
+      (decoded.cols slot.memberIndex)
+      (decoded.uComp slot.memberIndex)
+      (decoded.wComp slot.memberIndex)
       hrows hopen
   refine bindOrRelationWitness hbound fun heq => ?_
   rw [CanonicalMemberConstraintRelation.polynomial,
@@ -306,7 +305,7 @@ generated keygen σ column — the `hcolumns` premise of
 relation. `hval` is the keygen-side name fact: the committed σ rows are the replayed
 permutation's cell names.
 -/
-noncomputable def permCommon_eq_keygenSigmaColumn_or_relation
+def permCommon_eq_keygenSigmaColumn_or_relation
     {nc : ℕ} {width : ℕ → ℕ}
     (relation : CanonicalMemberConstraintRelation
       urs hk vk instanceCommitment ps ch pU pW a
@@ -386,7 +385,7 @@ resolver's permutation pair is the generated keygen σ column. The routing premi
 (`hj`, `hlt`, `hidx`) are chunk-layout facts of the concrete verifying key; `hcommit`
 and `hval` are the keygen-side commitment and name facts.
 -/
-noncomputable def resolverPermutationPairs_snd_eq_keygenSigmaColumn_or_relation
+def resolverPermutationPairs_snd_eq_keygenSigmaColumn_or_relation
     {nc : ℕ} {width : ℕ → ℕ}
     (relation : CanonicalMemberConstraintRelation
       urs hk vk instanceCommitment ps ch pU pW a
@@ -428,7 +427,7 @@ the commitment extractor names the same size as `2 ^ urs.k`. Localizing that
 propositional equality here keeps concrete circuit permutations free of
 dependent casts.
 -/
-noncomputable def resolverPermutationPairs_snd_eq_keygenSigmaColumn_or_relation_of_size
+def resolverPermutationPairs_snd_eq_keygenSigmaColumn_or_relation_of_size
     {nc n : ℕ} {width : ℕ → ℕ}
     (relation : CanonicalMemberConstraintRelation
       urs hk vk instanceCommitment ps ch pU pW a

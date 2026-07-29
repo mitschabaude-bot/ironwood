@@ -223,7 +223,7 @@ def deployedRouteSelectorOfSpecs [DecidableEq G] [Inhabited G] {shape : Shape}
         deployed_slot_route_of_checks vk instanceCommitment ps ch checks (hmem i) rfl }
 
 /-- The polynomial represented by member `m` of deployed point set `i`. -/
-noncomputable def DeployedAlgebraicDecode.memberPoly [DecidableEq G] [Inhabited G]
+def DeployedAlgebraicDecode.memberPoly [DecidableEq G] [Inhabited G]
     {shape : Shape} {urs : URS G} {hk : shape.k = urs.k} {vk : VerifyingKey shape Fp G} {instanceCommitment : Fin shape.numProofs → Nat → G}
     {ps : ProofString shape Fp G} {ch : Challenges shape.k Fp}
     {aggregate : Fin (2 ^ urs.k) -> Fp} {aggregateU aggregateW : Fp}
@@ -287,7 +287,7 @@ structure DeployedMemberPolynomials [DecidableEq G] [Inhabited G] {shape : Shape
         (((constructIntermediateSets (assembleQueries vk instanceCommitment ps ch)).points.getD i []).idxOf p) 0
 
 /-- Package the rewind-free AGM decode as the deterministic member-polynomial interface. -/
-noncomputable def DeployedAlgebraicDecode.toMemberPolynomials [DecidableEq G] [Inhabited G]
+def DeployedAlgebraicDecode.toMemberPolynomials [DecidableEq G] [Inhabited G]
     {shape : Shape} {urs : URS G} {hk : shape.k = urs.k} {vk : VerifyingKey shape Fp G} {instanceCommitment : Fin shape.numProofs → Nat → G}
     {ps : ProofString shape Fp G} {ch : Challenges shape.k Fp}
     {aggregate : Fin (2 ^ urs.k) -> Fp} {aggregateU aggregateW : Fp}
@@ -348,7 +348,7 @@ theorem DeployedAlgebraicDecode.ipaRelation [DecidableEq G] [Inhabited G]
 /-! ## The canonical pre-`x` constraint polynomial -/
 
 /-- Advice feeds built from an arbitrary pre-`x` polynomial source for committed points. -/
-noncomputable def committedAdviceFeed [Inhabited G] {shape : Shape}
+def committedAdviceFeed [Inhabited G] {shape : Shape}
     (poly : G -> Polynomial Fp) (vk : VerifyingKey shape Fp G) (ps : ProofString shape Fp G) :
     Fin shape.numProofs -> Nat -> Polynomial Fp := fun q =>
   rotatedFeed vk.omega vk.adviceQueryLayout fun j : Fin shape.numAdviceQueries =>
@@ -356,14 +356,14 @@ noncomputable def committedAdviceFeed [Inhabited G] {shape : Shape}
       (vk.adviceQueryLayout.getD (j : Nat) (0, 0)).1)
 
 /-- Instance feeds built from a pre-`x` polynomial source. -/
-noncomputable def committedInstanceFeed {shape : Shape} (poly : G -> Polynomial Fp)
+def committedInstanceFeed {shape : Shape} (poly : G -> Polynomial Fp)
     (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → Nat → G) :
     Fin shape.numProofs -> Nat -> Polynomial Fp := fun q =>
   rotatedFeed vk.omega vk.instanceQueryLayout fun j : Fin shape.numInstanceQueries =>
     poly (instanceCommitment q (vk.instanceQueryLayout.getD (j : Nat) (0, 0)).1)
 
 /-- Fixed-column feed built from a pre-`x` polynomial source. -/
-noncomputable def committedFixedFeed {shape : Shape} (poly : G -> Polynomial Fp)
+def committedFixedFeed {shape : Shape} (poly : G -> Polynomial Fp)
     (vk : VerifyingKey shape Fp G) : Nat -> Polynomial Fp :=
   rotatedFeed vk.omega vk.fixedQueryLayout fun j : Fin shape.numFixedQueries =>
     poly (vk.fixedCommitment (vk.fixedQueryLayout.getD (j : Nat) (0, 0)).1)
@@ -372,26 +372,32 @@ noncomputable def committedFixedFeed {shape : Shape} (poly : G -> Polynomial Fp)
 
 The final set's `else` branch is dead: halo2 reads a last-rotation evaluation only for the sets
 before the final one, so its `lastEval` is `none`. -/
-noncomputable def committedPermSets {shape : Shape} (poly : G -> Polynomial Fp)
+def committedPermSets {shape : Shape} (poly : G -> Polynomial Fp)
     (vk : VerifyingKey shape Fp G) (ps : ProofString shape Fp G) :
     Fin shape.numProofs -> List (PermSetEval (Polynomial Fp)) := fun q =>
   List.ofFn fun s : Fin shape.numPermutationSets =>
     let z := poly (ps.permutationProduct q s)
     PermSetEval.mk z
-      (z.comp (Polynomial.C (vk.omega ^ (1 : Int)) * Polynomial.X))
+      (ComputablePolynomial.comp z
+        (ComputablePolynomial.mul
+          (ComputablePolynomial.const (vk.omega ^ (1 : Int))) ComputablePolynomial.X))
       ((ps.permutationSetEvals q s).lastEval.map fun le =>
         if (s : Nat) + 1 < shape.numPermutationSets then
-          z.comp (Polynomial.C (vk.omega ^ (-((vk.blindingFactors : Int) + 1))) * Polynomial.X)
-        else Polynomial.C le)
+          ComputablePolynomial.comp z
+            (ComputablePolynomial.mul
+              (ComputablePolynomial.const
+                (vk.omega ^ (-((vk.blindingFactors : Int) + 1))))
+              ComputablePolynomial.X)
+        else ComputablePolynomial.const le)
 
 /-- Common permutation columns built from a pre-`x` polynomial source. -/
-noncomputable def committedPermCommonFeed [Inhabited G] {shape : Shape}
+def committedPermCommonFeed [Inhabited G] {shape : Shape}
     (poly : G -> Polynomial Fp) (vk : VerifyingKey shape Fp G) : Nat -> Polynomial Fp := fun c =>
   if h : c < shape.numPermutationColumns then poly (vk.permutationCommonCommitment ⟨c, h⟩)
-  else 0
+  else ComputablePolynomial.zero
 
 /-- Permutation chunks built from a pre-`x` polynomial source. -/
-noncomputable def committedPermChunks [Inhabited G] {shape : Shape}
+def committedPermChunks [Inhabited G] {shape : Shape}
     (poly : G -> Polynomial Fp) (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → Nat → G) (ps : ProofString shape Fp G) :
     Fin shape.numProofs ->
@@ -405,7 +411,7 @@ noncomputable def committedPermChunks [Inhabited G] {shape : Shape}
        committedPermCommonFeed poly vk cr.2))
 
 /-- Lookup carriers built from a pre-`x` polynomial source. -/
-noncomputable def committedLookups {shape : Shape} (poly : G -> Polynomial Fp)
+def committedLookups {shape : Shape} (poly : G -> Polynomial Fp)
     (vk : VerifyingKey shape Fp G) (ps : ProofString shape Fp G) :
     Fin shape.numProofs ->
       List (LookupEval (Polynomial Fp) × List (Expr Fp) × List (Expr Fp)) := fun q =>
@@ -414,30 +420,88 @@ noncomputable def committedLookups {shape : Shape} (poly : G -> Polynomial Fp)
     let input := poly (ps.lookupPermutedInput q l)
     let table := poly (ps.lookupPermutedTable q l)
     (LookupEval.mk product
-      (product.comp (Polynomial.C (vk.omega ^ (1 : Int)) * Polynomial.X)) input
-      (input.comp (Polynomial.C (vk.omega ^ (-1 : Int)) * Polynomial.X)) table,
+      (ComputablePolynomial.comp product
+        (ComputablePolynomial.mul
+          (ComputablePolynomial.const (vk.omega ^ (1 : Int))) ComputablePolynomial.X)) input
+      (ComputablePolynomial.comp input
+        (ComputablePolynomial.mul
+          (ComputablePolynomial.const (vk.omega ^ (-1 : Int))) ComputablePolynomial.X)) table,
      vk.lookupInputExprs l, vk.lookupTableExprs l)
 
 /-- Pre-`x` quotient assembled from explicit represented quotient-piece polynomials. -/
-noncomputable def committedPreXQuotient {shape : Shape} (vk : VerifyingKey shape Fp G)
+def committedPreXQuotient {shape : Shape} (vk : VerifyingKey shape Fp G)
     (piecePoly : Fin shape.numQuotientPieces -> Polynomial Fp) : Polynomial Fp :=
-  preXQuotient vk.n piecePoly
+  preXQuotientData vk.n piecePoly
+
+omit [AddCommGroup G] [Module Fp G] in
+theorem committedPreXQuotient_eq {shape : Shape} (vk : VerifyingKey shape Fp G)
+    (piecePoly : Fin shape.numQuotientPieces -> Polynomial Fp) :
+    committedPreXQuotient vk piecePoly = preXQuotient vk.n piecePoly :=
+  preXQuotientData_eq vk.n piecePoly
+
+/-- Executable sum of the Lagrange selectors for blinded rows. -/
+def committedBlindSelector {shape : Shape} (vk : VerifyingKey shape Fp G) : Polynomial Fp :=
+  ComputablePolynomial.sumList ((List.range vk.blindingFactors).map
+    (fun j => lagrangeBasisPoly vk.omega vk.n (-((j : Int) + 1))))
+
+omit [AddCommGroup G] [Module Fp G] in
+theorem committedBlindSelector_eq {shape : Shape} (vk : VerifyingKey shape Fp G) :
+    committedBlindSelector vk =
+      ((List.range vk.blindingFactors).map
+        (fun j => lagrangeBasisPoly vk.omega vk.n (-((j : Int) + 1)))).foldl (· + ·) 0 := by
+  rw [committedBlindSelector, ComputablePolynomial.sumList_eq]
+  symm
+  let ps := (List.range vk.blindingFactors).map
+    (fun j => lagrangeBasisPoly vk.omega vk.n (-((j : Int) + 1)))
+  change ps.foldl (· + ·) 0 = ps.sum
+  rw [show (fun x y : Polynomial Fp => x + y) = ComputablePolynomial.add by
+    funext x y
+    exact (ComputablePolynomial.add_eq x y).symm]
+  rw [show (0 : Polynomial Fp) = ComputablePolynomial.zero from
+    ComputablePolynomial.zero_eq.symm]
+  simpa only [ComputablePolynomial.zero_eq, zero_add] using
+    (ComputablePolynomial.foldl_add_eq ps ComputablePolynomial.zero)
 
 /-- The pre-`x` constraint difference built entirely from explicit online AGM coordinates. -/
-noncomputable def committedPreXConstraintDifference [Inhabited G] {shape : Shape}
+def committedPreXConstraintDifference [Inhabited G] {shape : Shape}
     (poly : G -> Polynomial Fp)
     (piecePoly : Fin shape.numQuotientPieces -> Polynomial Fp)
     (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → Nat → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp) : Polynomial Fp :=
-  combineConstraints (committedFixedFeed poly vk) (committedAdviceFeed poly vk ps)
+  ComputablePolynomial.sub
+    (combineConstraintsData (committedFixedFeed poly vk) (committedAdviceFeed poly vk ps)
       (committedInstanceFeed poly vk instanceCommitment) vk.gates (committedPermSets poly vk ps)
       (committedPermChunks poly vk instanceCommitment ps) (committedLookups poly vk ps)
       ch.beta ch.gamma vk.delta ch.theta ch.y vk.chunkLen
       (lagrangeBasisPoly vk.omega vk.n 0)
       (lagrangeBasisPoly vk.omega vk.n (-((vk.blindingFactors : Int) + 1)))
-      (((List.range vk.blindingFactors).map
-        (fun j => lagrangeBasisPoly vk.omega vk.n (-((j : Int) + 1)))).foldl (· + ·) 0)
-    - committedPreXQuotient vk piecePoly * (Polynomial.X ^ vk.n - 1)
+      (committedBlindSelector vk))
+    (ComputablePolynomial.mul (committedPreXQuotient vk piecePoly)
+      (ComputablePolynomial.sub
+        (ComputablePolynomial.pow ComputablePolynomial.X vk.n)
+        (ComputablePolynomial.const 1)))
+
+omit [AddCommGroup G] [Module Fp G] in
+theorem committedPreXConstraintDifference_eq [Inhabited G] {shape : Shape}
+    (poly : G -> Polynomial Fp)
+    (piecePoly : Fin shape.numQuotientPieces -> Polynomial Fp)
+    (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → Nat → G)
+    (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp) :
+    committedPreXConstraintDifference poly piecePoly vk instanceCommitment ps ch =
+      combineConstraints (committedFixedFeed poly vk) (committedAdviceFeed poly vk ps)
+        (committedInstanceFeed poly vk instanceCommitment) vk.gates (committedPermSets poly vk ps)
+        (committedPermChunks poly vk instanceCommitment ps) (committedLookups poly vk ps)
+        ch.beta ch.gamma vk.delta ch.theta ch.y vk.chunkLen
+        (lagrangeBasisPoly vk.omega vk.n 0)
+        (lagrangeBasisPoly vk.omega vk.n (-((vk.blindingFactors : Int) + 1)))
+        (((List.range vk.blindingFactors).map
+          (fun j => lagrangeBasisPoly vk.omega vk.n (-((j : Int) + 1)))).foldl (· + ·) 0)
+      - committedPreXQuotient vk piecePoly * (Polynomial.X ^ vk.n - 1) := by
+  rw [committedPreXConstraintDifference, combineConstraintsData_eq,
+    committedBlindSelector_eq]
+  simp only [ComputablePolynomial.sub_eq, ComputablePolynomial.mul_eq,
+    ComputablePolynomial.pow_eq, ComputablePolynomial.X_eq, ComputablePolynomial.const_eq,
+    Polynomial.C_1]
 
 /-- Computed comparison between the decoded vanishing member and a pre-`x` quotient assembled
 from explicit online quotient-piece coordinates. -/
@@ -1017,9 +1081,9 @@ open Polynomial in
 open Classical in
 /-- Constraint-witness adapter produced directly from `DeployedAlgebraicDecode`, with no opened
 or joint-acceptance premises.  The relation branch is the computable quotient comparison of
-`deployedConstraintQuotientFinder`; only the success branch's Mathlib polynomials keep this
-`noncomputable`. -/
-noncomputable def deployedConstraintOutcomeOfDecode
+`deployedConstraintQuotientFinder`.  The polynomial success branch is finite executable arithmetic
+over `Fp`, so the complete outcome remains computed data. -/
+def deployedConstraintOutcomeOfDecode
     [DecidableEq G] [Inhabited G] {shape : Shape}
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → Nat → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
@@ -1146,17 +1210,20 @@ noncomputable def deployedConstraintOutcomeOfDecode
   set commonF : Nat -> Polynomial Fp := fun n =>
     if h : n < shape.numPermutationColumns then
       src.poly (cSet ⟨n, h⟩) (hcSet ⟨n, h⟩) (cMem ⟨n, h⟩)
-    else 0 with hcommonDef
+    else ComputablePolynomial.zero with hcommonDef
   set setsC : Fin shape.numProofs -> List (PermSetEval (Polynomial Fp)) := fun q =>
     List.ofFn (fun s : Fin shape.numPermutationSets => PermSetEval.mk
       (src.poly (pSet q s) (hpSet q s) (pMem q s))
-      ((src.poly (pSet q s) (hpSet q s) (pMem q s)).comp
-        (Polynomial.C (vk.omega ^ (1 : Int)) * Polynomial.X))
+      (ComputablePolynomial.comp (src.poly (pSet q s) (hpSet q s) (pMem q s))
+        (ComputablePolynomial.mul
+          (ComputablePolynomial.const (vk.omega ^ (1 : Int))) ComputablePolynomial.X))
       ((ps.permutationSetEvals q s).lastEval.map (fun le =>
         if (s : Nat) + 1 < shape.numPermutationSets then
-          (src.poly (pSet q s) (hpSet q s) (pMem q s)).comp
-            (Polynomial.C (vk.omega ^ (-((vk.blindingFactors : Int) + 1))) * Polynomial.X)
-        else Polynomial.C le))) with hsetsC
+          ComputablePolynomial.comp (src.poly (pSet q s) (hpSet q s) (pMem q s))
+            (ComputablePolynomial.mul
+              (ComputablePolynomial.const
+                (vk.omega ^ (-((vk.blindingFactors : Int) + 1)))) ComputablePolynomial.X)
+        else ComputablePolynomial.const le))) with hsetsC
   set chunksC : Fin shape.numProofs ->
       List (PermSetEval (Polynomial Fp) × List (Polynomial Fp × Polynomial Fp)) := fun q =>
     ((setsC q).zip vk.permutationChunks).map (fun sc => (sc.1, sc.2.map (fun cr =>
@@ -1169,11 +1236,13 @@ noncomputable def deployedConstraintOutcomeOfDecode
     List.ofFn (fun l : Fin shape.numLookups =>
       (LookupEval.mk
         (src.poly (lpSel q l) (hlpSel q l) (lpMem q l))
-        ((src.poly (lpSel q l) (hlpSel q l) (lpMem q l)).comp
-          (Polynomial.C (vk.omega ^ (1 : Int)) * Polynomial.X))
+        (ComputablePolynomial.comp (src.poly (lpSel q l) (hlpSel q l) (lpMem q l))
+          (ComputablePolynomial.mul
+            (ComputablePolynomial.const (vk.omega ^ (1 : Int))) ComputablePolynomial.X))
         (src.poly (liSel q l) (hliSel q l) (liMem q l))
-        ((src.poly (liSel q l) (hliSel q l) (liMem q l)).comp
-          (Polynomial.C (vk.omega ^ (-1 : Int)) * Polynomial.X))
+        (ComputablePolynomial.comp (src.poly (liSel q l) (hliSel q l) (liMem q l))
+          (ComputablePolynomial.mul
+            (ComputablePolynomial.const (vk.omega ^ (-1 : Int))) ComputablePolynomial.X))
         (src.poly (ltSel q l) (hltSel q l) (ltMem q l)),
       vk.lookupInputExprs l, vk.lookupTableExprs l)) with hlookupsC
   let decodedHP := src.poly iV hiV ⟨mV, hmV⟩
@@ -1240,6 +1309,27 @@ noncomputable def deployedConstraintOutcomeOfDecode
   intro hquotEval
   obtain ⟨hl0, hlLast, hlBlind⟩ :=
     lagrange_bind_derived vk.omega vk.n vk.blindingFactors ch.x homega hn checks.xnNeOne
+  have hlBlind' : (committedBlindSelector vk).eval ch.x =
+      (lagrangeBasis vk.omega vk.n vk.blindingFactors (ch.x ^ vk.n) ch.x).2.2 := by
+    rw [committedBlindSelector_eq]
+    exact hlBlind
+  have hpBind' : ∀ q,
+      (setsC q).map (PermSetEval.map (fun r => r.eval ch.x)) = subProofPermSets ps q := by
+    intro q
+    rw [hsetsC]
+    simpa only [ComputablePolynomial.comp_eq, ComputablePolynomial.mul_eq,
+      ComputablePolynomial.const_eq, ComputablePolynomial.X_eq] using hpBind q
+  have hlBind' : ∀ q,
+      (lookupsC q).map (fun lk =>
+        (lk.1.map (fun r => r.eval ch.x), lk.2.1, lk.2.2)) = subProofLookups vk ps q := by
+    intro q
+    rw [hlookupsC]
+    simpa only [ComputablePolynomial.comp_eq, ComputablePolynomial.mul_eq,
+      ComputablePolynomial.const_eq, ComputablePolynomial.X_eq] using hlBind q
+  have hcommonF' : ∀ n, (commonF n).eval ch.x = finFn ps.permutationCommonEvals n := by
+    intro n
+    rw [hcommonDef]
+    simpa only [ComputablePolynomial.zero_eq] using hcommonF n
   have hadviceCanonical : adviceF = committedAdviceFeed poly vk ps := by
     funext q
     change rotatedFeed vk.omega vk.adviceQueryLayout
@@ -1271,7 +1361,8 @@ noncomputable def deployedConstraintOutcomeOfDecode
   have hcommonCanonical : commonF = committedPermCommonFeed poly vk := by
     funext n
     change (if h : n < shape.numPermutationColumns then
-      src.poly (cSet ⟨n, h⟩) (hcSet ⟨n, h⟩) (cMem ⟨n, h⟩) else 0) = _
+      src.poly (cSet ⟨n, h⟩) (hcSet ⟨n, h⟩) (cMem ⟨n, h⟩)
+      else ComputablePolynomial.zero) = _
     by_cases h : n < shape.numPermutationColumns
     · rw [dif_pos h, committedPermCommonFeed, dif_pos h, hcommonBase]
     · rw [dif_neg h, committedPermCommonFeed, dif_neg h]
@@ -1296,28 +1387,26 @@ noncomputable def deployedConstraintOutcomeOfDecode
           ch.beta ch.gamma vk.delta ch.theta ch.y vk.chunkLen
           (lagrangeBasisPoly vk.omega vk.n 0)
           (lagrangeBasisPoly vk.omega vk.n (-((vk.blindingFactors : Int) + 1)))
-          (((List.range vk.blindingFactors).map
-            (fun j => lagrangeBasisPoly vk.omega vk.n
-              (-((j : Int) + 1)))).foldl (· + ·) 0) -
+          (committedBlindSelector vk) -
         hpolyP * (Polynomial.X ^ vk.n - 1) =
           committedPreXConstraintDifference poly piecePoly vk instanceCommitment ps ch := by
     rw [hadviceCanonical, hinstanceCanonical, hfixedCanonical, hsetsCanonical,
       hchunksCanonical, hlookupsCanonical]
-    rfl
+    rw [committedBlindSelector_eq]
+    exact (committedPreXConstraintDifference_eq poly piecePoly vk instanceCommitment ps ch).symm
   have hxgood' : ch.x ∉ szBadSet
       (combineConstraints fixedF adviceF instanceF vk.gates setsC chunksC lookupsC
           ch.beta ch.gamma vk.delta ch.theta ch.y vk.chunkLen
           (lagrangeBasisPoly vk.omega vk.n 0)
           (lagrangeBasisPoly vk.omega vk.n (-((vk.blindingFactors : Int) + 1)))
-          (((List.range vk.blindingFactors).map
-            (fun j => lagrangeBasisPoly vk.omega vk.n
-              (-((j : Int) + 1)))).foldl (· + ·) 0) -
+          (committedBlindSelector vk) -
         hpolyP * (Polynomial.X ^ vk.n - 1)) := by
     rw [hconstraintDiff]
     exact hxgood
   have hquotEval' : decodedHP.eval ch.x = hpolyP.eval ch.x := by
     change (decoded.memberPoly iV hiV ⟨mV, hmV⟩).eval ch.x =
       (committedPreXQuotient vk piecePoly).eval ch.x
+    rw [committedPreXQuotient_eq]
     exact hquotEval
   have hdecodedExpected : decodedHP.eval ch.x = vanishingValue := by
     have hb := src.eval_at_point iV hiV ⟨mV, hmV⟩ ch.x hvanishingRoute.1
@@ -1331,19 +1420,18 @@ noncomputable def deployedConstraintOutcomeOfDecode
     rw [← hquotEval']
     exact hdecodedExpected
   have hfold := hfold_of_constraint_polys_of_xn_ne_direct vk ps ch
-    fixedF adviceF instanceF setsC chunksC lookupsC _ _ _ hpolyP hvanishing checks.xnNeOne
-    hfBind haBind hiBind hpBind
-    (fun q => permChunks_bind_of_feeds vk ps ch q (setsC q) (hpBind q) fixedF (adviceF q)
-      (instanceF q) commonF hfBind (haBind q) (hiBind q) hcommonF)
-    hlBind hl0 hlLast hlBlind
+    fixedF adviceF instanceF setsC chunksC lookupsC _ _ (committedBlindSelector vk)
+    hpolyP hvanishing checks.xnNeOne
+    hfBind haBind hiBind hpBind'
+    (fun q => permChunks_bind_of_feeds vk ps ch q (setsC q) (hpBind' q) fixedF (adviceF q)
+      (instanceF q) commonF hfBind (haBind q) (hiBind q) hcommonF')
+    hlBind' hl0 hlLast hlBlind'
   have hfold' :
       (combineConstraints fixedF adviceF instanceF vk.gates setsC chunksC lookupsC
         ch.beta ch.gamma vk.delta ch.theta ch.y vk.chunkLen
         (lagrangeBasisPoly vk.omega vk.n 0)
         (lagrangeBasisPoly vk.omega vk.n (-((vk.blindingFactors : Int) + 1)))
-        (((List.range vk.blindingFactors).map
-          (fun j => lagrangeBasisPoly vk.omega vk.n
-            (-((j : Int) + 1)))).foldl (· + ·) 0)).eval ch.x =
+        (committedBlindSelector vk)).eval ch.x =
           hpolyP.eval ch.x * (ch.x ^ vk.n - 1) := by
     exact hfold
   exact
@@ -1355,8 +1443,7 @@ noncomputable def deployedConstraintOutcomeOfDecode
       lookupsC := lookupsC
       l0P := lagrangeBasisPoly vk.omega vk.n 0
       lLastP := lagrangeBasisPoly vk.omega vk.n (-((vk.blindingFactors : Int) + 1))
-      lBlindP := ((List.range vk.blindingFactors).map
-        (fun j => lagrangeBasisPoly vk.omega vk.n (-((j : Int) + 1)))).foldl (· + ·) 0
+      lBlindP := committedBlindSelector vk
       hpolyP := hpolyP
       decode := decoded
       commitmentPolynomial := poly

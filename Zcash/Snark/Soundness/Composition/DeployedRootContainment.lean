@@ -22,7 +22,7 @@ local instance vestaInhabitedDeployedRootContainment : Inhabited VestaG := âŸ¨0â
 variable {shape : Shape}
 
 /-- The wrapped online output for one sampled basis and random-oracle table. -/
-noncomputable abbrev deployedRootRunOutput (family : ComputedDeployedRootFSFamily shape)
+abbrev deployedRootRunOutput (family : ComputedDeployedRootFSFamily shape)
     (basis : AugmentedIndex (2 ^ shape.k) -> VestaG) (coins : family.toFamily.Coins) :=
   (wrappedAdversary family.toFamily basis).run coins.1
 

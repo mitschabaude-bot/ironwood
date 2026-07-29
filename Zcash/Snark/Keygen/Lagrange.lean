@@ -36,7 +36,7 @@ theorem rowPolynomial_single_eq_closed (k : ℕ) (hk : k ≤ 32) (i : Fin (2 ^ k
     rowPolynomial (omegaOf k) (Pi.single i (1 : Fp)) = lagrangeBasisClosed k i := by
   classical
   symm
-  rw [rowPolynomial]
+  rw [rowPolynomial_eq_lagrange]
   apply Lagrange.eq_interpolate_of_eval_eq _ (omegaOf_powers_injective k hk).injOn
   · rw [Finset.card_univ, Fintype.card_fin]
     exact lt_of_le_of_lt Polynomial.degree_le_natDegree

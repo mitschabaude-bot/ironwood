@@ -246,7 +246,7 @@ theorem acceptedAdviceSelection_feed_eq
         proofIndex query
   by_cases hquery : query < shape.numAdviceQueries
   · simp only [rotatedFeed, adviceQueryFeedOfResolver, resolverQueryFeed,
-      finFn, dif_pos hquery]
+      dif_pos hquery]
     rw [show selected proofIndex ⟨query, hquery⟩ =
         CanonicalMemberConstraintRelation.acceptedPolynomial
           (batchOpenings := pbatch) (memberDecode := memberDecode) haccepts
@@ -258,7 +258,7 @@ theorem acceptedAdviceSelection_feed_eq
         (proofIndex := proofIndex)
         urs hk memberDecode haccepts hLayout ⟨query, hquery⟩]
   · simp only [rotatedFeed, adviceQueryFeedOfResolver, resolverQueryFeed,
-      finFn, dif_neg hquery]
+      dif_neg hquery]
 
 assert_no_sorry acceptedAdviceSelection_feed_eq
 
@@ -487,7 +487,7 @@ theorem acceptedInstanceSelection_feed_eq
         proofIndex query
   by_cases hquery : query < shape.numInstanceQueries
   · simp only [rotatedFeed, instanceQueryFeedOfResolver, resolverQueryFeed,
-      finFn, dif_pos hquery]
+      dif_pos hquery]
     rw [show selected proofIndex ⟨query, hquery⟩ =
         CanonicalMemberConstraintRelation.acceptedPolynomial
           (batchOpenings := pbatch) (memberDecode := memberDecode) haccepts
@@ -499,7 +499,7 @@ theorem acceptedInstanceSelection_feed_eq
         (proofIndex := proofIndex)
         urs hk memberDecode haccepts hLayout ⟨query, hquery⟩]
   · simp only [rotatedFeed, instanceQueryFeedOfResolver, resolverQueryFeed,
-      finFn, dif_neg hquery]
+      dif_neg hquery]
 
 assert_no_sorry acceptedInstanceSelection_feed_eq
 

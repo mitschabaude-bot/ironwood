@@ -23,12 +23,12 @@ open Polynomial
 set_option maxHeartbeats 20000
 
 /-- The Lagrange row selector that is one at `selected` and zero at every other row. -/
-noncomputable def rowSelectorPolynomial {n : ℕ}
+def rowSelectorPolynomial {n : ℕ}
     (omega : Fp) (selected : Fin n) : Polynomial Fp :=
   rowPolynomial omega (Pi.single selected 1)
 
 /-- The selector that is one exactly on rows strictly after the final usable row. -/
-noncomputable def blindSelectorPolynomial {n : ℕ}
+def blindSelectorPolynomial {n : ℕ}
     (omega : Fp) (lastUsable : Fin n) : Polynomial Fp :=
   rowPolynomial omega fun row : Fin n =>
     if lastUsable.val < row.val then 1 else 0
@@ -39,7 +39,7 @@ theorem rowSelectorPolynomial_eq_basis {n : ℕ}
     rowSelectorPolynomial omega selected =
       Lagrange.basis Finset.univ (fun i : Fin n => omega ^ (i : ℕ)) selected := by
   classical
-  rw [rowSelectorPolynomial, rowPolynomial, Lagrange.interpolate_apply]
+  rw [rowSelectorPolynomial, rowPolynomial_eq_lagrange, Lagrange.interpolate_apply]
   rw [Finset.sum_eq_single selected]
   · simp
   · intro row _ hne
@@ -188,7 +188,7 @@ theorem blindSelectorPolynomial_eq_sum {n : ℕ}
           (fun row => lastUsable.val < row.val),
         rowSelectorPolynomial omega row := by
   classical
-  rw [blindSelectorPolynomial, rowPolynomial, Lagrange.interpolate_apply]
+  rw [blindSelectorPolynomial, rowPolynomial_eq_lagrange, Lagrange.interpolate_apply]
   simp_rw [rowSelectorPolynomial_eq_basis]
   rw [Finset.sum_filter]
   apply Finset.sum_congr rfl
@@ -263,7 +263,7 @@ theorem blindSelectorPolynomial_eval_eq_lagrangeBasis
   exact (foldl_add_map_range f blinding).symm
 
 /-- The three fixed selector polynomials corresponding to the verifier's Lagrange triple. -/
-noncomputable def canonicalLagrangePolynomials
+def canonicalLagrangePolynomials
     {n blinding : ℕ} (omega : Fp) (hblinding : blinding < n) :
     Polynomial Fp × Polynomial Fp × Polynomial Fp :=
   (rowSelectorPolynomial omega ⟨0, Nat.zero_lt_of_lt hblinding⟩,

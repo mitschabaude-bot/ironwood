@@ -29,7 +29,7 @@ The canonical Lagrange commitment key for a top-level circuit's instance domain.
 Each row generator is the monomial commitment to the corresponding interpolating
 basis polynomial.
 -/
-noncomputable def instanceCommitmentKey
+def instanceCommitmentKey
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G) :
     LagrangeCommitmentKey urs (top.toVerifierKey pp urs).omega where
@@ -45,7 +45,7 @@ noncomputable def instanceCommitmentKey
 The verifier commitment family determined by a top-level circuit's public-input
 layout. It supports arbitrary proof multiplicity and any number of instance columns.
 -/
-noncomputable def instanceCommitment
+def instanceCommitment
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G) {numProofs : ℕ}
     (inputs : Fin numProofs → PublicInput Fp) :
@@ -134,7 +134,7 @@ variable
 Verifier acceptance binds one cell's circuit-derived instance column to its
 layout-derived row polynomial, or yields the augmented-basis relation.
 -/
-noncomputable def acceptedColumn_eq_rowPolynomial_or_relation
+def acceptedColumn_eq_rowPolynomial_or_relation
     (proofIndex : Fin (pp.mergeDerived top).numProofs)
     (index : Fin (size PublicInput))
     (hrows : Function.Injective
@@ -149,13 +149,17 @@ noncomputable def acceptedColumn_eq_rowPolynomial_or_relation
         (top.publicInputRows (inputs proofIndex)
           (top.publicInputLayout.cells index).1) ⊕'
       NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
-  classical
   let column := (top.publicInputLayout.cells index).1
-  -- The registered rotation is an `∃` and the conclusion is data, so it is chosen.
-  have hrotation :=
-    top.exists_rotation_mem_instanceQueries_of_publicInputLayout_cell index
-  let instanceRotation := Classical.choose hrotation
-  have hregistered := Classical.choose_spec hrotation
+  have hquery : ∃ q ∈ assembleQueries (top.toVerifierKey pp urs)
+      (top.instanceCommitment pp urs inputs) ps ch,
+      q.commId = .instanceCol proofIndex column.index := by
+    obtain ⟨instanceRotation, hregistered⟩ :=
+      top.exists_rotation_mem_instanceQueries_of_publicInputLayout_cell index
+    exact instanceQuery_of_layout
+      (top.toVerifierKey pp urs) (top.instanceCommitment pp urs inputs) ps ch proofIndex
+      column.index instanceRotation (top.toVerifierKey_instanceQueryCount pp urs)
+      (QueryLayouts.instanceQueryLayout_of_constraintSystem
+        top pp urs column instanceRotation hregistered)
   have hbound :=
     CanonicalMemberConstraintRelation.acceptedInstanceColumn_eq_rowPolynomial_or_relation
       (pU := pU) (pW := pW) (a := a)
@@ -166,13 +170,7 @@ noncomputable def acceptedColumn_eq_rowPolynomial_or_relation
       (top.publicInputRows (inputs proofIndex) column) 1
       (top.instanceCommitment_column pp urs inputs proofIndex column)
       hrows
-      (instanceQuery_of_layout
-        (top.toVerifierKey pp urs)
-        (top.instanceCommitment pp urs inputs) ps ch proofIndex
-        column.index instanceRotation
-        (top.toVerifierKey_instanceQueryCount pp urs)
-        (QueryLayouts.instanceQueryLayout_of_constraintSystem
-          top pp urs column instanceRotation hregistered))
+      hquery
   simpa only [← hk, column] using hbound
 
 assert_no_sorry
@@ -182,7 +180,7 @@ assert_no_sorry
 Verifier acceptance binds one decoded assignment to the public input supplied for
 that proof, or yields the augmented-basis relation.
 -/
-noncomputable def publicInputEncoding_or_relation
+def publicInputEncoding_or_relation
     (proofIndex : Fin (pp.mergeDerived top).numProofs)
     (domainExponent_lt : top.domainExponent < 33) :
     (let assignment : TopLevelAssignment top
@@ -228,7 +226,7 @@ Acceptance binds every circuit-derived public instance column to its layout-deri
 row polynomial, or yields the shared augmented-basis relation. No assumption is made
 about proof multiplicity, column count, column indices, or query rotations.
 -/
-noncomputable def statements_or_relation_of_accepted_topLevelBundleStatement
+def statements_or_relation_of_accepted_topLevelBundleStatement
     (domainExponent_lt : top.domainExponent < 33)
     (htop :
       TopLevelBundleStatement top pp

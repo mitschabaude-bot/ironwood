@@ -86,7 +86,7 @@ variable
 A canonically routed instance-column opening is the polynomial interpolating the
 verifier-supplied public rows, or it computes an augmented commitment relation.
 -/
-noncomputable def instanceColumn_eq_rowPolynomial_or_relation
+def instanceColumn_eq_rowPolynomial_or_relation
     (relation : CanonicalMemberConstraintRelation
       urs hk vk instanceCommitment ps ch pU pW a
       batchOpenings memberDecode hblinding y hpoly deg)
@@ -104,51 +104,49 @@ noncomputable def instanceColumn_eq_rowPolynomial_or_relation
     relation.polynomial (.instanceCol proofIndex column) =
         instanceRowPolynomial (2 ^ urs.k) vk.omega rows ⊕'
       NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
-  classical
-  let q := Classical.choose hquery
-  have hq : q ∈ assembleQueries vk instanceCommitment ps ch :=
-    (Classical.choose_spec hquery).1
-  have hqid : q.commId = _ := (Classical.choose_spec hquery).2
-  have routed :=
-    assembledQueryMemberRoute_faithful
-      (instanceCommitment := instanceCommitment)
-      vk ps ch relation.groupingCount relation.noDuplicateQueries q hq
+  have hsome : (relation.route (.instanceCol proofIndex column)).isSome := by
+    obtain ⟨q, hq, hqid⟩ := hquery
+    have routed := assembledQueryMemberRoute_faithful
+      (instanceCommitment := instanceCommitment) vk ps ch relation.groupingCount
+      relation.noDuplicateQueries q hq
+    unfold CanonicalMemberConstraintRelation.route
+    rw [← hqid, routed.route_eq]
+    rfl
+  let slot := (relation.route (.instanceCol proofIndex column)).get hsome
   have routedInstance :
       relation.route (.instanceCol proofIndex column) =
-        some routed.slot := by
-    rw [← hqid]
-    exact routed.route_eq
+        some slot := (Option.some_get hsome).symm
   have hid :
       (deployedSetCommIds (instanceCommitment := instanceCommitment)
-        vk ps ch routed.slot.setIndex).getD
-          (routed.slot.memberIndex : ℕ) .vanishingH =
+        vk ps ch slot.setIndex).getD
+          (slot.memberIndex : ℕ) .vanishingH =
         .instanceCol proofIndex column := by
     apply assembledQueryMemberRoute_id
       (instanceCommitment := instanceCommitment)
       vk ps ch relation.groupingCount relation.noDuplicateQueries
-      (.instanceCol proofIndex column) routed.slot
+      (.instanceCol proofIndex column) slot
     simpa [CanonicalMemberConstraintRelation.route] using routedInstance
   have href :=
     deployedMemberRef_eq_instanceCommitment
       (instanceCommitment := instanceCommitment)
-      vk ps ch relation.groupingCount routed.slot proofIndex column hid
+      vk ps ch relation.groupingCount slot proofIndex column hid
   let decoded :=
-    memberDecode routed.slot.setIndex routed.slot.setIndex_lt
+    memberDecode slot.setIndex slot.setIndex_lt
   have hopen :
-      commit urs (decoded.cols routed.slot.memberIndex) +
-          decoded.uComp routed.slot.memberIndex • urs.u +
-          decoded.wComp routed.slot.memberIndex • urs.w =
+      commit urs (decoded.cols slot.memberIndex) +
+          decoded.uComp slot.memberIndex • urs.u +
+          decoded.wComp slot.memberIndex • urs.w =
         key.commitInstance rows blind := by
     calc
-      commit urs (decoded.cols routed.slot.memberIndex) +
-            decoded.uComp routed.slot.memberIndex • urs.u +
-            decoded.wComp routed.slot.memberIndex • urs.w =
+      commit urs (decoded.cols slot.memberIndex) +
+            decoded.uComp slot.memberIndex • urs.u +
+            decoded.wComp slot.memberIndex • urs.w =
           ((deployedSetQueries
               (instanceCommitment := instanceCommitment)
-              vk ps ch routed.slot.setIndex).getD
-            (routed.slot.memberIndex : ℕ) (.point 0, [])).1.eval
+              vk ps ch slot.setIndex).getD
+            (slot.memberIndex : ℕ) (.point 0, [])).1.eval
               ⟨shape.k, hk ▸ urs.g, urs.w, urs.u⟩ :=
-        decoded.commitment routed.slot.memberIndex
+        decoded.commitment slot.memberIndex
       _ = instanceCommitment proofIndex column := by
         rw [href]
         rfl
@@ -156,9 +154,9 @@ noncomputable def instanceColumn_eq_rowPolynomial_or_relation
   have hbound :=
     coeffsToPoly_eq_instanceRowPolynomial_or_relation
       key rows blind
-      (decoded.cols routed.slot.memberIndex)
-      (decoded.uComp routed.slot.memberIndex)
-      (decoded.wComp routed.slot.memberIndex)
+      (decoded.cols slot.memberIndex)
+      (decoded.uComp slot.memberIndex)
+      (decoded.wComp slot.memberIndex)
       hrows hopen
   refine bindOrRelationWitness hbound fun heq => ?_
   rw [CanonicalMemberConstraintRelation.polynomial,
@@ -170,7 +168,7 @@ The accepting run's canonical resolver identifies a queried instance column with
 the polynomial committed by the verifier's public-instance commitment, without
 requiring circuit satisfaction.
 -/
-noncomputable def acceptedInstanceColumn_eq_rowPolynomial_or_relation
+def acceptedInstanceColumn_eq_rowPolynomial_or_relation
     {shape : Shape}
     {urs : URS G} {hk : shape.k = urs.k}
     {vk : VerifyingKey shape Fp G}
@@ -212,7 +210,6 @@ noncomputable def acceptedInstanceColumn_eq_rowPolynomial_or_relation
           (.instanceCol proofIndex column) =
         instanceRowPolynomial (2 ^ urs.k) vk.omega rows ⊕'
       NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
-  classical
   let routing :=
     canonicalRoutingConditions_of_accepts
       urs hk vk instanceCommitment ps ch haccepts
@@ -220,49 +217,47 @@ noncomputable def acceptedInstanceColumn_eq_rowPolynomial_or_relation
     assembledQueryMemberRoute
       (instanceCommitment := instanceCommitment)
       vk ps ch routing.1 routing.2
-  let q := Classical.choose hquery
-  have hq : q ∈ assembleQueries vk instanceCommitment ps ch :=
-    (Classical.choose_spec hquery).1
-  have hqid : q.commId = _ := (Classical.choose_spec hquery).2
-  have routed :=
-    assembledQueryMemberRoute_faithful
-      (instanceCommitment := instanceCommitment)
-      vk ps ch routing.1 routing.2 q hq
+  have hsome : (route (.instanceCol proofIndex column)).isSome := by
+    obtain ⟨q, hq, hqid⟩ := hquery
+    have routed := assembledQueryMemberRoute_faithful
+      (instanceCommitment := instanceCommitment) vk ps ch routing.1 routing.2 q hq
+    dsimp only [route]
+    rw [← hqid, routed.route_eq]
+    rfl
+  let slot := (route (.instanceCol proofIndex column)).get hsome
   have routedInstance :
-      route (.instanceCol proofIndex column) = some routed.slot := by
-    rw [← hqid]
-    exact routed.route_eq
+      route (.instanceCol proofIndex column) = some slot := (Option.some_get hsome).symm
   have hid :
       (deployedSetCommIds (instanceCommitment := instanceCommitment)
-        vk ps ch routed.slot.setIndex).getD
-          (routed.slot.memberIndex : ℕ) .vanishingH =
+        vk ps ch slot.setIndex).getD
+          (slot.memberIndex : ℕ) .vanishingH =
         .instanceCol proofIndex column := by
     apply assembledQueryMemberRoute_id
       (instanceCommitment := instanceCommitment)
       vk ps ch routing.1 routing.2
-      (.instanceCol proofIndex column) routed.slot
+      (.instanceCol proofIndex column) slot
     simpa only [route] using routedInstance
   have href :=
     deployedMemberRef_eq_instanceCommitment
       (instanceCommitment := instanceCommitment)
-      vk ps ch routing.1 routed.slot proofIndex column hid
+      vk ps ch routing.1 slot proofIndex column hid
   let decoded :=
-    memberDecode routed.slot.setIndex routed.slot.setIndex_lt
+    memberDecode slot.setIndex slot.setIndex_lt
   have hopen :
-      commit urs (decoded.cols routed.slot.memberIndex) +
-          decoded.uComp routed.slot.memberIndex • urs.u +
-          decoded.wComp routed.slot.memberIndex • urs.w =
+      commit urs (decoded.cols slot.memberIndex) +
+          decoded.uComp slot.memberIndex • urs.u +
+          decoded.wComp slot.memberIndex • urs.w =
         key.commitInstance rows blind := by
     calc
-      commit urs (decoded.cols routed.slot.memberIndex) +
-            decoded.uComp routed.slot.memberIndex • urs.u +
-            decoded.wComp routed.slot.memberIndex • urs.w =
+      commit urs (decoded.cols slot.memberIndex) +
+            decoded.uComp slot.memberIndex • urs.u +
+            decoded.wComp slot.memberIndex • urs.w =
           ((deployedSetQueries
               (instanceCommitment := instanceCommitment)
-              vk ps ch routed.slot.setIndex).getD
-            (routed.slot.memberIndex : ℕ) (.point 0, [])).1.eval
+              vk ps ch slot.setIndex).getD
+            (slot.memberIndex : ℕ) (.point 0, [])).1.eval
               ⟨shape.k, hk ▸ urs.g, urs.w, urs.u⟩ :=
-        decoded.commitment routed.slot.memberIndex
+        decoded.commitment slot.memberIndex
       _ = instanceCommitment proofIndex column := by
         rw [href]
         rfl
@@ -270,9 +265,9 @@ noncomputable def acceptedInstanceColumn_eq_rowPolynomial_or_relation
   have hbound :=
     coeffsToPoly_eq_instanceRowPolynomial_or_relation
       key rows blind
-      (decoded.cols routed.slot.memberIndex)
-      (decoded.uComp routed.slot.memberIndex)
-      (decoded.wComp routed.slot.memberIndex)
+      (decoded.cols slot.memberIndex)
+      (decoded.uComp slot.memberIndex)
+      (decoded.wComp slot.memberIndex)
       hrows hopen
   refine bindOrRelationWitness hbound fun heq => ?_
   simpa only [

@@ -3,6 +3,7 @@ import Zcash.Snark.Soundness.FoldSplit
 import Zcash.Snark.Soundness.GoodChallenge
 import Zcash.Snark.Soundness.Canonical.LookupRows
 import Clean.Halo2.Keygen.FloorPlanner
+import Zcash.Common.RelationWitness
 
 /-!
 # Enabled operation lookups and tuple-compression soundness
@@ -230,6 +231,14 @@ noncomputable def tupleCompressionBadSet
     (left right : List Fp) : Finset Fp :=
   szBadSet (foldPoly left - foldPoly right)
 
+/-- Executable polynomial whose roots are the tuple-compression collision surface. -/
+def tupleCompressionPolynomialData (left right : List Fp) : Polynomial Fp :=
+  ComputablePolynomial.sub (foldPoly left) (foldPoly right)
+
+theorem tupleCompressionPolynomialData_eq (left right : List Fp) :
+    tupleCompressionPolynomialData left right = foldPoly left - foldPoly right := by
+  simp [tupleCompressionPolynomialData, ComputablePolynomial.sub_eq]
+
 /-- Outside the explicit collision set, compressed equality of equal-length tuples lifts to tuple
 equality. -/
 theorem eq_of_compressValues_eq_of_not_mem
@@ -302,6 +311,43 @@ theorem EnabledLookup.not_mem_thetaBadSet_iff
         theta ∉ tupleCompressionBadSet
           (lookup.inputValues place env) (lookup.tableValues env row) := by
   simp [EnabledLookup.thetaBadSet]
+
+/-- Compute avoidance of one enabled lookup's `θ` surface by checking its finite usable rows.
+No root set is enumerated. -/
+def EnabledLookup.thetaAvoidance?
+    (place : RegionIndex → ℕ) (env : Environment Fp)
+    (lookup : EnabledLookup Fp) (theta : Fp) :
+    Option (PLift (theta ∉ lookup.thetaBadSet place env)) :=
+  match hrows : finForallOption (fun row : Fin env.usableRows =>
+      szBadSetAvoidance?
+        (tupleCompressionPolynomialData
+          (lookup.inputValues place env) (lookup.tableValues env row.1)) theta) with
+  | none => none
+  | some rows => some ⟨(lookup.not_mem_thetaBadSet_iff place env theta).2
+      fun row hrow => by
+        simpa [tupleCompressionBadSet, tupleCompressionPolynomialData_eq] using
+          (rows ⟨row, hrow⟩).down⟩
+
+theorem EnabledLookup.thetaAvoidance?_isSome_of
+    (place : RegionIndex → ℕ) (env : Environment Fp)
+    (lookup : EnabledLookup Fp) (theta : Fp)
+    (hgood : theta ∉ lookup.thetaBadSet place env) :
+    (lookup.thetaAvoidance? place env theta).isSome := by
+  have hrowsSpec := (lookup.not_mem_thetaBadSet_iff place env theta).1 hgood
+  have hrows : ∀ row : Fin env.usableRows,
+      (szBadSetAvoidance?
+        (tupleCompressionPolynomialData
+          (lookup.inputValues place env) (lookup.tableValues env row.1)) theta).isSome :=
+    fun row => (szBadSetAvoidance?_isSome_iff _ _).2 (by
+      simpa [tupleCompressionBadSet, tupleCompressionPolynomialData_eq] using
+        hrowsSpec row.1 row.2)
+  have hall := finForallOption_isSome_of _ hrows
+  unfold EnabledLookup.thetaAvoidance?
+  generalize hresult : finForallOption (fun row : Fin env.usableRows =>
+      szBadSetAvoidance?
+        (tupleCompressionPolynomialData
+          (lookup.inputValues place env) (lookup.tableValues env row.1)) theta) = result at hall ⊢
+  cases result <;> simp_all
 
 /-- One enabled lookup's tuple-collision budget is at most
 `usableRows × inputArity`. -/

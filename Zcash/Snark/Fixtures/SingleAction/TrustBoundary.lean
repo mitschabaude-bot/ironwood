@@ -40,7 +40,7 @@ captured points. The derivation's supporting data and functions (`capturedUrsGLa
 -- `sorry`, no unexpected axiom (whole dependency graph). The `native_decide` fixtures carry the
 -- compiler-trust axiom, permitted by `+native` and pinned exactly by the `#print axioms` guards below.
 -- The static checks and degree budget at the single-Action captured key (issue #128):
--- the eleven decided facts the Action-level capstone's derived-key checks transfer through.
+-- the twelve decided facts the Action-level capstone's derived-key checks transfer through.
 assert_axioms Zcash.Snark.Fixture.vk_advice_layout_length +native(Zcash.Snark.Fixture.vk_advice_layout_length)
 assert_axioms Zcash.Snark.Fixture.vk_instance_layout_length +native(
   Zcash.Snark.Fixture.vk_instance_layout_length)
@@ -139,6 +139,7 @@ assert_axioms Zcash.Snark.Deployed.action_bundleStatement_or_relation_of_deploye
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
   Zcash.Snark.ActionGateCoherence.gateData_eq,
   Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.adviceQueryColumnsAllocated,
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
   Zcash.Snark.Keygen.certificate,
   CompElliptic.Curves.Pasta.Pallas.neg_five_not_isCube,

@@ -96,7 +96,7 @@ theorem hsamp_of_multiopenEval_reversed {numSets : ℕ}
 `x₁`-compressed evaluation vector, and the prover's claimed set evaluation `multiopenUⱼ`. This is the
 list `deployedBaseEval` feeds `multiopenEval`; naming it lets the value check's field identifications
 be stated. -/
-noncomputable def deployedSetsForEval [DecidableEq G] [Inhabited G] {shape : Shape}
+def deployedSetsForEval [DecidableEq G] [Inhabited G] {shape : Shape}
     (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → ℕ → G) (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp) :
     List (List Fp × List Fp × Fp) :=
   let grouped := constructIntermediateSets (assembleQueries vk instanceCommitment ps ch)
@@ -249,7 +249,7 @@ theorem deployedSetsForEval_reverse_getD_u [DecidableEq G] [Inhabited G] {shape 
 theorem coeffsToPoly_natDegree_lt {n : ℕ} (hn : 0 < n) (a : Fin n → Fp) :
     (coeffsToPoly a).natDegree < n := by
   have hle : (coeffsToPoly a).natDegree ≤ n - 1 := by
-    rw [coeffsToPoly]
+    rw [coeffsToPoly_eq_sum]
     refine Polynomial.natDegree_sum_le_of_forall_le _ _ (fun i _ => ?_)
     calc (Polynomial.C (a i) * Polynomial.X ^ (i : ℕ)).natDegree
         ≤ (Polynomial.X ^ (i : ℕ) : Polynomial Fp).natDegree :=
@@ -418,8 +418,9 @@ theorem rotatedFeed_eval {n : ℕ} (omega : Fp) (layout : List (ℕ × ℤ))
     (col : Fin n → Polynomial Fp) {j : ℕ} (hj : j < n) (x : Fp) :
     (rotatedFeed omega layout col j).eval x
       = (col ⟨j, hj⟩).eval (rotateOmega omega x (layout.getD j (0, 0)).2) := by
-  simp only [rotatedFeed, finFn, dif_pos hj, Polynomial.eval_comp, Polynomial.eval_mul,
-    Polynomial.eval_C, Polynomial.eval_X, rotateOmega]
+  simp only [rotatedFeed, dif_pos hj, ComputablePolynomial.comp_eq,
+    ComputablePolynomial.mul_eq, ComputablePolynomial.const_eq, ComputablePolynomial.X_eq,
+    Polynomial.eval_comp, Polynomial.eval_mul, Polynomial.eval_C, Polynomial.eval_X, rotateOmega]
   exact congrArg (fun t => Polynomial.eval t (col ⟨j, hj⟩))
     (mul_comm (omega ^ (layout.getD j (0, 0)).2) x)
 
@@ -427,7 +428,8 @@ theorem rotatedFeed_eval {n : ℕ} (omega : Fp) (layout : List (ℕ × ℤ))
 theorem rotatedFeed_eval_of_ge {n : ℕ} (omega : Fp) (layout : List (ℕ × ℤ))
     (col : Fin n → Polynomial Fp) {j : ℕ} (hj : n ≤ j) (x : Fp) :
     (rotatedFeed omega layout col j).eval x = 0 := by
-  simp only [rotatedFeed, finFn, dif_neg (Nat.not_lt.mpr hj), Polynomial.eval_zero]
+  simp only [rotatedFeed, dif_neg (Nat.not_lt.mpr hj), ComputablePolynomial.zero_eq,
+    Polynomial.eval_zero]
 
 
 

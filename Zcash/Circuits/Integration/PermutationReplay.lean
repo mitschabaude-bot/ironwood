@@ -919,24 +919,50 @@ theorem widen_mk_of_lt
 /-- Restrict a full-domain cell permutation to the active rows, given that it maps
 active cells to active cells: injectivity survives the restriction, and a finite
 injection is a permutation. -/
-noncomputable def restrictActivePerm
+def restrictActivePerm
     {nc activeRows domainSize : ℕ} {width : ℕ → ℕ}
     (hactive : activeRows ≤ domainSize)
     (π : Perm (ChunkCell nc domainSize width))
     (hpres : ∀ c : ChunkCell nc activeRows width,
       ((π (widenPermutationChunkCell hactive c)).2.1 : ℕ) < activeRows) :
-    Perm (ChunkCell nc activeRows width) :=
-  Equiv.ofBijective
-    (fun c =>
+    Perm (ChunkCell nc activeRows width) := by
+  let forward : ChunkCell nc activeRows width → ChunkCell nc activeRows width :=
+    fun c =>
       ⟨(π (widenPermutationChunkCell hactive c)).1,
         ⟨((π (widenPermutationChunkCell hactive c)).2.1 : ℕ), hpres c⟩,
-        (π (widenPermutationChunkCell hactive c)).2.2⟩)
-    (Finite.injective_iff_bijective.mp (by
-      intro c d h
-      apply widenPermutationChunkCell_injective hactive
-      apply π.injective
-      rw [← widen_mk_of_lt hactive _ (hpres c), ← widen_mk_of_lt hactive _ (hpres d)]
-      exact congrArg (widenPermutationChunkCell hactive) h))
+        (π (widenPermutationChunkCell hactive c)).2.2⟩
+  have hforwardWiden (c : ChunkCell nc activeRows width) :
+      widenPermutationChunkCell hactive (forward c) =
+        π (widenPermutationChunkCell hactive c) := by
+    exact widen_mk_of_lt hactive _ (hpres c)
+  have hforwardInjective : Function.Injective forward := by
+    intro c d h
+    apply widenPermutationChunkCell_injective hactive
+    apply π.injective
+    rw [← hforwardWiden c, ← hforwardWiden d, h]
+  have hforwardSurjective : Function.Surjective forward :=
+    (Finite.injective_iff_bijective.mp hforwardInjective).2
+  have hinversePres (c : ChunkCell nc activeRows width) :
+      (((π.symm (widenPermutationChunkCell hactive c)).2.1 : ℕ) < activeRows) := by
+    obtain ⟨d, rfl⟩ := hforwardSurjective c
+    rw [hforwardWiden d, π.symm_apply_apply]
+    exact d.2.1.isLt
+  let inverse : ChunkCell nc activeRows width → ChunkCell nc activeRows width :=
+    fun c =>
+      ⟨(π.symm (widenPermutationChunkCell hactive c)).1,
+        ⟨((π.symm (widenPermutationChunkCell hactive c)).2.1 : ℕ), hinversePres c⟩,
+        (π.symm (widenPermutationChunkCell hactive c)).2.2⟩
+  have hinverseWiden (c : ChunkCell nc activeRows width) :
+      widenPermutationChunkCell hactive (inverse c) =
+        π.symm (widenPermutationChunkCell hactive c) := by
+    exact widen_mk_of_lt hactive _ (hinversePres c)
+  exact
+    { toFun := forward
+      invFun := inverse
+      left_inv := fun c => widenPermutationChunkCell_injective hactive (by
+        rw [hinverseWiden, hforwardWiden, π.symm_apply_apply])
+      right_inv := fun c => widenPermutationChunkCell_injective hactive (by
+        rw [hforwardWiden, hinverseWiden, π.apply_symm_apply]) }
 
 /-- The restriction equation of `restrictActivePerm`, by construction. -/
 theorem restrictActivePerm_widen
@@ -1069,7 +1095,7 @@ over the keygen copy list: each copy pair agrees in value (or the shared branch 
 via `chunkRowValue_eq_of_mem_copies`), each declared copy's encoded endpoints are
 linked by the replayed list (via the membership lemmas), and the declared endpoints
 read back (resolution and the constants realization). -/
-noncomputable def CopyReplayWitness.ofLinkedPairs
+def CopyReplayWitness.ofLinkedPairs
     {numCols n : ℕ} {place : RegionIndex → ℕ} {env : Environment Fp}
     {ops : Operations Fp} {Bad : Type}
     (copies' : List (FlatCell numCols n × FlatCell numCols n))

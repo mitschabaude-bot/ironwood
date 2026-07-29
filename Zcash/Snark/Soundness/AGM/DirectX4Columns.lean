@@ -139,6 +139,59 @@ def deployedX4ColumnRepresentationsOfCovered
       rw [x4BatchCommitments, if_neg hj]
       exact (AlgebraicPoint.point_eq_components _).symm
 
+/-- The direct column representation is transport-stable in its proof and challenge inputs.
+`HEq` is the natural statement because the column index type itself contains those inputs. -/
+theorem deployedX4ColumnRepresentationsOfCovered_heq
+    {vk : VerifyingKey shape Fp VestaG}
+    {instanceCommitment : Fin shape.numProofs → ℕ → VestaG}
+    (p p' : AlgebraicWfProof basis vk instanceCommitment)
+    (fixed : List (AlgebraicPoint (F := Fp) basis))
+    (hcovered : DeployedMembersCovered vk instanceCommitment p.algebraicProof fixed)
+    (hcovered' : DeployedMembersCovered vk instanceCommitment p'.algebraicProof fixed)
+    (nu nu' : Fin 11 → Fp) (hp : p = p') (hnu : nu = nu') :
+    HEq (deployedX4ColumnRepresentationsOfCovered p fixed hcovered nu)
+      (deployedX4ColumnRepresentationsOfCovered p' fixed hcovered' nu') := by
+  subst p'
+  subst nu'
+  have hc : hcovered = hcovered' := Subsingleton.elim _ _
+  subst hcovered'
+  rfl
+
+set_option maxHeartbeats 600000 in
+/-- Transport the retained-source reconstruction equation to any propositionally equal proof and
+challenge vector.  Stating the transport once avoids casts at every adaptive caller. -/
+theorem DeployedBatchWitness.x4CoveredSource_reconstruct
+    {family : ComputedAlgebraicFSFamily shape}
+    {pnu : WrappedAlgebraicOutput family basis}
+    (witness : DeployedBatchWitness family basis pnu)
+    (p : AlgebraicWfProof basis (family.vk basis) (family.instanceCommitment basis))
+    (fixed : List (AlgebraicPoint (F := Fp) basis))
+    (hcovered : DeployedMembersCovered (family.vk basis) (family.instanceCommitment basis)
+      p.algebraicProof fixed)
+    (nu : Fin 11 → Fp) (hp : pnu.1 = p) (hnu : wrappedPreIpaReads pnu = nu)
+    (hsource : HEq witness.x4Source
+      (deployedX4ColumnRepresentationsOfCovered p fixed hcovered nu)) :
+    ((∑ j : Fin (deployedX4PairCount (family.vk basis)
+          (family.instanceCommitment basis) p.proof.1 (chRecord nu (fun _ => 0)) + 1),
+        nu 8 ^ (j : Nat) •
+          (deployedX4ColumnRepresentationsOfCovered p fixed hcovered nu).coeffs j) =
+        p.aMulti nu) ∧
+      ((∑ j : Fin (deployedX4PairCount (family.vk basis)
+          (family.instanceCommitment basis) p.proof.1 (chRecord nu (fun _ => 0)) + 1),
+        nu 8 ^ (j : Nat) *
+          (deployedX4ColumnRepresentationsOfCovered p fixed hcovered nu).uComp j) =
+        p.multiU nu) := by
+  subst p
+  subst nu
+  have hs : witness.x4Source =
+      deployedX4ColumnRepresentationsOfCovered pnu.1 fixed hcovered
+        (wrappedPreIpaReads pnu) := eq_of_heq hsource
+  constructor
+  · rw [← hs]
+    exact witness.x4Source_reconstruct
+  · rw [← hs]
+    exact witness.x4Source_reconstructU
+
 /-! ## The direct batch, without interpolation -/
 
 /-- The aggregate coordinates an `AlgebraicWfProof` declares open to the deployed commitment. -/
@@ -174,6 +227,27 @@ def deployedX4BatchOfCoveredOrRelation
         (ursOfAugmentedBasis shape.k basis).u (ursOfAugmentedBasis shape.k basis).w :=
   deployedX4AlgebraicBatchOrRelation (ursOfAugmentedBasis shape.k basis) rfl vk
     instanceCommitment p.proof.1 (chRecord nu (fun _ => 0))
+    (deployedX4ColumnRepresentationsOfCovered p fixed hcovered nu)
+    (p.aMulti nu) (p.multiU nu) (p.multiBlind nu)
+    (aggregate_opens_deployedCommitment p nu)
+
+/-- Provenance-preserving form of the direct deployed `x₄` batch. -/
+def deployedX4BatchOfCoveredWithSourceOrRelation
+    {vk : VerifyingKey shape Fp VestaG}
+    {instanceCommitment : Fin shape.numProofs → ℕ → VestaG}
+    (p : AlgebraicWfProof basis vk instanceCommitment)
+    (fixed : List (AlgebraicPoint (F := Fp) basis))
+    (hcovered : DeployedMembersCovered vk instanceCommitment p.algebraicProof fixed)
+    (nu : Fin 11 → Fp) :
+    AlgebraicPowerBatchWithSource (ursOfAugmentedBasis shape.k basis)
+        (deployedX4ColumnRepresentationsOfCovered p fixed hcovered nu)
+        (p.aMulti nu) (p.multiU nu) (p.multiBlind nu)
+        (chRecord (k := shape.k) nu (fun _ => 0)).x4 ⊕'
+      AugmentedRelationWitness (F := Fp) (ursOfAugmentedBasis shape.k basis).g
+        (ursOfAugmentedBasis shape.k basis).u
+        (ursOfAugmentedBasis shape.k basis).w :=
+  deployedX4AlgebraicBatchWithSourceOrRelation (ursOfAugmentedBasis shape.k basis) rfl
+    vk instanceCommitment p.proof.1 (chRecord nu (fun _ => 0))
     (deployedX4ColumnRepresentationsOfCovered p fixed hcovered nu)
     (p.aMulti nu) (p.multiU nu) (p.multiBlind nu)
     (aggregate_opens_deployedCommitment p nu)
@@ -222,12 +296,13 @@ because it never chooses ghost evaluation points. -/
 def deployedRootOutcomeOfCovered
     (family : ComputedOnlineMemberFSFamily shape) :
     DeployedRootOutcomeProvider family.toFamily := fun basis O =>
-  match deployedX4BatchOfCoveredOrRelation
+  match deployedX4BatchOfCoveredWithSourceOrRelation
       ((wrappedAdversary family.toFamily basis).run O).1
       (family.fixedRepresentations basis) (family.membersCovered_wrapped basis O)
       (wrappedPreIpaReads ((wrappedAdversary family.toFamily basis).run O)) with
   | PSum.inr relation => PSum.inr relation
-  | PSum.inl x4Batch =>
+  | PSum.inl x4Result =>
+      let x4Batch := x4Result.batch
       match finForallOrRelationWitness (fun i :
           Fin (deployedX4PairCount (family.vk basis) (family.instanceCommitment basis)
             ((wrappedAdversary family.toFamily basis).run O).1.proof.1
@@ -246,9 +321,59 @@ def deployedRootOutcomeOfCovered
               batches :=
                 { x4 := x4Batch
                   x1 := fun i hi => (results ⟨i, hi⟩).batch }
+              x4Source := deployedX4ColumnRepresentationsOfCovered
+                ((wrappedAdversary family.toFamily basis).run O).1
+                (family.fixedRepresentations basis) (family.membersCovered_wrapped basis O)
+                (wrappedPreIpaReads ((wrappedAdversary family.toFamily basis).run O))
+              x4Coeffs := x4Result.coeffs_eq
+              x4U := x4Result.uComp_eq
+              x4W := x4Result.wComp_eq
               memberCoeffs := fun i hi => (results ⟨i, hi⟩).coeffs_eq
               memberU := fun i hi => (results ⟨i, hi⟩).uComp_eq
               memberW := fun i hi => (results ⟨i, hi⟩).wComp_eq }
+
+/-- A successful generated outcome retains exactly the direct online `x₄` source used to
+construct it. -/
+theorem deployedRootOutcomeOfCovered_x4Source
+    (family : ComputedOnlineMemberFSFamily shape)
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
+    (O : BTranscript Fp VestaG
+      (preIpaLen shape family.init.length 10 + 3 * shape.k) → Fp)
+    (witness : DeployedBatchWitness family.toFamily basis
+      ((wrappedAdversary family.toFamily basis).run O))
+    (hout : deployedRootOutcomeOfCovered family basis O = PSum.inl witness) :
+    HEq witness.x4Source (deployedX4ColumnRepresentationsOfCovered
+      (runProof family.toFamily basis O) (family.fixedRepresentations basis)
+      (family.membersCovered basis O) (runReads family.toFamily basis O)) := by
+  unfold deployedRootOutcomeOfCovered at hout
+  split at hout
+  · exact absurd hout (by simp)
+  · dsimp only at hout
+    split at hout
+    · exact absurd hout (by simp)
+    · cases PSum.inl.inj hout
+      have hp := wrappedAdversary_run_fst family.toFamily basis O
+      have hnu := wrappedPreIpaReads_run family.toFamily basis O
+      exact deployedX4ColumnRepresentationsOfCovered_heq _ _ _ _ _ _ _ hp hnu
+
+/-- A successful generated outcome retains exactly the family's fixed representations. -/
+theorem deployedRootOutcomeOfCovered_fixedRepresentations
+    (family : ComputedOnlineMemberFSFamily shape)
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
+    (O : BTranscript Fp VestaG
+      (preIpaLen shape family.init.length 10 + 3 * shape.k) → Fp)
+    (witness : DeployedBatchWitness family.toFamily basis
+      ((wrappedAdversary family.toFamily basis).run O))
+    (hout : deployedRootOutcomeOfCovered family basis O = PSum.inl witness) :
+    witness.fixedRepresentations = family.fixedRepresentations basis := by
+  unfold deployedRootOutcomeOfCovered at hout
+  split at hout
+  · exact absurd hout (by simp)
+  · dsimp only at hout
+    split at hout
+    · exact absurd hout (by simp)
+    · cases PSum.inl.inj hout
+      rfl
 
 /-- **A deployed root family on the direct route.** The outcome is decoded from online coverage,
 so no field-capacity hypothesis is needed and no ghost evaluation points are chosen. Its
@@ -266,7 +391,8 @@ def ComputedDeployedRootFSFamily.ofCovered
     unfold deployedRootOutcomeOfCovered at h
     split at h
     · exact absurd h (by simp)
-    · split at h
+    · dsimp only at h
+      split at h
       · exact absurd h (by simp)
       · cases PSum.inl.inj h
         rfl

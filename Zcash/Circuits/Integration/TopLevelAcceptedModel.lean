@@ -55,7 +55,7 @@ variable
 Canonical circuit satisfaction and the circuit's named correctness package yield
 its statements at the supplied public inputs, or a computed nontrivial relation.
 -/
-noncomputable def statements_or_relation_of_circuitSat
+def statements_or_relation_of_circuitSat
     (hblinding :
       (top.toVerifierKey pp urs).blindingFactors <
         (top.toVerifierKey pp urs).n)

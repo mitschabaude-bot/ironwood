@@ -59,14 +59,27 @@ open Polynomial
 
 variable {G : Type*} [AddCommGroup G] [Module Fp G]
 
-/-- Interpret a coefficient vector as the corresponding polynomial. -/
-noncomputable def coeffsToPoly {n : ℕ} (a : Fin n → Fp) : Polynomial Fp :=
-  ∑ i, Polynomial.C (a i) * Polynomial.X ^ (i : ℕ)
+/-- Interpret a coefficient vector as the corresponding polynomial.
+
+This is ordinary executable data: `Fp` supplies decidable equality and the finite sum is over the
+canonical `Fin n` enumeration.  Keeping this a plain `def` is important for reductions that return
+commitment collisions as computed coefficient vectors. -/
+def coeffsToPoly {n : ℕ} (a : Fin n → Fp) : Polynomial Fp :=
+  ComputablePolynomial.sumList
+    (List.ofFn fun i => ComputablePolynomial.mul
+      (ComputablePolynomial.const (a i))
+      (ComputablePolynomial.pow ComputablePolynomial.X (i : ℕ)))
+
+theorem coeffsToPoly_eq_sum {n : ℕ} (a : Fin n → Fp) :
+    coeffsToPoly a = ∑ i, Polynomial.C (a i) * Polynomial.X ^ (i : ℕ) := by
+  rw [coeffsToPoly, ComputablePolynomial.sumList_eq]
+  simp only [ComputablePolynomial.mul_eq, ComputablePolynomial.const_eq,
+    ComputablePolynomial.pow_eq, ComputablePolynomial.X_eq, List.sum_ofFn]
 
 /-- Evaluating `coeffsToPoly` is the same linear form as committing to the powers evaluation vector. -/
 theorem coeffsToPoly_eval {k : ℕ} (a : Fin (2 ^ k) → Fp) (x : Fp) :
     (coeffsToPoly a).eval x = commitGen (evalVector k x) a := by
-  rw [coeffsToPoly, Polynomial.eval_finsetSum]
+  rw [coeffsToPoly_eq_sum, Polynomial.eval_finsetSum]
   simp [commitGen, evalVector, smul_eq_mul]
 
 /-- A family of rewound batched openings for one batch of column commitments.

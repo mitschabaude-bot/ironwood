@@ -523,7 +523,7 @@ theorem namesInjective
 
 /-- Assemble the semantic cycle at any active-row prefix preserved by the
 replayed full permutation. -/
-noncomputable def cycleOfKeygenColumnsAt
+def cycleOfKeygenColumnsAt
     (pp : Keygen.ProofParams) (urs : URS G)
     (poly : CommitmentId → Polynomial Fp)
     (p : Fin (actionShape pp).numProofs)
@@ -556,7 +556,7 @@ noncomputable def cycleOfKeygenColumnsAt
       (namesInjective pp urs poly p hactive)
 
 /-- Assemble the semantic cycle at the verifier-derived active-row boundary. -/
-noncomputable def cycleOfKeygenColumns
+def cycleOfKeygenColumns
     (pp : Keygen.ProofParams) (urs : URS G)
     (poly : CommitmentId → Polynomial Fp)
     (p : Fin (actionShape pp).numProofs)

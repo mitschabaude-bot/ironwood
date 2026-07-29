@@ -97,7 +97,7 @@ well-formed: the domain exponent computes to orchard's pinned `K = 11`
 `native_decide` — separate per-fact theorems would re-evaluate the shared selector-map
 and projection work once each; the field/fact splits below are `congrArg` projections
 of this single evaluation. -/
-private theorem bundle_pinned :
+theorem deploymentIdentityBundle :
     (capturedPinnedView, actionK,
       actionCS.invalidQueriedCells.isEmpty,
       (flatGates actionCS).all
@@ -110,7 +110,7 @@ theorem capturedPinnedView_eq_derived_and_wellFormed :
       (flatGates actionCircuit.constraintSystem).all
         (·.selectorsCovered (fun i => (actionCircuit.selectorMap.lookup i).isSome)))
       = (actionPinnedCs, 11, true, true) := by
-  have h := bundle_pinned
+  have h := deploymentIdentityBundle
   simpa only [actionSelMap, actionK, actionCS] using h
 
 /-- **The capture is the derived Action circuit** (pinned CS, captured families). -/

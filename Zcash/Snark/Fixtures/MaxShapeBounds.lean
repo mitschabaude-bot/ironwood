@@ -57,9 +57,9 @@ theorem deployedDirectDecodeOps_at_captured_shape {n : ℕ}
     show (shape n).numPointSets = 5 from rfl, show (shape n).k = 11 from rfl]
   norm_num
 
-/-- **At the consensus maximum, the direct path is negligible against the `2^122` work target.**
-Even with a generous `2^90` covered-source length, the modeled cost stays below `2^122` — the
-direct-coordinate postprocessing never threatens the adversary-work accounting. -/
+/-- **At the consensus maximum, the direct path fits the illustrative `2^122` work ceiling.**
+Even with a generous `2^90` covered-source length, the modeled cost stays below `2^122`.  This is
+a cost comparison, not a claim of 122-bit security. -/
 theorem deployedDirectDecodeOps_at_consensus_max {n : ℕ}
     (hn : n ≤ orchardConsensusMaxProofs)
     (vk : VerifyingKey (shape n) Fp VestaG)
@@ -132,12 +132,12 @@ Its per-run cost model stays outside Lean, like the random-oracle model: one run
 adversary (`Q + 11 + k` oracle reads), one direct-coordinate decode of the retained
 representations, and a constant number of field solves.
 
-`T = 2^122` cannot double as that finder's call budget. At `k = 11` the proved
-Attema–Fehr–Klooß-style (AFK) expectation is between `2^161` and `2^162` calls, and pushing the
-generic Markov tail below `2^-86` would need an `L+1` between `2^247` and `2^248`. So the
-recursive endpoint at deployed parameters is a structural polynomial bound, not a concrete
-security margin — a solver with either budget can Pollard-rho Vesta directly. The concrete margin
-is the straight-line endpoint's, in `StraightLineMaxShapeBounds`.
+The illustrative query cap `T = 2^122` cannot double as that finder's call budget. At `k = 11` the
+proved Attema–Fehr–Klooß-style (AFK) expectation is between `2^161` and `2^162` calls, and pushing
+the generic Markov tail below `2^-86` would need an `L+1` between `2^247` and `2^248`. So the
+recursive endpoint at those illustrative parameters is a structural polynomial bound, not a
+concrete security margin — a solver with either budget can Pollard-rho Vesta directly. The concrete
+margin is the straight-line endpoint's, in `StraightLineMaxShapeBounds`.
 
 The finder's unconditional expected call bound is `afkRunBound Q 11 + 3`: the AFK recursive bound
 plus the direct-coordinate and quotient fallbacks. The theorems below truncate the solver at a
@@ -150,7 +150,7 @@ The additive three is the direct-coordinate and quotient fallback overhead. -/
 def consensusCombinedFinderExpectedCallsModel (T : Nat) : Nat :=
   afkRunBound T 11 + 3
 
-/-- The `T = 2^122` AFK expectation is roughly `2^161.54`, not `2^122`. -/
+/-- At the illustrative query cap `T = 2^122`, the AFK expectation is roughly `2^161.54`. -/
 theorem consensusCombinedFinderExpectedCallsModel_at_2pow122_bounds :
     2 ^ 161 < consensusCombinedFinderExpectedCallsModel (2 ^ 122) ∧
       consensusCombinedFinderExpectedCallsModel (2 ^ 122) < 2 ^ 162 := by

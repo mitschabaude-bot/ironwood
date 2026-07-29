@@ -487,6 +487,17 @@ def witnessBatchWitness
       (witnessFamily_run_multiBlind basis O)
       (witnessFamily_pairCount_at_run basis O)
       (x4BatchCommitments_witness_at_run basis O)
+  x4Source :=
+    { coeffs := fun _ _ => 0
+      uComp := fun _ => 0
+      wComp := fun _ => 0
+      commitment := by
+        intro i
+        rw [x4BatchCommitments_witness_at_run basis O i]
+        simp [commit] }
+  x4Coeffs := rfl
+  x4U := rfl
+  x4W := rfl
   memberCoeffs := fun i hi =>
     absurd (absurd_lt_of_eq_zero (witnessFamily_pairCount_at_run basis O) hi) not_false
   memberU := fun i hi =>
@@ -644,10 +655,13 @@ theorem deployedX3RootSet_of_zero
     deployedX3RootSet urs hk vk ic ps ch b = ↑(deployedAllPts vk ic ps ch) := by
   haveI : IsEmpty (Fin (deployedX4PairCount vk ic ps ch)) := by
     rw [hcount]; infer_instance
+  have hq : deployedAlgebraicQPrime urs hk vk ic ps ch b.x4 = 0 := by
+    rw [deployedAlgebraicQPrime, hc, coeffsToPoly_eq_sum]
+    simp
   rw [deployedX3RootSet,
     show deployedX3ErrorPolynomial urs hk vk ic ps ch b.x4 = 0 from by
-      simp [deployedX3ErrorPolynomial, clearedQuotientErrorPolynomial,
-        deployedAlgebraicQPrime, hc, coeffsToPoly, Finset.univ_eq_empty]]
+      rw [deployedX3ErrorPolynomial, clearedQuotientErrorPolynomial, hq]
+      simp]
   simp [szBadSet]
 
 end RootSetCollapse

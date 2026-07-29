@@ -25,7 +25,7 @@ set_option maxHeartbeats 20000
 The full commitment-ID resolver model with its selector polynomials determined
 by the verification key's domain and blinding count.
 -/
-noncomputable def canonicalConstraintModelOfPermutationResolver
+def canonicalConstraintModelOfPermutationResolver
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → Polynomial Fp)

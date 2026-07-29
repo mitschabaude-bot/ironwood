@@ -37,7 +37,8 @@ theorem deployedConstraintDifferencePreX_witness
     (basis : AugmentedIndex (2 ^ witnessShape.k) → VestaG)
     (coins : witnessDeployedRootFamily.toFamily.Coins) :
     deployedConstraintDifferencePreX witnessDeployedRootFamily basis coins = 0 := by
-  unfold deployedConstraintDifferencePreX committedPreXConstraintDifference
+  unfold deployedConstraintDifferencePreX
+  rw [committedPreXConstraintDifference_eq]
   have hn : (witnessDeployedRootFamily.vk basis).n = 0 := rfl
   rw [hn]
   simp [combineConstraints, constraintPolys, allConstraints, witnessShape]

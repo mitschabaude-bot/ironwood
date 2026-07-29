@@ -88,10 +88,12 @@ theorem zeroConstraintDifference_eq_zero (hproofs : shape.numProofs = 0)
     unfold deployedConstraintPieceCoordinates
     rw [onlinePointCoordinates_zeroSource basis hsource]
     show coeffsToPoly (fun _ => (0 : Fp)) = 0
-    simp [coeffsToPoly]
-  simp only [deployedConstraintDifferencePreX, committedPreXConstraintDifference,
-    combineConstraints, constraintPolys_nil_of_no_proofs hproofs, List.foldl_nil,
-    committedPreXQuotient, preXQuotient]
+    rw [coeffsToPoly_eq_sum]
+    simp
+  unfold deployedConstraintDifferencePreX
+  rw [committedPreXConstraintDifference_eq, committedPreXQuotient_eq]
+  simp only [combineConstraints, constraintPolys_nil_of_no_proofs hproofs, List.foldl_nil,
+    preXQuotient]
   rw [Finset.sum_congr rfl (fun i (_ : i ∈ Finset.univ) => by rw [hpieces i, mul_zero])]
   simp
 
@@ -158,7 +160,8 @@ theorem zeroConstraintDifference_explicit
     unfold deployedConstraintPointPolynomial onlinePointPolynomial
     rw [onlinePointCoordinates_zeroSource basis hsource]
     show coeffsToPoly (fun _ => (0 : Fp)) = 0
-    simp [coeffsToPoly]
+    rw [coeffsToPoly_eq_sum]
+    simp
   have hpieces : (fun i => coeffsToPoly (deployedConstraintPieceCoordinates
       (zeroDeployedRootFamily vkS hfixed hperm) basis
       (deployedRootRunOutput (zeroDeployedRootFamily vkS hfixed hperm) basis coins) i).1) =
@@ -167,7 +170,8 @@ theorem zeroConstraintDifference_explicit
     unfold deployedConstraintPieceCoordinates
     rw [onlinePointCoordinates_zeroSource basis hsource]
     show coeffsToPoly (fun _ => (0 : Fp)) = 0
-    simp [coeffsToPoly]
+    rw [coeffsToPoly_eq_sum]
+    simp
   have hps : (deployedRootRunOutput (zeroDeployedRootFamily vkS hfixed hperm) basis
       coins).1.proof.1 = zeroProofString shape Fp VestaG := by
     show ((wrappedAdversary (zeroOnlineMemberFamily vkS hfixed hperm).toFamily basis).run

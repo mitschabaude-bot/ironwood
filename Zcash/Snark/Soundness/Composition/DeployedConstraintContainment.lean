@@ -37,7 +37,7 @@ structure DeployedConstraintStaticChecks (family : ComputedDeployedRootFSFamily 
 representation source over the family's retained list.  It mentions no root witness, batch
 witness, decode, or outcome branch, so it is defined on every run — honest, cheating, or
 degenerate. -/
-noncomputable def deployedConstraintDifferencePreX
+def deployedConstraintDifferencePreX
     (family : ComputedDeployedRootFSFamily shape)
     (basis : AugmentedIndex (2 ^ shape.k) -> VestaG) (coins : family.toFamily.Coins) :
     Polynomial Fp :=
@@ -51,7 +51,7 @@ noncomputable def deployedConstraintDifferencePreX
 
 /-- Run the concrete online constraint adapter from a successful root decode and deployed
 acceptance.  The result still preserves the explicit quotient-collision relation branch. -/
-noncomputable def deployedConstraintOutcomeOfRoot
+def deployedConstraintOutcomeOfRoot
     (family : ComputedDeployedRootFSFamily shape)
     (static : DeployedConstraintStaticChecks family)
     (basis : AugmentedIndex (2 ^ shape.k) -> VestaG) (coins : family.toFamily.Coins)
@@ -127,8 +127,8 @@ theorem deployedConstraintOutcomeOfRoot_relation_eq_online
   simpa [deployedConstraintOutcomeOfRoot, pnu, checks] using hout
 
 /-- Proposition that the actual root-decode data yields a concrete constraint witness.  The
-noncomputable polynomial witness stays under `Prop`; every relation branch is instead exposed by
-the standalone computable `deployedConstraintQuotientFinder`. -/
+polynomial witness is executable finite data; every relation branch is also exposed by the
+standalone computable `deployedConstraintQuotientFinder`. -/
 def deployedConstraintDecodedOfRoot
     (family : ComputedDeployedRootFSFamily shape)
     (static : DeployedConstraintStaticChecks family)

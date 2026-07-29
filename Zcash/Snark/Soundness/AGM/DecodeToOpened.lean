@@ -30,7 +30,7 @@ attribute [local irreducible] deployedSetQueries deployedX4PairCount x4BatchComm
   x4BatchEvals deployedSetMemberCommitments
 
 /-- The interpolation points a decode is presented at: a walk up from the actual `x₄` challenge. -/
-noncomputable def decodePoints (vk : VerifyingKey shape Fp G)
+def decodePoints (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → Nat → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp) :
     Fin (deployedX4PairCount vk instanceCommitment ps ch + 1) → Fp :=
@@ -55,7 +55,7 @@ theorem decodePoints_zero (vk : VerifyingKey shape Fp G)
 
 /-- **A decode's `x₄` batch as an opened-batch object.**  No rewinding: the columns are the
 decode's own AGM coordinates and the openings are their power combinations. -/
-noncomputable def DeployedAlgebraicDecode.toOpenedBatch
+def DeployedAlgebraicDecode.toOpenedBatch
     {urs : URS G} {hk : shape.k = urs.k} {vk : VerifyingKey shape Fp G}
     {instanceCommitment : Fin shape.numProofs → Nat → G}
     {ps : ProofString shape Fp G} {ch : Challenges shape.k Fp}
@@ -72,7 +72,7 @@ noncomputable def DeployedAlgebraicDecode.toOpenedBatch
     (decodePoints_zero vk instanceCommitment ps ch)
 
 /-- **A decode's routed `x₁` batch as a member decode**, against the opened batch above. -/
-noncomputable def DeployedAlgebraicDecode.toMemberDecode
+def DeployedAlgebraicDecode.toMemberDecode
     {urs : URS G} {hk : shape.k = urs.k} {vk : VerifyingKey shape Fp G}
     {instanceCommitment : Fin shape.numProofs → Nat → G}
     {ps : ProofString shape Fp G} {ch : Challenges shape.k Fp}

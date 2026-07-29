@@ -1,5 +1,6 @@
 import Zcash.Snark.Soundness.AGM.Peel
 import Zcash.Snark.Soundness.Multiopen.Compat
+import Zcash.Common.ComputablePolynomial
 
 /-!
 # The pre-`x` quotient reconstruction
@@ -36,6 +37,19 @@ noncomputable def reassembledQuotient (xn : Fp) (hp : Fin d → Polynomial Fp) :
 to the monomial `X^(n·i)`. Pre-`x`: it mentions only the piece polynomials and `n`. -/
 noncomputable def preXQuotient (n : ℕ) (hp : Fin d → Polynomial Fp) : Polynomial Fp :=
   ∑ i : Fin d, Polynomial.X ^ (n * (i : ℕ)) * hp i
+
+/-- Executable coefficient-data implementation of `preXQuotient`. -/
+def preXQuotientData (n : ℕ) (hp : Fin d → Polynomial Fp) : Polynomial Fp :=
+  ComputablePolynomial.sumList (List.ofFn fun i =>
+    ComputablePolynomial.mul
+      (ComputablePolynomial.pow ComputablePolynomial.X (n * (i : ℕ)))
+      (hp i))
+
+theorem preXQuotientData_eq (n : ℕ) (hp : Fin d → Polynomial Fp) :
+    preXQuotientData n hp = preXQuotient n hp := by
+  rw [preXQuotientData, ComputablePolynomial.sumList_eq, preXQuotient]
+  simp only [ComputablePolynomial.mul_eq, ComputablePolynomial.pow_eq,
+    ComputablePolynomial.X_eq, List.sum_ofFn]
 
 /-- **The reassembly and the pre-`x` quotient agree in value at `x`.** Each term matches under
 `(xⁿ)ⁱ = x^(n·i)`, so the `x`-dependent reassembled `hpolyP` never needs to enter the pinned bad
@@ -84,12 +98,14 @@ polynomials, exactly the `x`-dependent form whose evaluation the identity above 
 /-- `coeffsToPoly` is additive. -/
 private theorem coeffsToPoly_add {m : ℕ} (a a' : Fin m → Fp) :
     coeffsToPoly (a + a') = coeffsToPoly a + coeffsToPoly a' := by
-  simp only [coeffsToPoly, Pi.add_apply, Polynomial.C_add, add_mul, Finset.sum_add_distrib]
+  rw [coeffsToPoly_eq_sum, coeffsToPoly_eq_sum, coeffsToPoly_eq_sum]
+  simp only [Pi.add_apply, Polynomial.C_add, add_mul, Finset.sum_add_distrib]
 
 /-- `coeffsToPoly` sends a scalar multiple to the constant-scaled polynomial. -/
 private theorem coeffsToPoly_smul {m : ℕ} (c : Fp) (a : Fin m → Fp) :
     coeffsToPoly (c • a) = Polynomial.C c * coeffsToPoly a := by
-  simp only [coeffsToPoly, Pi.smul_apply, smul_eq_mul, Polynomial.C_mul, Finset.mul_sum]
+  rw [coeffsToPoly_eq_sum, coeffsToPoly_eq_sum]
+  simp only [Pi.smul_apply, smul_eq_mul, Polynomial.C_mul, Finset.mul_sum]
   exact Finset.sum_congr rfl (fun j _ => by ring)
 
 /-- `coeffsToPoly` sends an `(xⁿ)ⁱ`-scaled coefficient sum to the reassembled quotient of the
@@ -99,7 +115,7 @@ theorem coeffsToPoly_scaledSum {k : ℕ} (xn : Fp) (hp : Fin d → Fin (2 ^ k) �
       = reassembledQuotient xn (fun i => coeffsToPoly (hp i)) := by
   rw [reassembledQuotient]
   induction (Finset.univ : Finset (Fin d)) using Finset.induction with
-  | empty => simp [coeffsToPoly]
+  | empty => simp [coeffsToPoly_eq_sum]
   | @insert a s h ih =>
       rw [Finset.sum_insert h, Finset.sum_insert h, coeffsToPoly_add, coeffsToPoly_smul, ih]
 

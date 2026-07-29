@@ -38,14 +38,20 @@ open scoped ENNReal
 theorem eval_lookupEvalPolys_productNextEval (omega : Fp) (z a s : Polynomial Fp) (i : ℕ) :
     ((lookupEvalPolys omega z a s).productNextEval).eval (omega ^ i)
       = z.eval (omega ^ (i + 1)) := by
-  rw [lookupEvalPolys, eval_comp_rotate, pow_succ, mul_comm]
+  rw [lookupEvalPolys, ComputablePolynomial.comp_eq, ComputablePolynomial.mul_eq,
+    ComputablePolynomial.const_eq, ComputablePolynomial.X_eq,
+    eval_comp_rotate, pow_succ, mul_comm]
 
 /-- On every non-first row, the inverse-rotated lookup input is the preceding row. -/
 theorem eval_lookupEvalPolys_permutedInputInvEval_succ
     (omega : Fp) (z a s : Polynomial Fp) (homega : omega ≠ 0) (i : ℕ) :
     ((lookupEvalPolys omega z a s).permutedInputInvEval).eval (omega ^ (i + 1))
       = a.eval (omega ^ i) := by
-  rw [lookupEvalPolys, eval_comp_rotate, pow_succ]
+  change (ComputablePolynomial.comp a
+      (ComputablePolynomial.mul (ComputablePolynomial.const omega⁻¹)
+        ComputablePolynomial.X)).eval (omega ^ (i + 1)) = a.eval (omega ^ i)
+  rw [ComputablePolynomial.comp_eq, ComputablePolynomial.mul_eq,
+    ComputablePolynomial.const_eq, ComputablePolynomial.X_eq, eval_comp_rotate, pow_succ]
   congr 1
   field_simp
 
@@ -121,7 +127,11 @@ theorem lookup_run_structure_of_dvd
   · exact Or.inl hs
   · exact Or.inr (by
       simpa using ha.trans
-        (eval_lookupEvalPolys_permutedInputInvEval_succ omega 0 a s homega i))
+        (by
+          simpa [lookupEvalPolys, ComputablePolynomial.comp_eq,
+            ComputablePolynomial.mul_eq, ComputablePolynomial.const_eq,
+            ComputablePolynomial.X_eq] using
+              (eval_lookupEvalPolys_permutedInputInvEval_succ omega 0 a s homega i)))
 
 /-- Constraints one through three telescope to the whole-column lookup product identity, or expose
 an input/table factor that vanished in the legitimate `z`-ends-at-zero branch. -/
@@ -156,11 +166,11 @@ theorem lookup_product_eq_or_factor_eq_zero
   · exact running_product_end (by simpa [mul_comm] using hend) (hrow m) hlast
 
 /-- A polynomial column read over the first `m` powers of the evaluation-domain generator. -/
-noncomputable def lookupColumnRows (omega : Fp) (p : Polynomial Fp) (m : ℕ) : Fin m → Fp :=
+def lookupColumnRows (omega : Fp) (p : Polynomial Fp) (m : ℕ) : Fin m → Fp :=
   fun i => p.eval (omega ^ (i : ℕ))
 
 /-- Challenge values that make one row of a compressed lookup column's additive factor vanish. -/
-noncomputable def lookupColumnZeroBadSet
+def lookupColumnZeroBadSet
     (omega : Fp) (p : Polynomial Fp) (m : ℕ) : Finset Fp :=
   additiveZeroBadSet (lookupColumnRows omega p m)
 
