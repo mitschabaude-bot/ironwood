@@ -1660,6 +1660,42 @@ def adaptiveActionRepresentationRelationAt?
       exact data.algebraicProof.actionRepresentationsBefore_covered
         family.init data.wellFormed n ap hap)
 
+/-- Cached-log form of one Action semantic-squeeze provenance comparison. -/
+def adaptiveActionRepresentationRelationAtFromAnnotations?
+    (family : ComputedAdaptiveOnlineAGMFSFamily shape)
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
+    (annotations : AdaptiveOnlineAGMAnnotationLog family.init basis)
+    (data : OnlineMemberProofData (vk := family.vk basis)
+      (instanceCommitment := family.instanceCommitment basis) basis
+      (family.fixedRepresentations basis))
+    (n : Fin 5) : Option (AlgebraicRelationWitness (F := Fp) basis) :=
+  let p := data.toAlgebraicWfProof
+  let n11 : Fin 11 := Fin.castLE (by omega) n
+  let t := algebraicFullPrefixesPre family.init p n11
+  selectedQueryRepresentationRelationFromAnnotations? t annotations
+    (data.algebraicProof.actionRepresentationsBefore n) (by
+      intro ap hap
+      change ap.point ∈ transcriptGroupPoints
+        (preIpaSqueezePoints family.init data.algebraicProof.erase n11)
+      exact data.algebraicProof.actionRepresentationsBefore_covered
+        family.init data.wellFormed n ap hap)
+
+@[simp] theorem adaptiveActionRepresentationRelationAtFromAnnotations?_annotations
+    (family : ComputedAdaptiveOnlineAGMFSFamily shape)
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
+    (O : BTranscript Fp VestaG
+      (preIpaLen shape family.init.length 10 + 3 * shape.k) → Fp)
+    (data : OnlineMemberProofData (vk := family.vk basis)
+      (instanceCommitment := family.instanceCommitment basis) basis
+      (family.fixedRepresentations basis))
+    (n : Fin 5) :
+    family.adaptiveActionRepresentationRelationAtFromAnnotations? basis
+        ((family.adversary basis).annotations O) data n =
+      family.adaptiveActionRepresentationRelationAt? basis O data n := by
+  unfold adaptiveActionRepresentationRelationAtFromAnnotations?
+    adaptiveActionRepresentationRelationAt?
+  exact selectedQueryRepresentationRelationFromAnnotations?_eq _ _ _ _ _
+
 /-- Compare the polynomial source visible at one semantic squeeze with the complete pre-`x`
 source used by the executable decoder.  A collision with different coordinates is an explicit
 relation rather than an unpriced future dependency. -/
@@ -1819,11 +1855,28 @@ def adaptiveActionRepresentationRelationFinder
         (preIpaLen shape family.init.length 10 + 3 * shape.k) → Fp) →
       Option (AlgebraicRelationWitness (F := Fp) basis) :=
   fun basis O =>
-    let data := (family.adversary basis).run O
+    let execution := (family.adversary basis).runWithAnnotations O
+    let data := execution.1
+    let annotations := execution.2
     firstAdaptiveRelation?
-      ((List.ofFn fun n => family.adaptiveActionRepresentationRelationAt? basis O data n) ++
+      ((List.ofFn fun n =>
+          family.adaptiveActionRepresentationRelationAtFromAnnotations? basis annotations data n) ++
         (List.ofFn fun n => family.adaptiveActionSourceMismatchAt? basis data n) ++
         [family.adaptiveActionQuotientRelationFinder basis O])
+
+/-- The one-pass Action provenance finder is extensionally the former repeated-scan expression. -/
+theorem adaptiveActionRepresentationRelationFinder_eq_uncached
+    (family : ComputedAdaptiveOnlineAGMFSFamily shape)
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
+    (O : BTranscript Fp VestaG
+      (preIpaLen shape family.init.length 10 + 3 * shape.k) → Fp) :
+    family.adaptiveActionRepresentationRelationFinder basis O =
+      let data := (family.adversary basis).run O
+      firstAdaptiveRelation?
+        ((List.ofFn fun n => family.adaptiveActionRepresentationRelationAt? basis O data n) ++
+          (List.ofFn fun n => family.adaptiveActionSourceMismatchAt? basis data n) ++
+          [family.adaptiveActionQuotientRelationFinder basis O]) := by
+  simp [adaptiveActionRepresentationRelationFinder]
 
 /-- No aggregate semantic-provenance relation means every stage-local comparison was empty. -/
 theorem adaptiveActionRepresentationRelationFinder_none_at
@@ -1837,7 +1890,8 @@ theorem adaptiveActionRepresentationRelationFinder_none_at
     family.adaptiveActionRepresentationRelationAt? basis O data n = none := by
   dsimp only
   have hall := (firstAdaptiveRelation?_eq_none_iff _).1 (by
-    simpa only [adaptiveActionRepresentationRelationFinder] using hnone)
+    rw [family.adaptiveActionRepresentationRelationFinder_eq_uncached basis O] at hnone
+    exact hnone)
   apply hall
   exact List.mem_append.mpr (Or.inl
     (List.mem_append.mpr (Or.inl (List.mem_ofFn.mpr ⟨n, rfl⟩))))
@@ -1854,7 +1908,8 @@ theorem adaptiveActionRepresentationRelationFinder_none_source_at
     family.adaptiveActionSourceMismatchAt? basis data n = none := by
   dsimp only
   have hall := (firstAdaptiveRelation?_eq_none_iff _).1 (by
-    simpa only [adaptiveActionRepresentationRelationFinder] using hnone)
+    rw [family.adaptiveActionRepresentationRelationFinder_eq_uncached basis O] at hnone
+    exact hnone)
   apply hall
   exact List.mem_append.mpr (Or.inl
     (List.mem_append.mpr (Or.inr (List.mem_ofFn.mpr ⟨n, rfl⟩))))
@@ -1869,7 +1924,8 @@ theorem adaptiveActionRepresentationRelationFinder_none_quotient
     (hnone : family.adaptiveActionRepresentationRelationFinder basis O = none) :
     family.adaptiveActionQuotientRelationFinder basis O = none := by
   have hall := (firstAdaptiveRelation?_eq_none_iff _).1 (by
-    simpa only [adaptiveActionRepresentationRelationFinder] using hnone)
+    rw [family.adaptiveActionRepresentationRelationFinder_eq_uncached basis O] at hnone
+    exact hnone)
   apply hall
   exact List.mem_append.mpr (Or.inr (by simp))
 

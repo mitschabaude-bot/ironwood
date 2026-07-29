@@ -53,6 +53,35 @@ def annotations (A : LabeledOracleComp T F Label α) (O : T → F) :
   | .pure _ => []
   | .query t label k => ⟨t, label⟩ :: (k (O t)).annotations O
 
+/-- Evaluate an adaptive computation and retain its query annotations in the same traversal.
+Unlike calling `run` and then repeatedly calling `findLabel`, this consults the oracle exactly
+once at each visited query node. -/
+def runWithAnnotations (A : LabeledOracleComp T F Label α) (O : T → F) :
+    α × List (QueryAnnotation T Label) :=
+  match A with
+  | .pure a => (a, [])
+  | .query t label k =>
+      let rest := (k (O t)).runWithAnnotations O
+      (rest.1, ⟨t, label⟩ :: rest.2)
+
+@[simp] theorem runWithAnnotations_snd
+    (A : LabeledOracleComp T F Label α) (O : T → F) :
+    (A.runWithAnnotations O).2 = A.annotations O := by
+  induction A with
+  | pure => rfl
+  | query t label k ih =>
+      simp only [runWithAnnotations, annotations]
+      rw [ih (O t)]
+
+/-- Look up the first annotation at a point in an already retained log.  This traverses ordinary
+data and does not re-run the adversary or consult the oracle. -/
+def findLabelInAnnotations [DecidableEq T] :
+    List (QueryAnnotation T Label) → (t : T) → Option (Label t)
+  | [], _ => none
+  | entry :: rest, t =>
+      if h : entry.point = t then some (h ▸ entry.label)
+      else findLabelInAnnotations rest t
+
 /-- Retrieve the first annotation at `t`, if the computation queried `t`. -/
 def findLabel [DecidableEq T] (A : LabeledOracleComp T F Label α) (O : T → F)
     (t : T) : Option (Label t) :=
@@ -116,6 +145,39 @@ theorem queries_eq_map_annotations (A : LabeledOracleComp T F Label α) (O : T �
   | query t label k ih =>
       simp only [queries, erase, OracleComp.queries, annotations, List.map_cons]
       exact congrArg (List.cons t) (ih (O t))
+
+@[simp] theorem runWithAnnotations_fst
+    (A : LabeledOracleComp T F Label α) (O : T → F) :
+    (A.runWithAnnotations O).1 = A.run O := by
+  induction A with
+  | pure => rfl
+  | query t label k ih =>
+      simpa only [runWithAnnotations, run_query] using ih (O t)
+
+/-- Cached annotation lookup agrees with a fresh `findLabel` traversal. -/
+theorem findLabelInAnnotations_annotations [DecidableEq T]
+    (A : LabeledOracleComp T F Label α) (O : T → F) (t : T) :
+    findLabelInAnnotations (A.annotations O) t = A.findLabel O t := by
+  induction A with
+  | pure => rfl
+  | query q label k ih =>
+      simp only [annotations, findLabelInAnnotations, findLabel]
+      split
+      · rfl
+      · exact ih (O q)
+
+/-- The retained log contains exactly the ordinary query path. -/
+theorem annotations_length_eq_queries
+    (A : LabeledOracleComp T F Label α) (O : T → F) :
+    (A.annotations O).length = (A.queries O).length := by
+  rw [queries_eq_map_annotations, List.length_map]
+
+/-- A query-bounded adaptive computation's one-pass output/annotation log has the same bound. -/
+theorem runWithAnnotations_log_length_le
+    (A : LabeledOracleComp T F Label α) {Q : ℕ} (hQ : A.QueryBound Q) (O : T → F) :
+    (A.runWithAnnotations O).2.length ≤ Q := by
+  rw [runWithAnnotations_snd, annotations_length_eq_queries]
+  exact A.erase.queries_length_le hQ O
 
 @[simp] theorem findLabel_isSome_iff [DecidableEq T]
     (A : LabeledOracleComp T F Label α) (O : T → F) (t : T) :
@@ -994,9 +1056,54 @@ def selectedQueryRepresentationRelation?
     (final : List (AlgebraicPoint (F := F) basis))
     (hcovered : ∀ ap ∈ final, ap.point ∈ transcriptGroupPoints t.val) :
     Option (AlgebraicRelationWitness (F := F) basis) :=
-  match selectedQueryRepresentationProvenanceOrRelation t A O final hcovered with
-  | PSum.inr relation => some relation
-  | PSum.inl _ => none
+  match A.findLabel O t with
+  | none => none
+  | some query =>
+      let selected := query.representationsFor final hcovered
+      have hpoints : selected.map AlgebraicPoint.point = final.map AlgebraicPoint.point :=
+        query.representationsFor_points final hcovered
+      match representationListsEqualOrRelation selected final hpoints with
+      | PSum.inr relation => some relation
+      | PSum.inl _ => none
+
+/-- Cached-log implementation of the selected provenance check.  Every lookup below is over the
+retained annotation list, so a finite collection of checks shares the adversary/oracle traversal.
+-/
+def selectedQueryRepresentationRelationFromAnnotations?
+    {F G ι : Type*} [Field F] [DecidableEq F] [DecidableEq G]
+    [AddCommGroup G] [Module F G] [Fintype ι]
+    {basis : ι → G} {L : ℕ} (t : BTranscript F G L)
+    (annotations : List (LabeledOracleComp.QueryAnnotation
+      (BTranscript F G L) (AlgebraicTranscriptQuery (F := F) basis)))
+    (final : List (AlgebraicPoint (F := F) basis))
+    (hcovered : ∀ ap ∈ final, ap.point ∈ transcriptGroupPoints t.val) :
+    Option (AlgebraicRelationWitness (F := F) basis) :=
+  match LabeledOracleComp.findLabelInAnnotations annotations t with
+  | none => none
+  | some query =>
+      let selected := query.representationsFor final hcovered
+      have hpoints : selected.map AlgebraicPoint.point = final.map AlgebraicPoint.point :=
+        query.representationsFor_points final hcovered
+      match representationListsEqualOrRelation selected final hpoints with
+      | PSum.inr relation => some relation
+      | PSum.inl _ => none
+
+/-- The cached-log provenance finder is extensionally the original finder when the log is the
+one produced by the same adaptive execution. -/
+theorem selectedQueryRepresentationRelationFromAnnotations?_eq
+    {F G ι α : Type*} [Field F] [DecidableEq F] [DecidableEq G]
+    [AddCommGroup G] [Module F G] [Fintype ι]
+    {basis : ι → G} {L : ℕ} (t : BTranscript F G L)
+    (A : LabeledOracleComp (BTranscript F G L) F
+      (AlgebraicTranscriptQuery (F := F) basis) α) (O : BTranscript F G L → F)
+    (final : List (AlgebraicPoint (F := F) basis))
+    (hcovered : ∀ ap ∈ final, ap.point ∈ transcriptGroupPoints t.val) :
+    selectedQueryRepresentationRelationFromAnnotations? t (A.annotations O) final hcovered =
+      selectedQueryRepresentationRelation? t A O final hcovered := by
+  unfold selectedQueryRepresentationRelationFromAnnotations?
+  rw [show LabeledOracleComp.findLabelInAnnotations (A.annotations O) t =
+      A.findLabel O t from LabeledOracleComp.findLabelInAnnotations_annotations A O t]
+  rfl
 
 /-- If the selected executable finder returns no relation, the prefix was fresh or the final
 selected coefficients equal their first pre-answer query representations. -/
@@ -1011,9 +1118,20 @@ def selectedQueryRepresentationRelation?_eq_none
     (hnone : selectedQueryRepresentationRelation? t A O final hcovered = none) :
     A.findLabel O t = none ⊕' SelectedQueryRepresentationPinned t A O final := by
   unfold selectedQueryRepresentationRelation? at hnone
-  cases hprov : selectedQueryRepresentationProvenanceOrRelation t A O final hcovered with
-  | inl provenance => exact provenance
-  | inr relation => simp [hprov] at hnone
+  cases hfound : A.findLabel O t with
+  | none => exact PSum.inl rfl
+  | some query =>
+      simp only [hfound] at hnone
+      cases hrelation : representationListsEqualOrRelation
+          (query.representationsFor final hcovered) final
+          (query.representationsFor_points final hcovered) with
+      | inr relation => simp [hrelation] at hnone
+      | inl hcoeff =>
+          exact PSum.inr
+            { query := query
+              found := hfound
+              covered := hcovered
+              coefficients_eq := hcoeff }
 
 /-- A malicious adaptive online-AGM computation over the Halo2 transcript domain. -/
 abbrev AdaptiveOnlineAGMComp {shape : Shape}
@@ -1022,6 +1140,14 @@ abbrev AdaptiveOnlineAGMComp {shape : Shape}
   LabeledOracleComp
     (BTranscript Fp VestaG (preIpaLen shape init.length 10 + 3 * shape.k)) Fp
     (AlgebraicTranscriptQuery (F := Fp) basis) α
+
+/-- Retained query annotations from one concrete adaptive online-AGM execution. -/
+abbrev AdaptiveOnlineAGMAnnotationLog {shape : Shape}
+    (init : List (TranscriptElt Fp VestaG))
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG) :=
+  List (LabeledOracleComp.QueryAnnotation
+    (BTranscript Fp VestaG (preIpaLen shape init.length 10 + 3 * shape.k))
+    (AlgebraicTranscriptQuery (F := Fp) basis))
 
 /-- The bare bounded adaptive online-AGM family.  No execution cuts or freshness proofs are fields:
 the adversary may make arbitrary malicious random-oracle queries, and every query carries the AGM
@@ -1057,6 +1183,17 @@ structure ComputedAdaptiveOnlineAGMFSFamily (shape : Shape) where
 namespace ComputedAdaptiveOnlineAGMFSFamily
 
 variable {shape : Shape}
+
+/-- Every retained output/annotation execution has at most the family's declared `Q` visited
+query nodes.  Cached provenance lookup performs no further oracle calls. -/
+theorem runWithAnnotations_log_length_le
+    (family : ComputedAdaptiveOnlineAGMFSFamily shape)
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
+    (O : BTranscript Fp VestaG
+      (preIpaLen shape family.init.length 10 + 3 * shape.k) → Fp) :
+    ((family.adversary basis).runWithAnnotations O).2.length ≤ family.Q :=
+  LabeledOracleComp.runWithAnnotations_log_length_le
+    (family.adversary basis) (family.queryBound basis) O
 
 /-- Forget only the per-query AGM annotations and assemble the canonical online-member family.
 The erased random-oracle computation has definitionally the same outputs and query budget. -/

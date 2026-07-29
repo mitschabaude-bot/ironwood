@@ -930,7 +930,8 @@ theorem adaptive_action_constraint_count_le
       (min 3 (vkAt actionProofParams basis).permutationChunks.length) ≤
       vk.permutationChunks.length := Nat.min_le_left _ _
   have hc : vk.gates.length + (vk.permutationChunks.length + 19) ≤ 2 ^ 12 := by
-    native_decide
+    rw [vk_gates_length, vk_permutationChunks_length]
+    norm_num
   omega
 
 /-- The adaptive Action constraint list is linear in the number of bundled Actions. -/
@@ -979,7 +980,8 @@ theorem adaptive_action_constraint_count_le_for (numProofs : ℕ)
       (min 3 (vkAt (actionProofParamsFor numProofs) basis).permutationChunks.length) ≤
       vk.permutationChunks.length := Nat.min_le_left _ _
   have hc : vk.gates.length + (vk.permutationChunks.length + 19) ≤ 2 ^ 12 := by
-    native_decide
+    rw [vk_gates_length, vk_permutationChunks_length]
+    norm_num
   omega
 
 /-- The adaptive pre-`x` polynomial is assembled from coordinate vectors of degree below the
@@ -1169,7 +1171,7 @@ theorem action_semantic_count_le {Q : ℕ} (hQ : Q ≤ 2 ^ 123) :
 ten bits under the compressed model's `2^-84` ceiling. -/
 theorem two_pow_254_le_card : 2 ^ 254 ≤ Fintype.card Fp := by
   rw [Zcash.Arithmetic.card_Fp]
-  native_decide
+  norm_num
 
 /-- The four bundle-linear Action surfaces plus the bundle-independent `x` surface, collapsed to
 one numerator.  The coefficient is the exact sum of the proved `y`, `β`, `γ`, and `θ` caps. -/

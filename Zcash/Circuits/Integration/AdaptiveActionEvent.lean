@@ -632,12 +632,58 @@ def adaptiveActionRelationFinder :
         | none => adaptiveActionCompleteTerminalRelationFinder pp family inputs hvk hI hchar
             basis O hprovenance
 
-/-- Conservative random-oracle work for the adaptive combined finder.  The profile reserves eight
-uncached represented-run slots: two for Action provenance, four for the direct IPA/root walk, and
-two for the terminal fallback.  Every slot includes its own designated `11 + k` transcript reads.
--/
+/-- Modeled adversary traversals of the executable adaptive finder.  Action provenance performs
+one output/annotation traversal and one quotient traversal.  The deployed straight-line list adds
+four traversals, and its terminal fallback adds two more. -/
+def adaptiveActionRelationFinderCalls
+    (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
+    (O : BTranscript Fp VestaG
+      (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
+        + 3 * (pp.mergeDerived actionCircuit).k) → Fp) : Nat :=
+  match family.adaptiveActionRepresentationRelationFinder basis O with
+  | some _ => 2
+  | none =>
+      match family.adaptiveStraightLineDeployedRelationFinder basis O with
+      | some _ => 6
+      | none => 8
+
+/-- Independently charged adversary-traversal slots in the adaptive combined finder: one cached
+output/annotation traversal plus the quotient traversal for Action provenance, four traversals for
+cached pre-IPA provenance, cached IPA provenance, IPA binding, and deployed roots, and two for the
+terminal fallback. -/
+def adaptiveActionDlogTraversalSlots : Nat := 2 + 4 + 2
+
+@[simp] theorem adaptiveActionDlogTraversalSlots_eq_eight :
+    adaptiveActionDlogTraversalSlots = 8 := rfl
+
+/-- The executable combined finder has a pointwise eight-traversal bound. -/
+theorem adaptiveActionRelationFinderCalls_le_traversalSlots
+    (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
+    (O : BTranscript Fp VestaG
+      (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
+        + 3 * (pp.mergeDerived actionCircuit).k) → Fp) :
+    adaptiveActionRelationFinderCalls pp family basis O ≤ adaptiveActionDlogTraversalSlots := by
+  unfold adaptiveActionRelationFinderCalls adaptiveActionDlogTraversalSlots
+  split
+  · omega
+  · split <;> omega
+
+/-- Each of the three provenance aggregates retains one output/annotation log of length at most
+`Q`; its five, six, or `k` lookups scan that retained data and make no further oracle calls. -/
+theorem adaptiveActionCachedProvenanceLog_length_le
+    (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
+    (O : BTranscript Fp VestaG
+      (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
+        + 3 * (pp.mergeDerived actionCircuit).k) → Fp) :
+    ((family.adversary basis).runWithAnnotations O).2.length ≤ family.Q :=
+  family.runWithAnnotations_log_length_le basis O
+
+/-- Conservative random-oracle work for the adaptive combined finder after provenance caching.
+Every independently charged traversal slot includes its own `Q`-query run allowance and its own
+designated `11 + k` transcript reads. -/
 def adaptiveActionDlogRandomOracleQueries : Nat :=
-  8 * family.Q + 8 * (11 + (pp.mergeDerived actionCircuit).k)
+  adaptiveActionDlogTraversalSlots * family.Q +
+    adaptiveActionDlogTraversalSlots * (11 + (pp.mergeDerived actionCircuit).k)
 
 /-- Group-work envelope of the adaptive combined finder. -/
 def adaptiveActionDlogGroupWork (proverGroupWork reductionGroupWork : Nat) : Nat :=
@@ -667,7 +713,7 @@ structure AdaptiveActionDlogProfile (B : VestaG) where
       (adaptiveActionDlogGroupWork proverGroupWork reductionGroupWork))
 
 /-- Concrete resource profile for the bare adaptive route.  Unlike the sequential six-call
-profile, this deliberately charges all eight uncached adaptive run slots. -/
+profile, this charges all eight independently traversed adaptive slots after provenance caching. -/
 structure AdaptiveActionDirectDlogProfile (B : VestaG) (T : Nat)
     extends AdaptiveActionDlogProfile pp family inputs hvk hI hchar B where
   ipaDepth : (pp.mergeDerived actionCircuit).k = 11
@@ -688,6 +734,7 @@ theorem AdaptiveActionDirectDlogProfile.solverCost_le
       ∀ basis O, 2 * adaptiveActionDirectDecodeOps pp family basis O ≤ T := by
   constructor
   · unfold adaptiveActionDlogRandomOracleQueries
+    rw [adaptiveActionDlogTraversalSlots_eq_eight]
     rw [profile.ipaDepth]
     have hT := profile.targetAtLeastTwentyTwo
     calc

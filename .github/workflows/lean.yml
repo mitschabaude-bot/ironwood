@@ -79,10 +79,10 @@ jobs:
         run: scripts/check_csimp_census.sh
       # Installs the toolchain from lean-toolchain, fetches the Mathlib olean cache, and runs
       # `lake build --wfail`, which rejects all warnings and builds the lakefile's
-      # `defaultTargets`: `Zcash`, `TrustCheck`, `FixtureCheck`, `CircuitCheck`, and `MetaCheck`.
+      # `defaultTargets`: `Zcash`, `FixtureCheck`, `CircuitCheck`, and `MetaCheck`.
       #
-      # `TrustCheck` keeps the complete library/fixture trust census enforced without pulling
-      # concrete captures into the fixture-free `lake build Zcash` target.
+      # `Zcash` imports the fixture-free top-level trust census. Concrete capstone census entries
+      # live beside their captures and are built through `FixtureCheck`.
       #
       # `FixtureCheck` covers the deployed Action/Vesta capstone lane, whose
       # `Keygen/Certificate.lean` natively certifies the deployed verifying key against the

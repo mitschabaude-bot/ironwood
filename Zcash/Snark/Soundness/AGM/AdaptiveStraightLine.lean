@@ -57,6 +57,42 @@ def adaptivePreIpaRepresentationRelationAt?
       exact p.algebraicProof.representationsBefore_covered family.init p.wellFormed
         n h5n ap hap)
 
+/-- Cached-log form of one pre-IPA provenance comparison. -/
+def adaptivePreIpaRepresentationRelationAtFromAnnotations?
+    (family : ComputedAdaptiveOnlineAGMFSFamily shape)
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
+    (annotations : AdaptiveOnlineAGMAnnotationLog family.init basis)
+    (data : OnlineMemberProofData (vk := family.vk basis)
+      (instanceCommitment := family.instanceCommitment basis) basis
+      (family.fixedRepresentations basis))
+    (n : Fin 11) (h5n : 5 ≤ (n : ℕ)) :
+    Option (AlgebraicRelationWitness (F := Fp) basis) :=
+  let p := data.toAlgebraicWfProof
+  let t := algebraicFullPrefixesPre family.init p n
+  selectedQueryRepresentationRelationFromAnnotations? t annotations
+    (p.algebraicProof.representationsBefore n) (by
+      intro ap hap
+      change ap.point ∈ transcriptGroupPoints
+        (preIpaSqueezePoints family.init p.algebraicProof.erase n)
+      exact p.algebraicProof.representationsBefore_covered family.init p.wellFormed
+        n h5n ap hap)
+
+@[simp] theorem adaptivePreIpaRepresentationRelationAtFromAnnotations?_annotations
+    (family : ComputedAdaptiveOnlineAGMFSFamily shape)
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
+    (O : BTranscript Fp VestaG
+      (preIpaLen shape family.init.length 10 + 3 * shape.k) → Fp)
+    (data : OnlineMemberProofData (vk := family.vk basis)
+      (instanceCommitment := family.instanceCommitment basis) basis
+      (family.fixedRepresentations basis))
+    (n : Fin 11) (h5n : 5 ≤ (n : ℕ)) :
+    family.adaptivePreIpaRepresentationRelationAtFromAnnotations? basis
+        ((family.adversary basis).annotations O) data n h5n =
+      family.adaptivePreIpaRepresentationRelationAt? basis O data n h5n := by
+  unfold adaptivePreIpaRepresentationRelationAtFromAnnotations?
+    adaptivePreIpaRepresentationRelationAt?
+  exact selectedQueryRepresentationRelationFromAnnotations?_eq _ _ _ _ _
+
 /-- One shared-output comparison covers `x₁`, `x₂`, `x₃`, `x₄`, `ξ`, and `z`. -/
 def adaptivePreIpaRepresentationRelationFinder
     (family : ComputedAdaptiveOnlineAGMFSFamily shape) :
@@ -65,14 +101,39 @@ def adaptivePreIpaRepresentationRelationFinder
         (preIpaLen shape family.init.length 10 + 3 * shape.k) → Fp) →
       Option (AlgebraicRelationWitness (F := Fp) basis) :=
   fun basis O =>
-    let data := (family.adversary basis).run O
+    let execution := (family.adversary basis).runWithAnnotations O
+    let data := execution.1
+    let annotations := execution.2
     firstAdaptiveRelation?
-      [family.adaptivePreIpaRepresentationRelationAt? basis O data 5 (by omega),
-       family.adaptivePreIpaRepresentationRelationAt? basis O data 6 (by omega),
-       family.adaptivePreIpaRepresentationRelationAt? basis O data 7 (by omega),
-       family.adaptivePreIpaRepresentationRelationAt? basis O data 8 (by omega),
-       family.adaptivePreIpaRepresentationRelationAt? basis O data 9 (by omega),
-       family.adaptivePreIpaRepresentationRelationAt? basis O data 10 (by omega)]
+      [family.adaptivePreIpaRepresentationRelationAtFromAnnotations? basis annotations data 5
+          (by omega),
+       family.adaptivePreIpaRepresentationRelationAtFromAnnotations? basis annotations data 6
+          (by omega),
+       family.adaptivePreIpaRepresentationRelationAtFromAnnotations? basis annotations data 7
+          (by omega),
+       family.adaptivePreIpaRepresentationRelationAtFromAnnotations? basis annotations data 8
+          (by omega),
+       family.adaptivePreIpaRepresentationRelationAtFromAnnotations? basis annotations data 9
+          (by omega),
+       family.adaptivePreIpaRepresentationRelationAtFromAnnotations? basis annotations data 10
+          (by omega)]
+
+/-- The one-pass executable pre-IPA finder is extensionally the former repeated-scan expression. -/
+theorem adaptivePreIpaRepresentationRelationFinder_eq_uncached
+    (family : ComputedAdaptiveOnlineAGMFSFamily shape)
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
+    (O : BTranscript Fp VestaG
+      (preIpaLen shape family.init.length 10 + 3 * shape.k) → Fp) :
+    family.adaptivePreIpaRepresentationRelationFinder basis O =
+      let data := (family.adversary basis).run O
+      firstAdaptiveRelation?
+        [family.adaptivePreIpaRepresentationRelationAt? basis O data 5 (by omega),
+         family.adaptivePreIpaRepresentationRelationAt? basis O data 6 (by omega),
+         family.adaptivePreIpaRepresentationRelationAt? basis O data 7 (by omega),
+         family.adaptivePreIpaRepresentationRelationAt? basis O data 8 (by omega),
+         family.adaptivePreIpaRepresentationRelationAt? basis O data 9 (by omega),
+         family.adaptivePreIpaRepresentationRelationAt? basis O data 10 (by omega)] := by
+  simp [adaptivePreIpaRepresentationRelationFinder]
 
 /-- A successful phase-local comparison is also successful in the combined pre-IPA finder. -/
 theorem adaptivePreIpaRepresentationRelationFinder_none_at
@@ -86,7 +147,8 @@ theorem adaptivePreIpaRepresentationRelationFinder_none_at
     family.adaptivePreIpaRepresentationRelationAt? basis O data n h5n = none := by
   dsimp only
   have hall := (firstAdaptiveRelation?_eq_none_iff _).1 (by
-    simpa only [adaptivePreIpaRepresentationRelationFinder] using hnone)
+    rw [family.adaptivePreIpaRepresentationRelationFinder_eq_uncached basis O] at hnone
+    exact hnone)
   simp only [List.mem_cons, forall_eq_or_imp] at hall
   rcases hall with ⟨h5, h6, h7, h8, h9, h10⟩
   fin_cases n
@@ -124,6 +186,42 @@ def adaptiveIpaRepresentationRelationAt?
       exact p.algebraicProof.representationsBeforeRound_covered family.init p.wellFormed
         j ap hap)
 
+/-- Cached-log form of one IPA-round provenance comparison. -/
+def adaptiveIpaRepresentationRelationAtFromAnnotations?
+    (family : ComputedAdaptiveOnlineAGMFSFamily shape)
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
+    (annotations : AdaptiveOnlineAGMAnnotationLog family.init basis)
+    (data : OnlineMemberProofData (vk := family.vk basis)
+      (instanceCommitment := family.instanceCommitment basis) basis
+      (family.fixedRepresentations basis))
+    (j : Fin shape.k) : Option (AlgebraicRelationWitness (F := Fp) basis) :=
+  let p := data.toAlgebraicWfProof
+  let t := algebraicFullPrefixes family.init p j
+  selectedQueryRepresentationRelationFromAnnotations? t annotations
+    (p.algebraicProof.representationsBeforeRound j) (by
+      intro ap hap
+      change ap.point ∈ transcriptGroupPoints
+        (roundTranscriptFin (preIpaTranscript family.init p.algebraicProof.erase)
+          p.algebraicProof.erase.ipaRounds j)
+      exact p.algebraicProof.representationsBeforeRound_covered family.init p.wellFormed
+        j ap hap)
+
+@[simp] theorem adaptiveIpaRepresentationRelationAtFromAnnotations?_annotations
+    (family : ComputedAdaptiveOnlineAGMFSFamily shape)
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
+    (O : BTranscript Fp VestaG
+      (preIpaLen shape family.init.length 10 + 3 * shape.k) → Fp)
+    (data : OnlineMemberProofData (vk := family.vk basis)
+      (instanceCommitment := family.instanceCommitment basis) basis
+      (family.fixedRepresentations basis))
+    (j : Fin shape.k) :
+    family.adaptiveIpaRepresentationRelationAtFromAnnotations? basis
+        ((family.adversary basis).annotations O) data j =
+      family.adaptiveIpaRepresentationRelationAt? basis O data j := by
+  unfold adaptiveIpaRepresentationRelationAtFromAnnotations?
+    adaptiveIpaRepresentationRelationAt?
+  exact selectedQueryRepresentationRelationFromAnnotations?_eq _ _ _ _ _
+
 /-- The combined IPA provenance finder covers every round without assuming a recursive extractor
 or phase-equipped prover. -/
 def adaptiveIpaRepresentationRelationFinder
@@ -133,9 +231,23 @@ def adaptiveIpaRepresentationRelationFinder
         (preIpaLen shape family.init.length 10 + 3 * shape.k) → Fp) →
       Option (AlgebraicRelationWitness (F := Fp) basis) :=
   fun basis O =>
-    let data := (family.adversary basis).run O
+    let execution := (family.adversary basis).runWithAnnotations O
+    let data := execution.1
+    let annotations := execution.2
     firstAdaptiveRelation? (List.ofFn fun j =>
-      family.adaptiveIpaRepresentationRelationAt? basis O data j)
+      family.adaptiveIpaRepresentationRelationAtFromAnnotations? basis annotations data j)
+
+/-- The one-pass IPA provenance finder is extensionally the former repeated-scan expression. -/
+theorem adaptiveIpaRepresentationRelationFinder_eq_uncached
+    (family : ComputedAdaptiveOnlineAGMFSFamily shape)
+    (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
+    (O : BTranscript Fp VestaG
+      (preIpaLen shape family.init.length 10 + 3 * shape.k) → Fp) :
+    family.adaptiveIpaRepresentationRelationFinder basis O =
+      let data := (family.adversary basis).run O
+      firstAdaptiveRelation? (List.ofFn fun j =>
+        family.adaptiveIpaRepresentationRelationAt? basis O data j) := by
+  simp [adaptiveIpaRepresentationRelationFinder]
 
 /-- No combined IPA relation implies no phase-local mismatch relation at any round. -/
 theorem adaptiveIpaRepresentationRelationFinder_none_at
@@ -149,7 +261,8 @@ theorem adaptiveIpaRepresentationRelationFinder_none_at
     family.adaptiveIpaRepresentationRelationAt? basis O data j = none := by
   dsimp only
   have hall := (firstAdaptiveRelation?_eq_none_iff _).1 (by
-    simpa only [adaptiveIpaRepresentationRelationFinder] using hnone)
+    rw [family.adaptiveIpaRepresentationRelationFinder_eq_uncached basis O] at hnone
+    exact hnone)
   apply hall
   exact List.mem_ofFn.mpr ⟨j, rfl⟩
 

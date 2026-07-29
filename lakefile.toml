@@ -1,7 +1,7 @@
 name = "Zcash"
 version = "0.1.0"
 keywords = ["cryptography", "math", "protocols"]
-defaultTargets = ["Zcash", "TrustCheck", "FixtureCheck", "CircuitCheck", "MetaCheck"]
+defaultTargets = ["Zcash", "FixtureCheck", "CircuitCheck", "MetaCheck"]
 
 [leanOptions]
 pp.unicode.fun = true # pretty-prints `fun a ↦ b`
@@ -26,13 +26,6 @@ rev = "v4.30.0"
 
 [[lean_lib]]
 name = "Zcash"
-
-# The build-checked trust census imports both reusable theory and concrete fixture capstones.
-# Keeping it in a dedicated default target lets `lake build Zcash` remain the fixture-free core
-# build while plain `lake build` and CI still enforce the complete census.
-[[lean_lib]]
-name = "TrustCheck"
-globs = ["Zcash.TrustBoundary"]
 
 # Test-only adversarial declarations for `Zcash.Meta.AxiomCheck`. This is a separate library so
 # forged axioms used to exercise the rejection paths never enter the production `Zcash` import
