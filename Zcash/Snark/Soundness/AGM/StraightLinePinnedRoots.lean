@@ -302,7 +302,7 @@ theorem straightLineBindingAttackZSet_subset
     simpa [relSetWithCoins] using hrelation
 
 /-- One-run AGM binding at `z ≠ 0`: DLOG plus the programmed-slot loss and `2k` pinned IPA roots,
-with no recursive AFK or truncation term. -/
+with no expectation or truncation term. -/
 theorem straightLineBindingAttackZ_prob_le_of_textbookDL
     (B : VestaG) (family : ComputedStraightLineIpaFSFamily shape) {bound : ENNReal}
     (hDL : TextbookDLWithCoinsAdvantageLE B family.straightLineIpaRelationFinder bound) :
@@ -411,7 +411,7 @@ theorem straightLineBindingZero_prob_le
     (family.queryBound basis)
 
 /-- Straight-line AGM binding capstone.  Compared with the recursive capstone, the extraction
-term is the additive `2k` IPA-root budget; there is no AFK expectation or Markov tail. -/
+term is the additive `2k` IPA-root budget; there is no expectation or Markov tail. -/
 theorem straightLineBindingAttack_prob_le_of_textbookDL
     (B : VestaG) (family : ComputedStraightLineIpaFSFamily shape) {bound : ENNReal}
     (hDL : TextbookDLWithCoinsAdvantageLE B family.straightLineIpaRelationFinder bound) :

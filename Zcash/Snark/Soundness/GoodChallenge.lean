@@ -89,8 +89,7 @@ The lemmas above *price* the exclusion; the lemmas below *spend* it. An accept e
 measure beats `m / p` has more than `m` accepting challenges, so if the bad set has at most `m`
 elements some accepting challenge avoids it — the good-challenge condition is produced from the
 accept measure rather than assumed. This is the x-site instance of the codebase-wide counting
-floors: `extractable_of_prob` forces the round-forking tree, and
-`exists_injective_accepting_of_measure` forces the `x₄` rewound family, from the same
+floor: `exists_injective_accepting_of_measure` forces the `x₄` rewound family, from the same
 measure-beats-count shape. The `_xgood` rungs (`Soundness.Multiopen.Opened`, `Soundness.Vesta`)
 consume these, dropping the `hgood` hypothesis. -/
 

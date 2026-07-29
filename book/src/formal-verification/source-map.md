@@ -204,12 +204,10 @@ Six subtrees carry the heavier machinery:
   `LookupRows`), ending at `Terminal` and its Vesta adapter.
 - **`Composition/`** — joining the two halves the architecture keeps apart and bounding the
   probability loss the join costs. `Bridge`
-  identifies the algebraic forking extraction's clean opening with the deployed decoded capstone's
-  opened commitment; `Decomposition` splits the knowledge-error bound unconditionally into the
-  clean-opening failure, with its probability bound, plus a measured clean-but-not-extracted
-  residual.
-  `DeployedAcceptance` and `DeployedRuntime` isolate the deployed decision from the historical
-  rewind construction; `RootContainment`, `DeployedRootContainment` and
+  identifies the algebraic extraction's aggregate witness with the deployed decoded capstone's
+  opened commitment.
+  `DeployedAcceptance` and `DeployedRuntime` name the deployed decision on one oracle table;
+  `DeployedRootContainment` and
   `DeployedConstraintContainment` replace the four-level joint-event coupling with a finite union
   of explicit bad-root events, each fixed before its own squeeze, so the residual is additive and
   has no fourth root. `Quotient` reconstructs a genuinely pre-`x` quotient, `PrefixedSqueeze` and
@@ -228,27 +226,23 @@ Six subtrees carry the heavier machinery:
   (`Ipa`, `IpaPeel`), unfolds the flattened deployed MSM into the recursive generator fold
   (`Fold`), shows deployed acceptance implies halo2's explicit IPA verifier equation
   (`Verification`), reduces binding over the augmented generators to discrete-log-relation
-  hardness (`Binding`), reads the fork-tree knowledge error off the deployed Orchard parameters as
-  a concrete number (`ConcreteBounds` — `33/|F_p| ≈ 2⁻²⁴⁹` at the captured depth `k = 11`), and
-  states the Action capstone at the captured artifacts (`ActionVesta`).
-- **`Forking/`** — the reusable Fiat–Shamir forking kernel: random-oracle primitives
-  (`Oracle`), the deployed round ordering and rewinding (`Ordering`, `Rewind`), fork-tree
-  existence and the forking-lemma probability bound (`Tree`, `Probability`), the closed form
-  of that bound (`KnowledgeError`), the transcript assembly and extraction that turn forked
-  transcripts into a deployed IPA tree (`Assembly`, `Extractor`), the one-level pinned-squeeze
-  bound and the additive union of pinned root events (`PinnedSqueeze`, `PinnedRoots`), and the
-  wrapper that returns a run's own oracle reads with its output (`WithReads`).
+  hardness (`Binding`), and states the Action capstone at the captured artifacts (`ActionVesta`).
+- **`Forking/`** — the reusable Fiat–Shamir random-oracle kernel: random-oracle primitives
+  (`Oracle`), the deployed squeeze ordering (`Ordering`) and the reprogramming lemmas that say
+  changing the oracle at one squeeze prefix replaces exactly that challenge (`Rewind`), the
+  transcript assembly that turns accepting rounds into a deployed IPA tree (`Assembly`), the
+  one-level pinned-squeeze bound and the additive union of pinned root events (`PinnedSqueeze`,
+  `PinnedRoots`), and the wrapper that returns a run's own oracle reads with its output
+  (`WithReads`).
   **`Forking/Adversary/`** builds the querying-adversary reduction on top: the `Q`-query
-  adaptive adversary model (`OracleComp`), executable recursive forking from a finite tape
-  (`Recursive`), the Fiat–Shamir-to-AGM handoff (`Algebraic`), oracle-domain reduction to
-  finite support (`DomainReduction`), the adaptive interface and pre-IPA query accounting
-  (`Adaptive`, `PreIpa`, `Provenance`), and the expected-run bookkeeping (`ExpectedRuns`,
-  `ExpectedRunsPoly`). The efficiency floor of the reduction is unconditional:
-  `afkRunBound Q k = (8Q + 1) · 10^k`
-  follows from the adversary's query bound alone, field-independent and with no premise on the
-  fork DAG. That is a ~40-bit cost against the straight-line route's four prover invocations,
-  which is why the recursive route is retained as an alternative carrying its own probability
-  bound rather than the path the headline rests on.
+  adaptive adversary model (`OracleComp`), the Fiat–Shamir-to-AGM handoff (`Algebraic`),
+  oracle-domain reduction to finite support (`DomainReduction`), and the adaptive interface and
+  pre-IPA query accounting (`Adaptive`, `PreIpa`, `Provenance`). The rewinding extractor that once
+  sat here — the ternary fork tree, the executable recursive extractor over a finite sampling
+  tape, and the Attema–Fehr–Klooß-style expected-runs bookkeeping — has been retired (ironwood#133).
+  Its unconditional bound `(8Q + 1) · 10^k` was a ~40-bit cost against the straight-line route's
+  four prover invocations, so it was never the path the headline rested on, and a single deployed
+  extractor is now what the trust boundary reads.
 - **`Multiopen/`** — the multiopen argument's value binding. `Decode` recovers the individual
   columns from openings of the batch at enough distinct batching challenges, and `Deployed`
   discharges the flat-power-batch shape those openings are stated in against the deployed verifier

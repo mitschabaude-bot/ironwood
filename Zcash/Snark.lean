@@ -47,7 +47,7 @@ import Zcash.Snark.Soundness.PermutationRows
 import Zcash.Snark.Soundness.ConstraintRelations
 import Zcash.Snark.Soundness.ChallengePricing
 import Zcash.Snark.Soundness.InnerProduct
-import Zcash.Snark.Soundness.Extraction
+import Zcash.Snark.Soundness.Halves
 import Zcash.Snark.Soundness.Constraints
 import Zcash.Snark.Soundness.FoldSplit
 import Zcash.Snark.Soundness.CommitFold
@@ -90,22 +90,17 @@ import Zcash.Snark.Soundness.TopLevelTerminal
 import Zcash.Snark.Soundness.TopLevelVesta
 import Zcash.Snark.Soundness.ActionVesta
 import Zcash.Snark.Soundness.Vesta
--- Concrete fork-tree knowledge error over the deployed Orchard parameters.
-import Zcash.Snark.Soundness.Deployed.ConcreteBounds
 -- AGM binding reduction: consume computed deployed relations through the programmed-basis
 -- discrete-log adapter and representation-carrying algebraic-prover model.
 import Zcash.Snark.Soundness.AGM.Adapter
 import Zcash.Snark.Soundness.AGM.Probability
 import Zcash.Snark.Soundness.AGM.ProbabilityVesta
 import Zcash.Snark.Soundness.AGM.Peel
-import Zcash.Snark.Soundness.AGM.Prover
-import Zcash.Snark.Soundness.AGM.Capstone
 import Zcash.Snark.Soundness.AGM.BindingSignature
 -- Rewind-free deployed multiopen decoding and additive pinned-root composition.
 import Zcash.Snark.Soundness.Composition.DeployedRootContainment
--- Primary straight-line AGM route: staged IPA representations, fixed-call deployed constraint
--- extraction, and an explicit finite-security DLOG work profile. The recursive AFK route remains
--- available as a separately priced alternative.
+-- The straight-line AGM route: staged IPA representations, fixed-call deployed constraint
+-- extraction, and an explicit finite-security DLOG work profile.
 import Zcash.Snark.Soundness.AGM.StraightLineFiniteSecurity
 -- The constraint-level and straight-line family interfaces are inhabited at the witness shape.
 import Zcash.Snark.Soundness.Composition.StraightLineWitness

@@ -57,9 +57,9 @@ theorem deployedDirectDecodeOps_at_captured_shape {n : ℕ}
     show (shape n).numPointSets = 5 from rfl, show (shape n).k = 11 from rfl]
   norm_num
 
-/-- **At the consensus maximum, the direct path fits the illustrative `2^122` work ceiling.**
-Even with a generous `2^90` covered-source length, the modeled cost stays below `2^122`.  This is
-a cost comparison, not a claim of 122-bit security. -/
+/-- **At the consensus maximum, the direct path is negligible against the `2^122` work target.**
+Even with a generous `2^90` covered-source length, the modeled cost stays below `2^122` — the
+direct-coordinate postprocessing never threatens the adversary-work accounting. -/
 theorem deployedDirectDecodeOps_at_consensus_max {n : ℕ}
     (hn : n ≤ orchardConsensusMaxProofs)
     (vk : VerifyingKey (shape n) Fp VestaG)
@@ -124,114 +124,5 @@ theorem consensusPinnedRootMultiopenModel_at_2pow122 :
     (by norm_num)
     (by norm_num [scalarFieldOrder, CompElliptic.Fields.Pasta.PALLAS_BASE_CARD]) using 1 <;>
     norm_num
-
-/-! ## Reduction efficiency
-
-The `dlogBound` premise below is the advantage of the *combined finder*, not of the raw adversary.
-Its per-run cost model stays outside Lean, like the random-oracle model: one run of the wrapped
-adversary (`Q + 11 + k` oracle reads), one direct-coordinate decode of the retained
-representations, and a constant number of field solves.
-
-The illustrative query cap `T = 2^122` cannot double as that finder's call budget. At `k = 11` the
-proved Attema–Fehr–Klooß-style (AFK) expectation is between `2^161` and `2^162` calls, and pushing
-the generic Markov tail below `2^-86` would need an `L+1` between `2^247` and `2^248`. So the
-recursive endpoint at those illustrative parameters is a structural polynomial bound, not a
-concrete security margin — a solver with either budget can Pollard-rho Vesta directly. The concrete
-margin is the straight-line endpoint's, in `StraightLineMaxShapeBounds`.
-
-The finder's unconditional expected call bound is `afkRunBound Q 11 + 3`: the AFK recursive bound
-plus the direct-coordinate and quotient fallbacks. The theorems below truncate the solver at a
-separate fixed budget `L`, so fixed-call DLOG hardness supplies `dlogBound` and Markov conversion
-contributes `(afkRunBound Q 11 + 3)/(L+1)`. The query cap `T` controls the statistical terms
-only. -/
-
-/-- Expected black-box calls of the combined finder at the consensus shape, bounded using `Q <= T`.
-The additive three is the direct-coordinate and quotient fallback overhead. -/
-def consensusCombinedFinderExpectedCallsModel (T : Nat) : Nat :=
-  afkRunBound T 11 + 3
-
-/-- At the illustrative query cap `T = 2^122`, the AFK expectation is roughly `2^161.54`. -/
-theorem consensusCombinedFinderExpectedCallsModel_at_2pow122_bounds :
-    2 ^ 161 < consensusCombinedFinderExpectedCallsModel (2 ^ 122) ∧
-      consensusCombinedFinderExpectedCallsModel (2 ^ 122) < 2 ^ 162 := by
-  norm_num [consensusCombinedFinderExpectedCallsModel, afkRunBound]
-
-/-- A generic Markov tail of at most `2^-86` needs `L+1` at least `R·2^86`; for this AFK bound
-that sufficient budget lies between `2^247` and `2^248`. -/
-theorem consensusCombinedFinderBudgetForTail86_at_2pow122_bounds :
-    2 ^ 247 < consensusCombinedFinderExpectedCallsModel (2 ^ 122) * 2 ^ 86 ∧
-      consensusCombinedFinderExpectedCallsModel (2 ^ 122) * 2 ^ 86 < 2 ^ 248 := by
-  norm_num [consensusCombinedFinderExpectedCallsModel, afkRunBound]
-
-/-- **The composite compressed-identity bound for every consensus-valid captured shape** —
-row-level semantics remain the four-budget promotion
-`snarkConstraintsSemanticDeployed_prob_le_of_root_schedule_runtime`. For any action count
-`n ≤ 2¹⁶ − 1` and adversary query budget `Q ≤ T`, monotonicity bounds the shape's multiopen
-contribution by `consensusPinnedRootMultiopenModel T`, the consensus-maximum term evaluated at
-`≤ 2⁻⁸⁶` for `T = 2¹²²` above. The independent fixed solver budget `L` and its truncation tail
-remain explicit. -/
-theorem snarkConstraintsDeployed_prob_le_of_consensus_bound
-    {n : Nat} (hn : n ≤ orchardConsensusMaxProofs)
-    {T' : Type*} [DecidableEq T'] (B : VestaG) (hB : B ≠ 0)
-    (query : AugmentedIndex (2 ^ (shape n).k) → T')
-    (hquery : Function.Injective query)
-    (family : ComputedDeployedRootFSFamily (shape n))
-    (static : DeployedConstraintStaticChecks family)
-    {L : Nat} {epsilonX dlogBound : ENNReal}
-    (schedule : DeployedConstraintXSqueezeSchedule family epsilonX)
-    (hDL : TextbookDLWithCoinsTruncatedAdvantageLE B
-      (deployedConstraintRelationFinder family
-        (deployedConstraintQuotientFinder family))
-      (deployedConstraintRelationFinderCalls family) L dlogBound)
-    {T : ℕ} (hQ : family.Q ≤ T) :
-    (independentProductPMF (orchardGeneratorROSetup query)
-      (PMF.uniformOfFintype family.toFamily.Coins)).toOuterMeasure
-        ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
-          snarkExtractionFailureEventDeployed family.toFamily
-            (deployedConstraintDecodedOfRoot family static))
-      ≤ ((T + 11) * (3 / Fintype.card Fp) +
-          (T + 1 : ℕ) * (1 / Fintype.card Fp) +
-          (dlogBound + 1 / Fintype.card Fp +
-            ((afkRunBound family.Q 11 + 3 : Nat) : ENNReal) / (L + 1 : Nat)))
-        + consensusPinnedRootMultiopenModel T
-        + (T + 1 : ℕ) * epsilonX := by
-  refine le_trans (snarkConstraintsDeployed_prob_le_of_root_schedule_runtime B hB query hquery
-    family static schedule hDL) ?_
-  rw [consensusPinnedRootMultiopenModel]
-  have hk : (shape n).k = 11 := rfl
-  simp only [hk]
-  gcongr
-  · norm_num
-  · exact algebraicRootBudget_at_captured_shape_le_consensus_max hn
-
-/-- **The exact consensus-maximum instance.** This compatibility theorem is the maximum-action
-specialization of `snarkConstraintsDeployed_prob_le_of_consensus_bound`; the quantified theorem,
-not this endpoint alone, justifies applying the maximum model to smaller consensus-valid bundles. -/
-theorem snarkConstraintsDeployed_prob_le_at_consensus_max
-    {T' : Type*} [DecidableEq T'] (B : VestaG) (hB : B ≠ 0)
-    (query : AugmentedIndex (2 ^ (shape orchardConsensusMaxProofs).k) → T')
-    (hquery : Function.Injective query)
-    (family : ComputedDeployedRootFSFamily (shape orchardConsensusMaxProofs))
-    (static : DeployedConstraintStaticChecks family)
-    {L : Nat} {epsilonX dlogBound : ENNReal}
-    (schedule : DeployedConstraintXSqueezeSchedule family epsilonX)
-    (hDL : TextbookDLWithCoinsTruncatedAdvantageLE B
-      (deployedConstraintRelationFinder family
-        (deployedConstraintQuotientFinder family))
-      (deployedConstraintRelationFinderCalls family) L dlogBound)
-    {T : ℕ} (hQ : family.Q ≤ T) :
-    (independentProductPMF (orchardGeneratorROSetup query)
-      (PMF.uniformOfFintype family.toFamily.Coins)).toOuterMeasure
-        ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
-          snarkExtractionFailureEventDeployed family.toFamily
-            (deployedConstraintDecodedOfRoot family static))
-      ≤ ((T + 11) * (3 / Fintype.card Fp) +
-          (T + 1 : ℕ) * (1 / Fintype.card Fp) +
-          (dlogBound + 1 / Fintype.card Fp +
-            ((afkRunBound family.Q 11 + 3 : Nat) : ENNReal) / (L + 1 : Nat)))
-        + consensusPinnedRootMultiopenModel T
-        + (T + 1 : ℕ) * epsilonX :=
-  snarkConstraintsDeployed_prob_le_of_consensus_bound (Nat.le_refl _)
-    B hB query hquery family static schedule hDL hQ
 
 end Zcash.Snark.FixtureMax

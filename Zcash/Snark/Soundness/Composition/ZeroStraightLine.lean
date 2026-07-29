@@ -77,7 +77,7 @@ theorem zeroConstraintDifference_eq_zero (hproofs : shape.numProofs = 0)
     refine zeroAlgebraicProofString_source_eq basis ?_
     have hrun : (deployedRootRunOutput (zeroDeployedRootFamily vkS hfixed hperm) basis
         coins).1 = zeroWfProof basis vkS hfixed hperm :=
-      zeroFamily_wrapped_run basis vkS hfixed hperm coins.1
+      zeroFamily_wrapped_run basis vkS hfixed hperm coins
     unfold deployedConstraintSource at hap
     rw [hrun] at hap
     exact hap
@@ -105,9 +105,9 @@ theorem zeroConstraintXBadSet_empty (hproofs : shape.numProofs = 0)
         3 * shape.k) → Fp) :
     deployedConstraintXBadSet (zeroDeployedRootFamily vkS hfixed hperm) basis O = ∅ := by
   ext x
-  simp only [deployedConstraintXBadSet, Set.mem_setOf_eq, Set.mem_empty_iff_false, iff_false]
-  rintro ⟨tape, hx⟩
-  rw [zeroConstraintDifference_eq_zero vkS hfixed hperm hproofs basis (O, tape)] at hx
+  simp only [deployedConstraintXBadSet, Set.mem_empty_iff_false, iff_false]
+  intro hx
+  rw [zeroConstraintDifference_eq_zero vkS hfixed hperm hproofs basis O] at hx
   exact (mem_szBadSet.mp hx).1 rfl
 
 /-- **The zero family's executable constraint-`x` stage.**  The root set is empty, so the stage
@@ -149,7 +149,7 @@ theorem zeroConstraintDifference_explicit
     refine zeroAlgebraicProofString_source_eq basis ?_
     have hrun : (deployedRootRunOutput (zeroDeployedRootFamily vkS hfixed hperm) basis
         coins).1 = zeroWfProof basis vkS hfixed hperm :=
-      zeroFamily_wrapped_run basis vkS hfixed hperm coins.1
+      zeroFamily_wrapped_run basis vkS hfixed hperm coins
     unfold deployedConstraintSource at hap
     rw [hrun] at hap
     exact hap
@@ -175,8 +175,8 @@ theorem zeroConstraintDifference_explicit
   have hps : (deployedRootRunOutput (zeroDeployedRootFamily vkS hfixed hperm) basis
       coins).1.proof.1 = zeroProofString shape Fp VestaG := by
     show ((wrappedAdversary (zeroOnlineMemberFamily vkS hfixed hperm).toFamily basis).run
-      coins.1).1.proof.1 = _
-    rw [zeroFamily_wrapped_run basis vkS hfixed hperm coins.1]
+      coins).1.proof.1 = _
+    rw [zeroFamily_wrapped_run basis vkS hfixed hperm coins]
     rfl
   simp only [deployedConstraintDifferencePreX, zeroExplicitConstraintDifference]
   rw [hpoint, hpieces, hps]
@@ -214,27 +214,27 @@ theorem zeroConstConstraintXStage_agrees (basis : AugmentedIndex (2 ^ shape.k) �
   rw [zeroConstConstraintXStage, OracleComp.run_bind, OracleComp.run_readFin,
     OracleComp.run_pure]
   ext x
+  simp only [deployedConstraintXBadSet]
   constructor
   · intro hx
-    refine ⟨Classical.arbitrary _, ?_⟩
     rw [zeroConstraintDifference_explicit vkS hfixed hperm basis]
     rw [zeroExplicitConstraintDifference_reads vkS
       (fun i => wrappedPreIpaReads (deployedRootRunOutput
-        (zeroDeployedRootFamily vkS hfixed hperm) basis (O, Classical.arbitrary _)) i)
+        (zeroDeployedRootFamily vkS hfixed hperm) basis O) i)
       (fun i => if h : (i : ℕ) < 4 then O (algebraicFullPrefixesPre
         (zeroDeployedRootFamily vkS hfixed hperm).toFamily.init
         (zeroWfProof basis vkS hfixed hperm) ((⟨i, h⟩ : Fin 4).castLE (by omega))) else 0)]
     · exact hx
     all_goals
       exact congrFun (zeroFamily_reads_eq basis vkS hfixed hperm O) _
-  · rintro ⟨tape, hx⟩
+  · intro hx
     rw [zeroConstraintDifference_explicit vkS hfixed hperm basis] at hx
     rw [zeroExplicitConstraintDifference_reads vkS
       (fun i => if h : (i : ℕ) < 4 then O (algebraicFullPrefixesPre
         (zeroDeployedRootFamily vkS hfixed hperm).toFamily.init
         (zeroWfProof basis vkS hfixed hperm) ((⟨i, h⟩ : Fin 4).castLE (by omega))) else 0)
       (fun i => wrappedPreIpaReads (deployedRootRunOutput
-        (zeroDeployedRootFamily vkS hfixed hperm) basis (O, tape)) i)]
+        (zeroDeployedRootFamily vkS hfixed hperm) basis O) i)]
     · exact hx
     all_goals
       exact (congrFun (zeroFamily_reads_eq basis vkS hfixed hperm O) _).symm

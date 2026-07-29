@@ -1,4 +1,4 @@
-import Zcash.Snark.Soundness.Composition.Decomposition
+import Zcash.Snark.Soundness.Composition.Bridge
 import Zcash.Snark.Soundness.Multiopen.Deployed
 
 /-!
@@ -22,7 +22,7 @@ def fullAlgebraicAcceptDeployed {shape : Shape}
   DeployedAccepts (ursOfAugmentedBasis shape.k basis) rfl vk instanceCommitment p.proof.1
     (chRecord nu rounds)
 
-/-- Deployed acceptance implies the verifier-equation predicate used by the recursive extractor. -/
+/-- Deployed acceptance implies the explicit verifier-equation predicate. -/
 theorem fullAlgebraicAccept_of_deployed {shape : Shape}
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
     (vk : VerifyingKey shape Fp VestaG)
@@ -41,7 +41,7 @@ def snarkExtractionFailureEventDeployed {shape : Shape}
     Set ((AugmentedIndex (2 ^ shape.k) → VestaG) × family.Coins) :=
   {q | fsWinsFull (family.adversary q.1)
       (fullAlgebraicAcceptDeployed q.1 (family.vk q.1) (family.instanceCommitment q.1))
-      (algebraicFullPrefixesPre family.init) (algebraicFullPrefixes family.init) q.2.1 ∧
+      (algebraicFullPrefixesPre family.init) (algebraicFullPrefixes family.init) q.2 ∧
     ¬ extracted q.1 q.2}
 
 end Zcash.Snark

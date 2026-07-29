@@ -1,17 +1,17 @@
 import Zcash.Snark.Soundness.Main
+import Zcash.Snark.Soundness.UniformMeasure
 import Zcash.Snark.Soundness.Forking.Oracle
-import Zcash.Snark.Soundness.Forking.Extractor
 import Zcash.Snark.Soundness.Forking.Ordering
 
 /-!
-# Random-oracle rewinding for the deployed verifier
+# Random-oracle reprogramming for the deployed verifier
 
-`ofOracle` and `roChallenges` run the deployed schedule with a random oracle. `reprogramRounds` shows
-that changing the oracle at the IPA round prefixes is the same as replacing the round-challenge
-vector.
+`ofOracle` and `roChallenges` run the deployed schedule with a random oracle. `reprogramRounds` and
+the `reprogramX*` family show that changing the oracle at one squeeze prefix is the same as
+replacing that challenge, leaving every other read untouched.
 
-This file covers fixed and staged provers. `Soundness.Forking.Adversary` handles arbitrary queries
-and query loss. Identifying Blake2b with the modeled random oracle remains an assumption.
+`Soundness.Forking.Adversary` builds the querying-adversary reduction on top. Identifying Blake2b
+with the modeled random oracle remains an assumption.
 -/
 
 namespace Zcash.Snark
@@ -443,101 +443,6 @@ theorem reprogramX_apply_long {shape : Shape} (O : List (TranscriptElt Fp G) →
   reprogramX_apply_length O init ps xv ht.ne'
 
 open scoped ENNReal in
-open Classical in
-/-- A lower bound on deployed acceptance also bounds the explicit verifier-equation event. -/
-theorem kerr_lt_verifierEq_of_deployedAccepts [DecidableEq G] [Inhabited G] {shape : Shape}
-    (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → ℕ → G)
-    (psf : (Fin shape.k → Fp) → ProofString shape Fp G)
-    (chf : (Fin shape.k → Fp) → Challenges shape.k Fp) {ε : ℝ≥0∞}
-    (h : ε < (PMF.uniformOfFintype (Fin shape.k → Fp)).toOuterMeasure
-        (Finset.univ.filter (fun χ => DeployedAccepts urs hk vk instanceCommitment (psf χ) (chf χ)))) :
-    ε < (PMF.uniformOfFintype (Fin shape.k → Fp)).toOuterMeasure
-        (Finset.univ.filter (fun χ =>
-          DeployedIpaVerifierEq (hk ▸ urs.g) urs.w urs.u vk instanceCommitment (psf χ) (chf χ))) := by
-  refine lt_of_lt_of_le h ((PMF.uniformOfFintype (Fin shape.k → Fp)).toOuterMeasure.mono ?_)
-  intro χ hχ
-  simp only [Finset.coe_filter, Finset.mem_univ, true_and, Set.mem_setOf_eq] at hχ ⊢
-  exact deployedAccepts_verifierEq urs hk vk instanceCommitment (psf χ) (chf χ) hχ
-
-/-! ## Deployed forking opening
-
-Unshifting and unblinding convert the forked tree into the multiopen commitment opening. -/
-
-/-- Compute an opening or relation, shifting the value by the declared `U` coefficient. -/
-def deployed_forking_relation_shifted [DecidableEq G] [Inhabited G] (urs : URS G)
-    (b : Fin (2 ^ urs.k) → Fp) (v ξ z vU blind : Fp) (aMulti aDep s : Fin (2 ^ urs.k) → Fp)
-    (cert : DForkCert Fp G urs.k) (hz : z ≠ 0) (hb0 : b 0 = 1)
-    (hP : commit urs aDep = commit urs aMulti - v • urs.g 0 + ξ • commit urs s)
-    (hvalid : DeployedForkValid urs.g b urs.u urs.w z
-        (commit urs aDep + vU • urs.u + blind • urs.w) cert) :
-    (Σ' a, IpaRelation urs (commit urs aMulti) b (v + z⁻¹ * vU - ξ * innerProduct s b) a)
-      ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w :=
-  have hvalid' : DeployedForkValid urs.g b urs.u urs.w z
-      (commit urs aDep + (z * (z⁻¹ * vU)) • urs.u + blind • urs.w) cert := by
-    rwa [mul_inv_cancel_left₀ hz]
-  match deployed_forking_tree hz urs.g b aDep (z⁻¹ * vU) blind cert hvalid' with
-  | .inl ⟨blind', t, ht⟩ =>
-      if hclean : IpaAcceptV urs.g b (commit urs aDep) (z⁻¹ * vU) (projTree t) then
-        match ipaRelation_extract urs b (commit urs aDep) (z⁻¹ * vU) (projTree t) hclean with
-        | ⟨a, ha⟩ =>
-            PSum.inl ⟨_, by
-              have h1 := ipaRelation_unshift_value urs (commit urs aDep + v • urs.g 0) b v
-                (z⁻¹ * vU) a hb0 (by rw [add_sub_cancel_right]; exact ha)
-              have h2 : commit urs aDep + v • urs.g 0 = commit urs aMulti + ξ • commit urs s := by
-                rw [hP]; abel
-              rw [h2] at h1
-              have h3 := ipaRelation_unblind_value urs (commit urs aMulti) b (z⁻¹ * vU + v) ξ s _ h1
-              exact ⟨h3.1, h3.2.trans (by ring)⟩⟩
-      else
-        PSum.inr (NontrivialRelation.ofDeployedTree hz urs.g b (commit urs aDep) (z⁻¹ * vU)
-          blind' t ht hclean)
-  | .inr hrel => PSum.inr hrel
-
-/-- Compute an opening or relation when the whole commitment has no `U` component. -/
-def deployed_forking_relation [DecidableEq G] [Inhabited G] (urs : URS G)
-    (b : Fin (2 ^ urs.k) → Fp) (v ξ z blind : Fp) (aMulti aDep s : Fin (2 ^ urs.k) → Fp)
-    (cert : DForkCert Fp G urs.k) (hz : z ≠ 0) (hb0 : b 0 = 1)
-    (hP : commit urs aDep = commit urs aMulti - v • urs.g 0 + ξ • commit urs s)
-    (hvalid : DeployedForkValid urs.g b urs.u urs.w z
-        (commit urs aDep + (z * 0) • urs.u + blind • urs.w) cert) :
-    (Σ' a, IpaRelation urs (commit urs aMulti) b (v - ξ * innerProduct s b) a)
-      ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w :=
-  match deployed_forking_relation_shifted urs b v ξ z (z * 0) blind aMulti aDep s cert
-      hz hb0 hP hvalid with
-  | .inl ⟨a, ha⟩ => PSum.inl ⟨a, ha.1, ha.2.trans (by ring)⟩
-  | .inr hrel => PSum.inr hrel
-
-/-! ## Propositional extraction
-
-This path turns high acceptance into a fork certificate. The executable adversary path is in
-`Soundness.Forking.Adversary.Algebraic`. -/
-
-open scoped ENNReal in
-open Classical in
-/-- Componentwise inversion preserves the uniform measure on challenge vectors. -/
-theorem uniformOfFintype_measure_inv {d : ℕ} (acc : (Fin d → Fp) → Prop) :
-    (PMF.uniformOfFintype (Fin d → Fp)).toOuterMeasure
-        (Finset.univ.filter (fun χ : Fin d → Fp => acc (fun i => (χ i)⁻¹)))
-      = (PMF.uniformOfFintype (Fin d → Fp)).toOuterMeasure (Finset.univ.filter acc) := by
-  rw [PMF.toOuterMeasure_apply_finset, PMF.toOuterMeasure_apply_finset]
-  simp only [PMF.uniformOfFintype_apply, Finset.sum_const, nsmul_eq_mul]
-  congr 1
-  norm_cast
-  refine Finset.card_bij' (fun χ _ => (fun i => (χ i)⁻¹)) (fun χ _ => (fun i => (χ i)⁻¹))
-    ?hi ?hj ?li ?ri
-  case hi =>
-    intro χ hχ
-    simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hχ ⊢
-    exact hχ
-  case hj =>
-    intro χ hχ
-    simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hχ ⊢
-    have hχχ : (fun i => ((χ i)⁻¹)⁻¹) = χ := by funext i; rw [inv_inv]
-    rw [hχχ]; exact hχ
-  case li => intro χ _; funext i; simp only [inv_inv]
-  case ri => intro χ _; funext i; simp only [inv_inv]
-
-open scoped ENNReal in
 /-- If a nonzero blinding shift is fixed before uniform `ξ`, it hits any target with probability at
 most `1 / |Fp|`. -/
 theorem blinder_shift_badSet_measure (δ c : Fp) (hδ : δ ≠ 0) :
@@ -552,175 +457,12 @@ theorem blinder_shift_badSet_measure (δ c : Fp) (hδ : δ ≠ 0) :
   gcongr
   exact_mod_cast hcard
 
-/-- The accept condition along one path using halo2's inverse-challenge generator fold. -/
-def flatAccept : {d : ℕ} → Prover Fp G d → (Fin (2 ^ d) → G) → (Fin (2 ^ d) → Fp) → (U W : G) → (z : Fp) →
-    G → (Fin d → Fp) → Prop
-  | 0, .leaf c f, g, b, U, W, z, Pwhole, _ =>
-      Pwhole = commitGen g (fun _ => c) + (z * commitGen b (fun _ => c)) • U + f • W
-  | _ + 1, .node L R cont, g, b, U, W, z, Pwhole, χ =>
-      flatAccept (cont (χ 0)) (foldGens g (χ 0)⁻¹) (foldGens b (χ 0)⁻¹) U W z
-        (Pwhole + (χ 0)⁻¹ • L + (χ 0) • R) (Fin.tail χ)
+/-! ## Splicing the IPA block
 
-/-- Swap each round point and invert each challenge to change fold conventions. -/
-def invProver : {d : ℕ} → Prover Fp G d → Prover Fp G d
-  | 0, .leaf c f => .leaf c f
-  | _ + 1, .node L R cont => .node R L (fun u => invProver (cont u⁻¹))
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- `invProver` is an involution. -/
-theorem invProver_invProver : {d : ℕ} → (P : Prover Fp G d) → invProver (invProver P) = P
-  | 0, .leaf _ _ => rfl
-  | _ + 1, .node L R cont => by
-      simp only [invProver]
-      congr 1
-      funext u
-      rw [inv_inv, invProver_invProver (cont u)]
-
-/-- `proverAccept` equals `flatAccept` after swapping round points and inverting challenges. -/
-theorem proverAccept_iff_flatAccept {U W : G} {z : Fp} : {d : ℕ} → (P : Prover Fp G d) →
-    (g : Fin (2 ^ d) → G) → (b : Fin (2 ^ d) → Fp) → (Pwhole : G) → (χ : Fin d → Fp) →
-    (proverAccept P g b U W z Pwhole χ ↔
-      flatAccept (invProver P) g b U W z Pwhole (fun i => (χ i)⁻¹))
-  | 0, .leaf _ _, _, _, _, _ => Iff.rfl
-  | d + 1, .node L R cont, g, b, Pwhole, χ => by
-      rw [proverAccept, proverAccept_iff_flatAccept (cont (χ 0)) (foldGens g (χ 0)) (foldGens b (χ 0))
-        (Pwhole + (χ 0)⁻¹ • L + (χ 0) • R) (Fin.tail χ), invProver, flatAccept]
-      simp only [inv_inv]
-      have htail : (Fin.tail fun i => (χ i)⁻¹) = (fun i => ((Fin.tail χ) i)⁻¹) := by
-        funext i; rfl
-      rw [htail, show Pwhole + (χ 0) • R + (χ 0)⁻¹ • L = Pwhole + (χ 0)⁻¹ • L + (χ 0) • R from by abel]
-
-/-! ## The deterministic prover-to-verifier bridge
-
-This section builds the constant prover strategy represented by a fixed proof and proves that its
-`flatAccept` predicate is the deployed verifier equation. The random-oracle adversary experiment and
-query loss remain separate.
+An adversary supplies different IPA fields along different challenge paths. `spliceIpa` inserts one
+such block into a fixed pre-IPA proof, and `roChallenges_spliceIpa_pre` records that doing so leaves
+every pre-IPA challenge alone.
 -/
-
-/-- Build the constant prover strategy encoded by a fixed proof's IPA fields. -/
-def proverOfRounds : {d : ℕ} → (Fin d → G × G) → Fp → Fp → Prover Fp G d
-  | 0, _, c, f => .leaf c f
-  | _ + 1, R, c, f => .node (R 0).1 (R 0).2 (fun _ => proverOfRounds (Fin.tail R) c f)
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- A fixed proof's strategy returns round point `R j` at depth `j` on every challenge path. -/
-theorem proverRoundPoint_proverOfRounds : {d : ℕ} → (R : Fin d → G × G) → (c f : Fp) →
-    (χ : Fin d → Fp) → (j : ℕ) → (hj : j < d) →
-    proverRoundPoint (proverOfRounds R c f) χ j = some (R ⟨j, hj⟩)
-  | 0, _, _, _, _, _, hj => absurd hj (Nat.not_lt_zero _)
-  | _ + 1, R, _, _, _, 0, hj => by
-      show some ((R 0).1, (R 0).2) = some (R ⟨0, hj⟩)
-      exact congrArg some (congrArg R (Fin.ext (by simp)))
-  | _ + 1, R, c, f, χ, j + 1, hj => by
-      show proverRoundPoint (proverOfRounds (Fin.tail R) c f) (Fin.tail χ) j = _
-      rw [proverRoundPoint_proverOfRounds (Fin.tail R) c f (Fin.tail χ) j (Nat.lt_of_succ_lt_succ hj)]
-      rfl
-
-/-- `foldGens` commutes with reindexing by `Fin.cast`. -/
-theorem foldGens_comp_cast {m n : ℕ} (h : n = m) (g : Fin (2 ^ (m + 1)) → G) (u : Fp) :
-    foldGens (fun j : Fin (2 ^ (n + 1)) => g (Fin.cast (by rw [h]) j)) u
-      = fun i : Fin (2 ^ n) => foldGens g u (Fin.cast (by rw [h]) i) := by
-  subst h; rfl
-
-/-- Fold `g` through a `Fin`-indexed challenge vector without dependent casts. -/
-def foldAllFin : {d : ℕ} → (Fin d → Fp) → (Fin (2 ^ d) → G) → G
-  | 0, _, g => g 0
-  | _ + 1, χ, g => foldAllFin (Fin.tail χ) (foldGens g (χ 0)⁻¹)
-
-/-- Reindex `foldAll` along an equality of challenge lists. -/
-theorem foldAll_congr_cast {u u' : List Fp} (h : u = u') (g : Fin (2 ^ u.length) → G) :
-    foldAll u g = foldAll u' (fun j => g (Fin.cast (by rw [h]) j)) := by
-  subst h; rfl
-
-/-- `foldAllFin` equals the deployed list-based `foldAll`. -/
-theorem foldAllFin_eq : {d : ℕ} → (χ : Fin d → Fp) → (g : Fin (2 ^ d) → G) →
-    foldAllFin χ g = foldAll (List.ofFn χ) (fun j => g (Fin.cast (congrArg (2 ^ ·) List.length_ofFn) j)) 0
-  | 0, _, g => by simp only [foldAllFin]; rfl
-  | d + 1, χ, g => by
-      have hchal : List.ofFn χ = χ 0 :: List.ofFn (Fin.tail χ) := by rw [List.ofFn_succ]; rfl
-      rw [foldAllFin, foldAllFin_eq (Fin.tail χ) (foldGens g (χ 0)⁻¹), foldAll_congr_cast hchal, foldAll]
-      simp only [Fin.cast_cast]
-      exact congrArg (fun gen => foldAll (List.ofFn (Fin.tail χ)) gen 0)
-        (foldGens_comp_cast (List.length_ofFn (f := Fin.tail χ)) g (χ 0)⁻¹).symm
-
-/-- Reindex `CF` along an equality of challenge lists. -/
-theorem CF_congr_chal {u u' : List Fp} (h : u = u') (rounds : List (G × G))
-    (g : Fin (2 ^ u.length) → G) (P : G) (c Uc Wc : Fp) (U W : G) :
-    CF rounds u g P c Uc U Wc W
-      = CF rounds u' (fun j => g (Fin.cast (by rw [h]) j)) P c Uc U Wc W := by
-  subst h; rfl
-
-/-- For a fixed proof tree, `flatAccept` is exactly the closed-form verifier equation `CF = 0`. -/
-theorem flatAccept_proverOfRounds :
-    {d : ℕ} → (R : Fin d → G × G) → (c f : Fp) → (g : Fin (2 ^ d) → G) → (b : Fin (2 ^ d) → Fp) →
-    (U W : G) → (z : Fp) → (P : G) → (χ : Fin d → Fp) →
-    (flatAccept (proverOfRounds R c f) g b U W z P χ ↔
-      CF (List.ofFn R) (List.ofFn χ)
-          (fun j => g (Fin.cast (congrArg (2 ^ ·) List.length_ofFn) j)) P c
-          (-(z * c * foldAllFin χ b)) U (-f) W = 0)
-  | 0, R, c, f, g, b, U, W, z, P, χ => by
-      rw [proverOfRounds, flatAccept]
-      simp only [CF, gPart]
-      rw [← foldAllFin_eq]
-      have hg : commitGen g (fun _ : Fin (2 ^ 0) => c) = c • g 0 := by simp [commitGen]
-      have hb : commitGen b (fun _ : Fin (2 ^ 0) => c) = c * b 0 := by simp [commitGen]
-      simp only [roundSum, List.ofFn_zero, List.zip_nil_right, List.map_nil, List.sum_nil, add_zero,
-        foldAllFin, hg, hb]
-      constructor
-      · intro h; rw [h]; module
-      · intro h; linear_combination (norm := module) h
-  | d + 1, R, c, f, g, b, U, W, z, P, χ => by
-      have hchal : List.ofFn χ = χ 0 :: List.ofFn (Fin.tail χ) := by rw [List.ofFn_succ]; rfl
-      have hround : List.ofFn R = ((R 0).1, (R 0).2) :: List.ofFn (Fin.tail R) := by
-        rw [List.ofFn_succ]; rfl
-      rw [proverOfRounds, flatAccept,
-          flatAccept_proverOfRounds (Fin.tail R) c f (foldGens g (χ 0)⁻¹) (foldGens b (χ 0)⁻¹) U W z
-            (P + (χ 0)⁻¹ • (R 0).1 + (χ 0) • (R 0).2) (Fin.tail χ)]
-      rw [hround, CF_congr_chal hchal]
-      rw [show (((R 0).1, (R 0).2) : G × G)
-            = ((R 0).1 + (0 : Fp) • U + (0 : Fp) • W, (R 0).2 + (0 : Fp) • U + (0 : Fp) • W) by simp]
-      rw [CF_cons]
-      simp only [mul_zero, add_zero, Fin.cast_cast]
-      refine iff_of_eq (congrArg (· = (0 : G)) ?_)
-      congr 1
-      exact (foldGens_comp_cast (List.length_ofFn (f := Fin.tail χ)) g (χ 0)⁻¹).symm
-
-/-- Folding a `Fin`-indexed eval vector gives the flat verifier's `computeB`. -/
-theorem foldAllFin_evalVector {d : ℕ} (χ : Fin d → Fp) (x : Fp) :
-    foldAllFin χ (evalVector d x) = computeB x (List.ofFn χ) := by
-  rw [foldAllFin_eq]
-  have hev : (fun j => evalVector d x (Fin.cast (congrArg (2 ^ ·) List.length_ofFn) j))
-      = evalVector (List.ofFn χ).length x := by
-    funext j; simp only [evalVector, Fin.val_cast]
-  rw [hev]
-  exact foldAll_evalVector x (List.ofFn χ)
-
-/-- Halo2's deployed IPA verifier equation equals `flatAccept` for the proof's fixed IPA tree. -/
-theorem deployedVerifierEq_iff_flatAccept {shape : Shape} [DecidableEq Fp] [DecidableEq G] [Inhabited G]
-    (g : Fin (2 ^ shape.k) → G) (w u : G) (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → ℕ → G) (ps : ProofString shape Fp G)
-    (ch : Challenges shape.k Fp) :
-    DeployedIpaVerifierEq g w u vk instanceCommitment ps ch ↔
-      flatAccept (proverOfRounds ps.ipaRounds ps.ipaC ps.ipaF) g (evalVector shape.k ch.x3) u w ch.z
-        (multiopenCommitment g w u vk instanceCommitment ps ch
-          + (∑ i, ([-(multiopenValue vk instanceCommitment ps ch)].getD i.val 0) • g i) + ch.xi • ps.ipaS)
-        ch.ipaRound := by
-  rw [deployedVerifierEq_cf, flatAccept_proverOfRounds, foldAllFin_evalVector,
-    show (-ps.ipaC * computeB ch.x3 (List.ofFn ch.ipaRound) * ch.z)
-      = -(ch.z * ps.ipaC * computeB ch.x3 (List.ofFn ch.ipaRound)) from by ring]
-
-/-! ## The staged (round-adaptive) adversary: `hbridge` discharged beyond the constant strategy
-
-The fixed-tree theorem measures one proof over all challenges. A rewound adversary instead supplies
-different IPA fields along different challenge paths. `pathData` reads one path, `spliceIpa` inserts
-it into the fixed pre-IPA proof, and `deployedVerifierEq_iff_flatAccept_adaptive` proves the same bridge
-for any prefix-respecting strategy.
--/
-
-/-- The round points and final opening produced along one strategy path. -/
-def pathData : {d : ℕ} → Prover Fp G d → (Fin d → Fp) → (Fin d → G × G) × Fp × Fp
-  | 0, .leaf c f, _ => (Fin.elim0, c, f)
-  | _ + 1, .node L R cont, χ =>
-      (Fin.cons (L, R) (pathData (cont (χ 0)) (Fin.tail χ)).1, (pathData (cont (χ 0)) (Fin.tail χ)).2)
 
 /-- Replace a proof's IPA fields while keeping its pre-IPA fields fixed. -/
 def spliceIpa {shape : Shape} (ps : ProofString shape Fp G) (R : Fin shape.k → G × G) (c f : Fp) :
@@ -736,45 +478,5 @@ theorem roChallenges_spliceIpa_pre {shape : Shape} (O : List (TranscriptElt Fp G
       = { roChallenges O init ps with ipaRound := χ } := by
   refine Challenges.ext' ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ <;> rfl
 
-/-- Along `χ`, an adaptive strategy agrees with the fixed prover built from `pathData P χ`. -/
-theorem flatAccept_pathData {U W : G} {z : Fp} : {d : ℕ} → (P : Prover Fp G d) →
-    (g : Fin (2 ^ d) → G) → (b : Fin (2 ^ d) → Fp) → (Pwhole : G) → (χ : Fin d → Fp) →
-    (flatAccept P g b U W z Pwhole χ ↔
-      flatAccept (proverOfRounds (pathData P χ).1 (pathData P χ).2.1 (pathData P χ).2.2)
-        g b U W z Pwhole χ)
-  | 0, .leaf _ _, _, _, _, _ => Iff.rfl
-  | d + 1, .node L R cont, g, b, Pwhole, χ => by
-      rw [flatAccept, flatAccept_pathData (cont (χ 0)) (foldGens g (χ 0)⁻¹) (foldGens b (χ 0)⁻¹)
-        (Pwhole + (χ 0)⁻¹ • L + (χ 0) • R) (Fin.tail χ), pathData, proverOfRounds]
-      simp only [Fin.cons_zero, Fin.tail_cons]
-      rw [flatAccept]
-
-/-- Halo2's verifier equation on a path-spliced proof equals `flatAccept P` on that path. -/
-theorem deployedVerifierEq_iff_flatAccept_adaptive {shape : Shape} [DecidableEq G] [Inhabited G]
-    (g : Fin (2 ^ shape.k) → G) (w u : G) (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → ℕ → G) (ps : ProofString shape Fp G)
-    (ch : Challenges shape.k Fp) (P : Prover Fp G shape.k) (χ : Fin shape.k → Fp) :
-    DeployedIpaVerifierEq g w u vk instanceCommitment
-        (spliceIpa ps (pathData P χ).1 (pathData P χ).2.1 (pathData P χ).2.2) {ch with ipaRound := χ} ↔
-      flatAccept P g (evalVector shape.k ch.x3) u w ch.z
-        (multiopenCommitment g w u vk instanceCommitment ps ch
-          + (∑ i, ([-(multiopenValue vk instanceCommitment ps ch)].getD i.val 0) • g i) + ch.xi • ps.ipaS) χ := by
-  rw [deployedVerifierEq_iff_flatAccept]
-  have e1 : multiopenValue vk instanceCommitment
-      (spliceIpa ps (pathData P χ).1 (pathData P χ).2.1 (pathData P χ).2.2) {ch with ipaRound := χ}
-      = multiopenValue vk instanceCommitment ps ch := rfl
-  have e2 : multiopenCommitment g w u vk instanceCommitment
-      (spliceIpa ps (pathData P χ).1 (pathData P χ).2.1 (pathData P χ).2.2) {ch with ipaRound := χ}
-      = multiopenCommitment g w u vk instanceCommitment ps ch := rfl
-  rw [e1, e2]
-  exact (flatAccept_pathData P g (evalVector shape.k ch.x3)
-    (multiopenCommitment g w u vk instanceCommitment ps ch
-      + (∑ i, ([-(multiopenValue vk instanceCommitment ps ch)].getD i.val 0) • g i) + ch.xi • ps.ipaS) χ).symm
-
-/-! ## Prover-to-verifier bridge
-
-`hbridge` identifies an accept event pointwise with `flatAccept Q`. The constant and adaptive bridge
-theorems above establish this identity for the deployed verifier. The executable adversary path uses
-the corresponding bridge in `Soundness.Forking.Adversary.Algebraic`.
--/
 
 end Zcash.Snark

@@ -35,10 +35,10 @@ for every proof's copy argument — alongside the generic and lookup surfaces ab
 carries the whole challenge-pricing story.
 -/
 
--- The terminal API `snarkConstraintsSemanticDeployed_prob_le_of_root_schedule` consumes four
--- explicit bad-event bounds, one for each surface below. A concrete instantiation must obtain those
--- bounds through the sequential-coupling hook above; the compressed-identity capstone deliberately
--- cannot be presented as semantic soundness without them.
+-- The semantic terminal API consumes four explicit bad-event bounds, one for each surface below.
+-- A concrete instantiation must obtain those bounds through the sequential-coupling hook above;
+-- the compressed-identity capstone deliberately cannot be presented as semantic soundness
+-- without them.
 
 namespace Zcash.Snark
 

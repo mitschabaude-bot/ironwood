@@ -1,5 +1,4 @@
 import Zcash.Snark.Verifier.FiatShamir
-import Zcash.Snark.Soundness.Forking.Extractor
 
 /-!
 # Fiat–Shamir round ordering
@@ -10,15 +9,14 @@ import Zcash.Snark.Soundness.Forking.Extractor
         let t := t ++ [.point Lⱼ, .point Rⱼ, .challenge]
         (t, us ++ [squeeze t])) (t₀, [])
 
-This module proves that the deployed schedule has the prefix ordering assumed by the prover strategy
-and rewinding proofs.
+This module proves that the deployed schedule has the prefix ordering the reprogramming proofs
+assume.
 
 * `roundTranscript` is the prefix used to squeeze one round challenge.
 * `roundTranscript_succ` and `roundTranscript_prefix_mono` show how those prefixes grow.
 * `roundPoint_mem_roundTranscript` shows that the current point is present before its challenge.
 
-Halo2 does not reabsorb squeezed challenges. The `Prover` type separately ensures that each round
-point depends only on earlier challenges.
+Halo2 does not reabsorb squeezed challenges, so each squeeze prefix determines its challenge.
 -/
 
 namespace Zcash.Snark
@@ -72,31 +70,6 @@ theorem ipaFold_transcript {ι : Type*} (fs : FiatShamir F G) (rp : ι → G × 
   induction L generalizing t₀ us₀ with
   | nil => simp
   | cons i L ih => simp only [List.foldl_cons, ih, List.map_cons, List.flatten_cons, List.append_assoc]
-
-/-! ## The Prover-tree side: each round point is prefix-determined
-
-In `Prover.node`, the round point is fixed before the challenge selects a continuation. The theorem
-below states that two paths with the same prefix therefore have the same next round point.
--/
-
-/-- The prover's round point at depth `j` along challenge path `χ`. -/
-def proverRoundPoint : {d : ℕ} → Prover F G d → (Fin d → F) → ℕ → Option (G × G)
-  | 0, _, _, _ => none
-  | _ + 1, .node L R _, _, 0 => some (L, R)
-  | _ + 1, .node _ _ cont, χ, j + 1 => proverRoundPoint (cont (χ 0)) (Fin.tail χ) j
-
-/-- The round point at depth `j` depends only on the first `j` challenges. -/
-theorem proverRoundPoint_prefix : {d : ℕ} → (P : Prover F G d) → (χ χ' : Fin d → F) → (j : ℕ) →
-    (∀ i : Fin d, (i : ℕ) < j → χ i = χ' i) →
-    proverRoundPoint P χ j = proverRoundPoint P χ' j
-  | 0, .leaf _ _, _, _, _, _ => rfl
-  | _ + 1, .node _ _ _, _, _, 0, _ => rfl
-  | _ + 1, .node _ _ cont, χ, χ', j + 1, h => by
-      have h0 : χ 0 = χ' 0 := h 0 (Nat.succ_pos j)
-      show proverRoundPoint (cont (χ 0)) (Fin.tail χ) j = proverRoundPoint (cont (χ' 0)) (Fin.tail χ') j
-      rw [h0]
-      exact proverRoundPoint_prefix (cont (χ' 0)) (Fin.tail χ) (Fin.tail χ') j
-        (fun i hi => h i.succ (by simp only [Fin.val_succ]; omega))
 
 /-! ## Sealing the module to the deployed derivation
 

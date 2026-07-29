@@ -44,7 +44,7 @@ abbrev straightLineRunOutput
     (basis : AugmentedIndex (2 ^ shape.k) -> VestaG)
     (O : BTranscript Fp VestaG
       (preIpaLen shape family.init.length 10 + 3 * shape.k) -> Fp) :=
-  (wrappedAdversary family.toFamily basis).run O
+  deployedRootRunOutput family.toRootFamily basis O
 
 /-- The exact computed constraint witness retained by a successful straight-line adapter. -/
 def straightLineConstraintWitness

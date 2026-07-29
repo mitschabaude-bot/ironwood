@@ -1,6 +1,6 @@
 import Zcash.Security.KeyBinding.Basic
 import Zcash.Security.Common.Birthday
-import Zcash.Snark.Soundness.Forking.Probability
+import Zcash.Snark.Soundness.UniformMeasure
 import Zcash.Snark.Soundness.Forking.Adversary.OracleComp
 
 /-!

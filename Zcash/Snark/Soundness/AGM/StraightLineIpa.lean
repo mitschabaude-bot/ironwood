@@ -9,8 +9,7 @@ rewinding.  `straightLineIpaZeroOrRelation` and `straightLineBindingAttackZRootO
 endpoints; the symbolic IPA equation they read is built from the representation-carrying
 `AlgebraicWfProof` interface.
 
-The module is additive to the recursive AFK extractor: no declaration here weakens, replaces, or
-is imported by that path.
+No declaration here rewinds the adversary: every endpoint reads one accepting execution.
 -/
 
 namespace Zcash.Snark

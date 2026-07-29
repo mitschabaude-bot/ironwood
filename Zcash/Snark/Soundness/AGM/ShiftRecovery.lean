@@ -51,7 +51,7 @@ theorem ipaShiftZPolynomial_ne_zero {delta pU sU sEval xi : Fp}
   exact hslope hcoeff
 
 /-- Two fresh good challenges remove the IPA's `U`/`S` value shift.  This is the scalar core needed
-to turn the recursive extractor's shifted aggregate opening into the raw aggregate-value premise
+to turn the extractor's shifted aggregate opening into the raw aggregate-value premise
 consumed by algebraic multiopen unbatching. -/
 theorem rawValue_of_shiftedValue_of_good
     (aggregateEval value pU sU sEval xi z : Fp) (hz : z ≠ 0)

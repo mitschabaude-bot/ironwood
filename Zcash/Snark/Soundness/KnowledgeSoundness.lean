@@ -1,6 +1,5 @@
 import Mathlib
 import Zcash.Snark.Soundness.InnerProduct
-import Zcash.Snark.Soundness.Extraction
 import Zcash.Snark.Soundness.Constraints
 import Zcash.Snark.Soundness.CommitFold
 
@@ -8,17 +7,16 @@ import Zcash.Snark.Soundness.CommitFold
 # Knowledge-soundness relation
 
 `SnarkRelation` requires one witness to open the IPA commitment and satisfy the circuit. This file
-contains the legacy conditional composition and the Schwartz–Zippel error; the computed
-Fiat–Shamir/AGM reduction is in `Forking.Adversary.Algebraic`.
+carries that relation, its two circuit-satisfaction predicates, and the Schwartz–Zippel error; the
+computed Fiat–Shamir/AGM reduction is in `Forking.Adversary.Algebraic`.
 
 The boundary is explicit: DL-relation hardness, an ideal random oracle for Blake2b and challenge
 conversion (and, on the generator-RO endpoints, for the hash-to-curve URS derivation),
 CompElliptic's Vesta point-count axiom, and correctness of the supplied verifying key.
 The computed reduction models oracle queries, reprogramming, and query loss.
 
-Efficiency counts black-box calls.  The unconditional AFK analysis gives the field-independent
-expected bound `(8·Q+1)·10^k`; the deployed combined capstone adds its three fallback calls,
-truncates at a fixed budget `L`, and prices the tail explicitly by finite Markov.  Adversary PPT
+Efficiency counts black-box calls.  The deployed combined finder has a pointwise four-invocation
+bound, so no expectation, truncation budget, or Markov tail enters the accounting.  Adversary PPT
 time and the concrete DLOG hardness bound remain external.
 -/
 
@@ -123,14 +121,6 @@ theorem snarkRelation_constraints {np : ℕ} (urs : URS G) {P : G} {b : Fin (2 ^
     SnarkRelation urs P b v (circuitSatViaConstraints fixedCols decodeAdvice decodeInstance gates
       sets chunks lookups beta gamma delta theta y chunkLen l0 lLast lBlind hpoly deg) a :=
   ⟨hopen, hsat⟩
-
-/-- A consistent tree, opening, and circuit witness yield the extracted SNARK relation. -/
-theorem knowledge_sound (urs : URS G)
-    {t : Tree Fp urs.k} {a : Fin (2 ^ urs.k) → Fp} (hcons : Consistent t a)
-    {P : G} {b : Fin (2 ^ urs.k) → Fp} {v : Fp} (hopen : IpaRelation urs P b v a)
-    {circuitSat : (Fin (2 ^ urs.k) → Fp) → Prop} (hsat : circuitSat a) :
-    extract t = a ∧ SnarkRelation urs P b v circuitSat a :=
-  ⟨extract_correct t a hcons, ⟨hopen, hsat⟩⟩
 
 /-- Schwartz–Zippel error for an invalid quotient identity. -/
 theorem soundness_error (numerator h : Polynomial Fp) (n : ℕ) (hne : numerator ≠ h * (X ^ n - 1)) :

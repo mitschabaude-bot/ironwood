@@ -5,11 +5,10 @@ import Zcash.Common.DiscreteLogRelation
 /-!
 # The commitment respects the IPA round fold
 
-This closes the consistency seam of the soundness argument: that an accepting transcript yields a tree
-consistent with the witness (`Zcash.Snark.extract_correct`'s hypothesis). The structural fact is that
-the polynomial
-commitment is compatible with one IPA round — folding the witness by `u⁻¹` and the generators by `u`
-sends the parent commitment to the folded one plus the cross terms `L`/`R` the verifier accounts for.
+This closes the consistency seam of the soundness argument: that an accepting transcript folds the
+witness the way the extractor assumes. The structural fact is that the polynomial commitment is
+compatible with one IPA round — folding the witness by `u⁻¹` and the generators by `u` sends the
+parent commitment to the folded one plus the cross terms `L`/`R` the verifier accounts for.
 
 * `commitGen` — the commitment over arbitrary generators (`commit urs = commitGen urs.g`).
 * `commitGen_{add,smul}_{left,gen}` — bilinearity in the witness and in the generators.
@@ -45,7 +44,7 @@ theorem commitGen_round {m : ℕ} (gLo gHi : Fin m → G) (aLo aHi : Fin m → F
 /-- **The binding step: an accepting round response is the true fold.** If the folded-generator
 commitment is binding and the prover's response `a'` opens the verifier's folded commitment —
 which by `commitGen_round` is exactly what the true fold opens — then `a' = aLo + u⁻¹ • aHi`.
-This is the per-node step promoting an accepting transcript to a `Zcash.Snark.Consistent` tree,
+This is the per-node step promoting an accepting transcript to the extractor's fold relation,
 leaving binding (DLR hardness) at the folded generators as the only hypothesis. -/
 theorem accepting_fold_eq {m : ℕ} (gLo gHi : Fin m → G) (aLo aHi a' : Fin m → F) {u : F} (hu : u ≠ 0)
     (hbind : Function.Injective (commitGen (F := F) (gLo + u • gHi)))
@@ -57,7 +56,7 @@ theorem accepting_fold_eq {m : ℕ} (gLo gHi : Fin m → G) (aLo aHi a' : Fin m 
 
 /-- `accepting_fold_eq` in the extractor's fold convention (witness by `u`, generators by `u⁻¹`):
 an accepting round response equals `foldVec aLo aHi u` — with `aLo := loHalf a`, `aHi := hiHalf a`,
-exactly the per-node condition of `Zcash.Snark.Consistent`. Derived at `u⁻¹` via `(u⁻¹)⁻¹ = u`. -/
+the per-node fold the extractor inverts. Derived at `u⁻¹` via `(u⁻¹)⁻¹ = u`. -/
 theorem accepting_fold_eq_foldVec {m : ℕ} (gLo gHi : Fin m → G) (aLo aHi a' : Fin m → F) {u : F}
     (hu : u ≠ 0) (hbind : Function.Injective (commitGen (F := F) (gLo + u⁻¹ • gHi)))
     (haccept : commitGen (gLo + u⁻¹ • gHi) a'

@@ -220,8 +220,8 @@ def deployedConstraintQuotientFinder
     (basis : AugmentedIndex (2 ^ shape.k) -> VestaG) -> family.toFamily.Coins ->
       Option (AlgebraicRelationWitness (F := Fp) basis) :=
   fun basis coins =>
-    let pnu := (wrappedAdversary family.toFamily basis).run coins.1
-    match family.outcome basis coins.1 with
+    let pnu := (wrappedAdversary family.toFamily basis).run coins
+    match family.outcome basis coins with
     | PSum.inr _ => none
     | PSum.inl _ =>
         match deployedConstraintQuotientAgreementOrRelation family basis pnu with
@@ -511,7 +511,7 @@ decode or pre-`x` premises were unavailable; `some` retains either the constrain
 explicit relation produced by the online adapter. -/
 abbrev DeployedConstraintOutcomeProvider (family : ComputedDeployedRootFSFamily shape) :=
   forall (basis : AugmentedIndex (2 ^ shape.k) -> VestaG) (coins : family.toFamily.Coins),
-    let pnu := (wrappedAdversary family.toFamily basis).run coins.1
+    let pnu := (wrappedAdversary family.toFamily basis).run coins
     Option (DeployedConstraintWitness (ursOfAugmentedBasis shape.k basis) rfl
         (family.vk basis) (family.instanceCommitment basis) pnu.1.proof.1
         (wrappedPreIpaRecord pnu) (pnu.1.aMulti (wrappedPreIpaReads pnu))
@@ -531,10 +531,5 @@ def deployedConstraintFinderOfOutcome (family : ComputedDeployedRootFSFamily sha
           relation.toAlgebraicRelationWitness)
     | _ => none
 
-/-- Successful left branch of the run-level constraint provider. -/
-def deployedConstraintDecodedOfOutcome (family : ComputedDeployedRootFSFamily shape)
-    (provider : DeployedConstraintOutcomeProvider family)
-    (basis : AugmentedIndex (2 ^ shape.k) -> VestaG) (coins : family.toFamily.Coins) : Prop :=
-  ∃ witness, provider basis coins = some (PSum.inl witness)
 
 end Zcash.Snark

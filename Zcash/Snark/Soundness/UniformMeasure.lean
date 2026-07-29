@@ -1,23 +1,17 @@
 import Mathlib
-import Zcash.Snark.Soundness.Forking.Oracle
-import Zcash.Snark.Soundness.Forking.Tree
 
 /-!
-# Probability form of the forking lemma
+# Uniform-measure and accepting-count lemmas
 
-The deterministic assembly consumes three accepting continuations at each IPA round. This module
-proves when such a tree exists: acceptance above the knowledge-error threshold under uniform
-challenges forces a full `(3,…,3)` accepting tree.
+Distribution facts about `PMF.uniformOfFintype` and the counting floors built on them, kept
+independent of any extraction strategy: pushforwards along equivalences and injections, product
+and fibre bounds, point and blind-set measures, and the "measure beats count" lemmas
+(`exists_injective_accepting_of_measure` and friends) that turn an accept measure into an
+injective family of accepting points.
 
-The main results are:
-
-* `uniformOfFintype_toOuterMeasure_finset`: a finite event under a uniform distribution has
-  probability `|E| / |domain|`.
-* `extractable_of_prob`: if acceptance exceeds `kerr / |domain|`, an `Extractable` tree exists.
-
-The proof uses the multi-round `kerr` count directly. It does not compound a per-round cubic loss.
-`Forking.Oracle` describes the random-oracle idealization, and `Forking.Adversary` supplies the
-querying-adversary reduction and query loss.
+These were factored out of `Soundness.Forking.Probability` so the straight-line consumers
+(`Soundness.GoodChallenge`, `Soundness.Multiopen.*`, `Security.KeyBinding.Probability`,
+`Soundness.AGM.*`) do not depend on the forking development.
 -/
 
 namespace Zcash.Snark
@@ -345,160 +339,11 @@ theorem uniformOfFintype_toOuterMeasure_triple_le {α : Type*} [Fintype α] [Non
   rw [Nat.card_coe_set_eq]
   exact_mod_cast h1
 
-/-- If uniform acceptance exceeds the `kerr` probability, a full accepting fork tree exists. -/
-theorem extractable_of_prob [Fintype α] [DecidableEq α] [Zero α] [Nonempty α] {d : ℕ}
-    (acc : (Fin d → α) → Prop) [DecidablePred acc]
-    (h : (kerr (Fintype.card α) d : ℝ≥0∞) / Fintype.card (Fin d → α)
-       < (PMF.uniformOfFintype (Fin d → α)).toOuterMeasure (Finset.univ.filter acc)) :
-    Extractable acc := by
-  apply extractable_of_kerr_lt
-  by_contra hle
-  push Not at hle
-  have hmono : (PMF.uniformOfFintype (Fin d → α)).toOuterMeasure (Finset.univ.filter acc)
-      ≤ (kerr (Fintype.card α) d : ℝ≥0∞) / Fintype.card (Fin d → α) := by
-    rw [uniformOfFintype_toOuterMeasure_finset]
-    gcongr
-  exact absurd h (not_lt.mpr hmono)
-
-/-- Finite `ℝ≥0∞` Cauchy–Schwarz for the local forking bound. -/
-theorem ennreal_sq_sum_le_card_mul_sum_sq {ι : Type*} (s : Finset ι) (f : ι → ℝ≥0∞)
-    (hf : ∀ i ∈ s, f i ≠ ∞) :
-    (∑ i ∈ s, f i) ^ 2 ≤ s.card * ∑ i ∈ s, (f i) ^ 2 := by
-  have hsum : (∑ i ∈ s, f i) ≠ ∞ := (ENNReal.sum_lt_top.mpr (fun i hi => (hf i hi).lt_top)).ne
-  have hsq : (∑ i ∈ s, (f i) ^ 2) ≠ ∞ :=
-    (ENNReal.sum_lt_top.mpr (fun i hi => (ENNReal.pow_ne_top (hf i hi)).lt_top)).ne
-  rw [← ENNReal.toReal_le_toReal (ENNReal.pow_ne_top hsum)
-      (ENNReal.mul_ne_top (ENNReal.natCast_ne_top _) hsq),
-    ENNReal.toReal_pow, ENNReal.toReal_sum hf, ENNReal.toReal_mul, ENNReal.toReal_natCast,
-    ENNReal.toReal_sum (fun i hi => ENNReal.pow_ne_top (hf i hi))]
-  simp_rw [ENNReal.toReal_pow]
-  exact sq_sum_le_card_mul_sum_sq
-
-/-- Split accepting ordered pairs into distinct and diagonal pairs. -/
-theorem acc_pair_card {F : Type*} [Fintype F] [DecidableEq F] (P : F → Prop) [DecidablePred P] :
-    (Finset.univ.filter P).card * (Finset.univ.filter P).card
-      = (Finset.univ.filter (fun p : F × F => P p.1 ∧ P p.2 ∧ p.1 ≠ p.2)).card
-        + (Finset.univ.filter P).card := by
-  set A := Finset.univ.filter P with hA
-  have hoff : (Finset.univ.filter (fun p : F × F => P p.1 ∧ P p.2 ∧ p.1 ≠ p.2)) = A.offDiag := by
-    ext p
-    simp only [Finset.mem_filter, Finset.mem_univ, true_and, Finset.mem_offDiag, hA]
-  have hle : A.card ≤ A.card * A.card := by
-    rcases Nat.eq_zero_or_pos A.card with h0 | h0
-    · simp [h0]
-    · exact Nat.le_mul_of_pos_left _ h0
-  rw [hoff, Finset.offDiag_card]
-  exact (Nat.sub_add_cancel hle).symm
-
-/-- Counting form of the local `ε² − ε/N` forking bound. -/
-theorem forking_card_bound {Ψ F : Type*} [Fintype Ψ] [Fintype F] [DecidableEq F]
-    (acc : Ψ → F → Prop) [∀ ψ, DecidablePred (acc ψ)] :
-    (∑ ψ : Ψ, (Finset.univ.filter (acc ψ)).card) ^ 2
-      ≤ Fintype.card Ψ
-          * ((∑ ψ : Ψ,
-                (Finset.univ.filter (fun p : F × F => acc ψ p.1 ∧ acc ψ p.2 ∧ p.1 ≠ p.2)).card)
-              + ∑ ψ : Ψ, (Finset.univ.filter (acc ψ)).card) := by
-  set E : Ψ → ℕ := fun ψ => (Finset.univ.filter (acc ψ)).card with hE
-  set D : Ψ → ℕ :=
-    fun ψ => (Finset.univ.filter (fun p : F × F => acc ψ p.1 ∧ acc ψ p.2 ∧ p.1 ≠ p.2)).card with hD
-  have hsq : ∀ ψ, E ψ * E ψ = D ψ + E ψ := fun ψ => acc_pair_card (acc ψ)
-  have hsum : (∑ ψ : Ψ, E ψ * E ψ) = (∑ ψ : Ψ, D ψ) + ∑ ψ : Ψ, E ψ := by
-    rw [← Finset.sum_add_distrib]
-    exact Finset.sum_congr rfl fun ψ _ => hsq ψ
-  have hcs : ((∑ ψ : Ψ, E ψ : ℕ) : ℝ≥0∞) ^ 2
-      ≤ (Fintype.card Ψ : ℝ≥0∞) * ∑ ψ : Ψ, ((E ψ : ℝ≥0∞)) ^ 2 := by
-    have h := ennreal_sq_sum_le_card_mul_sum_sq (Finset.univ : Finset Ψ) (fun ψ => (E ψ : ℝ≥0∞))
-      (fun _ _ => ENNReal.natCast_ne_top _)
-    rw [Finset.card_univ] at h
-    rw [Nat.cast_sum]
-    exact h
-  have hcast : (∑ ψ : Ψ, ((E ψ : ℝ≥0∞)) ^ 2) = ((∑ ψ : Ψ, D ψ) + ∑ ψ : Ψ, E ψ : ℕ) := by
-    rw [← hsum]
-    push_cast
-    exact Finset.sum_congr rfl fun ψ _ => by rw [sq]
-  rw [hcast] at hcs
-  have hfin : ((∑ ψ : Ψ, E ψ) ^ 2 : ℕ)
-      ≤ (Fintype.card Ψ * ((∑ ψ : Ψ, D ψ) + ∑ ψ : Ψ, E ψ) : ℕ) := by
-    exact_mod_cast hcs
-  simpa [hE, hD] using hfin
-
-/-- Count of accepting `(state, challenge)` pairs as a sum over states. -/
-theorem card_acc_pairs {Ψ F : Type*} [Fintype Ψ] [Fintype F] (acc : Ψ → F → Prop)
-    [∀ ψ, DecidablePred (acc ψ)] :
-    Nat.card {x : Ψ × F | acc x.1 x.2} = ∑ ψ : Ψ, (Finset.univ.filter (acc ψ)).card := by
-  rw [Nat.card_coe_set_eq, Set.ncard_eq_toFinset_card', Set.toFinset_setOf,
-    Finset.card_filter, Fintype.sum_prod_type]
-  refine Finset.sum_congr rfl fun ψ _ => ?_
-  rw [Finset.card_filter]
-
-/-- Count of distinct-accepting challenge pairs (per state) as a sum over states. -/
-theorem card_acc_distinct {Ψ F : Type*} [Fintype Ψ] [Fintype F] [DecidableEq F]
-    (acc : Ψ → F → Prop) [∀ ψ, DecidablePred (acc ψ)] :
-    Nat.card {x : Ψ × F × F | acc x.1 x.2.1 ∧ acc x.1 x.2.2 ∧ x.2.1 ≠ x.2.2}
-      = ∑ ψ : Ψ,
-          (Finset.univ.filter (fun p : F × F => acc ψ p.1 ∧ acc ψ p.2 ∧ p.1 ≠ p.2)).card := by
-  rw [Nat.card_coe_set_eq, Set.ncard_eq_toFinset_card', Set.toFinset_setOf,
-    Finset.card_filter, Fintype.sum_prod_type]
-  refine Finset.sum_congr rfl fun ψ _ => ?_
-  rw [Finset.card_filter]
-
-/-- **Local forking, measure form.** Two independent challenges at one state are distinct and both
-accepting with probability at least `ε² − ε/N`. -/
-theorem forking_measure_bound {Ψ F : Type*} [Fintype Ψ] [Nonempty Ψ] [Fintype F] [Nonempty F]
-    [DecidableEq F] (acc : Ψ → F → Prop) [∀ ψ, DecidablePred (acc ψ)] :
-    ((PMF.uniformOfFintype (Ψ × F)).toOuterMeasure {x : Ψ × F | acc x.1 x.2}) ^ 2
-      ≤ (PMF.uniformOfFintype (Ψ × F × F)).toOuterMeasure
-          {x : Ψ × F × F | acc x.1 x.2.1 ∧ acc x.1 x.2.2 ∧ x.2.1 ≠ x.2.2}
-        + (PMF.uniformOfFintype (Ψ × F)).toOuterMeasure {x : Ψ × F | acc x.1 x.2}
-            / Fintype.card F := by
-  set Nψ : ℝ≥0∞ := (Fintype.card Ψ : ℝ≥0∞) with hNψ
-  set Nf : ℝ≥0∞ := (Fintype.card F : ℝ≥0∞) with hNf
-  set E : ℕ := ∑ ψ : Ψ, (Finset.univ.filter (acc ψ)).card with hEdef
-  set D : ℕ :=
-    ∑ ψ : Ψ, (Finset.univ.filter (fun p : F × F => acc ψ p.1 ∧ acc ψ p.2 ∧ p.1 ≠ p.2)).card
-    with hDdef
-  have hcard_bound : E ^ 2 ≤ Fintype.card Ψ * (D + E) := forking_card_bound acc
-  have hψ0 : Nψ ≠ 0 := by rw [hNψ]; exact_mod_cast Fintype.card_ne_zero
-  have hf0 : Nf ≠ 0 := by rw [hNf]; exact_mod_cast Fintype.card_ne_zero
-  simp only [uniformOfFintype_toOuterMeasure_set]
-  rw [card_acc_pairs, card_acc_distinct, ← hEdef, ← hDdef]
-  simp only [Fintype.card_prod]
-  push_cast
-  rw [← hNψ, ← hNf]
-  have hden : Nψ * Nf ≠ 0 := mul_ne_zero hψ0 hf0
-  have hL : ((E : ℝ≥0∞) / (Nψ * Nf)) ^ 2 ≠ ∞ :=
-    ENNReal.pow_ne_top (ENNReal.div_ne_top (ENNReal.natCast_ne_top _) hden)
-  have hR : (D : ℝ≥0∞) / (Nψ * (Nf * Nf)) + (E : ℝ≥0∞) / (Nψ * Nf) / Nf ≠ ∞ :=
-    ENNReal.add_ne_top.mpr
-      ⟨ENNReal.div_ne_top (ENNReal.natCast_ne_top _) (mul_ne_zero hψ0 (mul_ne_zero hf0 hf0)),
-       ENNReal.div_ne_top (ENNReal.div_ne_top (ENNReal.natCast_ne_top _) hden) hf0⟩
-  rw [← ENNReal.toReal_le_toReal hL hR,
-    ENNReal.toReal_add
-      (ENNReal.div_ne_top (ENNReal.natCast_ne_top _) (mul_ne_zero hψ0 (mul_ne_zero hf0 hf0)))
-      (ENNReal.div_ne_top (ENNReal.div_ne_top (ENNReal.natCast_ne_top _) hden) hf0),
-    ENNReal.toReal_pow, ENNReal.toReal_div, ENNReal.toReal_div, ENNReal.toReal_div,
-    ENNReal.toReal_div, ENNReal.toReal_mul, ENNReal.toReal_mul, ENNReal.toReal_mul]
-  rw [hNψ, hNf, ENNReal.toReal_natCast, ENNReal.toReal_natCast, ENNReal.toReal_natCast,
-    ENNReal.toReal_natCast]
-  have hnψ : (0 : ℝ) < (Fintype.card Ψ : ℝ) := by exact_mod_cast Fintype.card_pos
-  have hnf : (0 : ℝ) < (Fintype.card F : ℝ) := by exact_mod_cast Fintype.card_pos
-  have hcard_real : ((E : ℝ)) ^ 2
-      ≤ (Fintype.card Ψ : ℝ) * ((D : ℝ) + (E : ℝ)) := by exact_mod_cast hcard_bound
-  rw [div_pow, div_div,
-    show (Fintype.card Ψ : ℝ) * Fintype.card F * Fintype.card F
-        = Fintype.card Ψ * (Fintype.card F * Fintype.card F) from by ring,
-    ← add_div, div_le_div_iff₀ (by positivity) (by positivity)]
-  nlinarith [mul_le_mul_of_nonneg_right hcard_real
-      (show (0 : ℝ) ≤ (Fintype.card Ψ : ℝ) * ((Fintype.card F : ℝ) * (Fintype.card F : ℝ)) from by
-        positivity),
-    hnψ, hnf]
-
 open scoped ENNReal in
 /-- **The single-squeeze forking count.** If one accepting challenge is in hand and the accept event's
 uniform measure beats `n / |α|`, then `n + 1` pairwise-distinct accepting challenges exist, with the given
-one in slot `0`. The one-challenge analogue of `extractable_of_prob` (there the event is a whole round
-*vector* and beating `kerr` forces the `(3,…,3)` tree; here beating `n/|α|` forces `n` rewound accepting
-values beside the current one) — the counting core of the multiopen `x₄` rewinding
+one in slot `0`. Beating `n/|α|` forces `n` rewound accepting values beside the current one — the
+counting core of the multiopen `x₄` rewinding
 (`Soundness.Multiopen.Deployed`). -/
 theorem exists_injective_accepting_of_measure {α : Type*} [Fintype α] [DecidableEq α] [Nonempty α] {n : ℕ}
     {acc : α → Prop} [DecidablePred acc] {x₀ : α} (hx₀ : acc x₀)

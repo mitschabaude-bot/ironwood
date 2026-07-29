@@ -14,8 +14,8 @@ difference between the prover's representation and the expected one; no witness 
 * `deployedToAcceptVWitness` — the recursive peel, returning `IpaAcceptV ⊕' AugmentedRelationWitness`.
 * `algebraicRelationOfDeployedAccept` converts the result to the form used by the probability proof.
 
-`Soundness.AGM.Capstone` connects this peel to the deployed opening. The forking layer must supply
-the transcript and representations as data.
+`Soundness.Composition.StraightLineDeployed` connects this peel to the deployed opening. The
+straight-line layer supplies the transcript and representations as data.
 -/
 
 namespace Zcash.Snark

@@ -14,9 +14,9 @@ The witness is a coefficient vector `a` with `P = ⟨a, G⟩` and `v = ⟨a, b�
 * `IpaRelation` — the opening relation `⟨a, G⟩ = P ∧ ⟨a, b⟩ = v` the IPA is an argument of knowledge for.
 * `innerProduct_add_left` gives the linearity used by the extractor.
 
-Two distinct challenges recover one round's witness halves. The recursive extractor is defined in
-`Soundness.IpaSoundness`. Opening non-uniqueness produces an explicit discrete-log relation; hardness
-is used only at the computational boundary.
+Two distinct challenges recover one round's witness halves. The round-by-round extractor is
+defined in `Soundness.IpaSoundness`. Opening non-uniqueness produces an explicit discrete-log
+relation; hardness is used only at the computational boundary.
 -/
 
 namespace Zcash.Snark

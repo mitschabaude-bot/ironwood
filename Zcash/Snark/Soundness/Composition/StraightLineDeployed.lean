@@ -6,9 +6,8 @@ import Zcash.Snark.Soundness.Composition.DeployedConstraintContainment
 /-!
 # Straight-line AGM composition through deployed multiopen decoding
 
-This module combines the one-run IPA extractor with the existing rewind-free deployed batch/root
-decoder.  This is the primary deployed AGM route; the recursive/AFK composition remains available
-as a separately priced alternative.
+This module combines the one-run IPA extractor with the deployed batch/root decoder.  Since
+ironwood#133 retired the rewinding route, this is the deployed AGM composition.
 -/
 
 namespace Zcash.Snark
@@ -74,7 +73,7 @@ def toIpaFamily (family : ComputedStraightLineDeployedFSFamily shape) :
   ipaTrace := family.ipaTrace
 
 /-- The direct deployed relation finder: first the one-run IPA branch, then the existing online
-multiopen outcome.  It never invokes the recursive extractor. -/
+multiopen outcome.  It reads the run's own oracle table and rewinds nothing. -/
 def straightLineDeployedRelationFinder
     (family : ComputedStraightLineDeployedFSFamily shape) :
     (basis : AugmentedIndex (2 ^ shape.k) -> VestaG) ->
@@ -90,16 +89,12 @@ def straightLineDeployedRelationFinder
         | PSum.inr relation =>
             some (ComputedStraightLineIpaFSFamily.straightLineCanonicalRelation relation)
 
-/-- A fixed tape used only to reuse the existing root-decode witness type.  The retained decoded
-batch data depends on the oracle table and `outcome`, not on recursive extractor coins. -/
-noncomputable def straightLineDummyTape : RecursiveForkTape Fp shape.k := Classical.arbitrary _
-
-/-- The existing deployed root decode, indexed only by the one-run oracle table. -/
+/-- The existing deployed root decode, indexed by the one-run oracle table. -/
 def straightLineRootDecoded (family : ComputedStraightLineDeployedFSFamily shape)
     (basis : AugmentedIndex (2 ^ shape.k) -> VestaG)
     (O : BTranscript Fp VestaG
       (preIpaLen shape family.init.length 10 + 3 * shape.k) -> Fp) : Prop :=
-  deployedRootDecoded family.toRootFamily basis (O, straightLineDummyTape)
+  deployedRootDecoded family.toRootFamily basis O
 
 /-- The direct root-layer output is either an explicit relation or the complete deployed decode. -/
 def straightLineRootExtracted (family : ComputedStraightLineDeployedFSFamily shape)
@@ -401,7 +396,7 @@ theorem straightLineDeployedRoots_prob_le
   exact mul_le_mul_right (family.toRootFamily.pinnedRoots_budget_le basis) _
 
 /-- Straight-line deployed root capstone.  It charges the relation finder once and contains no
-recursive AFK expectation, truncation budget, or Markov tail. -/
+expectation, truncation budget, or Markov tail. -/
 theorem straightLineRootDecodeFailure_prob_le_of_textbookDL
     (B : VestaG) (family : ComputedStraightLineDeployedFSFamily shape) {bound : ENNReal}
     (hDL : TextbookDLWithCoinsAdvantageLE B

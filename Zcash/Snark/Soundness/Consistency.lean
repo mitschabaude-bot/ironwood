@@ -1,4 +1,4 @@
-import Zcash.Snark.Soundness.Extraction
+import Zcash.Snark.Soundness.Halves
 import Zcash.Snark.Soundness.CommitFold
 
 /-!

@@ -4,10 +4,9 @@ import Zcash.Snark.Soundness.Composition.DeployedConstraintContainment
 /-!
 # Straight-line AGM composition through the deployed constraint relation
 
-This module lifts the one-table straight-line IPA/root extractor through the existing online
-constraint adapter.  It is additive to the recursive/reprogramming AGM capstone.  The fixed dummy
-tape below is only an index used to reuse proof-only decode provenance; the new relation finder
-never invokes the recursive extractor.
+This module lifts the one-table straight-line IPA/root extractor through the online constraint
+adapter.  Every branch of the relation finder reads a single accepting execution and rewinds
+nothing.
 -/
 
 namespace Zcash.Snark
@@ -277,7 +276,7 @@ def straightLineConstraintQuotientFinder
               relation.toAlgebraicRelationWitness)
 
 /-- Complete straight-line relation finder: IPA, deployed unbatching, then quotient collision.
-Every branch returns explicit relation coefficients and no branch calls the recursive extractor. -/
+Every branch returns explicit relation coefficients and no branch rewinds the adversary. -/
 def straightLineConstraintRelationFinder
     (family : ComputedStraightLineDeployedFSFamily shape) :
     (basis : AugmentedIndex (2 ^ shape.k) -> VestaG) ->
@@ -377,7 +376,7 @@ theorem straightLineConstraintSuccess_eq_of_outcome
   simp [straightLineConstraintSuccess?, hout]
 
 set_option maxHeartbeats 800000 in
-/-- The legacy root-containment construction lands in the same computed success option.  This is
+/-- The root-containment construction lands in the same computed success option.  This is
 the proof bridge used by the existing probability decomposition; all data in the conclusion is
 nevertheless the value returned by `straightLineConstraintOutcome?`. -/
 theorem straightLineConstraintDecoded_of_root
@@ -390,33 +389,31 @@ theorem straightLineConstraintDecoded_of_root
       (fullAlgebraicAcceptDeployed basis (family.vk basis)
         (family.instanceCommitment basis))
       (algebraicFullPrefixesPre family.init) (algebraicFullPrefixes family.init) O)
-    (root : DeployedRootDecodeWitness family.toRootFamily basis
-      (O, straightLineDummyTape))
+    (root : DeployedRootDecodeWitness family.toRootFamily basis O)
     (hxgood : (wrappedPreIpaRecord
-        (deployedRootRunOutput family.toRootFamily basis (O, straightLineDummyTape))).x ∉
+        (deployedRootRunOutput family.toRootFamily basis O)).x ∉
       szBadSet (deployedConstraintDifferencePreX family.toRootFamily basis
-        (O, straightLineDummyTape)))
+        O))
     (constraint : DeployedConstraintWitness
       (ursOfAugmentedBasis shape.k basis) rfl (family.vk basis)
       (family.instanceCommitment basis)
-      (deployedRootRunOutput family.toRootFamily basis
-        (O, straightLineDummyTape)).1.proof.1
+      (deployedRootRunOutput family.toRootFamily basis O).1.proof.1
       (wrappedPreIpaRecord (deployedRootRunOutput family.toRootFamily basis
-        (O, straightLineDummyTape)))
+        O))
       ((deployedRootRunOutput family.toRootFamily basis
-        (O, straightLineDummyTape)).1.aMulti
+        O).1.aMulti
           (wrappedPreIpaReads (deployedRootRunOutput family.toRootFamily basis
-            (O, straightLineDummyTape))))
+            O)))
       ((deployedRootRunOutput family.toRootFamily basis
-        (O, straightLineDummyTape)).1.multiU
+        O).1.multiU
           (wrappedPreIpaReads (deployedRootRunOutput family.toRootFamily basis
-            (O, straightLineDummyTape))))
+            O)))
       ((deployedRootRunOutput family.toRootFamily basis
-        (O, straightLineDummyTape)).1.multiBlind
+        O).1.multiBlind
           (wrappedPreIpaReads (deployedRootRunOutput family.toRootFamily basis
-            (O, straightLineDummyTape)))))
+            O))))
     (hout : deployedConstraintOutcomeOfRoot family.toRootFamily static basis
-      (O, straightLineDummyTape) haccept root hxgood = PSum.inl constraint) :
+      O haccept root hxgood = PSum.inl constraint) :
     family.straightLineConstraintDecoded static basis O := by
   rcases root with ⟨batchWitness, outcome_eq, decoded, batches_eq⟩
   cases decoded with
@@ -672,7 +669,7 @@ def straightLineConstraintBadXSet (B : VestaG)
     Set ((AugmentedIndex (2 ^ shape.k) -> Fp) ×
       (BTranscript Fp VestaG
         (preIpaLen shape family.init.length 10 + 3 * shape.k) -> Fp)) :=
-  {q | (scalarBasis B q.1, (q.2, straightLineDummyTape)) ∈
+  {q | (scalarBasis B q.1, q.2) ∈
     deployedConstraintBadXEvent family.toRootFamily}
 
 /-- Deterministic straight-line constraint containment.  Failure is covered by the root-layer
@@ -692,7 +689,7 @@ theorem straightLineConstraintFailureSet_subset
               family.straightLineConstraintBadXSet B))) := by
   intro q hfailure
   let basis := scalarBasis B q.1
-  let coins : family.toFamily.Coins := (q.2, straightLineDummyTape)
+  let coins : family.toFamily.Coins := q.2
   by_cases hroot : family.straightLineRootDecoded basis q.2
   · let root := Classical.choice hroot
     by_cases hxgood : (wrappedPreIpaRecord
@@ -773,11 +770,11 @@ theorem straightLineConstraintBadX_prob_le
       (family.Q + 1 : Nat) * epsilonX := by
   apply uniformOfFintype_prod_fiber_bound_right
     (fun logs =>
-      {O | (scalarBasis B logs, (O, straightLineDummyTape)) ∈
+      {O | (scalarBasis B logs, O) ∈
         deployedConstraintBadXEvent family.toRootFamily})
   intro logs
   refine le_trans (MeasureTheory.measure_mono
-    (show {O | (scalarBasis B logs, (O, straightLineDummyTape)) ∈
+    (show {O | (scalarBasis B logs, O) ∈
           deployedConstraintBadXEvent family.toRootFamily} <=
         {O | (deployedConstraintXPinnedEvent family.toRootFamily schedule
           (scalarBasis B logs)).Landing O}
@@ -910,7 +907,7 @@ theorem straightLineConstraintFailure_union_relation_prob_le_of_relationSuperset
     _ = _ := by ring
 
 /-- Straight-line AGM deployed-constraint capstone.  The bound is linear in `Q`, uses a fixed
-finite relation finder, and contains no recursive AFK or Markov term. -/
+finite relation finder, and contains no expectation or Markov term. -/
 theorem straightLineConstraintFailure_prob_le_of_textbookDL
     (B : VestaG) (family : ComputedStraightLineDeployedFSFamily shape)
     (static : DeployedConstraintStaticChecks family.toRootFamily)

@@ -2,7 +2,6 @@ import Zcash.Snark.Fixtures.MultiAction.Fixture
 import Zcash.Snark.Fixtures.MultiAction.Degree
 import Zcash.Snark.Fixtures.MultiAction.StaticChecks
 import Zcash.Snark.Fixtures.MultiAction.Schedule
-import Zcash.Snark.Fixtures.MultiAction.KnowledgeError
 import Zcash.Snark.Fixtures.MultiAction.StraightLineKnowledgeError
 import Zcash.Snark.Fixtures.MultiAction.CapturedZeroFamily
 import Zcash.Snark.Fixtures.MultiAction.ActionCapstone
@@ -30,11 +29,9 @@ The instance-commitment derivation (`instance_commitments_derived`,
 functions it ranges over; see the single-action sibling for why this is the fixture's new trust
 surface.
 
-Two AGM capstones are retained.  The primary straight-line endpoint consumes an online
-representation trace and has a pointwise four-invocation bound.  The recursive/reprogramming
-endpoint remains a separately priced alternative using the unconditional AFK expectation,
-fixed-budget truncation, and an explicit Markov tail.  Those representations are ghost extractor
-data: they are neither transmitted nor checked by the Halo2 verifier.  Accordingly the tighter
+One AGM capstone is retained: the straight-line endpoint, which consumes an online
+representation trace and has a pointwise four-invocation bound.  Those representations are ghost
+extractor data: they are neither transmitted nor checked by the Halo2 verifier.  Accordingly the
 endpoint is only an AGM-and-random-oracle result under the supplied finite-security Vesta DLOG
 profile.
 -/
@@ -98,41 +95,12 @@ assert_axioms Zcash.Snark.Fixture2.deployedConstraintXSqueezeSchedule_captured +
   Zcash.Snark.Fixture2.vk_n_pred_le,
   Zcash.Snark.Fixture2.vk_quotient_tail_le,
   CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
--- The deployed compressed-identity extraction bound at the captured key: the rewind-free
+-- The deployed compressed-identity extraction bound at the captured key: the straight-line
 -- capstone with the static checks and degree caps discharged, so the bad-`x` term is the concrete
--- `(Q + 1) · 20470 / |𝔽|`, the multiopen term is the additive root budget, and the fixed-call
--- DLOG solver pays the explicit AFK truncation tail.  Semantic circuit satisfaction additionally
--- uses the four-budget promotion in the core trust census.
-assert_axioms Zcash.Snark.Fixture2.orchard_deployed_knowledge_error_captured +native(
-  Zcash.Snark.Fixture2.shape_k_pred_le,
-  Zcash.Snark.Fixture2.vk_advice_layout_length,
-  Zcash.Snark.Fixture2.vk_chunk_width_le,
-  Zcash.Snark.Fixture2.vk_fixed_layout_length,
-  Zcash.Snark.Fixture2.vk_gates_degree_le,
-  Zcash.Snark.Fixture2.vk_instance_layout_length,
-  Zcash.Snark.Fixture2.vk_lookup_input_degree_le,
-  Zcash.Snark.Fixture2.vk_lookup_table_degree_le,
-  Zcash.Snark.Fixture2.vk_n_cast_ne_zero,
-  Zcash.Snark.Fixture2.vk_n_pred_le,
-  Zcash.Snark.Fixture2.vk_omega_order,
-  Zcash.Snark.Fixture2.vk_quotient_tail_le,
-  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+-- `(Q + 1) · 20470 / |𝔽|` and the multiopen term is the additive root budget.  Semantic circuit
+-- satisfaction additionally uses the four-budget promotion in the core trust census.
 -- The same bound on the interpolation-free route: the deployed constraint family is built by
 -- `ofCovered` from the two fresh-query traces, with no field-capacity premise or interpolation.
-assert_axioms Zcash.Snark.Fixture2.orchard_deployed_knowledge_error_captured_direct +native(
-  Zcash.Snark.Fixture2.shape_k_pred_le,
-  Zcash.Snark.Fixture2.vk_advice_layout_length,
-  Zcash.Snark.Fixture2.vk_chunk_width_le,
-  Zcash.Snark.Fixture2.vk_fixed_layout_length,
-  Zcash.Snark.Fixture2.vk_gates_degree_le,
-  Zcash.Snark.Fixture2.vk_instance_layout_length,
-  Zcash.Snark.Fixture2.vk_lookup_input_degree_le,
-  Zcash.Snark.Fixture2.vk_lookup_table_degree_le,
-  Zcash.Snark.Fixture2.vk_n_cast_ne_zero,
-  Zcash.Snark.Fixture2.vk_n_pred_le,
-  Zcash.Snark.Fixture2.vk_omega_order,
-  Zcash.Snark.Fixture2.vk_quotient_tail_le,
-  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
 
 -- The captured single-Action assembly and consensus-generic Action capstones are fixture-level
 -- claims: their census belongs beside the capture and keygen certificate that they consume.

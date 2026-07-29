@@ -5,9 +5,7 @@ import Zcash.Snark.Soundness.AGM.StraightLineFiniteSecurity
 /-!
 # Captured-key straight-line AGM knowledge-error endpoint
 
-This is the primary deployed AGM endpoint.  `MultiAction.KnowledgeError` retains the recursive AFK
-capstone as a separately priced alternative, while this file selects the fixed-call straight-line
-relation finder.
+This is the deployed AGM endpoint, stated through the fixed-call straight-line relation finder.
 -/
 
 namespace Zcash.Snark.Fixture2

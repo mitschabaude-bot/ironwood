@@ -37,25 +37,21 @@ do not claim that implementation fact.
 ## What the adversary model still assumes
 
 The querying-adversary experiment is present: `Adversary.OracleComp` models a bounded-query
-adversary, `Adversary.Algebraic` runs the recursive extractor against it, and
-`ComputedAlgebraicFSFamily.knowledgeSoundness_under_DL` and `.binding_under_DL` price extraction
-failure from the adversary's own advantage. Query loss is charged explicitly: `(Q + k) · (3/p)`
-for the extractor's escape slice and `(Q + 1) · (1/p)` for the adaptive `z = 0` slice. What
-remains is:
+adversary, `Adversary.Algebraic` decodes its deployed transcript into the representation-carrying
+proof the AGM reduction reads, and the straight-line endpoints in
+`Composition.StraightLineConstraint` price failure from the adversary's own advantage. Query loss
+is charged explicitly: `(Q + 1) · (1/p)` per pinned squeeze and for the adaptive `z = 0` slice.
+What remains is:
 
-* **Efficiency modeling.** The generic endpoints take `ReductionEfficient R`; their `_poly` forms
-  discharge it unconditionally at `R = (8·Q+1)·10^k`, the Attema–Fehr–Klooß-style expected
-  black-box call bound of the recursive extractor
-  (`recursiveAlgebraicFork_oracle_tape_sum_runs_le_poly`, with `Q` the query bound and `k` the IPA
-  depth). `reductionEfficient_of_forkSpread` is the conditional density-sensitive alternative.
-  PPT-ness of the adversary family is external to Lean.
+* **Efficiency modeling.** The deployed combined finder has a pointwise four-invocation bound
+  (`straightLineConstraintRelationFinderCalls_le_four`), so no expected-runs analysis enters the
+  accounting. PPT-ness of the adversary family is external to Lean.
 * **The idealizations.** Blake2b as a random function, the conversion bias above, the AGM,
   plain-DL hardness, and the generator random-oracle model.
 
 The `Fp`-squeeze exclusions — the Schwartz–Zippel `d / p`, the `z ≠ 0` and `ξ`-recovery `1 / p`
 singletons, and any further point exclusions — combine into one subadditive bound by
-`GoodChallenge.uniformChallenge_szBadSet_union`. The `kerr` tree count lives over the
-round-*vector* domain and is charged separately.
+`GoodChallenge.uniformChallenge_szBadSet_union`.
 -/
 namespace Zcash.Snark
 

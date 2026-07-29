@@ -227,15 +227,14 @@ challenge congruence at the four folding reads. -/
 theorem view_difference_eq (sp : SequentialPreXProver family)
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
     (O : BTranscript Fp VestaG
-      (preIpaLen shape family.init.length 10 + 3 * shape.k) → Fp)
-    (tape : RecursiveForkTape Fp shape.k) :
+      (preIpaLen shape family.init.length 10 + 3 * shape.k) → Fp) :
     (sp.view basis ((sp.pre basis).run O)).difference (family.vk basis)
         (family.instanceCommitment basis) (family.fixedRepresentations basis) =
-      deployedConstraintDifferencePreX family basis (O, tape) := by
-  have hrun : (deployedRootRunOutput family basis (O, tape)).1 =
+      deployedConstraintDifferencePreX family basis O := by
+  have hrun : (deployedRootRunOutput family basis O).1 =
       (family.adversary basis).run O :=
     wrappedAdversary_run_fst family.toFamily basis O
-  have hreads : ∀ i, wrappedPreIpaReads (deployedRootRunOutput family basis (O, tape)) i =
+  have hreads : ∀ i, wrappedPreIpaReads (deployedRootRunOutput family basis O) i =
       O (algebraicFullPrefixesPre family.init ((family.adversary basis).run O) i) := by
     intro i
     have h := congrFun (wrappedPreIpaReads_run family.toFamily basis O) i
@@ -245,13 +244,13 @@ theorem view_difference_eq (sp : SequentialPreXProver family)
     AlgebraicProofString.preX1AssemblySource]
   rw [show ((sp.view basis ((sp.pre basis).run O)).points :
         List (AlgebraicPoint (F := Fp) basis)) =
-      (deployedRootRunOutput family basis (O, tape)).1.algebraicProof.preX1Points by
+      (deployedRootRunOutput family basis O).1.algebraicProof.preX1Points by
     rw [hrun]; exact sp.view_points basis O]
   rw [show (sp.view basis ((sp.pre basis).run O)).pieces =
-      (deployedRootRunOutput family basis (O, tape)).1.algebraicProof.hPieces by
+      (deployedRootRunOutput family basis O).1.algebraicProof.hPieces by
     funext i; rw [hrun]; exact sp.view_pieces basis O i]
   rw [committedPreXConstraintDifference_ps_congr
-    (ps₂ := (deployedRootRunOutput family basis (O, tape)).1.proof.1) _ _ _ _ _
+    (ps₂ := (deployedRootRunOutput family basis O).1.proof.1) _ _ _ _ _
     (fun q => by rw [hrun]; exact sp.view_advice basis O q)
     (fun q s => by rw [hrun]; exact sp.view_permProduct basis O q s)
     (sp.view_wf basis O)
@@ -288,13 +287,8 @@ theorem constraintXStage_agrees (sp : SequentialPreXProver family)
     (sp.constraintXStage basis).run O = deployedConstraintXBadSet family basis O := by
   rw [constraintXStage, OracleComp.run_bind, OracleComp.run_pure]
   ext x
-  simp only [Finset.mem_coe, deployedConstraintXBadSet, Set.mem_setOf_eq]
-  constructor
-  · intro hx
-    exact ⟨Classical.arbitrary _,
-      sp.view_difference_eq basis O (Classical.arbitrary _) ▸ hx⟩
-  · rintro ⟨tape, hx⟩
-    exact (sp.view_difference_eq basis O tape).symm ▸ hx
+  simp only [Finset.mem_coe, deployedConstraintXBadSet]
+  rw [sp.view_difference_eq basis O]
 
 /-- The lifted stage's queries are the prover's own pre-`x` queries, so the `x` prefix is
 untouched. -/

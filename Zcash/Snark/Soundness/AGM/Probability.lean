@@ -1,5 +1,5 @@
 import Zcash.Snark.Soundness.AGM.Adapter
-import Zcash.Snark.Soundness.Forking.Probability
+import Zcash.Snark.Soundness.UniformMeasure
 
 /-!
 # From relation probability to DL probability
@@ -27,9 +27,9 @@ solves for the challenge unless the returned relation annihilates `y` (Lemma 3 o
 ## Boundary
 
 The relation finder `A` is a deterministic total function. These are information-theoretic counting
-theorems; efficiency is modeled outside Lean. `Soundness.AGM.Capstone` supplies the deployed finder
-and `.ProbabilityVesta` specializes the bounds; plain-DL hardness, the AGM, and the generator
-random-oracle model remain assumptions there.
+theorems; efficiency is modeled outside Lean. `Soundness.Composition.StraightLineConstraint`
+supplies the deployed finder and `.ProbabilityVesta` specializes the bounds; plain-DL hardness,
+the AGM, and the generator random-oracle model remain assumptions there.
 -/
 
 open scoped ENNReal

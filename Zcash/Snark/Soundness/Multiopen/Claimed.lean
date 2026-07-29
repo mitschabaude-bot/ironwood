@@ -2,7 +2,7 @@ import Mathlib
 import Zcash.Snark.Soundness.Multiopen.RPoly
 import Zcash.Snark.Soundness.Multiopen.ValueCheck
 import Zcash.Snark.Soundness.GoodChallenge
-import Zcash.Snark.Soundness.Forking.Probability
+import Zcash.Snark.Soundness.UniformMeasure
 
 /-!
 # Claimed-evaluation binding through the `x₃` rewinds

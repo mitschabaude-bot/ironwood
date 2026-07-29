@@ -168,12 +168,12 @@ theorem badX_le_via_squeeze_prefixed {T' : Type*} [DecidableEq T']
       (PMF.uniformOfFintype Fp).toOuterMeasure (badF basis t nu) <= epsilon)
     (hcontX : forall basis, {coins : family.Coins | ¬ goodX basis coins} <=
       {coins : family.Coins |
-        coins.1 (algebraicFullPrefixesPre family.init
-            ((family.adversary basis).run coins.1) 4) ∈
+        coins (algebraicFullPrefixesPre family.init
+            ((family.adversary basis).run coins) 4) ∈
           badF basis (algebraicFullPrefixesPre family.init
-              ((family.adversary basis).run coins.1) 4)
-            (fun i : Fin 4 => coins.1 (algebraicFullPrefixesPre family.init
-              ((family.adversary basis).run coins.1) (i.castLE (by omega))))}) :
+              ((family.adversary basis).run coins) 4)
+            (fun i : Fin 4 => coins (algebraicFullPrefixesPre family.init
+              ((family.adversary basis).run coins) (i.castLE (by omega))))}) :
     (independentProductPMF (orchardGeneratorROSetup query)
       (PMF.uniformOfFintype family.Coins)).toOuterMeasure
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
@@ -195,14 +195,6 @@ theorem badX_le_via_squeeze_prefixed {T' : Type*} [DecidableEq T']
   intro setup
   set basis' := orchardGeneratorROBasis query setup with hbasis'
   refine le_trans (MeasureTheory.measure_mono (hcontX basis')) ?_
-  refine uniformOfFintype_prod_fiber_bound
-    (fun _ : RecursiveForkTape Fp shape.k =>
-      {O | O (algebraicFullPrefixesPre family.init ((family.adversary basis').run O) 4) ∈
-        badF basis' (algebraicFullPrefixesPre family.init
-            ((family.adversary basis').run O) 4)
-          (fun i : Fin 4 => O (algebraicFullPrefixesPre family.init
-            ((family.adversary basis').run O) (i.castLE (by omega))))})
-    (fun _ => ?_)
   refine xEscTable_measure_le (family.adversary basis')
     (fun p => algebraicFullPrefixesPre family.init p 4)
     (fun p O => badF basis' (algebraicFullPrefixesPre family.init p 4)
@@ -254,12 +246,12 @@ theorem badAt_le_via_squeeze_prefixed {T' : Type*} [DecidableEq T'] (n : Fin 11)
       (PMF.uniformOfFintype Fp).toOuterMeasure (badF basis t nu) <= epsilon)
     (hcont : forall basis, {coins : family.Coins | ¬ good basis coins} <=
       {coins : family.Coins |
-        coins.1 (algebraicFullPrefixesPre family.init
-            ((family.adversary basis).run coins.1) n) ∈
+        coins (algebraicFullPrefixesPre family.init
+            ((family.adversary basis).run coins) n) ∈
           badF basis (algebraicFullPrefixesPre family.init
-              ((family.adversary basis).run coins.1) n)
-            (fun i : Fin (n : Nat) => coins.1 (algebraicFullPrefixesPre family.init
-              ((family.adversary basis).run coins.1)
+              ((family.adversary basis).run coins) n)
+            (fun i : Fin (n : Nat) => coins (algebraicFullPrefixesPre family.init
+              ((family.adversary basis).run coins)
               (i.castLE (le_of_lt n.isLt))))}) :
     (independentProductPMF (orchardGeneratorROSetup query)
       (PMF.uniformOfFintype family.Coins)).toOuterMeasure
@@ -282,14 +274,6 @@ theorem badAt_le_via_squeeze_prefixed {T' : Type*} [DecidableEq T'] (n : Fin 11)
   intro setup
   set basis' := orchardGeneratorROBasis query setup with hbasis'
   refine le_trans (MeasureTheory.measure_mono (hcont basis')) ?_
-  refine uniformOfFintype_prod_fiber_bound
-    (fun _ : RecursiveForkTape Fp shape.k =>
-      {O | O (algebraicFullPrefixesPre family.init ((family.adversary basis').run O) n) ∈
-        badF basis' (algebraicFullPrefixesPre family.init
-            ((family.adversary basis').run O) n)
-          (fun i : Fin (n : Nat) => O (algebraicFullPrefixesPre family.init
-            ((family.adversary basis').run O) (i.castLE (le_of_lt n.isLt))))})
-    (fun _ => ?_)
   refine xEscTable_measure_le (family.adversary basis')
     (fun p => algebraicFullPrefixesPre family.init p n)
     (fun p O => badF basis' (algebraicFullPrefixesPre family.init p n)
@@ -321,7 +305,7 @@ theorem badAt_le_via_squeeze_prefixed {T' : Type*} [DecidableEq T'] (n : Fin 11)
 
 open ComputedAlgebraicFSFamily in
 /-- **The table-level form of the index-`n` squeeze price.**  The semantic endpoint states its
-`y`, `β`, `γ` and `θ` premises over oracle tables alone, without the fork tape, so this states the
+`y`, `β`, `γ` and `θ` premises over oracle tables alone, so this states the
 same `(Q + 1) * epsilon` bound at that measure.  It is the shorter statement: the coins-level form
 above reduces to it through a tape fiber. -/
 theorem badAt_table_le_via_squeeze_prefixed (n : Fin 11)
