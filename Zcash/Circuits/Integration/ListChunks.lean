@@ -265,11 +265,11 @@ theorem getD_length_eq_min_of_chunk_shape {α : Type}
       take_flatten_length_of_dropLast_full chunks n (i + 1) hfull hnext
     have hprefixLe :
         (chunks.take (i + 1)).flatten.length ≤ chunks.flatten.length := by
-      have happend :=
+      have hTakeAppendDrop :=
         congrArg List.flatten
           (List.take_append_drop (i + 1) chunks)
-      simp only [List.flatten_append] at happend
-      rw [← happend, List.length_append]
+      simp only [List.flatten_append] at hTakeAppendDrop
+      rw [← hTakeAppendDrop, List.length_append]
       exact Nat.le_add_right _ _
     have hnle : n ≤ total - i * n := by
       rw [hprefixNext, hflatten] at hprefixLe
