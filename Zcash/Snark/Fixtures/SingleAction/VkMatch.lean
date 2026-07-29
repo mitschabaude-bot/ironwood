@@ -196,7 +196,7 @@ private theorem bundle_scalars :
     ((vk.omega, vk.n, vk.blindingFactors, vk.delta, vk.chunkLen), vk.permutationChunks)
       = ((omegaOf actionK, 2 ^ actionK, actionCS.blindingFactors, deltaFp,
             actionCS.chunkLen),
-          Keygen.permutationChunksOf actionPinned actionCS.chunkLen) := by
+          Keygen.permutationChunksOf actionPinnedCs actionCS.chunkLen) := by
   native_decide
 
 theorem vk_scalars_and_chunks_derived :
@@ -206,9 +206,8 @@ theorem vk_scalars_and_chunks_derived :
             actionCircuit.constraintSystem.blindingFactors, deltaFp,
             actionCircuit.constraintSystem.chunkLen),
           Keygen.permutationChunksOf actionCircuit.pinnedCS
-        actionCircuit.constraintSystem.chunkLen) := by
-  have h := bundle_scalars
-  simpa only [actionSelMap, actionK, actionCS] using h
+            actionCircuit.constraintSystem.chunkLen) := by
+  exact bundle_scalars
 
 theorem vk_scalars_derived :
     (vk.omega, vk.n, vk.blindingFactors, vk.delta, vk.chunkLen)
