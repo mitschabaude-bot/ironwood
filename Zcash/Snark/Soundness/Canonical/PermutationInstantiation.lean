@@ -1,5 +1,4 @@
 import Zcash.Common.RelationWitness
-import Mathlib
 import Zcash.Snark.Soundness.Multiopen.ConstraintResolver
 import Zcash.Snark.Soundness.PermutationRows
 
@@ -584,35 +583,6 @@ theorem eval_permutationChunksOfResolver
     exact eval_permutationChunkPairsOfResolver
       vk instanceCommitment ps ch poly p sc.2 hchunk hcoherent hopen
 
-/-- The full constraint model with permutation sets and chunks selected by the same commitment-ID
-resolver already used for gates and lookups. -/
-def constraintModelOfPermutationResolver
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
-    (l0 lLast lBlind : Polynomial Fp) :
-    ConstraintPolyModel shape.numProofs :=
-  constraintModelOfResolver vk ch poly
-    (permutationSetsOfResolver vk poly)
-    (permutationChunksOfResolver vk poly)
-    l0 lLast lBlind
-
-@[simp] theorem constraintModelOfPermutationResolver_sets
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
-    (l0 lLast lBlind : Polynomial Fp) (p : Fin shape.numProofs) :
-    (constraintModelOfPermutationResolver vk ch poly l0 lLast lBlind).sets p =
-      permutationSetsOfResolver vk poly p := rfl
-
-@[simp] theorem constraintModelOfPermutationResolver_chunks
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
-    (l0 lLast lBlind : Polynomial Fp) (p : Fin shape.numProofs) :
-    (constraintModelOfPermutationResolver vk ch poly l0 lLast lBlind).chunks p =
-      permutationChunksOfResolver vk poly p := rfl
-
 /-- The four divisibility families consumed by
 `deployed_perm_copy_constraints_all_chunks`, specialized to one resolver-backed proof. -/
 structure ResolverPermutationConstraints
@@ -643,7 +613,10 @@ theorem ConstraintSatisfaction.resolverPermutationConstraints
     (l0 lLast lBlind : Polynomial Fp)
     (p : Fin shape.numProofs) {n m : ℕ}
     (h : ConstraintSatisfaction
-      (constraintModelOfPermutationResolver vk ch poly l0 lLast lBlind) n)
+      (constraintModelOfResolver vk ch poly
+        (permutationSetsOfResolver vk poly)
+        (permutationChunksOfResolver vk poly)
+        l0 lLast lBlind) n)
     (hnonempty : 0 < shape.numPermutationSets)
     (hchunks : vk.permutationChunks.length = shape.numPermutationSets)
     (hrotation : vk.omega ^ m =
@@ -673,7 +646,7 @@ theorem ConstraintSatisfaction.resolverPermutationConstraints
     have hdvd := h.permutationExpression p (permutation_step_mem
       sets chunks (C ch.beta) (C ch.gamma) X (C vk.delta) vk.chunkLen
       l0 lLast lBlind hchunk)
-    simpa [constraintModelOfPermutationResolver, constraintModelOfResolver,
+    simpa [constraintModelOfResolver,
       ConstraintPolyModel.permutationConstraints, sets, chunks, chunk,
       permutationSetOfResolver, permSetPolys, permChunkExpression] using hdvd
   · intro c hc
@@ -688,7 +661,7 @@ theorem ConstraintSatisfaction.resolverPermutationConstraints
     have hdvd := h.permutationExpression p (permutation_chain_mem
       sets chunks (C ch.beta) (C ch.gamma) X (C vk.delta) vk.chunkLen
       l0 lLast lBlind hpair)
-    simpa [constraintModelOfPermutationResolver, constraintModelOfResolver,
+    simpa [constraintModelOfResolver,
       ConstraintPolyModel.permutationConstraints, sets, chunks, current, previous,
       permutationSetOfResolver, hrotation,
       ComputablePolynomial.comp_eq, ComputablePolynomial.mul_eq,
@@ -702,7 +675,7 @@ theorem ConstraintSatisfaction.resolverPermutationConstraints
     have hdvd := h.permutationExpression p (permutation_start_mem
       sets chunks (C ch.beta) (C ch.gamma) X (C vk.delta) vk.chunkLen
       l0 lLast lBlind hfirst)
-    simpa [constraintModelOfPermutationResolver, constraintModelOfResolver,
+    simpa [constraintModelOfResolver,
       ConstraintPolyModel.permutationConstraints, sets, chunks, first,
       permutationSetOfResolver] using hdvd
   · let last := permutationSetOfResolver vk poly p
@@ -714,7 +687,7 @@ theorem ConstraintSatisfaction.resolverPermutationConstraints
     have hdvd := h.permutationExpression p (permutation_end_mem
       sets chunks (C ch.beta) (C ch.gamma) X (C vk.delta) vk.chunkLen
       l0 lLast lBlind hlast)
-    simpa [constraintModelOfPermutationResolver, constraintModelOfResolver,
+    simpa [constraintModelOfResolver,
       ConstraintPolyModel.permutationConstraints, sets, chunks, last,
       permutationSetOfResolver] using hdvd
 

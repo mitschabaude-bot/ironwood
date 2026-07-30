@@ -148,7 +148,7 @@ theorem actionChunkCommonIndex
       actionCircuit pp urs chunk hchunk
   have hglobal :
       global <
-        actionCircuit.constraintSystem.permutationColumns.length := by
+        actionCircuit.permutationColumnCount := by
     have h := (flatten ⟨chunk, row, column⟩).2.isLt
     simpa only [global, Zcash.Snark.actionNumPermCols,
       Zcash.Snark.actionPermCols, Keygen.permColsOf,
@@ -173,12 +173,13 @@ theorem actionChunkCommonIndex
   rw [hglobalIndex] at hlocal
   have hflatten :
       vk.permutationChunks.flatten =
-        (actionCircuit.pinnedCS.permutationColumns.map
+        (actionCircuit.permutationColumns.map
           (Zcash.Snark.permutationQueryReference
-            actionCircuit.pinnedCS)).zipIdx := by
+            actionCircuit.adviceQueryLayout
+            actionCircuit.fixedQueryLayout
+            actionCircuit.instanceQueryLayout)).zipIdx := by
     rw [TopLevelCircuit.toVerifierKey_permutationChunks]
-    exact Zcash.Snark.permutationChunksOf_flatten
-      actionCircuit.pinnedCS actionCircuit.constraintSystem.chunkLen
+    exact Zcash.Snark.verifierCS_permutationChunks_flatten actionCircuit
   calc
     ((vk.permutationChunks.getD chunk []).getD
         column ((.advice 0), 0)).2 =
@@ -186,16 +187,17 @@ theorem actionChunkCommonIndex
           global ((.advice 0), 0)).2 := by
       exact congrArg Prod.snd hlocal.symm
     _ =
-        (((actionCircuit.pinnedCS.permutationColumns.map
+        (((actionCircuit.permutationColumns.map
           (Zcash.Snark.permutationQueryReference
-            actionCircuit.pinnedCS)).zipIdx).getD
+            actionCircuit.adviceQueryLayout
+            actionCircuit.fixedQueryLayout
+            actionCircuit.instanceQueryLayout)).zipIdx).getD
           global ((.advice 0), 0)).2 := by
       rw [hflatten]
     _ = global := zipIdx_getD_snd _ (ColumnRef.advice 0) global
       (by
-        rw [List.length_map,
-          TopLevelCircuit.pinnedCS_permutationColumns]
-        exact hglobal)
+        simpa only [List.length_map,
+          TopLevelCircuit.permutationColumnCount] using hglobal)
 
 omit [DecidableEq G] in
 theorem actionPermutationCommitment_ofKeygen
@@ -278,7 +280,7 @@ def actionResolverPermutationCycle_or_relation
     (relation : CanonicalMemberConstraintRelation
       urs hk (actionVk pp urs) instanceCommitment ps ch pU pW a
       batchOpenings memberDecode
-        (blindingFactors_lt pp urs) y hpoly deg)
+        (actionCircuit.toVerifierKey_blindingFactors_lt_n pp urs) y hpoly deg)
     (proofIndex : Fin (actionShape pp).numProofs) :
     {cycle : ResolverPermutationCycle
         (actionVk pp urs) relation.polynomial proofIndex actionActiveRows //

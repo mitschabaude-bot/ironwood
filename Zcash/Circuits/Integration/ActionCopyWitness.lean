@@ -131,8 +131,10 @@ theorem actionReplayPreservesActive
 /-- The replay's flat column count is the circuit-derived permutation-column count. -/
 theorem actionNumPermCols_eq_derived :
     actionNumPermCols =
-      actionCircuit.pinnedCS.permutationColumns.length := by
-  simp [actionNumPermCols, actionPermCols, Keygen.permColsOf]
+      actionCircuit.permutationColumnCount := by
+  simp [actionNumPermCols, actionPermCols, Keygen.permColsOf,
+    TopLevelCircuit.permutationColumnCount,
+    TopLevelCircuit.permutationColumns]
 
 /-- Resolver-backed Action permutation chunks have the compiler-derived width. -/
 theorem actionResolverChunkWidth
@@ -154,19 +156,18 @@ theorem actionResolverChunkWidth
     permutationChunkPairsOfResolver, List.length_map]
   have hi :
       (chunk : ℕ) <
-        (Keygen.permutationChunksOf
-          actionCircuit.pinnedCS actionCircuit.constraintSystem.chunkLen).length := by
-    rw [permutationChunksOf_length]
-    exact chunk.isLt
+        actionCircuit.verifierCS.permutationChunks.length := by
+    rw [verifierCS_permutationChunks_length]
+    simpa only [ActionPermutationDomain.actionShape,
+      ProofParams.mergeDerived_numPermutationSets] using chunk.isLt
   change
-    ((Keygen.permutationChunksOf
-          actionCircuit.pinnedCS actionCircuit.constraintSystem.chunkLen).getD chunk []).length =
-      min actionCircuit.constraintSystem.chunkLen
+    (actionCircuit.verifierCS.permutationChunks.getD chunk []).length =
+      min actionCircuit.chunkLen
         (actionNumPermCols -
           (chunk : ℕ) *
-            actionCircuit.constraintSystem.chunkLen)
+            actionCircuit.chunkLen)
   rw [actionNumPermCols_eq_derived]
-  exact permutationChunksOf_getD_length _ _ chunk hi
+  exact verifierCS_permutationChunks_getD_length actionCircuit chunk hi
 
 /-- The circuit-derived Action permutation chunk width is positive. -/
 theorem actionChunkLen_pos
@@ -186,11 +187,11 @@ theorem actionPermutationChunks_cover
         (ActionPermutationDomain.actionVk pp urs).chunkLen := by
   rw [actionNumPermCols_eq_derived]
   have hcover :=
-    permutationColumns_length_le_chunks_mul
-      actionCircuit.pinnedCS
-      actionCircuit.constraintSystem
-  rw [permutationChunksOf_length] at hcover
-  exact hcover
+    permutationColumns_length_le_chunks_mul actionCircuit
+  rw [verifierCS_permutationChunks_length] at hcover
+  simpa only [ActionPermutationDomain.actionShape,
+    ProofParams.mergeDerived_numPermutationSets,
+    actionCircuit.toVerifierKey_chunkLen] using hcover
 
 /-- Flatten the compiler-derived Action chunks to `(row, global column)`. -/
 def actionChunkFlatten
@@ -413,13 +414,8 @@ theorem actionActiveChunkCell_columnAddress
     have hprefix :
         (vk.permutationChunks.take cell.1).flatten.length =
           (cell.1 : ℕ) * vk.chunkLen := by
-      change
-        ((Keygen.permutationChunksOf
-          actionCircuit.pinnedCS actionCircuit.constraintSystem.chunkLen).take
-            cell.1).flatten.length =
-          (cell.1 : ℕ) *
-            actionCircuit.constraintSystem.chunkLen
-      exact permutationChunksOf_take_flatten_length _ _ cell.1 hchunk
+      exact topLevelPermutationChunks_take_flatten_length
+        actionCircuit pp urs cell.1 hchunk
     rw [hprefix]
     exact hcoordinate
   have hdecoded := decodedChunkAddress_eq_sourceColumn
@@ -552,9 +548,13 @@ theorem actionCopyPairValue_of_resolverPermutation
       Fin (ActionPermutationDomain.actionShape pp).numProofs)
     {n : ℕ}
     (hsat : ConstraintSatisfaction
-      (constraintModelOfPermutationResolver
-        (ActionPermutationDomain.actionVk pp urs)
-        ch poly l0 lLast lBlind) n)
+      (constraintModelOfResolver
+        (ActionPermutationDomain.actionVk pp urs) ch poly
+        (permutationSetsOfResolver
+          (ActionPermutationDomain.actionVk pp urs) poly)
+        (permutationChunksOfResolver
+          (ActionPermutationDomain.actionVk pp urs) poly)
+        l0 lLast lBlind) n)
     (hdom : ResolverPermutationDomain
       (ActionPermutationDomain.actionVk pp urs)
       l0 lLast lBlind n actionActiveRows)

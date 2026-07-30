@@ -41,10 +41,12 @@ private theorem action_domainExponent_eq : actionCircuit.domainExponent = 11 := 
 
 private theorem vk_domain_eq :
     (vk.omega, vk.n) =
-      (omegaOf actionCircuit.domainExponent, 2 ^ actionCircuit.domainExponent) := by
-  have h := congrArg (fun key => (key.omega, key.n)) Keygen.vk_eq_derived
-  simpa only [Keygen.derivedActionVk, Halo2.TopLevelCircuit.verifierKeyAt,
-    VerifyingKey.ofOperations] using h
+      (actionCircuit.omega, actionCircuit.n) := by
+  have hscalars :=
+    congrArg (fun bundle => bundle.2.2.2.1) Keygen.certificate
+  apply Prod.ext
+  · exact (congrArg (fun scalars => scalars.1) hscalars).symm
+  · exact (congrArg (fun scalars => scalars.2.1) hscalars).symm
 
 /-- The captured advice query layout covers the shape's advice query count. -/
 theorem vk_advice_layout_length : shape.numAdviceQueries ≤ vk.adviceQueryLayout.length := by
@@ -67,6 +69,7 @@ theorem vk_omega_order : vk.omega ^ vk.n = 1 := by
   have hdomain := vk_domain_eq
   simp only [Prod.mk.injEq] at hdomain
   rw [hdomain.1, hdomain.2]
+  rw [Halo2.TopLevelCircuit.n_eq_two_pow_domainExponent]
   exact (omegaOf_isPrimitiveRoot actionCircuit.domainExponent (by
     rw [action_domainExponent_eq]
     norm_num)).pow_eq_one

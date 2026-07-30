@@ -74,7 +74,7 @@ flowchart TD
   KS --->|"<a target='_blank' href='https://github.com/zcash/ironwood/blob/main/Zcash/Snark/Soundness/AGM/Capstone.lean'>AGM heuristic +<br/>independent<br/>hash-to-curve bases</a>"| DL
   KS -->|"<a target='_blank' href='https://github.com/zcash/ironwood/tree/main/Zcash/Snark/Soundness/Forking'>Fiat–Shamir<br/>heuristic</a>"| ROM
   MC --> SDLR
-  CUS --->|"<a target='_blank' href='https://github.com/zcash/ironwood/blob/main/Zcash/Security/Common/Birthday.lean'>birthday counting<br/>q(q-1)/r,<br/>no assumption</a>"| ROM
+  CUS --->|"<a target='_blank' href='https://github.com/zcash/ironwood/blob/main/Zcash/Security/Common/Birthday.lean'>birthday counting<br/>q(q-1)/|F|,<br/>no assumption</a>"| ROM
   NFC -->|"<a target='_blank' href='https://github.com/zcash/ironwood/blob/main/Zcash/Security/Ledger/Nullifier.lean'>distinct-note openings<br/>compute</a>"| SDLR
   SAF --> RDSA["RedDSA unforgeability,<br/>±-randomized keys"]
   RDSA -->|"re-rand reduction<br/><a target='_blank' href='https://eprint.iacr.org/2015/395'>[FKMSSS2016]</a> +<br/>forking extraction"| DL
@@ -193,7 +193,7 @@ circuit soundness proof.
 <div class="grp">Key binding — ZIP 2005 theorem (ROM)</div>
 <div class="g"><div class="g-head"><span class="term">key binding</span><span class="anchor">Security.KeyBinding.KB</span></div><div class="def">A verifying Recovery-Statement witness pins its key components — <code>ak</code> (up to y-sign), <code>nk</code>, and the <code>qk</code>/<code>sk</code> branch with its key — to <code>ivk</code>, unless a break is exhibited (<a href="https://zips.z.cash/zip-2005#thm-key-binding-rom">ZIP 2005 key-binding theorem</a>). Factors as <code>KB = KBOpening ∧ KBDerivation</code>: the <code>Commit^ivk</code> opening and the derivation constraints.</div></div>
 <div class="g"><div class="g-head"><span class="term">commit_scalar_pm</span><span class="anchor">KeyBinding.commit_scalar_pm · OpeningBreak</span></div><div class="def">Algebraic core: two openings of the same <code>Commitivk</code> value force their Pedersen scalars equal or negated. An <code>OpeningBreak</code> (two valid openings differing in the opening data) is the break structure the games layer produces.</div></div>
-<div class="g"><div class="g-head"><span class="term">reduces to an RO collision</span><span class="anchor">CollisionUpToSign.ofBreak · Birthday.birthday_closed_form</span></div><div class="def">The reduction computes a <code>±</code>-collision of the <code>rivk</code>-derivation random oracle at distinct derivation queries from a break (Layer B). Producing that collision within <code>q</code> queries is bounded by the birthday bound <code>ε_kb ≤ q(q-1)/r</code> (Layer C).</div></div>
+<div class="g"><div class="g-head"><span class="term">reduces to an RO collision</span><span class="anchor">CollisionUpToSign.ofBreak · Birthday.birthday_closed_form</span></div><div class="def">The reduction computes a <code>±</code>-collision of the <code>rivk</code>-derivation random oracle at distinct derivation queries from a break (Layer B). Producing that collision within <code>q</code> queries is bounded by the birthday bound <code>ε_kb ≤ q(q-1)/|RIVK|</code>, which is <code>q(q-1)/r_ℙ</code> at the intended Pallas instantiation (Layer C).</div></div>
 </section>
 
 <section>

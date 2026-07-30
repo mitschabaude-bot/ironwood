@@ -1,6 +1,7 @@
 import Zcash.Circuits.Integration.PermutationCompiler
 import Zcash.Circuits.Action.TopLevel
 import Zcash.Arithmetic.Domain
+import Mathlib.Util.AssertNoSorry
 
 /-!
 # Action permutation-column compiler bounds

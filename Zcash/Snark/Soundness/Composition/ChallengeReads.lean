@@ -153,7 +153,7 @@ theorem fixedQueryFeedOfResolver_congr
 /-- The advice query feed reads only the proof's advice columns. -/
 theorem adviceQueryFeedOfResolver_congr
     (vk : VerifyingKey shape Fp G) {poly₁ poly₂ : CommitmentId → Polynomial Fp}
-    (p : Fin shape.numProofs)
+    (p : ℕ)
     (h : ∀ id, id.isColumnInput → poly₁ id = poly₂ id) :
     adviceQueryFeedOfResolver vk poly₁ p = adviceQueryFeedOfResolver vk poly₂ p := by
   unfold adviceQueryFeedOfResolver
@@ -163,7 +163,7 @@ theorem adviceQueryFeedOfResolver_congr
 /-- The instance query feed reads only the proof's instance columns. -/
 theorem instanceQueryFeedOfResolver_congr
     (vk : VerifyingKey shape Fp G) {poly₁ poly₂ : CommitmentId → Polynomial Fp}
-    (p : Fin shape.numProofs)
+    (p : ℕ)
     (h : ∀ id, id.isColumnInput → poly₁ id = poly₂ id) :
     instanceQueryFeedOfResolver vk poly₁ p = instanceQueryFeedOfResolver vk poly₂ p := by
   unfold instanceQueryFeedOfResolver
@@ -172,9 +172,9 @@ theorem instanceQueryFeedOfResolver_congr
 
 /-- The compressed input polynomial reads only the query columns. -/
 theorem lookupInputPolyOfResolver_congr
-    (vk : VerifyingKey shape Fp G) {ch₁ ch₂ : Challenges shape.k Fp}
+    {k : ℕ} (vk : VerifyingKey shape Fp G) {ch₁ ch₂ : Challenges k Fp}
     {poly₁ poly₂ : CommitmentId → Polynomial Fp}
-    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (htheta : ch₁.theta = ch₂.theta)
+    (p : ℕ) (l : Fin shape.numLookups) (htheta : ch₁.theta = ch₂.theta)
     (h : ∀ id, id.isColumnInput → poly₁ id = poly₂ id) :
     lookupInputPolyOfResolver vk ch₁ poly₁ p l =
       lookupInputPolyOfResolver vk ch₂ poly₂ p l := by
@@ -184,9 +184,9 @@ theorem lookupInputPolyOfResolver_congr
 
 /-- The compressed table polynomial reads only the query columns. -/
 theorem lookupTablePolyOfResolver_congr
-    (vk : VerifyingKey shape Fp G) {ch₁ ch₂ : Challenges shape.k Fp}
+    {k : ℕ} (vk : VerifyingKey shape Fp G) {ch₁ ch₂ : Challenges k Fp}
     {poly₁ poly₂ : CommitmentId → Polynomial Fp}
-    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (htheta : ch₁.theta = ch₂.theta)
+    (p : ℕ) (l : Fin shape.numLookups) (htheta : ch₁.theta = ch₂.theta)
     (h : ∀ id, id.isColumnInput → poly₁ id = poly₂ id) :
     lookupTablePolyOfResolver vk ch₁ poly₁ p l =
       lookupTablePolyOfResolver vk ch₂ poly₂ p l := by
@@ -196,9 +196,9 @@ theorem lookupTablePolyOfResolver_congr
 
 /-- **The lookup product difference reads only the lookup input slots.** -/
 theorem resolverLookupProductDifference_congr
-    (vk : VerifyingKey shape Fp G) {ch₁ ch₂ : Challenges shape.k Fp}
+    {k : ℕ} (vk : VerifyingKey shape Fp G) {ch₁ ch₂ : Challenges k Fp}
     {poly₁ poly₂ : CommitmentId → Polynomial Fp}
-    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u : ℕ)
+    (p : ℕ) (l : Fin shape.numLookups) (u : ℕ)
     (htheta : ch₁.theta = ch₂.theta)
     (h : ∀ id, id.isLookupInput → poly₁ id = poly₂ id) :
     resolverLookupProductDifference vk ch₁ poly₁ p l u =
@@ -211,9 +211,9 @@ theorem resolverLookupProductDifference_congr
 /-- The per-lookup `β` exclusion reads only the lookup input slots, and of the challenge
 record only `θ`. -/
 theorem resolverLookupBetaBadSet_congr
-    (vk : VerifyingKey shape Fp G) {ch₁ ch₂ : Challenges shape.k Fp}
+    {k : ℕ} (vk : VerifyingKey shape Fp G) {ch₁ ch₂ : Challenges k Fp}
     {poly₁ poly₂ : CommitmentId → Polynomial Fp}
-    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u : ℕ)
+    (p : ℕ) (l : Fin shape.numLookups) (u : ℕ)
     (htheta : ch₁.theta = ch₂.theta)
     (h : ∀ id, id.isLookupInput → poly₁ id = poly₂ id) :
     resolverLookupBetaBadSet vk ch₁ poly₁ p l u =
@@ -225,9 +225,9 @@ theorem resolverLookupBetaBadSet_congr
 /-- The per-lookup `γ` exclusion reads only the lookup input slots, and of the challenge
 record only `θ` and `β`. -/
 theorem resolverLookupGammaBadSet_congr
-    (vk : VerifyingKey shape Fp G) {ch₁ ch₂ : Challenges shape.k Fp}
+    {k : ℕ} (vk : VerifyingKey shape Fp G) {ch₁ ch₂ : Challenges k Fp}
     {poly₁ poly₂ : CommitmentId → Polynomial Fp}
-    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u : ℕ)
+    (p : ℕ) (l : Fin shape.numLookups) (u : ℕ)
     (htheta : ch₁.theta = ch₂.theta) (hbeta : ch₁.beta = ch₂.beta)
     (h : ∀ id, id.isLookupInput → poly₁ id = poly₂ id) :
     resolverLookupGammaBadSet vk ch₁ poly₁ p l u =
@@ -238,24 +238,26 @@ theorem resolverLookupGammaBadSet_congr
 
 /-- **The bundle-wide lookup `β` exclusion reads only the lookup input slots.** -/
 theorem allResolverLookupBetaBadSet_congr
-    (vk : VerifyingKey shape Fp G) {ch₁ ch₂ : Challenges shape.k Fp}
+    {k : ℕ} (numProofs : ℕ) (vk : VerifyingKey shape Fp G)
+    {ch₁ ch₂ : Challenges k Fp}
     {poly₁ poly₂ : CommitmentId → Polynomial Fp} (u : ℕ)
     (htheta : ch₁.theta = ch₂.theta)
     (h : ∀ id, id.isLookupInput → poly₁ id = poly₂ id) :
-    allResolverLookupBetaBadSet vk ch₁ poly₁ u =
-      allResolverLookupBetaBadSet vk ch₂ poly₂ u := by
+    allResolverLookupBetaBadSet numProofs vk ch₁ poly₁ u =
+      allResolverLookupBetaBadSet numProofs vk ch₂ poly₂ u := by
   unfold allResolverLookupBetaBadSet
   exact Finset.biUnion_congr rfl
     (fun q _ => resolverLookupBetaBadSet_congr vk q.1 q.2 u htheta h)
 
 /-- **The bundle-wide lookup `γ` exclusion reads only the lookup input slots.** -/
 theorem allResolverLookupGammaBadSet_congr
-    (vk : VerifyingKey shape Fp G) {ch₁ ch₂ : Challenges shape.k Fp}
+    {k : ℕ} (numProofs : ℕ) (vk : VerifyingKey shape Fp G)
+    {ch₁ ch₂ : Challenges k Fp}
     {poly₁ poly₂ : CommitmentId → Polynomial Fp} (u : ℕ)
     (htheta : ch₁.theta = ch₂.theta) (hbeta : ch₁.beta = ch₂.beta)
     (h : ∀ id, id.isLookupInput → poly₁ id = poly₂ id) :
-    allResolverLookupGammaBadSet vk ch₁ poly₁ u =
-      allResolverLookupGammaBadSet vk ch₂ poly₂ u := by
+    allResolverLookupGammaBadSet numProofs vk ch₁ poly₁ u =
+      allResolverLookupGammaBadSet numProofs vk ch₂ poly₂ u := by
   unfold allResolverLookupGammaBadSet
   exact Finset.biUnion_congr rfl
     (fun q _ => resolverLookupGammaBadSet_congr vk q.1 q.2 u htheta hbeta h)
@@ -265,7 +267,7 @@ theorem allResolverLookupGammaBadSet_congr
 /-- The row environment reads only the proof's query columns. -/
 theorem resolverEnvironment_congr
     (vk : VerifyingKey shape Fp G) {poly₁ poly₂ : CommitmentId → Polynomial Fp}
-    (p : Fin shape.numProofs) (usableRows : ℕ)
+    (p : ℕ) (usableRows : ℕ)
     (h : ∀ id, id.isColumnInput → poly₁ id = poly₂ id) :
     resolverEnvironment vk poly₁ p usableRows = resolverEnvironment vk poly₂ p usableRows := by
   unfold resolverEnvironment
@@ -279,31 +281,31 @@ theorem resolverEnvironment_congr
 /-- **The `θ` budget is a length count.**  Row count times input arity per activation — the
 polynomial map and the URS never enter, so the per-state `θ` epsilon is one number per
 circuit. -/
-theorem TopLevelLookupCoherence.topLevelLookupThetaBudget_eq
+theorem TopLevelLookup.thetaBudget_eq
     {G' : Type} [AddCommGroup G'] [Inhabited G']
     {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
     (top : Halo2.TopLevelCircuit Fp Config PublicInput)
     (pp : Keygen.ProofParams) (urs : URS G')
     (poly : CommitmentId → Polynomial Fp) :
-    TopLevelLookupCoherence.topLevelLookupThetaBudget top pp urs poly =
-      ∑ index : TopLevelLookupCoherence.TopLevelLookupActivationIndex top pp,
+    TopLevelLookup.thetaBudget top pp urs poly =
+      ∑ index : TopLevelLookup.ActivationIndex top pp,
         top.usableRowsAt top.domainExponent *
           ((operationEnabledLookups top.operations 0).get index.2).argument.inputs.length := by
-  unfold TopLevelLookupCoherence.topLevelLookupThetaBudget
+  unfold TopLevelLookup.thetaBudget
   refine Finset.sum_congr rfl fun index _ => ?_
   exact congrArg (top.usableRowsAt top.domainExponent * ·) (List.length_map _)
 
 /-- **The top-level `θ` exclusion reads only the query columns.** -/
-theorem TopLevelLookupCoherence.allTopLevelLookupThetaBadSet_congr
+theorem TopLevelLookup.thetaBadSet_congr
     {G' : Type} [AddCommGroup G'] [Inhabited G']
     {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
     (top : Halo2.TopLevelCircuit Fp Config PublicInput)
     (pp : Keygen.ProofParams) (urs : URS G')
     {poly₁ poly₂ : CommitmentId → Polynomial Fp}
     (h : ∀ id, id.isColumnInput → poly₁ id = poly₂ id) :
-    TopLevelLookupCoherence.allTopLevelLookupThetaBadSet top pp urs poly₁ =
-      TopLevelLookupCoherence.allTopLevelLookupThetaBadSet top pp urs poly₂ := by
-  unfold TopLevelLookupCoherence.allTopLevelLookupThetaBadSet
+    TopLevelLookup.thetaBadSet top pp urs poly₁ =
+      TopLevelLookup.thetaBadSet top pp urs poly₂ := by
+  unfold TopLevelLookup.thetaBadSet
   exact Finset.biUnion_congr rfl fun index _ =>
     congrArg (fun env => EnabledLookup.thetaBadSet top.placement env
         ((operationEnabledLookups top.operations 0).get index.2))

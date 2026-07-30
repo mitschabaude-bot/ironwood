@@ -3,9 +3,8 @@ import Zcash.Snark.Soundness.AGM.AdaptiveRootSurfaces
 /-!
 # Pricing deployed roots for a bare adaptive online AGM
 
-This module instantiates the generic annotation-aware squeeze theorem with the six deployed
-multiopen/shift surfaces.  Every queried branch is reconstructed from the first query annotation;
-the fresh fallback is reconstructed from the final online proof data.
+The six deployed root surfaces use first-query annotations, with final-proof data only for fresh
+fallbacks.
 -/
 
 namespace Zcash.Snark

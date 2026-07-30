@@ -4,15 +4,9 @@ import Zcash.Snark.Soundness.Composition.PrefixedSqueeze
 /-!
 # Semantic challenge surfaces for arbitrary adaptive online-AGM adversaries
 
-The phase-based route proves that a final proof prefix is stable when its own challenge is
-reprogrammed.  An arbitrary malicious random-oracle adversary need not have that shape.  Instead,
-`firstLabelOrFallbackBad_measure_le` prices the first actual query of the prefix, or the verifier's
-fresh completion query when the adversary never asked it.
-
-The semantic bad set at pre-IPA index `n` depends only on the queried transcript and answers at
-strictly shorter prefixes.  Consequently it is blind at the index-`n` point without any phase or
-cut object.  This file supplies the generic table-level bound used by theta, beta, gamma, y, and
-the constraint-x challenge.
+These bounds use the first annotated query of a prefix, or a fresh fallback if it was never
+queried. Each bad set depends only on the prefix and earlier answers, so no execution cut is
+required.
 -/
 
 namespace Zcash.Snark
@@ -226,10 +220,7 @@ theorem adaptivePrefixSurface_table_le
   rw [hevent]
   exact hbound
 
-/-- **Arbitrary-adversary, annotation-aware squeeze bound.**  The queried branch uses the first
-online-AGM annotation at the verifier-selected prefix; the unqueried branch uses a final-output
-fallback whose own set is decoded only from the prefix and earlier answers.  Neither arbitrary
-query order nor adaptive continuation after the query requires an execution cut. -/
+/-- Bounds a first annotated prefix query, or a prefix-local fallback when unqueried. -/
 theorem adaptiveLabeledPrefixSurface_table_le
     (family : ComputedAdaptiveOnlineAGMFSFamily shape)
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG) (n : Fin 11)
@@ -269,11 +260,8 @@ theorem adaptiveLabeledPrefixSurface_table_le
     exact adaptivePrefixBad_measure_le family.init n fallbackF hfallback
   · exact family.queryBound basis
 
-/-- **Relation-safe arbitrary-adversary prefix bound.**  This is the reusable endpoint for a
-bad set defined from the adversary's final output.  A caller supplies an executable relation
-finder covering every mismatch between that final output and the first query-time AGM
-annotation.  On the `finder = none` branch, the event is charged by the annotation-aware squeeze
-above; no stopped computation, freshness proof, or phase witness is exposed. -/
+/-- Bounds a final-output bad set when an executable finder covers query-time representation
+mismatches. -/
 theorem adaptiveFinalPrefixBadWithoutRelation_table_le
     {Relation : Type*}
     (family : ComputedAdaptiveOnlineAGMFSFamily shape)

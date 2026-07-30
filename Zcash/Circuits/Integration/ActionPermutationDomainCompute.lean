@@ -1,6 +1,6 @@
-import Zcash.Snark.Keygen.Derivation
 import Zcash.Snark.Soundness.Canonical.PermutationInstantiation
 import Zcash.Circuits.Integration.ActionGateCoherenceCompute
+import Zcash.Circuits.Integration.PermutationCompiler
 
 /-!
 # Closed computations for the Action permutation layout
@@ -23,56 +23,51 @@ theorem domainExponent_lt :
 
 def ColumnRefCoherent : ColumnRef → Prop
   | .advice i =>
-      i < actionCircuit.pinnedCS.adviceQueryLayout.length ∧
-        (actionCircuit.pinnedCS.adviceQueryLayout.getD i (0, 0)).2 = 0
+      i < actionCircuit.adviceQueryLayout.length ∧
+        (actionCircuit.adviceQueryLayout.getD i (0, 0)).2 = 0
   | .fixed i =>
-      i < actionCircuit.pinnedCS.fixedQueryLayout.length ∧
-        (actionCircuit.pinnedCS.fixedQueryLayout.getD i (0, 0)).2 = 0
+      i < actionCircuit.fixedQueryLayout.length ∧
+        (actionCircuit.fixedQueryLayout.getD i (0, 0)).2 = 0
   | .instance i =>
-      i < actionCircuit.pinnedCS.instanceQueryLayout.length ∧
-        (actionCircuit.pinnedCS.instanceQueryLayout.getD i (0, 0)).2 = 0
+      i < actionCircuit.instanceQueryLayout.length ∧
+        (actionCircuit.instanceQueryLayout.getD i (0, 0)).2 = 0
 
 /-- Executable form of one reference's L-classified routing obligations. -/
 def routingCoherentBool (ref : ColumnRef × ℕ) : Bool :=
   match ref.1 with
   | .advice i =>
-      decide (i < actionCircuit.pinnedCS.adviceQueryLayout.length) &&
+      decide (i < actionCircuit.adviceQueryLayout.length) &&
       decide
-        ((actionCircuit.pinnedCS.adviceQueryLayout.getD
+        ((actionCircuit.adviceQueryLayout.getD
           i (0, 0)).2 = 0) &&
       decide
-        (ref.2 <
-          actionCircuit.constraintSystem.permutationColumns.length)
+        (ref.2 < actionCircuit.permutationColumnCount)
   | .fixed i =>
-      decide (i < actionCircuit.pinnedCS.fixedQueryLayout.length) &&
+      decide (i < actionCircuit.fixedQueryLayout.length) &&
       decide
-        ((actionCircuit.pinnedCS.fixedQueryLayout.getD
+        ((actionCircuit.fixedQueryLayout.getD
           i (0, 0)).2 = 0) &&
       decide
-        (ref.2 <
-          actionCircuit.constraintSystem.permutationColumns.length)
+        (ref.2 < actionCircuit.permutationColumnCount)
   | .instance i =>
-      decide (i < actionCircuit.pinnedCS.instanceQueryLayout.length) &&
+      decide (i < actionCircuit.instanceQueryLayout.length) &&
       decide
-        ((actionCircuit.pinnedCS.instanceQueryLayout.getD
+        ((actionCircuit.instanceQueryLayout.getD
           i (0, 0)).2 = 0) &&
       decide
-        (ref.2 <
-          actionCircuit.constraintSystem.permutationColumns.length)
+        (ref.2 < actionCircuit.permutationColumnCount)
 
 theorem routingCoherentBool_eq_true_iff (ref : ColumnRef × ℕ) :
     routingCoherentBool ref = true ↔
       ColumnRefCoherent ref.1 ∧
-        ref.2 <
-          actionCircuit.constraintSystem.permutationColumns.length := by
+        ref.2 < actionCircuit.permutationColumnCount := by
   rcases ref with ⟨ref, common⟩
   cases ref <;> simp [routingCoherentBool, ColumnRefCoherent]
 
 /-- Compiled Action references that fail either query routing or global-index
 bounds. This remains the L-classified routing diagnostic. -/
 def routingFailures : List (ColumnRef × ℕ) :=
-  (Keygen.permutationChunksOf
-          actionCircuit.pinnedCS actionCircuit.constraintSystem.chunkLen).flatten.filter fun ref =>
+  actionCircuit.verifierCS.permutationChunks.flatten.filter fun ref =>
       !routingCoherentBool ref
 
 theorem routingFailures_eq_nil : routingFailures = [] := by
@@ -82,12 +77,10 @@ theorem routingFailures_eq_nil : routingFailures = [] := by
 every accompanying common-permutation index is in range. -/
 theorem routingCoherent :
     ∀ chunk ∈
-        Keygen.permutationChunksOf
-          actionCircuit.pinnedCS actionCircuit.constraintSystem.chunkLen,
+        actionCircuit.verifierCS.permutationChunks,
       ∀ ref ∈ chunk,
         ColumnRefCoherent ref.1 ∧
-          ref.2 <
-            actionCircuit.constraintSystem.permutationColumns.length := by
+          ref.2 < actionCircuit.permutationColumnCount := by
   intro chunk hchunk ref href
   by_contra hfailure
   have hmem :

@@ -126,9 +126,8 @@ probability.
 
 Concrete Orchard captures that exercise the assembly end-to-end and make the Rust/Lean boundary
 less silent. This subtree is the `FixtureCheck` lake target, kept out of `lake build Zcash` (the
-captures are large, generated, and slow) but built by CI; the target's glob also names
-`Soundness.Deployed.ActionVesta`, which extends the same instance-level lane to the verifying-key
-commitment certificate chain. `MaxShape` specializes the verifier shape to the captured column and
+captures are large, generated, and slow) but built by CI. `MaxShape` specializes the verifier shape
+to the captured column and
 query dimensions while leaving the action count free, and `MaxShapeBounds` and
 `StraightLineMaxShapeBounds` evaluate the composite bounds at that shape and at the consensus
 maximum; `ScheduleMarker` re-encodes captured Fiat–Shamir schedules into the model's marker form;
@@ -166,7 +165,10 @@ multiset identity), `Permutation`, `PermutationConstruction`, `PermutationRows`,
 `CommitFold`. `InstanceBinding` closes the public-instance gap: a decoded instance column is the
 polynomial halo2 committed from its `instances` argument, or a `(g, U, W)` relation is computed.
 `ZeroData` supplies the zero-data multiopen keystone the constant prover families
-are built on. `Vesta` pins the abstract group to the actual Vesta curve. `TopLevelTerminal` and `TopLevelVesta` connect verifier acceptance to the Spec of an arbitrary top-level circuit, using that circuit's derived verifier key. `ActionVesta` specializes them to our concrete Lean model of the Action circuit.
+are built on. `Vesta` pins the abstract group to the actual Vesta curve.
+`TopLevelTerminal` connects canonical constraint satisfaction to the Spec of an
+arbitrary top-level circuit using that circuit's derived verifier key and public
+inputs.
 
 Six subtrees carry the heavier machinery:
 
@@ -201,10 +203,10 @@ Six subtrees carry the heavier machinery:
   instance commitments to the extractor's monomial coefficient vectors (`InstanceCommitment`), and
   instantiates the permutation and lookup arguments at routed decoded polynomials
   (`PermutationInstantiation`, `PermutationSemantics`, `LookupInstantiation`, `LookupSemantics`,
-  `LookupRows`), ending at `Terminal` and its Vesta adapter.
+  `LookupRows`), ending at `Terminal`.
 - **`Composition/`** — joining the two halves the architecture keeps apart and bounding the
   probability loss the join costs. `Bridge`
-  identifies the algebraic extraction's aggregate witness with the deployed decoded capstone's
+  identifies the algebraic extraction's aggregate witness with the deployed decoded terminal's
   opened commitment.
   `DeployedAcceptance` and `DeployedRuntime` name the deployed decision on one oracle table;
   `DeployedRootContainment` and
@@ -226,7 +228,7 @@ Six subtrees carry the heavier machinery:
   (`Ipa`, `IpaPeel`), unfolds the flattened deployed MSM into the recursive generator fold
   (`Fold`), shows deployed acceptance implies halo2's explicit IPA verifier equation
   (`Verification`), reduces binding over the augmented generators to discrete-log-relation
-  hardness (`Binding`), and states the Action capstone at the captured artifacts (`ActionVesta`).
+  hardness (`Binding`).
 - **`Forking/`** — the reusable Fiat–Shamir random-oracle kernel: random-oracle primitives
   (`Oracle`), the deployed squeeze ordering (`Ordering`) and the reprogramming lemmas that say
   changing the oracle at one squeeze prefix replaces exactly that challenge (`Rewind`), the
@@ -249,7 +251,7 @@ Six subtrees carry the heavier machinery:
   rather than assuming it; `Compat` is the MSM evaluation spine; `RPoly` supplies the interpolation
   core (Mathlib's `Lagrange.interpolate`, plus the bridge to the deployed `foldl`); `Claimed`,
   `Opened`, `ValueCheck`, `ValueCheckDeployed`, and `NodeBinding` bind each decoded aggregate
-  column to its claimed evaluation; and `ConstraintResolver`, `CanonicalSelection` and
+  column to its claimed evaluation; and `ConstraintResolver` and
   `CanonicalRelation` route the decoded members into the canonical constraint model, which is the
   semantic handoff to the formal circuit.
 

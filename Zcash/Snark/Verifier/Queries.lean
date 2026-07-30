@@ -1,4 +1,4 @@
-import Mathlib
+import Mathlib.Tactic
 import Zcash.Snark.Verifier.Checks
 import Zcash.Snark.Core.ProofString
 

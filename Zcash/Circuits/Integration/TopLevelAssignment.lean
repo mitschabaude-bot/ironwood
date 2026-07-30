@@ -64,29 +64,29 @@ variable
 /-- The circuit-derived domain generator has exact order `2^k`. -/
 theorem domainRoot
     (hbound : top.domainExponent < 33) :
-    Zcash.Arithmetic.omegaOf top.domainExponent ^
-      (2 ^ top.domainExponent) = 1 := by
+    top.omega ^
+      top.n = 1 := by
   simpa using Zcash.Arithmetic.omegaOf_domain
     top.domainExponent 1 (by omega)
 
 /-- Circuit-derived domain row names are injective. -/
 theorem domainRowsInjective
     (hbound : top.domainExponent < 33) :
-    Function.Injective fun row : Fin (2 ^ top.domainExponent) =>
-      Zcash.Arithmetic.omegaOf top.domainExponent ^ (row : ℕ) :=
+    Function.Injective fun row : Fin top.n =>
+      top.omega ^ (row : ℕ) :=
   Zcash.Arithmetic.omegaOf_powers_injective
     top.domainExponent (by omega)
 
 /-- The circuit-derived domain size is nonzero in the verifier scalar field. -/
 theorem domainSizeCastNeZero
     (hbound : top.domainExponent < 33) :
-    (((2 ^ top.domainExponent : ℕ) : Fp)) ≠ 0 :=
+    (((top.n : ℕ) : Fp)) ≠ 0 :=
   Zcash.Arithmetic.domainSize_cast_ne_zero
     top.domainExponent (by omega)
 
 /-- A fitting top-level circuit has fewer blinding rows than domain rows. -/
 theorem blindingFactors_lt_domainSize
-    : top.blindingFactors < 2 ^ top.domainExponent := by
+    : top.blindingFactors < top.n := by
   have h := top.blindingFactors_add_three_le_domainSize
   omega
 
@@ -94,7 +94,7 @@ theorem blindingFactors_lt_domainSize
 The compiler-derived domain has room beyond the blinding rows and final unusable row.
 -/
 theorem blindingFactors_succ_lt_domainSize
-    : top.blindingFactors + 1 < 2 ^ top.domainExponent := by
+    : top.blindingFactors + 1 < top.n := by
   have h := top.blindingFactors_add_three_le_domainSize
   omega
 
@@ -108,7 +108,7 @@ def proofAssignment
     (assignment : TopLevelAssignment top numProofs proofIndex) :
     ProofAssignment Fp :=
   resolverAssignment
-    (Zcash.Arithmetic.omegaOf top.domainExponent)
+    (top.omega)
     assignment.polynomial proofIndex
 
 /-- The circuit-owned semantic environment for this bundle member. -/
@@ -125,12 +125,10 @@ Unlike advice and instance columns, fixed columns are not part of
 verifier-side polynomial values with the circuit-owned keygen data.
 -/
 def FixedColumnEncoding
-    {G : Type} [AddCommGroup G] [Inhabited G]
-    (assignment : TopLevelAssignment top numProofs proofIndex)
-    (pp : Keygen.ProofParams) (urs : URS G) : Prop :=
+    (assignment : TopLevelAssignment top numProofs proofIndex) : Prop :=
   ∀ column row,
     (assignment.polynomial (.fixedCol column.index)).eval
-        ((top.toVerifierKey pp urs).omega ^ row) =
+        (top.omega ^ row) =
       top.fixedValue column row
 
 /--
@@ -140,10 +138,10 @@ circuit-owned environment built from the corresponding proof assignment.
 theorem resolverEnvironment_eq_environment
     {G : Type} [AddCommGroup G] [Inhabited G]
     (pp : Keygen.ProofParams) (urs : URS G)
-    {proofIndex : Fin (pp.mergeDerived top).numProofs}
+    {proofIndex : Fin pp.numProofs}
     (assignment :
-      TopLevelAssignment top (pp.mergeDerived top).numProofs proofIndex)
-    (hfixed : assignment.FixedColumnEncoding pp urs) :
+      TopLevelAssignment top pp.numProofs proofIndex)
+    (hfixed : assignment.FixedColumnEncoding) :
     resolverEnvironment
         (top.toVerifierKey pp urs) assignment.polynomial proofIndex
         (top.usableRowsAt top.domainExponent) =
@@ -176,7 +174,7 @@ theorem resolverEnvironment_eq_environment
     assignment.environment.advice column row =
       (assignment.polynomial
         (.adviceCol proofIndex column.index)).eval
-          (Zcash.Arithmetic.omegaOf top.domainExponent ^ row) :=
+          (top.omega ^ row) :=
   rfl
 
 @[simp] theorem environment_instance
@@ -185,7 +183,7 @@ theorem resolverEnvironment_eq_environment
     assignment.environment.inst column row =
       (assignment.polynomial
         (.instanceCol proofIndex column.index)).eval
-          (Zcash.Arithmetic.omegaOf top.domainExponent ^ row) :=
+          (top.omega ^ row) :=
   rfl
 
 /--
@@ -227,26 +225,26 @@ theorem publicInputEncoding_of_rowPolynomials
       assignment.polynomial
           (.instanceCol proofIndex
             (top.publicInputLayout.cells index).1.index) =
-        instanceRowPolynomial (2 ^ top.domainExponent)
-          (Zcash.Arithmetic.omegaOf top.domainExponent)
+        instanceRowPolynomial top.n
+          (top.omega)
           (rows (top.publicInputLayout.cells index).1.index))
     (hencoded : ∀ index,
       (rows (top.publicInputLayout.cells index).1.index).getD
           (top.publicInputLayout.cells index).2 0 =
         (toElements input)[index])
     (hinjective : Function.Injective
-      fun row : Fin (2 ^ top.domainExponent) =>
-        Zcash.Arithmetic.omegaOf top.domainExponent ^ (row : ℕ)) :
+      fun row : Fin top.n =>
+        top.omega ^ (row : ℕ)) :
     assignment.PublicInputEncoding input := by
   intro index
   let cell := top.publicInputLayout.cells index
-  let domainRow : Fin (2 ^ top.domainExponent) :=
+  let domainRow : Fin top.n :=
     ⟨cell.2, by
       have hrow :=
         top.publicInputLayout_cells_snd_lt_usableRowsAt_domainExponent index
       have hrow' :
           cell.2 <
-            2 ^ top.domainExponent - top.blindingFactors - 1 := by
+            top.n - top.blindingFactors - 1 := by
         simpa only [cell] using hrow
       have hfit := top.blindingFactors_add_three_le_domainSize
       omega⟩
@@ -254,10 +252,10 @@ theorem publicInputEncoding_of_rowPolynomials
   have hrow := instanceRowPolynomial_eval
     (values := rows cell.1.index) hinjective domainRow
   rw [show
-    (instanceRowPolynomial (2 ^ top.domainExponent)
-      (Zcash.Arithmetic.omegaOf top.domainExponent)
+    (instanceRowPolynomial top.n
+      (top.omega)
       (rows cell.1.index)).eval
-        (Zcash.Arithmetic.omegaOf top.domainExponent ^ (cell.2 : ℤ)) =
+        (top.omega ^ (cell.2 : ℤ)) =
       (rows cell.1.index).getD cell.2 0 by
     simpa only [cell, domainRow] using hrow]
   exact hencoded index
@@ -273,13 +271,13 @@ theorem publicInputEncoding_of_publicInputRowPolynomials
       assignment.polynomial
           (.instanceCol proofIndex
             (top.publicInputLayout.cells index).1.index) =
-        instanceRowPolynomial (2 ^ top.domainExponent)
-          (Zcash.Arithmetic.omegaOf top.domainExponent)
+        instanceRowPolynomial top.n
+          (top.omega)
           (top.publicInputRows input
             (top.publicInputLayout.cells index).1))
     (hinjective : Function.Injective
-      fun row : Fin (2 ^ top.domainExponent) =>
-        Zcash.Arithmetic.omegaOf top.domainExponent ^ (row : ℕ)) :
+      fun row : Fin top.n =>
+        top.omega ^ (row : ℕ)) :
     assignment.PublicInputEncoding input := by
   apply assignment.publicInputEncoding_of_rowPolynomials input
     (fun column => top.publicInputRows input ⟨column⟩)

@@ -1,4 +1,3 @@
-import Mathlib
 import Zcash.Snark.Soundness.FoldSplit
 import Zcash.Snark.Soundness.GrandProductBridge
 

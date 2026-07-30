@@ -304,6 +304,22 @@ omit [AddCommGroup G] in
   · fin_cases j <;> simp [augmentedBasis, ursOfAugmentedBasis, AugmentedIndex.u,
       AugmentedIndex.w]
 
+omit [AddCommGroup G] in
+/-- The other round trip: every URS *is* the split of an augmented basis, namely its own.
+
+This is what lets a result stated over `ursOfAugmentedBasis k basis` for an arbitrary basis — the
+shape the rewind-free and adaptive routes take, since their families are indexed by the augmented
+basis the extractor represents against — be instantiated at a URS given as concrete data, such as
+a captured fixture's `capturedURS`. Without it the two families of statements cannot be joined:
+one quantifies over bases, the other names a record. -/
+theorem ursOfAugmentedBasis_augmentedBasis (urs : URS G) :
+    ursOfAugmentedBasis urs.k (augmentedBasis urs.g urs.u urs.w) = urs := by
+  cases urs with
+  | mk k g w u =>
+    simp only [ursOfAugmentedBasis, augmentedBasis, AugmentedIndex.gen, AugmentedIndex.u,
+      AugmentedIndex.w]
+    norm_num
+
 /-- The coefficients of an augmented relation as one representation vector. -/
 def augmentedCoeffs {n : ℕ} (a : Fin n → F) (alpha beta : F) : AugmentedIndex n → F
   | Sum.inl i => a i

@@ -178,11 +178,9 @@ theorem eraseLookup_tables_eval
 The selected projected lookup evaluates like the corresponding selector-substituted
 configured argument under any interpretation of the final query layouts.
 -/
-theorem PinnedConstraintSystem.lookup_eval
+theorem PinnedConstraintSystem.derive_lookup_eval
     {F : Type} [Field F] [DecidableEq F]
-    (pinnedCS : PinnedConstraintSystem F)
     (cs : ConstraintSystem F) (map : SelCompressMap)
-    (hpinned : pinnedCS = PinnedConstraintSystem.derive cs map)
     (fixed advice instanceFeed : ℕ → F) (valuation : Query → F)
     (lookupIndex : ℕ) (hlookup : lookupIndex < cs.lookups.length)
     (hinputCoverage : ∀ expression ∈ cs.lookups[lookupIndex].inputs,
@@ -193,14 +191,16 @@ theorem PinnedConstraintSystem.lookup_eval
         (fun selector => (map.lookup selector).isSome) = true)
     (hinterprets :
       Interprets
-        (pinnedQueryState pinnedCS)
+        (pinnedQueryState
+          (PinnedConstraintSystem.derive cs map))
         fixed advice instanceFeed valuation) :
+    let pinned := PinnedConstraintSystem.derive cs map
     let argument := cs.lookups[lookupIndex]
-    ((pinnedCS.lookupInputExprs.getD lookupIndex []).map
+    ((pinned.lookupInputExprs.getD lookupIndex []).map
         (RichExpression.eval fixed advice instanceFeed) =
       argument.inputs.map
         (Expression.eval (substValuation map.lookup valuation))) ∧
-    ((pinnedCS.lookupTableExprs.getD lookupIndex []).map
+    ((pinned.lookupTableExprs.getD lookupIndex []).map
         (RichExpression.eval fixed advice instanceFeed) =
       argument.tables.map
         (Expression.eval (substValuation map.lookup valuation))) := by
@@ -218,15 +218,14 @@ theorem PinnedConstraintSystem.lookup_eval
   obtain ⟨localState, hselected, hselectedExtends⟩ :=
     eraseLookups_getElem arguments gateState lookupIndex hlookup'
   have hfinal :
-      pinnedQueryState pinnedCS =
+      pinnedQueryState (PinnedConstraintSystem.derive cs map) =
         (eraseLookups arguments gateState).2 := by
-    rw [hpinned]
     simp [pinnedQueryState, PinnedConstraintSystem.derive,
       projectCS, arguments, gateState]
   have hfixture :
-      (pinnedCS.lookupInputExprs.getD
+      ((PinnedConstraintSystem.derive cs map).lookupInputExprs.getD
           lookupIndex [],
-        pinnedCS.lookupTableExprs.getD
+        (PinnedConstraintSystem.derive cs map).lookupTableExprs.getD
           lookupIndex []) =
       ((eraseLookup arguments[lookupIndex] localState).1.inputs,
         (eraseLookup arguments[lookupIndex] localState).1.tables) := by
@@ -237,14 +236,12 @@ theorem PinnedConstraintSystem.lookup_eval
           (eraseLookup arguments[lookupIndex] localState).1 :=
       hselected
     have hpinnedInputs :
-        pinnedCS.lookupInputExprs =
+        (PinnedConstraintSystem.derive cs map).lookupInputExprs =
           (eraseLookups arguments gateState).1.map (·.inputs) := by
-      rw [hpinned]
       simp [PinnedConstraintSystem.derive, projectCS, arguments, gateState]
     have hpinnedTables :
-        pinnedCS.lookupTableExprs =
+        (PinnedConstraintSystem.derive cs map).lookupTableExprs =
           (eraseLookups arguments gateState).1.map (·.tables) := by
-      rw [hpinned]
       simp [PinnedConstraintSystem.derive, projectCS, arguments, gateState]
     have hemitted :
         lookupIndex <
@@ -291,17 +288,18 @@ theorem PinnedConstraintSystem.lookup_eval
     exact (substSelectorMap_selectorFree _ source).2
       (htableCoverage source hsource)
   have hextends :
-      (pinnedQueryState pinnedCS).Extends
+      (pinnedQueryState
+        (PinnedConstraintSystem.derive cs map)).Extends
           (eraseLookup arguments[lookupIndex] localState).2 := by
     rw [hfinal]
     exact hselectedExtends
   have hinputs := eraseLookup_inputs_eval
     arguments[lookupIndex] localState
-    (pinnedQueryState pinnedCS)
+    (pinnedQueryState (PinnedConstraintSystem.derive cs map))
     fixed advice instanceFeed valuation hinputFree hextends hinterprets
   have htables := eraseLookup_tables_eval
     arguments[lookupIndex] localState
-    (pinnedQueryState pinnedCS)
+    (pinnedQueryState (PinnedConstraintSystem.derive cs map))
     fixed advice instanceFeed valuation htableFree hextends hinterprets
   rw [hargument] at hinputs htables
   simp only [substitutedLookup, List.map_map] at hinputs htables
@@ -330,13 +328,15 @@ theorem PinnedConstraintSystem.lookup_eval
   have hfixtureInputs := congrArg Prod.fst hfixture
   have hfixtureTables := congrArg Prod.snd hfixture
   have hfixtureInputs' :
-      pinnedCS.lookupInputExprs.getD lookupIndex [] =
+      (PinnedConstraintSystem.derive cs map).lookupInputExprs.getD
+          lookupIndex [] =
         (eraseLookup
           (substitutedLookup map cs.lookups[lookupIndex])
           localState).1.inputs := by
     simpa only [hargument] using hfixtureInputs
   have hfixtureTables' :
-      pinnedCS.lookupTableExprs.getD lookupIndex [] =
+      (PinnedConstraintSystem.derive cs map).lookupTableExprs.getD
+          lookupIndex [] =
         (eraseLookup
           (substitutedLookup map cs.lookups[lookupIndex])
           localState).1.tables := by
@@ -344,5 +344,37 @@ theorem PinnedConstraintSystem.lookup_eval
   dsimp only
   rw [hfixtureInputs', hfixtureTables']
   exact And.intro hinputs htables
+
+/-- Project one lookup directly through a top-level circuit's owned compilation. -/
+theorem _root_.Halo2.TopLevelCircuit.lookup_eval
+    {F : Type} [FiniteField F]
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit F Config PublicInput)
+    (fixed advice instanceFeed : ℕ → F) (valuation : Query → F)
+    (lookup : Fin top.lookupCount)
+    (hinputCoverage :
+      ∀ expression ∈ top.constraintSystem.lookups[lookup.val].inputs,
+        expression.selectorsCovered
+          (fun selector => (top.selectorMap.lookup selector).isSome) = true)
+    (htableCoverage :
+      ∀ expression ∈ top.constraintSystem.lookups[lookup.val].tables,
+        expression.selectorsCovered
+          (fun selector => (top.selectorMap.lookup selector).isSome) = true)
+    (hinterprets :
+      Interprets (pinnedQueryState top.pinnedCS)
+        fixed advice instanceFeed valuation) :
+    ((top.pinnedCS.lookupInputExprs.getD lookup.val []).map
+        (RichExpression.eval fixed advice instanceFeed) =
+      top.constraintSystem.lookups[lookup.val].inputs.map
+        (Expression.eval
+          (substValuation top.selectorMap.lookup valuation))) ∧
+    ((top.pinnedCS.lookupTableExprs.getD lookup.val []).map
+        (RichExpression.eval fixed advice instanceFeed) =
+      top.constraintSystem.lookups[lookup.val].tables.map
+        (Expression.eval
+          (substValuation top.selectorMap.lookup valuation))) := by
+  exact PinnedConstraintSystem.derive_lookup_eval
+    top.constraintSystem top.selectorMap fixed advice instanceFeed valuation
+    lookup.val lookup.isLt hinputCoverage htableCoverage hinterprets
 
 end Zcash.Snark

@@ -1,4 +1,4 @@
-import Mathlib
+import Mathlib.Tactic
 import Zcash.Arithmetic
 import Zcash.Common.ComputablePolynomial
 import Zcash.Snark.Verifier.Expressions
@@ -132,10 +132,8 @@ theorem not_mem_szBadSet {C : Polynomial Fp} {x : Fp} :
     x ∉ szBadSet C ↔ (C ≠ 0 → C.eval x ≠ 0) := by
   rw [mem_szBadSet, not_and]
 
-/-- Compute avoidance of one Schwartz--Zippel bad set without computing the root set itself.
-The branch decision uses only polynomial equality and evaluation at the sampled point; the
-equivalence with `x ∉ szBadSet C` is retained in the erased proof returned on success.  This is
-the executable form reductions should use when a successful branch returns break data. -/
+/-- Executable polynomial evaluation used to certify bad-set avoidance without enumerating
+roots. -/
 def polynomialEvalData (C : Polynomial Fp) (x : Fp) : Fp :=
   ∑ i ∈ C.toFinsupp.support, C.toFinsupp.toFun i * x ^ i
 

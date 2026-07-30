@@ -10,7 +10,9 @@ The deterministic key-binding layer ends at a computed event: `CollisionUpToSign
 any key-binding `Break` into a ±-collision of the shifted combined final oracle at two distinct
 queries, and `collision_mem_shifted_pm` places its output pair in the set `Birthday.lean` counts.
 This module adds the probabilistic model that turns those counting facts into a probability
-bound.
+bound. The bound's denominator is the cardinality of the abstract randomness type `RIVK`.
+Nothing here pins `|RIVK|`: at the intended Pallas instantiation `RIVK` is the scalar field,
+so `|RIVK| = r_ℙ`, and an undersized instantiation would make the bounds vacuous.
 
 The model samples the combined final `rivk`-derivation oracle `H^*` as one uniform table
 `O : FinalQuery AK NK RIVK QK SK → RIVK`. A uniform table is the same as independent uniform outputs at
@@ -33,8 +35,9 @@ Results (static model — the query set is fixed before the table is sampled):
 * `finset_shifted_collision_measure_le` — union bound over the `C(q,2)` unordered pairs of a
   query set of size at most `q`: probability at most `q·(q−1)/|F|`.
 * `break_measure_le` — the key-binding capstone: an adversary whose witnesses' derivation
-  queries land in the static set produces a `Break` with probability at most `q·(q−1)/|RIVK|`
-  (ZIP 2005's `ε_kb` as sharpened in zcash/zips#1338; `|RIVK| = r`).
+  queries land in the static set produces a `Break` with probability at most `q·(q−1)/|RIVK|`.
+  This is ZIP 2005's `ε_kb` as sharpened in zcash/zips#1338. At the intended instantiation,
+  `|RIVK|` is the Pallas group order `r_ℙ`.
 
 Results (adaptive — a bounded-query machine choosing queries after seeing earlier answers, as
 an `OracleComp` from the Fiat–Shamir layer):
@@ -589,7 +592,8 @@ theorem ofBreak_queries {Extract : Extractor G IVK AK} {S : G} {hfn : AK → NK 
 table. An adversary —here, any pair of witness choices depending on the whole table— whose
 witnesses' derivation queries lie in a set `Qs` of at most `q` queries *fixed in advance*,
 produces a key-binding `Break` with probability at most `q·(q−1)/|RIVK|`. This is ZIP 2005's
-`ε_kb` as sharpened in zcash/zips#1338, at `|RIVK| = r`. -/
+`ε_kb` as sharpened in zcash/zips#1338. At the intended instantiation, `|RIVK|` is the
+Pallas group order `r_ℙ`. -/
 theorem break_measure_le (Extract : Extractor G IVK AK) (S : G) (hfn : AK → NK → RIVK)
     (Ggen : G) (hS : S ≠ 0)
     (Hask : SK → ASK) (Hnk : SK → NK)
@@ -629,8 +633,9 @@ def derivQueries (Extract : Extractor G IVK AK)
 
 /-- **Adaptive key-binding bound (ZIP 2005 accounting).** An `n`-query machine that queries its
 output witnesses' derivation inputs produces a key-binding `Break` with probability at most
-`n·(n−1)/|RIVK|` — ZIP 2005's `ε_kb` (as sharpened in zcash/zips#1338) at `|RIVK| = r`, with
-the adversary's queries chosen adaptively. -/
+`n·(n−1)/|RIVK|`, with the adversary's queries chosen adaptively. This is ZIP 2005's
+`ε_kb` as sharpened in zcash/zips#1338. At the intended instantiation, `|RIVK|` is the
+Pallas group order `r_ℙ`. -/
 theorem break_measure_le_adaptive (Extract : Extractor G IVK AK) (S : G) (hfn : AK → NK → RIVK)
     (Ggen : G) (hS : S ≠ 0)
     (Hask : SK → ASK) (Hnk : SK → NK)

@@ -1,4 +1,4 @@
-import Mathlib
+import Mathlib.Tactic
 import Zcash.Snark.Soundness.Lookup
 import Zcash.Snark.Soundness.GrandProductBridge
 import Zcash.Snark.Soundness.PermutationRows

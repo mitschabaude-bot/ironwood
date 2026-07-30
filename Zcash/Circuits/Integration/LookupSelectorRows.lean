@@ -203,7 +203,7 @@ def EnabledLookup.InputSelectorLeafRowsExact
       | none =>
           lookup.selectorValue selector.index = 0
       | some compressed =>
-          compressed.packedCol < top.pinnedCS.numFixedColumns ∧
+          compressed.packedCol < top.fixedColumnCount ∧
             (selReplacement compressed).eval
                 (fun
                   | .fixed column _ =>
@@ -241,7 +241,7 @@ theorem EnabledLookup.inputSelectorLeafRowsExact_of_realizes
       lookup ∈ operationEnabledLookups (top.operations) 0)
     (realizes : ∀ column row value,
       (column, row, value) ∈ topLevelRequiredFixedEntries top →
-        column < top.pinnedCS.numFixedColumns ∧
+        column < top.fixedColumnCount ∧
           (rows column).getD row 0 = (value : Fp)) :
     lookup.InputSelectorLeafRowsExact top rows := by
   rw [EnabledLookup.InputSelectorLeafRowsExact,
@@ -269,11 +269,11 @@ theorem EnabledLookup.inputSelectorLeafRowsExact_of_realizes
                     0)
             else
               some
-                (top.pinnedCS.numFixedColumns,
+                (top.fixedColumnCount,
                   top.regionStarts.getD lookup.region 0 + lookup.row, 0)
         | none =>
             some
-              (top.pinnedCS.numFixedColumns,
+              (top.fixedColumnCount,
                 top.regionStarts.getD lookup.region 0 + lookup.row, 0)) =
           some entry) :
       entry ∈ topLevelRequiredFixedEntries top := by
@@ -288,11 +288,11 @@ theorem EnabledLookup.inputSelectorLeafRowsExact_of_realizes
   | none =>
       have hrequired :=
         required_of_result
-          (top.pinnedCS.numFixedColumns,
+          (top.fixedColumnCount,
             top.regionStarts.getD lookup.region 0 + lookup.row, 0)
           (by simp [hlookup])
       have hbound :=
-        (realizes top.pinnedCS.numFixedColumns
+        (realizes top.fixedColumnCount
           (top.regionStarts.getD lookup.region 0 + lookup.row)
           0 hrequired).1
       exact False.elim (Nat.lt_irrefl _ hbound)
@@ -349,11 +349,11 @@ theorem EnabledLookup.inputSelectorLeafRowsExact_of_realizes
             EnabledLookup.selectorValue, henabledSelector, if_false]
       · have hrequired :=
           required_of_result
-            (top.pinnedCS.numFixedColumns,
+            (top.fixedColumnCount,
               top.regionStarts.getD lookup.region 0 + lookup.row, 0)
             (by simp [hlookup, hsingleton])
         have hbound :=
-          (realizes top.pinnedCS.numFixedColumns
+          (realizes top.fixedColumnCount
             (top.regionStarts.getD lookup.region 0 + lookup.row)
             0 hrequired).1
         exact False.elim (Nat.lt_irrefl _ hbound)
@@ -367,7 +367,7 @@ instance EnabledLookup.inputSelectorLeafRowsExactDecidable
     | none =>
         lookup.selectorValue selector.index = 0
     | some compressed =>
-        compressed.packedCol < top.pinnedCS.numFixedColumns ∧
+        compressed.packedCol < top.fixedColumnCount ∧
           (selReplacement compressed).eval
               (fun
                 | .fixed column _ =>
@@ -413,20 +413,20 @@ def EnabledLookup.inputSelectorValuesRealized_or_bad
     (rows : ℕ → List Fp)
     (hrows : Function.Injective
       fun i : Fin (2 ^ urs.k) =>
-        (top.toVerifierKey pp urs).omega ^ (i : ℕ))
-    (hn : (top.toVerifierKey pp urs).n = 2 ^ urs.k)
+        top.omega ^ (i : ℕ))
+    (hn : top.n = 2 ^ urs.k)
     {Bad : Type}
     (binding : ∀ column,
-      column < top.pinnedCS.numFixedColumns →
+      column < top.fixedColumnCount →
         poly (.fixedCol column) =
             instanceRowPolynomial (2 ^ urs.k)
-              (top.toVerifierKey pp urs).omega (rows column) ⊕'
+              top.omega (rows column) ⊕'
           Bad)
-    (proofIndex : Fin (pp.mergeDerived top).numProofs)
+    (proofIndex : Fin pp.numProofs)
     (lookup : EnabledLookup Fp)
     (hrow :
       top.placement lookup.region + lookup.row <
-        (top.toVerifierKey pp urs).n)
+        top.n)
     (hexact : lookup.InputSelectorLeafRowsExact top rows) :
     lookup.InputSelectorValuesRealized top
         (resolverEnvironment
@@ -434,7 +434,7 @@ def EnabledLookup.inputSelectorValuesRealized_or_bad
           (top.usableRowsAt top.domainExponent)) ⊕'
       Bad :=
   bindOrRelationWitness
-    (boundedForallOrRelationWitness (n := top.pinnedCS.numFixedColumns) binding)
+    (boundedForallOrRelationWitness (n := top.fixedColumnCount) binding)
     fun hbinding => by
     classical
     intro expression hexpression

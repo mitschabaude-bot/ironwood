@@ -1,4 +1,5 @@
-import Mathlib
+import Mathlib.Tactic
+import Mathlib.Data.List.GetD
 import Zcash.Security.Ledger.Effects
 
 /-!
@@ -6,11 +7,11 @@ import Zcash.Security.Ledger.Effects
 
 The first Balance theorem, as a computed reduction. For a valid ledger, the nonzero
 spends of the first `i + 1` transactions form a sub-multiset of the positioned outputs
-of the first `i` — outputs of *strictly earlier* transactions, since an anchor
-references the tree at a transaction boundary, so a spend can never match an output of
-its own transaction. Each spend is the opening of the output that created its
-commitment, at that output's leaf position, and no positioned opening is spent twice —
-or the ledger's own data computes a `BalanceBreak`:
+of the first `i` — outputs of *strictly earlier* transactions (since an anchor
+references the tree at a transaction boundary, a spend can never match an output of
+its own transaction). Each spend is the opening of the output that created its
+commitment, at that output's leaf position, and no positioned opening is spent twice;
+otherwise the ledger's own data computes a `BalanceBreak`:
 
 * a Merkle `Collision` — one height's compression collided, with both evaluations
   successful — when a spend's authentication path validates a leaf that is not the
@@ -20,15 +21,19 @@ or the ledger's own data computes a `BalanceBreak`:
 * a key-binding break, when two spends of one note tuple would otherwise have to reveal
   the same nullifier twice.
 
-The shape of the argument (design doc, "The theorems"): the anchor pins each spend's
-path to a prefix tree; position binding pins the leaf; `uncommitted_ne` rules out the
-padding; and the opening comparison pins the output or computes the note-commitment
-break. Duplicate spends of one positioned opening are found by `findPair`. Its result
-is certified as a two-element *sublist*, which carries "two distinct occurrences" with
-no index arithmetic, so `nfOldEqOrBreak` and nullifier uniqueness finish.
+The shape of the argument (design doc, "The theorems"):
 
-Everything is a plain computable `def` per breaks-as-computed-data; the anchor index and
-the duplicate pair are found by decidable search, so no data is conjured from the
+* the anchor pins each spend's path to a prefix tree;
+* position binding pins the leaf;
+* `uncommitted_ne` rules out the note commitment tree padding; and
+* the opening comparison pins the output or computes the note-commitment break.
+
+Duplicate spends of one positioned opening are found by `findPair`. Its result is
+certified as a two-element *sublist*, which carries "two distinct occurrences" with
+no index arithmetic.
+
+Everything is a plain computable `def` per breaks-as-computed-data; the anchor index
+and the duplicate pair are found by decidable search, so no data is conjured from the
 validity hypothesis's existentials.
 -/
 
@@ -212,8 +217,8 @@ theorem anchor_of_spendMem
   exact ⟨j, lt_of_le_of_lt hjk hki, hrt⟩
 
 /-- **Per-spend pinning.** A nonzero spend of a valid ledger is the positioned opening
-of the output that created its commitment — or the ledger data computes a break. The
-anchor prefix is recovered by decidable search (`Nat.find`), so the branches stay
+of the output that created its commitment — or the ledger data computes a `BalanceBreak`.
+The anchor prefix is recovered by decidable search (`Nat.find`), so the branches stay
 computable. -/
 def spendPinnedOrBreak [DecidableEq F] [DecidableEq G] [DecidableEq RHO]
     [DecidableEq PSI] [DecidableEq MHASH] [DecidableEq MENC]
@@ -288,9 +293,9 @@ of the first `i + 1` transactions are a sub-multiset of the positioned outputs o
 first `i` — or the ledger data computes a `BalanceBreak`. The one-transaction lag is the
 strictly-earlier constraint: an anchor references a transaction boundary, so a spend
 never matches an output of its own transaction. Duplicate spends are located by
-`findPair`; sharing a positioned opening
-forces sharing a revealed nullifier (`nfOldEqOrBreak`), which nullifier uniqueness
-forbids, so the surviving branch is a key-binding break. -/
+`findPair`; sharing a positioned opening forces sharing a revealed nullifier
+(`nfOldEqOrBreak`), which nullifier uniqueness forbids, so the surviving branch is a
+key-binding break. -/
 def balanceSubsetOrBreak [DecidableEq F] [DecidableEq G] [DecidableEq RHO]
     [DecidableEq PSI] [DecidableEq MHASH] [DecidableEq MENC] [DecidableEq NK]
     [NoZeroSMulDivisors F G]
@@ -407,17 +412,23 @@ theorem balanceSubsetOrBreak_kbPair [DecidableEq F] [DecidableEq G] [DecidableEq
 
 end Validity
 
-/-! ## Balance-value, in conservation form
+/-! ## Balance conservation
 
-The value ledger balances: what the shielded pool holds plus what the transparent pool
-holds is exactly what issuance has minted — up to a per-transaction value premiss. The
-premiss says each transaction's witnessed net value matches its declared `vBalance`, or
-a value break of the caller's type is exhibited. The intended deployed discharge is the
-binding-signature machinery (`NontrivialRelation.ofBundleIntImbalance` with the
-statement's value ranges and the action-count bound), with a nontrivial discrete-log
-relation as the break; that glue is not yet formalized, and validity does not yet carry
-binding-signature verification. Balance is then the corollary: given the transparent
-pool never goes negative (`ValidLedger.transparent_nonneg`), the shielded pool holds at
+The ledger balances: what the shielded pool holds plus what the transparent pool
+holds is exactly what issuance has minted —up to a transaction-balance premiss— and
+both pool balances are non-negative. The premiss says each transaction's witnessed
+net value matches its declared `vBalance`, or a balance break of the caller's type
+is exhibited. The intended deployed discharge is the binding-signature machinery
+(`NontrivialRelation.ofBundleIntImbalance` with the statement's value ranges and the
+action-count bound), with a nontrivial discrete-log relation as the break. That glue
+is formalized —`ValueShape.premissOrBreak` in `Value.lean`, against
+`ValidLedger.binding_verified`— but only relative to the named `extractBsk`/`hextract`
+extractability hypothesis. That hypothesis is a placeholder rather than a theorem: as
+a total hypothesis it is classically satisfiable, and it carries computational force
+only for an efficient `extractBsk` (see `Value.lean`'s module doc).
+
+Modulo that hypothesis, and given the transparent pool balance never goes negative
+(`ValidLedger.transparent_nonneg`), a corollary is that the shielded pool holds at
 most what was minted. -/
 
 /-- A transaction's net value, read off its witnesses: spent minus created, over all
@@ -519,10 +530,10 @@ theorem nonZeroSpends_value_sum
   exact congrArg List.sum (List.map_congr_left fun tx _ => hfil tx.actions)
 
 /-- The shielded pool balance is the negated sum of the transactions' net values. -/
-theorem poolValueBalance_eq_neg
+theorem shieldedPoolBalance_eq_neg
     (ledger : Ledger KW F G RHO PSI MHASH MENC MSG SIG d) (i : ℕ) :
-    poolValueBalance ledger i = -((ledger.take i).map txNetValue).sum := by
-  rw [poolValueBalance, positionedOutputs_value_sum, nonZeroSpends_value_sum]
+    shieldedPoolBalance ledger i = -((ledger.take i).map txNetValue).sum := by
+  rw [shieldedPoolBalance, positionedOutputs_value_sum, nonZeroSpends_value_sum]
   rw [show ((ledger.take i).map txNetValue).sum
       = ((ledger.take i).map fun tx =>
             (tx.actions.map fun a => (a.w.note_old.v : ℤ)).sum).sum
@@ -541,8 +552,8 @@ variable {kv : KeyBindingInterface KW G IVK NK}
 variable {ledger : Ledger KW F G RHO PSI MHASH MENC MSG SIG P.depth}
 variable {issuance : ℕ → ℕ} {maxActions : ℕ}
 
-/-- Run the per-transaction value premiss over a list, stopping at the first break. -/
-def allValueOrBreak {VB : Type*}
+/-- Run the transaction-balance premiss over a list, stopping at the first break. -/
+def allConservedOrBreak {VB : Type*}
     (perTx : (tx : Tx KW F G RHO PSI MHASH MENC MSG SIG P.depth) → tx ∈ ledger →
       (txNetValue tx = tx.vBalance) ⊕' VB) :
     (L : List (Tx KW F G RHO PSI MHASH MENC MSG SIG P.depth)) → (∀ tx ∈ L, tx ∈ ledger) →
@@ -552,38 +563,39 @@ def allValueOrBreak {VB : Type*}
     match perTx tx (hL tx (by simp)) with
     | .inr b => .inr b
     | .inl heq =>
-      match allValueOrBreak perTx t (fun x hx => hL x (by simp [hx])) with
+      match allConservedOrBreak perTx t (fun x hx => hL x (by simp [hx])) with
       | .inr b => .inr b
       | .inl hall => .inl (by
           intro x hx
           rcases List.mem_cons.mp hx with rfl | hx'
           exacts [heq, hall x hx'])
 
-/-- **Value conservation.** Up to the value premiss's break, the shielded pool plus the
-transparent pool is exactly the minted issuance. -/
-def valueConservationOrBreak {VB : Type*}
+/-- **Balance conservation.** Up to the transaction-balance premiss's break, the
+shielded pool plus the transparent pool is exactly the minted issuance. -/
+def balanceConservationOrBreak {VB : Type*}
     (perTx : (tx : Tx KW F G RHO PSI MHASH MENC MSG SIG P.depth) → tx ∈ ledger →
       (txNetValue tx = tx.vBalance) ⊕' VB) (i : ℕ) :
-    (poolValueBalance ledger i + transparentPoolBalance issuance ledger i
+    (shieldedPoolBalance ledger i + transparentPoolBalance issuance ledger i
         = issuanceTotal issuance ledger i) ⊕' VB :=
-  match allValueOrBreak perTx (ledger.take i)
+  match allConservedOrBreak perTx (ledger.take i)
       (fun _ h => (List.take_sublist i ledger).subset h) with
   | .inr b => .inr b
   | .inl hall => .inl (by
       have hsum : ((ledger.take i).map txNetValue).sum
           = ((ledger.take i).map fun tx => tx.vBalance).sum :=
         congrArg List.sum (List.map_congr_left fun tx htx => hall tx htx)
-      rw [poolValueBalance_eq_neg, transparentPoolBalance_eq, hsum]
+      rw [shieldedPoolBalance_eq_neg, transparentPoolBalance_eq, hsum]
       ring)
 
-/-- **Balance-value.** Given the transparent pool never goes negative, the shielded pool
-holds at most what issuance has minted — up to the value premiss's break. -/
-def balanceValueOrBreak {VB : Type*}
+/-- **Shielded balance cap.** Given that the transparent pool never goes negative,
+the shielded pool holds at most what issuance has minted — up to the transaction-balance
+premiss's break. -/
+def shieldedBalanceCapOrBreak {VB : Type*}
     (hval : ValidLedger P kv issuance maxActions ledger)
     (perTx : (tx : Tx KW F G RHO PSI MHASH MENC MSG SIG P.depth) → tx ∈ ledger →
       (txNetValue tx = tx.vBalance) ⊕' VB) (i : ℕ) :
-    (poolValueBalance ledger i ≤ issuanceTotal issuance ledger i) ⊕' VB :=
-  match valueConservationOrBreak (issuance := issuance) perTx i with
+    (shieldedPoolBalance ledger i ≤ issuanceTotal issuance ledger i) ⊕' VB :=
+  match balanceConservationOrBreak (issuance := issuance) perTx i with
   | .inr b => .inr b
   | .inl h => .inl (by
       have hnn := hval.transparent_nonneg i
@@ -624,49 +636,57 @@ theorem positionedOutputs_value_sum_mono
   linarith
 
 omit [Field F] [AddCommGroup G] [Module F G] in
-/-- **Balance-value, lower bound.** When the nonzero spends of the first `i + 1`
+/-- **Shielded pool balance lower bound.** When the nonzero spends of the first `i + 1`
 transactions are covered by the positioned outputs of the first `i` — the Balance-subset
 conclusion — the shielded pool holds non-negative value: no value is spent that was not
 created. -/
-theorem poolValueBalance_nonneg
+theorem shieldedPoolBalance_nonneg
     (ledger : Ledger KW F G RHO PSI MHASH MENC MSG SIG d) (i : ℕ)
     (hsub : nonZeroSpends ledger (i + 1) ≤ (↑(positionedOutputs ledger i) : Multiset _)) :
-    0 ≤ poolValueBalance ledger (i + 1) := by
-  rw [poolValueBalance, sub_nonneg]
+    0 ≤ shieldedPoolBalance ledger (i + 1) := by
+  rw [shieldedPoolBalance, sub_nonneg]
   have h1 : ((nonZeroSpends ledger (i + 1)).map fun p => (p.opening.note.v : ℤ)).sum
       ≤ ((positionedOutputs ledger i).map fun p => (p.opening.note.v : ℤ)).sum := by
     refine le_trans (sum_val_le_of_le hsub) ?_
     rw [Multiset.map_coe, Multiset.sum_coe]
   exact le_trans h1 (positionedOutputs_value_sum_mono ledger (Nat.le_succ i))
 
-/-- **Balance.** In a valid ledger, either the value after the first `i + 1`
-transactions is accounted for exactly — the shielded and transparent pools are both
-non-negative and sum to the minted issuance — or the ledger's own data computes a break:
-a Balance-subset break (a Merkle, note-commitment, or key-binding break) or the value
-premiss's break. The three facts come from three places. The shielded pool is
-non-negative by spend-integrity (`poolValueBalance_nonneg`, from Balance-subset: no value
-is spent that was not created). The transparent pool is non-negative by validity
-(`transparent_nonneg`). The two pools sum to issuance by per-transaction value
-conservation (`valueConservationOrBreak`, from the binding signature: no value is created
-within a transaction). Together they place each pool in `[0, issuanceTotal]` and compose
-the two arguments into one statement. -/
-def balanceOrBreak [DecidableEq F] [DecidableEq G] [DecidableEq RHO]
+/-- **Balance integrity.** In a valid ledger, either the value after the first
+`i + 1` transactions is accounted for exactly —the shielded and transparent pools
+are both non-negative and sum to the minted issuance— or the ledger's own data
+computes a break: a Balance-subset break (a Merkle, note-commitment, or key-binding
+break) or the transaction-balance premiss's break.
+
+In the absence of a break, this matches (modulo the simplification of only one
+shielded pool made in the modelling) the rules in ZIP 209. More specifically
+it ensures that those rules only reinforce properties that are in any case
+cryptographically guaranteed. That is, there will be no "turnstile violation".
+
+Facts from three places come together to ensure balance integrity:
+
+* The shielded pool is non-negative by `shieldedPoolBalance_nonneg`, from
+  Balance-subset: no value is spent that was not created.
+* The transparent pool is non-negative by validity (`transparent_nonneg`).
+* The two pools sum to issuance by balance conservation
+  (`balanceConservationOrBreak`, from the binding signature: value balances within
+  a transaction). -/
+def balanceIntegrityOrBreak [DecidableEq F] [DecidableEq G] [DecidableEq RHO]
     [DecidableEq PSI] [DecidableEq MHASH] [DecidableEq MENC] [DecidableEq NK]
     [NoZeroSMulDivisors F G] {VB : Type*}
     (hval : ValidLedger P kv issuance maxActions ledger)
     (perTx : (tx : Tx KW F G RHO PSI MHASH MENC MSG SIG P.depth) → tx ∈ ledger →
       (txNetValue tx = tx.vBalance) ⊕' VB) (i : ℕ) :
-    (0 ≤ poolValueBalance ledger (i + 1)
+    (0 ≤ shieldedPoolBalance ledger (i + 1)
         ∧ 0 ≤ transparentPoolBalance issuance ledger (i + 1)
-        ∧ poolValueBalance ledger (i + 1) + transparentPoolBalance issuance ledger (i + 1)
+        ∧ shieldedPoolBalance ledger (i + 1) + transparentPoolBalance issuance ledger (i + 1)
             = issuanceTotal issuance ledger (i + 1))
       ⊕' (BalanceBreak P kv ⊕' VB) :=
   match balanceSubsetOrBreak hval i,
-      valueConservationOrBreak (issuance := issuance) perTx (i + 1) with
+      balanceConservationOrBreak (issuance := issuance) perTx (i + 1) with
   | .inr b, _ => .inr (.inl b)
   | _, .inr vb => .inr (.inr vb)
   | .inl hsub, .inl hcons =>
-      .inl ⟨poolValueBalance_nonneg ledger i hsub, hval.transparent_nonneg (i + 1), hcons⟩
+      .inl ⟨shieldedPoolBalance_nonneg ledger i hsub, hval.transparent_nonneg (i + 1), hcons⟩
 
 end Conservation
 

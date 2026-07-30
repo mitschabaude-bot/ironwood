@@ -1,4 +1,4 @@
-import Mathlib
+import Mathlib.Tactic
 import Zcash.Snark.Soundness.Permutation
 
 /-!

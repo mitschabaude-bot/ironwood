@@ -1,4 +1,4 @@
-import Mathlib
+import Mathlib.Tactic
 import Zcash.Snark.Soundness.KnowledgeSoundness
 import Zcash.Snark.Soundness.PermutationRows
 import Zcash.Snark.Soundness.LookupAssembly

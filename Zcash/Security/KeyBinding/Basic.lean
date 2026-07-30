@@ -1,4 +1,4 @@
-import Mathlib
+import Mathlib.Tactic
 import Zcash.Security.Common.RandomOracle
 
 /-!
@@ -21,7 +21,8 @@ The route, each step proven here:
    (consumed by the Balance and Spend Authorization arguments).
 
 The probabilistic side — producing the computed collision is hard — is the birthday bound
-`ε_kb ≤ q(q-1)/r` (`Birthday.lean`), ZIP 2005's `ε_kb` as sharpened in zcash/zips#1338.
+`ε_kb ≤ q(q-1)/|RIVK|` (`Birthday.lean`, with `|RIVK| = r_ℙ` at the intended Pallas
+instantiation), ZIP 2005's `ε_kb` as sharpened in zcash/zips#1338.
 nf-pinning, which the Spendability argument consumes, is the games'
 `nfOldEqOrBreak` (`Security/Ledger/Statement.lean`).
 
@@ -594,7 +595,8 @@ combined final oracle at *distinct* queries: the two witnesses' final queries wh
 (the residual case, `residual_of_finalQuery_eq`) the two `rivk_ext`-derivation queries when they
 coincide. What the birthday bound then adds is that inhabiting this event is hard: `hfn` is
 non-querying, so a fixed shift cannot be steered to manufacture collisions, and ±-colliding the
-shifted oracle at distinct queries has probability at most `q(q-1)/r` (`Birthday.lean`). -/
+shifted oracle at distinct queries has probability at most `q(q-1)/|RIVK|`
+(`Birthday.lean`). -/
 def _root_.Zcash.Security.RandomOracle.CollisionUpToSign.ofBreak
     [DecidableEq AK] [DecidableEq NK] [DecidableEq QK] [DecidableEq SK]
     (Extract : Extractor G IVK AK) (S : G) (hfn : AK → NK → RIVK) (Ggen : G) (hS : S ≠ 0)

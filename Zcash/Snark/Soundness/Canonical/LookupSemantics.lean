@@ -60,10 +60,10 @@ theorem ResolverLookupDomain.ofCanonicalSelectors
 /-- The product-difference polynomial whose roots are excluded at the selected lookup's `γ`
 squeeze.  It is fixed after `β`. -/
 noncomputable def resolverLookupProductDifference
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u : ℕ) :
+    (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) :
     Polynomial (Polynomial Fp) :=
   lookupProdDiff
     (Finset.univ.val.map
@@ -80,10 +80,10 @@ noncomputable def resolverLookupProductDifference
 /-- The selected lookup difference after fixing `β`, computed without constructing a nested
 polynomial. -/
 def resolverLookupProductDifferenceGammaData
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u : ℕ) : Polynomial Fp :=
+    (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) : Polynomial Fp :=
   lookupProdDiffGammaData
     (Finset.univ.val.map
       (lookupColumnRows vk.omega (poly (.lookupPermInput p l)) (u + 1)))
@@ -98,10 +98,10 @@ def resolverLookupProductDifferenceGammaData
     ch.beta
 
 theorem resolverLookupProductDifferenceGammaData_eq
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u : ℕ) :
+    (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) :
     resolverLookupProductDifferenceGammaData vk ch poly p l u =
       (resolverLookupProductDifference vk ch poly p l u).map (evalRingHom ch.beta) := by
   rw [resolverLookupProductDifferenceGammaData, resolverLookupProductDifference,
@@ -109,10 +109,10 @@ theorem resolverLookupProductDifferenceGammaData_eq
 
 /-- One `γ` coefficient of the selected lookup difference, computed directly over `Fp`. -/
 def resolverLookupProductDifferenceCoeffData
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u j : ℕ) : Polynomial Fp :=
+    (p : ℕ) (l : Fin shape.numLookups) (u j : ℕ) : Polynomial Fp :=
   lookupProdDiffCoeffData
     (Finset.univ.val.map
       (lookupColumnRows vk.omega (poly (.lookupPermInput p l)) (u + 1)))
@@ -127,10 +127,10 @@ def resolverLookupProductDifferenceCoeffData
     j
 
 theorem resolverLookupProductDifferenceCoeffData_eq
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u j : ℕ)
+    (p : ℕ) (l : Fin shape.numLookups) (u j : ℕ)
     (hj : j ≤ u + 1) :
     resolverLookupProductDifferenceCoeffData vk ch poly p l u j =
       (resolverLookupProductDifference vk ch poly p l u).coeff j := by
@@ -142,10 +142,10 @@ theorem resolverLookupProductDifferenceCoeffData_eq
 /-- All separately priced challenges used by the selected lookup endpoint, including the two
 row-factor exclusions that eliminate its residual zero-product branch. -/
 structure ResolverLookupGoodChallenges
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u : ℕ) : Prop where
+    (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) : Prop where
   gamma : ch.gamma ∉ szBadSet
     ((resolverLookupProductDifference vk ch poly p l u).map (evalRingHom ch.beta))
   beta : ∀ j, ch.beta ∉ szBadSet
@@ -159,14 +159,14 @@ structure ResolverLookupGoodChallenges
 of a selected compressed lookup.  Tuple recovery is intentionally downstream: it uses the Clean
 operation's concrete input/table tuples and the separately priced `θ` collision exclusion. -/
 theorem ConstraintSatisfaction.resolverLookupSubset
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {numProofs k : ℕ} {G : Type*}
+    (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp)
-    (sets : Fin shape.numProofs → List (PermSetEval (Polynomial Fp)))
-    (chunks : Fin shape.numProofs →
+    (sets : Fin numProofs → List (PermSetEval (Polynomial Fp)))
+    (chunks : Fin numProofs →
       List (PermSetEval (Polynomial Fp) × List (Polynomial Fp × Polynomial Fp)))
     (l0 lLast lBlind : Polynomial Fp)
-    (p : Fin shape.numProofs) (l : Fin shape.numLookups) {n u : ℕ}
+    (p : Fin numProofs) (l : Fin shape.numLookups) {n u : ℕ}
     (h : ConstraintSatisfaction
       (constraintModelOfResolver vk ch poly sets chunks l0 lLast lBlind) n)
     (hdom : ResolverLookupDomain vk l0 lLast lBlind n u)

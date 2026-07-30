@@ -1,17 +1,17 @@
-import Mathlib
+import Mathlib.Tactic
 import Zcash.Security.Ledger.Statement
 import Zcash.Security.Ledger.Pool
 import Zcash.Security.Ledger.SinsemillaDLR
 
 /-!
-# The deployed note-commitment break computes a discrete-log relation
+# The Orchard-protocol note-commitment break computes a discrete-log relation
 
 The pre-quantum discharge of the note-commitment arm: a `NoteCommitBreak` at the
-deployed primitives — two openings with distinct `(rcm, note)` pairs whose commitments
-share an extracted coordinate — computes a nontrivial relation among the Sinsemilla
-table, the `NoteCommit` domain point, and the randomness base. The reduction unpacks
-the two openings into their defined Sinsemilla chains and blinding scalars and applies the
-chain-collision reducer `relationOfChainPmEq`.
+Orchard-protocol primitives — two openings with distinct `(rcm, note)` pairs whose
+commitments share an extracted coordinate — computes a nontrivial relation among the
+Sinsemilla table, the `NoteCommit` domain point, and the randomness base. The
+reduction unpacks the two openings into their defined Sinsemilla chains and blinding
+scalars and applies the chain-collision reducer `relationOfChainPmEq`.
 
 The reduction is hypothesis-free. The chunk-coefficient injectivity is `preCoeffs_inj`
 and the 109-chunk message encoding is injective by `noteCommitChunks_inj`. Recovering
@@ -40,7 +40,7 @@ def noteCommitRpt : PallasGroup :=
 theorem smul_eq_val_nsmul (r : Fq) (P : PallasGroup) : r • P = r.val • P := by
   rw [← Nat.cast_smul_eq_nsmul Fq, ZMod.natCast_zmod_val]
 
-/-- Every note value below the deployed bound is below the base-field order. -/
+/-- Every note value below the Orchard-protocol bound is below the base-field order. -/
 theorem valueBound_lt_card {v : ℕ} (hv : v < 2 ^ 64) :
     v < CompElliptic.Fields.Pasta.PALLAS_BASE_CARD :=
   lt_trans hv (by norm_num [CompElliptic.Fields.Pasta.PALLAS_BASE_CARD])
@@ -73,7 +73,7 @@ theorem noteCommit_get_spec {rcm : Fq} {n : Note PallasGroup Fp Fp}
         (Point.valid_nsmul (Or.inl Ecc.MulFixed.Certs.noteCommitR.onCurve) rcm.val)]
   · exact absurd hop (by simp)
 
-/-- **The deployed note-commitment break computes a discrete-log relation.** Two
+/-- **The Orchard-protocol note-commitment break computes a discrete-log relation.** Two
 openings with distinct `(rcm, note)` pairs whose commitments share an extracted
 coordinate: the reduction unpacks them into their defined Sinsemilla chains and blinding
 scalars and applies the chain-collision reducer at the `NoteCommit` domain point and

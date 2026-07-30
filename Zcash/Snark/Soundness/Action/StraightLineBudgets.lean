@@ -1,4 +1,5 @@
-import Zcash.Circuits.Integration.StraightLineActionEvent
+import Zcash.Snark.Soundness.Action.StraightLineEvent
+import Zcash.Snark.Soundness.StraightLine.TopLevelEvent
 import Zcash.Snark.Soundness.Composition.SequentialLift
 import Zcash.Snark.Soundness.Composition.ChallengeReads
 import Zcash.Snark.Soundness.Composition.SemanticChallengeRemainder
@@ -49,7 +50,7 @@ local instance vestaInhabitedStraightLineActionBudgets : Inhabited VestaG := ⟨
 variable (pp : ProofParams)
   (family : ComputedStraightLineDeployedFSFamily (pp.mergeDerived actionCircuit))
   (static : DeployedConstraintStaticChecks family.toRootFamily)
-  (inputs : Fin (pp.mergeDerived actionCircuit).numProofs → PublicInputs Fp)
+  (inputs : Fin pp.numProofs → PublicInputs Fp)
   (hvk : ∀ basis, family.vk basis =
     actionCircuit.toVerifierKey pp
       (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
@@ -100,16 +101,16 @@ theorem actionThetaFailureEvent_subset
     (view : cut.State → CommitmentId → Polynomial Fp)
     (hview : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
       ∀ id, id.isColumnInput →
-        actionRunPolynomial pp family static inputs hvk hI hchar basis O h id =
+        topLevelRunPolynomial actionCircuit pp family static inputs hvk hI hchar basis O h id =
           view ((cut.pre basis).run O) id) :
-    actionThetaFailureEvent pp family static inputs hvk hI hchar ⊆
+    topLevelThetaFailureEvent actionCircuit pp family static inputs hvk hI hchar ⊆
       cut.surfaceEvent (fun basis s =>
-        ↑(TopLevelLookupCoherence.allTopLevelLookupThetaBadSet actionCircuit pp
+        ↑(TopLevelLookup.thetaBadSet actionCircuit pp
           (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) (view s))) := by
   rintro ⟨basis, O⟩ ⟨h, hmem⟩
   dsimp only at hmem
   have hin := not_not.mp hmem
-  rw [TopLevelLookupCoherence.allTopLevelLookupThetaBadSet_congr actionCircuit pp
+  rw [TopLevelLookup.thetaBadSet_congr actionCircuit pp
     (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)
     (fun id hid => hview basis O h id hid)] at hin
   have hproj : (straightLineRunRecord family basis O).theta =
@@ -125,19 +126,19 @@ theorem actionThetaFailureEvent_prob_le {T : Type*} [DecidableEq T]
     (view : cut.State → CommitmentId → Polynomial Fp)
     (hview : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
       ∀ id, id.isColumnInput →
-        actionRunPolynomial pp family static inputs hvk hI hchar basis O h id =
+        topLevelRunPolynomial actionCircuit pp family static inputs hvk hI hchar basis O h id =
           view ((cut.pre basis).run O) id)
     {epsilon : ENNReal}
     (hbad : ∀ (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
       (s : cut.State), (PMF.uniformOfFintype Fp).toOuterMeasure
-      ↑(TopLevelLookupCoherence.allTopLevelLookupThetaBadSet actionCircuit pp
+      ↑(TopLevelLookup.thetaBadSet actionCircuit pp
         (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) (view s)) ≤ epsilon) :
     (independentProductPMF (orchardGeneratorROSetup query)
       (PMF.uniformOfFintype (BTranscript Fp VestaG
         (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
           + 3 * (pp.mergeDerived actionCircuit).k) → Fp))).toOuterMeasure
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
-          actionThetaFailureEvent pp family static inputs hvk hI hchar)
+          topLevelThetaFailureEvent actionCircuit pp family static inputs hvk hI hchar)
       ≤ (family.Q + 1 : ℕ) * epsilon := by
   refine le_trans (measure_mono (Set.preimage_mono
     (actionThetaFailureEvent_subset pp family static inputs hvk hI hchar cut view hview))) ?_
@@ -154,15 +155,16 @@ theorem actionBetaFailureEvent_subset
     (thetaOf : cut.State → Fp)
     (hview : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
       ∀ id, id.isPermutationInput ∨ id.isLookupInput →
-        actionRunPolynomial pp family static inputs hvk hI hchar basis O h id =
+        topLevelRunPolynomial actionCircuit pp family static inputs hvk hI hchar basis O h id =
           view ((cut.pre basis).run O) id)
     (htheta : ∀ basis O, (straightLineRunRecord family basis O).theta =
       thetaOf ((cut.pre basis).run O)) :
-    actionBetaFailureEvent pp family static inputs hvk hI hchar ⊆
+    topLevelBetaFailureEvent actionCircuit pp family static inputs hvk hI hchar ⊆
       cut.surfaceEvent (fun basis s =>
-        ↑(allResolverPermutationBetaBadSet (vkAt pp basis) (view s) actionActiveRows) ∪
-        ↑(allResolverLookupBetaBadSet (vkAt pp basis)
-          (semanticChRecord (thetaOf s) 0) (view s)
+        ↑(allResolverPermutationBetaBadSet (vkAt pp basis) (view s) (actionCircuit.usableRowsAt actionCircuit.domainExponent)) ∪
+        ↑(allResolverLookupBetaBadSet pp.numProofs (vkAt pp basis)
+          (semanticChRecord (thetaOf s) 0
+            (k := (pp.mergeDerived actionCircuit).k)) (view s)
           ((vkAt pp basis).n - (vkAt pp basis).blindingFactors - 2))) := by
   rintro ⟨basis, O⟩ ⟨h, hmem⟩
   dsimp only at hmem
@@ -171,11 +173,11 @@ theorem actionBetaFailureEvent_subset
     straightLineRunRecord_read pp family basis O 1
   rcases not_and_or.mp hmem with hperm | hlook
   · have hin := not_not.mp hperm
-    rw [allResolverPermutationBetaBadSet_congr (vkAt pp basis) actionActiveRows
+    rw [allResolverPermutationBetaBadSet_congr (vkAt pp basis) (actionCircuit.usableRowsAt actionCircuit.domainExponent)
       (fun id hid => hview basis O h id (Or.inl hid)), hproj] at hin
     exact Set.mem_union_left _ (Finset.mem_coe.mpr hin)
   · have hin := not_not.mp hlook
-    rw [allResolverLookupBetaBadSet_congr (vkAt pp basis)
+    rw [allResolverLookupBetaBadSet_congr pp.numProofs (vkAt pp basis)
       ((vkAt pp basis).n - (vkAt pp basis).blindingFactors - 2)
       ((htheta basis O).trans (semanticChRecord_theta _ _).symm)
       (fun id hid => hview basis O h id (Or.inr hid)), hproj] at hin
@@ -190,23 +192,24 @@ theorem actionBetaFailureEvent_prob_le {T : Type*} [DecidableEq T]
     (thetaOf : cut.State → Fp)
     (hview : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
       ∀ id, id.isPermutationInput ∨ id.isLookupInput →
-        actionRunPolynomial pp family static inputs hvk hI hchar basis O h id =
+        topLevelRunPolynomial actionCircuit pp family static inputs hvk hI hchar basis O h id =
           view ((cut.pre basis).run O) id)
     (htheta : ∀ basis O, (straightLineRunRecord family basis O).theta =
       thetaOf ((cut.pre basis).run O))
     {epsilon : ENNReal}
     (hbad : ∀ (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
       (s : cut.State), (PMF.uniformOfFintype Fp).toOuterMeasure
-      (↑(allResolverPermutationBetaBadSet (vkAt pp basis) (view s) actionActiveRows) ∪
-        ↑(allResolverLookupBetaBadSet (vkAt pp basis)
-          (semanticChRecord (thetaOf s) 0) (view s)
+      (↑(allResolverPermutationBetaBadSet (vkAt pp basis) (view s) (actionCircuit.usableRowsAt actionCircuit.domainExponent)) ∪
+        ↑(allResolverLookupBetaBadSet pp.numProofs (vkAt pp basis)
+          (semanticChRecord (thetaOf s) 0
+            (k := (pp.mergeDerived actionCircuit).k)) (view s)
           ((vkAt pp basis).n - (vkAt pp basis).blindingFactors - 2))) ≤ epsilon) :
     (independentProductPMF (orchardGeneratorROSetup query)
       (PMF.uniformOfFintype (BTranscript Fp VestaG
         (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
           + 3 * (pp.mergeDerived actionCircuit).k) → Fp))).toOuterMeasure
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
-          actionBetaFailureEvent pp family static inputs hvk hI hchar)
+          topLevelBetaFailureEvent actionCircuit pp family static inputs hvk hI hchar)
       ≤ (family.Q + 1 : ℕ) * epsilon := by
   refine le_trans (measure_mono (Set.preimage_mono
     (actionBetaFailureEvent_subset pp family static inputs hvk hI hchar
@@ -223,18 +226,19 @@ theorem actionGammaFailureEvent_subset
     (thetaOf betaOf : cut.State → Fp)
     (hview : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
       ∀ id, id.isPermutationInput ∨ id.isLookupInput →
-        actionRunPolynomial pp family static inputs hvk hI hchar basis O h id =
+        topLevelRunPolynomial actionCircuit pp family static inputs hvk hI hchar basis O h id =
           view ((cut.pre basis).run O) id)
     (htheta : ∀ basis O, (straightLineRunRecord family basis O).theta =
       thetaOf ((cut.pre basis).run O))
     (hbeta : ∀ basis O, (straightLineRunRecord family basis O).beta =
       betaOf ((cut.pre basis).run O)) :
-    actionGammaFailureEvent pp family static inputs hvk hI hchar ⊆
+    topLevelGammaFailureEvent actionCircuit pp family static inputs hvk hI hchar ⊆
       cut.surfaceEvent (fun basis s =>
         ↑(allResolverPermutationGammaBadSet (vkAt pp basis)
-          (semanticChRecord (thetaOf s) (betaOf s)) (view s) actionActiveRows) ∪
-        ↑(allResolverLookupGammaBadSet (vkAt pp basis)
-          (semanticChRecord (thetaOf s) (betaOf s)) (view s)
+          (semanticChRecord (thetaOf s) (betaOf s)) (view s) (actionCircuit.usableRowsAt actionCircuit.domainExponent)) ∪
+        ↑(allResolverLookupGammaBadSet pp.numProofs (vkAt pp basis)
+          (semanticChRecord (thetaOf s) (betaOf s)
+            (k := (pp.mergeDerived actionCircuit).k)) (view s)
           ((vkAt pp basis).n - (vkAt pp basis).blindingFactors - 2))) := by
   rintro ⟨basis, O⟩ ⟨h, hmem⟩
   dsimp only at hmem
@@ -243,12 +247,12 @@ theorem actionGammaFailureEvent_subset
     straightLineRunRecord_read pp family basis O 2
   rcases not_and_or.mp hmem with hperm | hlook
   · have hin := not_not.mp hperm
-    rw [allResolverPermutationGammaBadSet_congr (vkAt pp basis) actionActiveRows
+    rw [allResolverPermutationGammaBadSet_congr (vkAt pp basis) (actionCircuit.usableRowsAt actionCircuit.domainExponent)
       ((hbeta basis O).trans (semanticChRecord_beta _ _).symm)
       (fun id hid => hview basis O h id (Or.inl hid)), hproj] at hin
     exact Set.mem_union_left _ (Finset.mem_coe.mpr hin)
   · have hin := not_not.mp hlook
-    rw [allResolverLookupGammaBadSet_congr (vkAt pp basis)
+    rw [allResolverLookupGammaBadSet_congr pp.numProofs (vkAt pp basis)
       ((vkAt pp basis).n - (vkAt pp basis).blindingFactors - 2)
       ((htheta basis O).trans (semanticChRecord_theta _ _).symm)
       ((hbeta basis O).trans (semanticChRecord_beta _ _).symm)
@@ -264,7 +268,7 @@ theorem actionGammaFailureEvent_prob_le {T : Type*} [DecidableEq T]
     (thetaOf betaOf : cut.State → Fp)
     (hview : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
       ∀ id, id.isPermutationInput ∨ id.isLookupInput →
-        actionRunPolynomial pp family static inputs hvk hI hchar basis O h id =
+        topLevelRunPolynomial actionCircuit pp family static inputs hvk hI hchar basis O h id =
           view ((cut.pre basis).run O) id)
     (htheta : ∀ basis O, (straightLineRunRecord family basis O).theta =
       thetaOf ((cut.pre basis).run O))
@@ -274,16 +278,17 @@ theorem actionGammaFailureEvent_prob_le {T : Type*} [DecidableEq T]
     (hbad : ∀ (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
       (s : cut.State), (PMF.uniformOfFintype Fp).toOuterMeasure
       (↑(allResolverPermutationGammaBadSet (vkAt pp basis)
-          (semanticChRecord (thetaOf s) (betaOf s)) (view s) actionActiveRows) ∪
-        ↑(allResolverLookupGammaBadSet (vkAt pp basis)
-          (semanticChRecord (thetaOf s) (betaOf s)) (view s)
+          (semanticChRecord (thetaOf s) (betaOf s)) (view s) (actionCircuit.usableRowsAt actionCircuit.domainExponent)) ∪
+        ↑(allResolverLookupGammaBadSet pp.numProofs (vkAt pp basis)
+          (semanticChRecord (thetaOf s) (betaOf s)
+            (k := (pp.mergeDerived actionCircuit).k)) (view s)
           ((vkAt pp basis).n - (vkAt pp basis).blindingFactors - 2))) ≤ epsilon) :
     (independentProductPMF (orchardGeneratorROSetup query)
       (PMF.uniformOfFintype (BTranscript Fp VestaG
         (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
           + 3 * (pp.mergeDerived actionCircuit).k) → Fp))).toOuterMeasure
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
-          actionGammaFailureEvent pp family static inputs hvk hI hchar)
+          topLevelGammaFailureEvent actionCircuit pp family static inputs hvk hI hchar)
       ≤ (family.Q + 1 : ℕ) * epsilon := by
   refine le_trans (measure_mono (Set.preimage_mono
     (actionGammaFailureEvent_subset pp family static inputs hvk hI hchar
@@ -299,22 +304,22 @@ index-4 views supply them. -/
 theorem actionXYFailureEvent_subset
     (cutY : SequentialCut family.toComputedAlgebraicFSFamily 3)
     (cutX : SequentialCut family.toComputedAlgebraicFSFamily 4)
-    (modelY : cutY.State → ConstraintPolyModel (pp.mergeDerived actionCircuit).numProofs)
-    (modelX : cutX.State → ConstraintPolyModel (pp.mergeDerived actionCircuit).numProofs)
+    (modelY : cutY.State → ConstraintPolyModel pp.numProofs)
+    (modelX : cutX.State → ConstraintPolyModel pp.numProofs)
     (yOf : cutX.State → Fp) (vanishingOf : cutX.State → Polynomial Fp)
     (hmodelY : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
-      actionRunModel pp family static inputs hvk hI hchar basis O h =
+      topLevelRunModel actionCircuit pp family static inputs hvk hI hchar basis O h =
         modelY ((cutY.pre basis).run O))
     (hmodelX : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
-      actionRunModel pp family static inputs hvk hI hchar basis O h =
+      topLevelRunModel actionCircuit pp family static inputs hvk hI hchar basis O h =
         modelX ((cutX.pre basis).run O))
     (hy : ∀ basis O, (straightLineRunRecord family basis O).y =
       yOf ((cutX.pre basis).run O))
     (hvanishing : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
-      actionRunPolynomial pp family static inputs hvk hI hchar basis O h
+      topLevelRunPolynomial actionCircuit pp family static inputs hvk hI hchar basis O h
           CommitmentId.vanishingH =
         vanishingOf ((cutX.pre basis).run O)) :
-    actionXYFailureEvent pp family static inputs hvk hI hchar ⊆
+    topLevelXYFailureEvent actionCircuit pp family static inputs hvk hI hchar ⊆
       cutX.surfaceEvent (fun basis s =>
         ↑(szBadSet (combineConstraints (modelX s).fixedCols (modelX s).adviceCols
           (modelX s).instanceCols (modelX s).gates (modelX s).sets (modelX s).chunks
@@ -347,19 +352,19 @@ theorem actionXYFailureEvent_prob_le {T : Type*} [DecidableEq T]
     (query : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → T)
     (cutY : SequentialCut family.toComputedAlgebraicFSFamily 3)
     (cutX : SequentialCut family.toComputedAlgebraicFSFamily 4)
-    (modelY : cutY.State → ConstraintPolyModel (pp.mergeDerived actionCircuit).numProofs)
-    (modelX : cutX.State → ConstraintPolyModel (pp.mergeDerived actionCircuit).numProofs)
+    (modelY : cutY.State → ConstraintPolyModel pp.numProofs)
+    (modelX : cutX.State → ConstraintPolyModel pp.numProofs)
     (yOf : cutX.State → Fp) (vanishingOf : cutX.State → Polynomial Fp)
     (hmodelY : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
-      actionRunModel pp family static inputs hvk hI hchar basis O h =
+      topLevelRunModel actionCircuit pp family static inputs hvk hI hchar basis O h =
         modelY ((cutY.pre basis).run O))
     (hmodelX : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
-      actionRunModel pp family static inputs hvk hI hchar basis O h =
+      topLevelRunModel actionCircuit pp family static inputs hvk hI hchar basis O h =
         modelX ((cutX.pre basis).run O))
     (hy : ∀ basis O, (straightLineRunRecord family basis O).y =
       yOf ((cutX.pre basis).run O))
     (hvanishing : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
-      actionRunPolynomial pp family static inputs hvk hI hchar basis O h
+      topLevelRunPolynomial actionCircuit pp family static inputs hvk hI hchar basis O h
           CommitmentId.vanishingH =
         vanishingOf ((cutX.pre basis).run O))
     {epsilonX epsilonY : ENNReal}
@@ -380,7 +385,7 @@ theorem actionXYFailureEvent_prob_le {T : Type*} [DecidableEq T]
         (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
           + 3 * (pp.mergeDerived actionCircuit).k) → Fp))).toOuterMeasure
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
-          actionXYFailureEvent pp family static inputs hvk hI hchar)
+          topLevelXYFailureEvent actionCircuit pp family static inputs hvk hI hchar)
       ≤ (family.Q + 1 : ℕ) * epsilonX + (family.Q + 1 : ℕ) * epsilonY := by
   refine le_trans (measure_mono (Set.preimage_mono
     (actionXYFailureEvent_subset pp family static inputs hvk hI hchar cutY cutX
@@ -403,35 +408,39 @@ theorem actionThetaBadSet_measure_le
     (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
     (poly : CommitmentId → Polynomial Fp) :
     (PMF.uniformOfFintype Fp).toOuterMeasure
-      ↑(TopLevelLookupCoherence.allTopLevelLookupThetaBadSet actionCircuit pp
+      ↑(TopLevelLookup.thetaBadSet actionCircuit pp
         (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) poly) ≤
-      (TopLevelLookupCoherence.topLevelLookupThetaBudget actionCircuit pp
+      (TopLevelLookup.thetaBudget actionCircuit pp
         (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) poly : ℝ≥0∞) /
         (Fintype.card Fp : ℝ≥0∞) :=
-  TopLevelLookupCoherence.uniformChallenge_allTopLevelLookupThetaBadSet
-    TopLevelLookupCoherence.ofTopLevel poly
+  TopLevelLookup.uniformChallenge_thetaBadSet
+    poly
 
 /-- The per-state `β` measure: permutation cells plus lookup pair counts. -/
 theorem actionBetaBadSets_measure_le
     (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
     (theta : Fp) (poly : CommitmentId → Polynomial Fp) :
     (PMF.uniformOfFintype Fp).toOuterMeasure
-      (↑(allResolverPermutationBetaBadSet (vkAt pp basis) poly actionActiveRows) ∪
-        ↑(allResolverLookupBetaBadSet (vkAt pp basis) (semanticChRecord theta 0) poly
+      (↑(allResolverPermutationBetaBadSet (vkAt pp basis) poly (actionCircuit.usableRowsAt actionCircuit.domainExponent)) ∪
+        ↑(allResolverLookupBetaBadSet pp.numProofs (vkAt pp basis)
+          (semanticChRecord theta 0
+            (k := (pp.mergeDerived actionCircuit).k)) poly
           ((vkAt pp basis).n - (vkAt pp basis).blindingFactors - 2))) ≤
-      ((∑ p : Fin (pp.mergeDerived actionCircuit).numProofs,
-        (Fintype.card (ResolverPermutationCell (vkAt pp basis) poly p actionActiveRows) + 1) *
-          Fintype.card (ResolverPermutationCell (vkAt pp basis) poly p actionActiveRows) :
+      ((∑ p : Fin pp.numProofs,
+        (Fintype.card (ResolverPermutationCell (vkAt pp basis) poly p (actionCircuit.usableRowsAt actionCircuit.domainExponent)) + 1) *
+          Fintype.card (ResolverPermutationCell (vkAt pp basis) poly p (actionCircuit.usableRowsAt actionCircuit.domainExponent)) :
             ℕ) : ℝ≥0∞) / Fintype.card Fp +
-      (((pp.mergeDerived actionCircuit).numProofs * (pp.mergeDerived actionCircuit).numLookups *
+      ((pp.numProofs * actionCircuit.lookupCount *
         (((vkAt pp basis).n - (vkAt pp basis).blindingFactors - 2 + 2) *
             ((vkAt pp basis).n - (vkAt pp basis).blindingFactors - 2 + 1) +
           ((vkAt pp basis).n - (vkAt pp basis).blindingFactors - 2 + 1)) : ℕ) : ℝ≥0∞) /
         Fintype.card Fp :=
   le_trans (measure_union_le _ _)
     (add_le_add
-      (allResolverPermutationBetaBadSet_measure_le (vkAt pp basis) poly actionActiveRows)
-      (allResolverLookupBetaBadSet_measure_le (vkAt pp basis) (semanticChRecord theta 0) poly
+      (allResolverPermutationBetaBadSet_measure_le (vkAt pp basis) poly (actionCircuit.usableRowsAt actionCircuit.domainExponent))
+      (allResolverLookupBetaBadSet_measure_le pp.numProofs (vkAt pp basis)
+        (semanticChRecord theta 0
+          (k := (pp.mergeDerived actionCircuit).k)) poly
         ((vkAt pp basis).n - (vkAt pp basis).blindingFactors - 2)))
 
 /-- The per-state `γ` measure: doubled permutation cells plus lookup pair counts. -/
@@ -440,20 +449,24 @@ theorem actionGammaBadSets_measure_le
     (theta beta : Fp) (poly : CommitmentId → Polynomial Fp) :
     (PMF.uniformOfFintype Fp).toOuterMeasure
       (↑(allResolverPermutationGammaBadSet (vkAt pp basis)
-          (semanticChRecord theta beta) poly actionActiveRows) ∪
-        ↑(allResolverLookupGammaBadSet (vkAt pp basis) (semanticChRecord theta beta) poly
+          (semanticChRecord theta beta) poly (actionCircuit.usableRowsAt actionCircuit.domainExponent)) ∪
+        ↑(allResolverLookupGammaBadSet pp.numProofs (vkAt pp basis)
+          (semanticChRecord theta beta
+            (k := (pp.mergeDerived actionCircuit).k)) poly
           ((vkAt pp basis).n - (vkAt pp basis).blindingFactors - 2))) ≤
-      ((∑ p : Fin (pp.mergeDerived actionCircuit).numProofs,
-        2 * Fintype.card (ResolverPermutationCell (vkAt pp basis) poly p actionActiveRows) :
+      ((∑ p : Fin pp.numProofs,
+        2 * Fintype.card (ResolverPermutationCell (vkAt pp basis) poly p (actionCircuit.usableRowsAt actionCircuit.domainExponent)) :
           ℕ) : ℝ≥0∞) / Fintype.card Fp +
-      (((pp.mergeDerived actionCircuit).numProofs * (pp.mergeDerived actionCircuit).numLookups *
+      ((pp.numProofs * actionCircuit.lookupCount *
         (2 * ((vkAt pp basis).n - (vkAt pp basis).blindingFactors - 2 + 1)) : ℕ) : ℝ≥0∞) /
         Fintype.card Fp :=
   le_trans (measure_union_le _ _)
     (add_le_add
       (allResolverPermutationGammaBadSet_measure_le (vkAt pp basis)
-        (semanticChRecord theta beta) poly actionActiveRows)
-      (allResolverLookupGammaBadSet_measure_le (vkAt pp basis) (semanticChRecord theta beta)
+        (semanticChRecord theta beta) poly (actionCircuit.usableRowsAt actionCircuit.domainExponent))
+      (allResolverLookupGammaBadSet_measure_le pp.numProofs (vkAt pp basis)
+        (semanticChRecord theta beta
+          (k := (pp.mergeDerived actionCircuit).k))
         poly ((vkAt pp basis).n - (vkAt pp basis).blindingFactors - 2)))
 
 /-- The per-state `y` measure: `n` times the constraint count over the field size. -/
@@ -513,41 +526,41 @@ structure ActionSequentialExecution (Dx L : ℕ) where
   betaPhase : SequentialPhase family.toComputedAlgebraicFSFamily 1 ActionBetaSnapshot
   gammaPhase : SequentialPhase family.toComputedAlgebraicFSFamily 2 ActionGammaSnapshot
   yPhase : SequentialPhase family.toComputedAlgebraicFSFamily 3
-    (ActionYSnapshot (pp.mergeDerived actionCircuit).numProofs)
+    (ActionYSnapshot pp.numProofs)
   xPhase : SequentialPhase family.toComputedAlgebraicFSFamily 4
-    (ActionXSnapshot (pp.mergeDerived actionCircuit).numProofs)
+    (ActionXSnapshot pp.numProofs)
   hthetaPolynomial : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
     ∀ id, id.isColumnInput →
-      actionRunPolynomial pp family static inputs hvk hI hchar basis O h id =
+      topLevelRunPolynomial actionCircuit pp family static inputs hvk hI hchar basis O h id =
         ((thetaPhase.pre basis).run O).polynomial id
   hbetaPolynomial : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
     ∀ id, id.isPermutationInput ∨ id.isLookupInput →
-      actionRunPolynomial pp family static inputs hvk hI hchar basis O h id =
+      topLevelRunPolynomial actionCircuit pp family static inputs hvk hI hchar basis O h id =
         ((betaPhase.pre basis).run O).polynomial id
   hbetaTheta : ∀ basis O, (straightLineRunRecord family basis O).theta =
     ((betaPhase.pre basis).run O).theta
   hgammaPolynomial : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
     ∀ id, id.isPermutationInput ∨ id.isLookupInput →
-      actionRunPolynomial pp family static inputs hvk hI hchar basis O h id =
+      topLevelRunPolynomial actionCircuit pp family static inputs hvk hI hchar basis O h id =
         ((gammaPhase.pre basis).run O).polynomial id
   hgammaTheta : ∀ basis O, (straightLineRunRecord family basis O).theta =
     ((gammaPhase.pre basis).run O).theta
   hgammaBeta : ∀ basis O, (straightLineRunRecord family basis O).beta =
     ((gammaPhase.pre basis).run O).beta
   hyModel : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
-    actionRunModel pp family static inputs hvk hI hchar basis O h =
+    topLevelRunModel actionCircuit pp family static inputs hvk hI hchar basis O h =
       ((yPhase.pre basis).run O).model
-  ylen : ∀ s : ActionYSnapshot (pp.mergeDerived actionCircuit).numProofs,
+  ylen : ∀ s : ActionYSnapshot pp.numProofs,
     s.model.constraints.length ≤ L
   hxModel : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
-    actionRunModel pp family static inputs hvk hI hchar basis O h =
+    topLevelRunModel actionCircuit pp family static inputs hvk hI hchar basis O h =
       ((xPhase.pre basis).run O).model
   hxY : ∀ basis O, (straightLineRunRecord family basis O).y =
     ((xPhase.pre basis).run O).y
   hxVanishing : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
-    actionRunPolynomial pp family static inputs hvk hI hchar basis O h
+    topLevelRunPolynomial actionCircuit pp family static inputs hvk hI hchar basis O h
         CommitmentId.vanishingH = ((xPhase.pre basis).run O).vanishing
-  xdeg : ∀ basis (s : ActionXSnapshot (pp.mergeDerived actionCircuit).numProofs),
+  xdeg : ∀ basis (s : ActionXSnapshot pp.numProofs),
     (combineConstraints s.model.fixedCols s.model.adviceCols s.model.instanceCols
       s.model.gates s.model.sets s.model.chunks s.model.lookups s.model.beta s.model.gamma
       s.model.delta s.model.theta s.y s.model.chunkLen s.model.l0 s.model.lLast
@@ -562,7 +575,7 @@ structure ActionSequentialCuts (Dx L : ℕ) where
   /-- The `θ` view agrees with the decoded run polynomial on the query columns. -/
   hview0 : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
     ∀ id, id.isColumnInput →
-      actionRunPolynomial pp family static inputs hvk hI hchar basis O h id =
+      topLevelRunPolynomial actionCircuit pp family static inputs hvk hI hchar basis O h id =
         view0 ((cut0.pre basis).run O) id
   /-- The cut at the `β` squeeze. -/
   cut1 : SequentialCut family.toComputedAlgebraicFSFamily 1
@@ -573,7 +586,7 @@ structure ActionSequentialCuts (Dx L : ℕ) where
   /-- The `β` view agrees with the decoded run polynomial on both input classes. -/
   hview1 : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
     ∀ id, id.isPermutationInput ∨ id.isLookupInput →
-      actionRunPolynomial pp family static inputs hvk hI hchar basis O h id =
+      topLevelRunPolynomial actionCircuit pp family static inputs hvk hI hchar basis O h id =
         view1 ((cut1.pre basis).run O) id
   /-- The state's `θ` is the run record's. -/
   htheta1 : ∀ basis O, (straightLineRunRecord family basis O).theta =
@@ -589,7 +602,7 @@ structure ActionSequentialCuts (Dx L : ℕ) where
   /-- The `γ` view agrees with the decoded run polynomial on both input classes. -/
   hview2 : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
     ∀ id, id.isPermutationInput ∨ id.isLookupInput →
-      actionRunPolynomial pp family static inputs hvk hI hchar basis O h id =
+      topLevelRunPolynomial actionCircuit pp family static inputs hvk hI hchar basis O h id =
         view2 ((cut2.pre basis).run O) id
   /-- The state's `θ` is the run record's. -/
   htheta2 : ∀ basis O, (straightLineRunRecord family basis O).theta =
@@ -600,31 +613,31 @@ structure ActionSequentialCuts (Dx L : ℕ) where
   /-- The cut at the `y` squeeze. -/
   cut3 : SequentialCut family.toComputedAlgebraicFSFamily 3
   /-- The accepted model, read off the pre-`y` state. -/
-  modelY : cut3.State → ConstraintPolyModel (pp.mergeDerived actionCircuit).numProofs
+  modelY : cut3.State → ConstraintPolyModel pp.numProofs
   /-- The `y` model view agrees with the decoded run model. -/
   hmodelY : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
-    actionRunModel pp family static inputs hvk hI hchar basis O h =
+    topLevelRunModel actionCircuit pp family static inputs hvk hI hchar basis O h =
       modelY ((cut3.pre basis).run O)
   /-- The `y` view's constraint count is capped: decoded models carry the key's list shape. -/
   ylen : ∀ s, (modelY s).constraints.length ≤ L
   /-- The cut at the `x` squeeze. -/
   cut4 : SequentialCut family.toComputedAlgebraicFSFamily 4
   /-- The accepted model, read off the pre-`x` state. -/
-  modelX : cut4.State → ConstraintPolyModel (pp.mergeDerived actionCircuit).numProofs
+  modelX : cut4.State → ConstraintPolyModel pp.numProofs
   /-- The `y` answer carried by the pre-`x` state. -/
   yOf : cut4.State → Fp
   /-- The vanishing commitment's polynomial, read off the pre-`x` state. -/
   vanishingOf : cut4.State → Polynomial Fp
   /-- The `x` model view agrees with the decoded run model. -/
   hmodelX : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
-    actionRunModel pp family static inputs hvk hI hchar basis O h =
+    topLevelRunModel actionCircuit pp family static inputs hvk hI hchar basis O h =
       modelX ((cut4.pre basis).run O)
   /-- The state's `y` is the run record's. -/
   hy : ∀ basis O, (straightLineRunRecord family basis O).y =
     yOf ((cut4.pre basis).run O)
   /-- The vanishing view agrees with the decoded run polynomial at the vanishing slot. -/
   hvanishing : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
-    actionRunPolynomial pp family static inputs hvk hI hchar basis O h
+    topLevelRunPolynomial actionCircuit pp family static inputs hvk hI hchar basis O h
         CommitmentId.vanishingH =
       vanishingOf ((cut4.pre basis).run O)
   /-- The `x` fold degree is capped: decoded representations have degree below `2^k`. -/
@@ -676,14 +689,14 @@ theorem ActionSequentialCuts.theta_prob_le {T : Type*} [DecidableEq T]
     {Ntheta : ℕ}
     (hbudget : ∀ (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
       (poly : CommitmentId → Polynomial Fp),
-      TopLevelLookupCoherence.topLevelLookupThetaBudget actionCircuit pp
+      TopLevelLookup.thetaBudget actionCircuit pp
         (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) poly ≤ Ntheta) :
     (independentProductPMF (orchardGeneratorROSetup query)
       (PMF.uniformOfFintype (BTranscript Fp VestaG
         (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
           + 3 * (pp.mergeDerived actionCircuit).k) → Fp))).toOuterMeasure
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
-          actionThetaFailureEvent pp family static inputs hvk hI hchar)
+          topLevelThetaFailureEvent actionCircuit pp family static inputs hvk hI hchar)
       ≤ (family.Q + 1 : ℕ) * ((Ntheta : ℝ≥0∞) / (Fintype.card Fp : ℝ≥0∞)) := by
   refine actionThetaFailureEvent_prob_le pp family static inputs hvk hI hchar query
     cuts.cut0 cuts.view0 cuts.hview0 (fun basis s => ?_)
@@ -699,10 +712,10 @@ theorem ActionSequentialCuts.beta_prob_le {T : Type*} [DecidableEq T]
     {Nbeta : ℕ}
     (hcap : ∀ (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
       (poly : CommitmentId → Polynomial Fp),
-      (∑ p : Fin (pp.mergeDerived actionCircuit).numProofs,
-        (Fintype.card (ResolverPermutationCell (vkAt pp basis) poly p actionActiveRows) + 1) *
-          Fintype.card (ResolverPermutationCell (vkAt pp basis) poly p actionActiveRows)) +
-      (pp.mergeDerived actionCircuit).numProofs * (pp.mergeDerived actionCircuit).numLookups *
+      (∑ p : Fin pp.numProofs,
+        (Fintype.card (ResolverPermutationCell (vkAt pp basis) poly p (actionCircuit.usableRowsAt actionCircuit.domainExponent)) + 1) *
+          Fintype.card (ResolverPermutationCell (vkAt pp basis) poly p (actionCircuit.usableRowsAt actionCircuit.domainExponent))) +
+      pp.numProofs * actionCircuit.lookupCount *
         (((vkAt pp basis).n - (vkAt pp basis).blindingFactors - 2 + 2) *
             ((vkAt pp basis).n - (vkAt pp basis).blindingFactors - 2 + 1) +
           ((vkAt pp basis).n - (vkAt pp basis).blindingFactors - 2 + 1)) ≤ Nbeta) :
@@ -711,7 +724,7 @@ theorem ActionSequentialCuts.beta_prob_le {T : Type*} [DecidableEq T]
         (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
           + 3 * (pp.mergeDerived actionCircuit).k) → Fp))).toOuterMeasure
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
-          actionBetaFailureEvent pp family static inputs hvk hI hchar)
+          topLevelBetaFailureEvent actionCircuit pp family static inputs hvk hI hchar)
       ≤ (family.Q + 1 : ℕ) * ((Nbeta : ℝ≥0∞) / (Fintype.card Fp : ℝ≥0∞)) := by
   refine actionBetaFailureEvent_prob_le pp family static inputs hvk hI hchar query
     cuts.cut1 cuts.view1 cuts.theta1 cuts.hview1 cuts.htheta1 (fun basis s => ?_)
@@ -728,16 +741,16 @@ theorem ActionSequentialCuts.gamma_prob_le {T : Type*} [DecidableEq T]
     {Ngamma : ℕ}
     (hcap : ∀ (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
       (poly : CommitmentId → Polynomial Fp),
-      (∑ p : Fin (pp.mergeDerived actionCircuit).numProofs,
-        2 * Fintype.card (ResolverPermutationCell (vkAt pp basis) poly p actionActiveRows)) +
-      (pp.mergeDerived actionCircuit).numProofs * (pp.mergeDerived actionCircuit).numLookups *
+      (∑ p : Fin pp.numProofs,
+        2 * Fintype.card (ResolverPermutationCell (vkAt pp basis) poly p (actionCircuit.usableRowsAt actionCircuit.domainExponent))) +
+      pp.numProofs * actionCircuit.lookupCount *
         (2 * ((vkAt pp basis).n - (vkAt pp basis).blindingFactors - 2 + 1)) ≤ Ngamma) :
     (independentProductPMF (orchardGeneratorROSetup query)
       (PMF.uniformOfFintype (BTranscript Fp VestaG
         (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
           + 3 * (pp.mergeDerived actionCircuit).k) → Fp))).toOuterMeasure
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
-          actionGammaFailureEvent pp family static inputs hvk hI hchar)
+          topLevelGammaFailureEvent actionCircuit pp family static inputs hvk hI hchar)
       ≤ (family.Q + 1 : ℕ) * ((Ngamma : ℝ≥0∞) / (Fintype.card Fp : ℝ≥0∞)) := by
   refine actionGammaFailureEvent_prob_le pp family static inputs hvk hI hchar query
     cuts.cut2 cuts.view2 cuts.theta2 cuts.beta2 cuts.hview2 cuts.htheta2 cuts.hbeta2
@@ -763,7 +776,7 @@ theorem ActionSequentialCuts.xy_prob_le {T : Type*} [DecidableEq T]
         (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
           + 3 * (pp.mergeDerived actionCircuit).k) → Fp))).toOuterMeasure
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
-          actionXYFailureEvent pp family static inputs hvk hI hchar)
+          topLevelXYFailureEvent actionCircuit pp family static inputs hvk hI hchar)
       ≤ (family.Q + 1 : ℕ) * ((Dx : ℝ≥0∞) / (Fintype.card Fp : ℝ≥0∞)) +
         (family.Q + 1 : ℕ) * ((Ny : ℝ≥0∞) / (Fintype.card Fp : ℝ≥0∞)) := by
   refine actionXYFailureEvent_prob_le pp family static inputs hvk hI hchar query

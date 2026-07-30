@@ -1,4 +1,4 @@
-import Mathlib
+import Mathlib.Tactic
 import Zcash.Security.Ledger.Model
 
 /-!
@@ -87,7 +87,7 @@ def nonZeroSpends (ledger : Ledger KW F G RHO PSI MHASH MENC MSG SIG d) (i : ℕ
 
 /-- The shielded pool balance after the first `i` transactions: output value total minus
 nonzero-spend value total, both read off the witnesses. -/
-def poolValueBalance (ledger : Ledger KW F G RHO PSI MHASH MENC MSG SIG d) (i : ℕ) : ℤ :=
+def shieldedPoolBalance (ledger : Ledger KW F G RHO PSI MHASH MENC MSG SIG d) (i : ℕ) : ℤ :=
   (((positionedOutputs ledger i).map fun p => (p.opening.note.v : ℤ)).sum : ℤ)
     - ((nonZeroSpends ledger i).map fun p => (p.opening.note.v : ℤ)).sum
 

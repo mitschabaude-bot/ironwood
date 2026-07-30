@@ -1,4 +1,4 @@
-import Mathlib
+import Mathlib.Tactic
 import Zcash.Snark.Soundness.Constraints
 import Zcash.Snark.Soundness.Forking.Oracle
 

@@ -1,4 +1,4 @@
-import Mathlib
+import Mathlib.Data.Nat.Notation
 
 /-!
 # Sequencing a computed break branch
@@ -46,7 +46,7 @@ def andThenOrRelationWitness {A : Sort u} {B : Sort v} {R : Sort w}
 
 /-- Traverse a `Fin`-indexed family of computed outcomes left to right: every left-hand value, or
 the first right-hand value as data — no existential search. -/
-def finForallOrRelationWitness {n : ℕ} {A : Fin n → Sort v} {R : Sort w}
+def finForallOrRelationWitness {n : Nat} {A : Fin n → Sort v} {R : Sort w}
     (outcome : ∀ i, A i ⊕' R) : (∀ i, A i) ⊕' R := by
   induction n with
   | zero => exact PSum.inl fun i => Fin.elim0 i
@@ -95,7 +95,7 @@ theorem finForallOption_isSome_of {n : ℕ} {A : Fin n → Type v}
 /-- The bounded-`ℕ` analogue of `finForallOrRelationWitness`. Column and row families in the
 compiled constraint system are indexed by a natural number under a bound rather than by `Fin n`,
 so this is the shape their folds actually have. -/
-def boundedForallOrRelationWitness {n : ℕ} {A : ℕ → Sort v} {R : Sort w}
+def boundedForallOrRelationWitness {n : Nat} {A : Nat → Sort v} {R : Sort w}
     (outcome : ∀ i, i < n → A i ⊕' R) : (∀ i, i < n → A i) ⊕' R :=
   bindOrRelationWitness
     (finForallOrRelationWitness (A := fun i : Fin n => A i.val)

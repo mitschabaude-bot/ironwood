@@ -2,7 +2,6 @@ import Zcash.Circuits.Action.TopLevel
 import Zcash.Circuits.Integration.FixedColumns
 import Zcash.Common.RelationWitness
 import Zcash.Circuits.Integration.InstanceColumns
-import Zcash.Circuits.Integration.QueryLayouts
 import Zcash.Circuits.Integration.TopLevelLookups
 import Zcash.Snark.Soundness.Multiopen.CanonicalRelation
 import Zcash.Circuits.Integration.TopLevelCircuit
@@ -13,6 +12,7 @@ import Zcash.Circuits.Integration.ActionFixedCoherenceCompute
 import Zcash.Circuits.Integration.ActionGateCoherence
 import Zcash.Circuits.Integration.ActionLookupSelectorRows
 import Zcash.Snark.Keygen.Pipeline
+import Mathlib.Util.AssertNoSorry
 
 /-!
 # Action correctness instantiation
@@ -48,7 +48,7 @@ def actionTopLevelCircuitCorrectness
     (hk :
       (pp.mergeDerived actionCircuit).k = urs.k)
     (instanceCommitment :
-      Fin (pp.mergeDerived actionCircuit).numProofs →
+      Fin pp.numProofs →
         ℕ → G)
     (ps : ProofString
       (pp.mergeDerived actionCircuit) Fp G)
@@ -77,7 +77,7 @@ def actionTopLevelCircuitCorrectness
       CanonicalMemberConstraintRelation
         urs hk (actionCircuit.toVerifierKey pp urs)
         instanceCommitment ps ch pU pW a batchOpenings memberDecode
-        (ActionPermutationDomain.blindingFactors_lt pp urs)
+        (actionCircuit.toVerifierKey_blindingFactors_lt_n pp urs)
         ch.y hpoly
         (actionCircuit.toVerifierKey pp urs).n)
     (hgoodY : ∀ j,
@@ -89,7 +89,7 @@ def actionTopLevelCircuitCorrectness
         (actionCircuit.toVerifierKey pp urs)
         ch relation.polynomial actionActiveRows)
     (lookupExclusions :
-      TopLevelLookupCoherence.TopLevelLookupChallengeExclusions
+      TopLevelLookup.ChallengeExclusions
         actionCircuit pp urs ch relation.polynomial) :
     TopLevelCircuitCorrectness
       actionCircuit pp urs ch relation.polynomial
@@ -97,12 +97,12 @@ def actionTopLevelCircuitCorrectness
       (NontrivialRelation (F := Fp) urs.g urs.u urs.w) := by
   classical
   let fixedCoherence :
-      TopLevelFixedCoherence actionCircuit pp urs :=
-    ActionFixedCoherence.ofDerived pp urs hk
+      TopLevelFixedCoherence actionCircuit urs :=
+    ActionFixedCoherence.ofDerived urs hk
   have hdomainSize :
       (actionCircuit.toVerifierKey pp urs).n = 2 ^ urs.k := by
     change
-      2 ^ actionCircuit.domainExponent = 2 ^ urs.k
+      actionCircuit.n = 2 ^ urs.k
     exact congrArg (2 ^ ·) hk
   have hfixedRows : Function.Injective
       fun i : Fin (2 ^ urs.k) =>
@@ -110,7 +110,7 @@ def actionTopLevelCircuitCorrectness
           (i : ℕ) :=
     actionRowsInjectiveAtUrs pp urs hk
   refine
-    { gates := ActionGateCoherence.topLevelGateCoherence pp urs
+    { gates := ActionGateCoherence.topLevel
       fixedEncoding := ?_
       fixed := ?_
       copies := ?_
@@ -122,12 +122,13 @@ def actionTopLevelCircuitCorrectness
         actionCircuit.fixedRows
         actionCircuit.fixedRows_length
         fixedCoherence.key fixedCoherence.commitment
-        fixedCoherence.fixedQueryCount fixedCoherence.queryLayout
+        (actionCircuit.toVerifierKey_fixedQueryCount pp urs)
+        fixedCoherence.queryLayout
         fixedCoherence.queryLayoutBounded hfixedRows)
       fun hbinding => ?_
     let assignment :
         TopLevelAssignment actionCircuit
-          (pp.mergeDerived actionCircuit).numProofs
+          pp.numProofs
           proofIndex :=
       { polynomial := relation.polynomial }
     apply topLevelFixedColumnEncoding_of_binding
@@ -139,17 +140,12 @@ def actionTopLevelCircuitCorrectness
         (top := actionCircuit)
         ActionPermutationDomain.domainExponent_lt)
     intro column
-    change
-      relation.polynomial (.fixedCol column) =
-        instanceRowPolynomial
-          (2 ^ actionCircuit.domainExponent)
-          (actionCircuit.toVerifierKey pp urs).omega
-          (actionCircuit.fixedRows.getD column [])
     have hkTop :
         actionCircuit.domainExponent = urs.k :=
       hk
-    rw [hkTop]
-    exact hbinding column
+    simpa only [assignment,
+      actionCircuit.n_eq_two_pow_domainExponent, hkTop,
+      actionCircuit.toVerifierKey_omega] using hbinding column
   · intro proofIndex
     exact relation.topLevelFixedConstraints_or_relation
       rfl fixedCoherence hfixedRows hdomainSize proofIndex
@@ -159,10 +155,7 @@ def actionTopLevelCircuitCorrectness
         pp urs hk relation hgoodY fixedCoherence
         permutationExclusions proofIndex
   · intro proofIndex
-    · let lookupCoherence :
-          TopLevelLookupCoherence actionCircuit :=
-        TopLevelLookupCoherence.ofTopLevel
-      have hrows : Function.Injective
+    · have hrows : Function.Injective
           fun i : Fin
               (actionCircuit.toVerifierKey pp urs).n =>
             (actionCircuit.toVerifierKey pp urs).omega ^
@@ -174,8 +167,8 @@ def actionTopLevelCircuitCorrectness
             (actionCircuit.toVerifierKey pp urs).n = 1 :=
         ActionPermutationDomain.root pp urs
       have hn : (actionCircuit.toVerifierKey pp urs).n ≠ 0 := by
-        change 2 ^ actionCircuit.domainExponent ≠ 0
-        positivity
+        rw [actionCircuit.toVerifierKey_n]
+        exact actionCircuit.n_ne_zero
       have hsatisfaction :=
         relation.constraintSatisfaction hn hgoodY
       refine bindOrRelationWitness
@@ -183,7 +176,7 @@ def actionTopLevelCircuitCorrectness
           (operationEnabledLookups (actionCircuit.operations) 0)
           fun lookup henabled => ?_)
         fun lookupSelectorValues =>
-          TopLevelLookupCoherence.TopLevelLookupWitnessConditions.ofChallengeExclusions
+          TopLevelLookup.WitnessConditions.ofChallengeExclusions
             ch relation.polynomial proofIndex
             lookupSelectorValues lookupExclusions
       · have hrow :
@@ -192,7 +185,7 @@ def actionTopLevelCircuitCorrectness
           by
             change
               actionCircuit.placement lookup.region + lookup.row <
-                2 ^ actionCircuit.domainExponent
+                actionCircuit.n
             exact
               (lookup.activationRow_lt_usableRows henabled).trans_le
                 (by
@@ -221,7 +214,7 @@ def actionTopLevelCircuitCorrectness
                   exact fixedQuery_of_layout
                     (actionCircuit.toVerifierKey pp urs)
                     instanceCommitment ps ch column rotation
-                    fixedCoherence.fixedQueryCount hlayout))
+                    (actionCircuit.toVerifierKey_fixedQueryCount pp urs) hlayout))
             proofIndex hrow hexact
         exact hvalues
 

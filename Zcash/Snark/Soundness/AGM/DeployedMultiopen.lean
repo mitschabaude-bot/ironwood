@@ -1,5 +1,6 @@
 import Zcash.Snark.Soundness.AGM.AlgebraicUnbatch
 import Zcash.Snark.Soundness.AGM.ShiftRecovery
+import Zcash.Snark.Soundness.Multiopen.Deployed
 
 /-!
 # AGM unbatching for the deployed `x₄` multiopen collapse

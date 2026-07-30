@@ -42,24 +42,21 @@ only the representation boundaries that genuinely come from other streams:
 * one bundle-wide record of lookup challenge exclusions.
 -/
 def ofTopLevelCanonical
-    (gateCoherence : TopLevelGateCoherence top pp urs)
-    (ch : Challenges (pp.mergeDerived top).k Fp)
+    {k : ℕ}
+    (gateCoherence : TopLevelGateCoherence top)
+    (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp)
-    (proofIndex : Fin (pp.mergeDerived top).numProofs)
-    (hblinding :
-      (top.toVerifierKey pp urs).blindingFactors <
-        (top.toVerifierKey pp urs).n)
+    (proofIndex : Fin pp.numProofs)
     (satisfaction :
       ConstraintSatisfaction
-        (canonicalConstraintModelOfPermutationResolver
-          (top.toVerifierKey pp urs) ch poly hblinding)
-        (top.toVerifierKey pp urs).n)
+        (top.constraintModel pp urs ch poly)
+        top.n)
     (hrows : Function.Injective
-      fun row : Fin (top.toVerifierKey pp urs).n =>
-        (top.toVerifierKey pp urs).omega ^ (row : ℕ))
+      fun row : Fin top.n =>
+        top.omega ^ (row : ℕ))
     (hroot :
-      (top.toVerifierKey pp urs).omega ^
-        (top.toVerifierKey pp urs).n = 1)
+      top.omega ^
+        top.n = 1)
     (selectorActivations :
       SelectorActivationsRealized top.selectorMap
         top.selectorActivations
@@ -79,28 +76,26 @@ def ofTopLevelCanonical
           (top.usableRowsAt top.domainExponent))
         (top.operations) cell Bad)
     (lookupConditions :
-      TopLevelLookupCoherence.TopLevelLookupWitnessConditions
+      TopLevelLookup.WitnessConditions
         top pp urs ch poly proofIndex) :
     FullCircuitBridge top.placement
       (resolverEnvironment
         (top.toVerifierKey pp urs) poly proofIndex
         (top.usableRowsAt top.domainExponent))
       (top.operations) 0 cell Bad := by
-  let lookupCoherence : TopLevelLookupCoherence top :=
-    TopLevelLookupCoherence.ofTopLevel
   refine
     { gates := ?_
       fixed := fixed
       copies := copies
       theta := ch.theta
       lookups := ?_ }
-  · apply gateCoherence.canonicalConstraints ch poly hblinding proofIndex
+  · apply gateCoherence.canonicalConstraints ch poly proofIndex
       satisfaction
     · intro row
       rw [← pow_mul, Nat.mul_comm, pow_mul, hroot, one_pow]
     · exact selectorActivations
-  · exact lookupCoherence.deployedWitnesses gateCoherence ch poly proofIndex
-      hblinding satisfaction hrows hroot lookupConditions
+  · exact TopLevelLookup.deployedWitnesses gateCoherence ch poly proofIndex
+      satisfaction hrows hroot lookupConditions
 
 /--
 Lift per-proof full bridges to a bundle of circuit-owned statements while

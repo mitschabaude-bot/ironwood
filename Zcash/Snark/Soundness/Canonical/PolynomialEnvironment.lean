@@ -1,3 +1,4 @@
+import Mathlib.LinearAlgebra.Lagrange
 import Zcash.Snark.Soundness.Constraints
 
 /-!

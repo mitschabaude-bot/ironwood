@@ -1,4 +1,5 @@
 import CompElliptic.Curves.Pasta.Fast.Projective
+import Mathlib.Algebra.Module.ZMod
 import Zcash.Arithmetic.Field
 import CompElliptic.Curves.PastaOrder
 

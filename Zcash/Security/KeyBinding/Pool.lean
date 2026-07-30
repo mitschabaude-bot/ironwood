@@ -53,9 +53,9 @@ structure KB
   ivk_ne : w.ivk ≠ 0
 
 /-- Two valid openings of the same `ivk` which disagree on an opening
-projection.  A later cryptographic layer may reduce this event to the
+projection. A later cryptographic layer may reduce this event to the
 appropriate Sinsemilla/DLR relation. -/
-structure Break
+structure CommitIvkCollision
     (extract : G → B) (hash : B → B → Option G) (commitIvkR : G)
     (w₁ w₂ : Witness F G B) : Prop where
   kb₁ : KB extract hash commitIvkR w₁
@@ -76,7 +76,7 @@ def toInterface
   nk := Witness.nk
   akP := Witness.akP
   KB := KB extract hash commitIvkR
-  Break := Break extract hash commitIvkR
+  Break := CommitIvkCollision extract hash commitIvkR
   break_of_nk_ne {w₁ w₂} h₁ h₂ hivk hnk := by
     refine ⟨h₁, h₂, hivk, fun heq => hnk ?_⟩
     exact congrArg BreakProjection.nk heq

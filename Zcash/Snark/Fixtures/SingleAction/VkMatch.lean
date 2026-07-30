@@ -97,7 +97,7 @@ well-formed: the domain exponent computes to orchard's pinned `K = 11`
 `native_decide` — separate per-fact theorems would re-evaluate the shared selector-map
 and projection work once each; the field/fact splits below are `congrArg` projections
 of this single evaluation. -/
-theorem deploymentIdentityBundle :
+private theorem bundle_pinned :
     (capturedPinnedView, actionK,
       actionCS.invalidQueriedCells.isEmpty,
       (flatGates actionCS).all
@@ -110,7 +110,7 @@ theorem capturedPinnedView_eq_derived_and_wellFormed :
       (flatGates actionCircuit.constraintSystem).all
         (·.selectorsCovered (fun i => (actionCircuit.selectorMap.lookup i).isSome)))
       = (actionPinnedCs, 11, true, true) := by
-  have h := deploymentIdentityBundle
+  have h := bundle_pinned
   simpa only [actionSelMap, actionK, actionCS] using h
 
 /-- **The capture is the derived Action circuit** (pinned CS, captured families). -/
@@ -189,40 +189,26 @@ computable from the circuit: `omega`/`n` from the derived domain exponent
 advice queries, `delta` a pasta constant, `chunkLen` from the ported `cs.degree()`,
 and `permutationChunks` the recorded permutation columns chunked by it. -/
 
-/-- ONE bundled `native_decide` for the scalars and the permutation chunks (separate
-theorems would re-evaluate the shared selector-map/projection work once each; the
-nesting `((…), chunks)` rather than a flat 6-tuple is what instance synthesis accepts). -/
-private theorem bundle_scalars :
-    ((vk.omega, vk.n, vk.blindingFactors, vk.delta, vk.chunkLen), vk.permutationChunks)
-      = ((omegaOf actionK, 2 ^ actionK, actionCS.blindingFactors, deltaFp,
-            actionCS.chunkLen),
-          Keygen.permutationChunksOf actionPinnedCs actionCS.chunkLen) := by
-  native_decide
-
 theorem vk_scalars_and_chunks_derived :
     ((vk.omega, vk.n, vk.blindingFactors, vk.delta, vk.chunkLen), vk.permutationChunks)
-      = ((omegaOf actionCircuit.domainExponent,
-            2 ^ actionCircuit.domainExponent,
-            actionCircuit.constraintSystem.blindingFactors, deltaFp,
-            actionCircuit.constraintSystem.chunkLen),
-          Keygen.permutationChunksOf actionCircuit.pinnedCS
-            actionCircuit.constraintSystem.chunkLen) := by
-  exact bundle_scalars
+      = ((actionCircuit.omega, actionCircuit.n,
+            actionCircuit.blindingFactors, deltaFp, actionCircuit.chunkLen),
+          actionCircuit.verifierCS.permutationChunks) := by
+  native_decide
 
 theorem vk_scalars_derived :
     (vk.omega, vk.n, vk.blindingFactors, vk.delta, vk.chunkLen)
-      = (omegaOf actionCircuit.domainExponent,
-          2 ^ actionCircuit.domainExponent,
-          actionCircuit.constraintSystem.blindingFactors, deltaFp,
-          actionCircuit.constraintSystem.chunkLen) := by
+      = (actionCircuit.omega,
+          actionCircuit.n,
+          actionCircuit.blindingFactors, deltaFp,
+          actionCircuit.chunkLen) := by
   have h := vk_scalars_and_chunks_derived
   simp only [Prod.mk.injEq] at h ⊢
   exact h.1
 
 theorem vk_permutationChunks_derived :
     vk.permutationChunks
-      = Keygen.permutationChunksOf actionCircuit.pinnedCS
-        actionCircuit.constraintSystem.chunkLen := by
+      = actionCircuit.verifierCS.permutationChunks := by
   have h := vk_scalars_and_chunks_derived
   simp only [Prod.mk.injEq] at h
   exact h.2

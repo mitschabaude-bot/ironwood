@@ -175,6 +175,17 @@ theorem PinnedConstraintSystem.derive_queryState_extends_gates
       ((flatGates cs).map (substSelectorMap map.lookup))
       (queryWalkInit map cs)).2
 
+/-- The circuit-owned pinned query state extends its gate-erasure state. -/
+theorem _root_.Halo2.TopLevelCircuit.pinnedQueryState_extends_gates
+    {F : Type} [FiniteField F]
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit F Config PublicInput) :
+    (pinnedQueryState top.pinnedCS).Extends
+      top.gateQueryState := by
+  simpa only [TopLevelCircuit.pinnedCS, TopLevelCircuit.gateQueryState] using
+    PinnedConstraintSystem.derive_queryState_extends_gates
+      top.constraintSystem top.selectorMap
+
 /-- Prepending packed fixed-selector queries leaves every configure-recorded query
 at the same index. -/
 theorem queryWalkInit_extends_recorded
@@ -263,6 +274,17 @@ theorem PinnedConstraintSystem.mem_instanceQueryLayout_derive_of_mem
     PinnedConstraintSystem.derive_queryState_extends_recorded cs map
   have hfinal := hext.2.2.subset hrecorded
   simpa [pinnedQueryState] using hfinal
+
+/-- Every top-level configured instance query remains in its circuit-owned layout. -/
+theorem _root_.Halo2.TopLevelCircuit.mem_instanceQueryLayout_of_mem_constraintSystem
+    {F : Type} [FiniteField F]
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit F Config PublicInput)
+    (column : Column .instance) (rotation : Rotation)
+    (hquery : (column, rotation) ∈ top.constraintSystem.instanceQueries) :
+    (column.index, rotation) ∈ top.instanceQueryLayout := by
+  exact PinnedConstraintSystem.mem_instanceQueryLayout_derive_of_mem
+    top.constraintSystem top.selectorMap column rotation hquery
 
 /-- Rotating a domain point is addition of its row and query rotation. -/
 theorem rotateOmega_domainPoint

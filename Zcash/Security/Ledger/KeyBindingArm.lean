@@ -1,4 +1,4 @@
-import Mathlib
+import Mathlib.Tactic
 import Zcash.Security.KeyBinding.Instance
 import Zcash.Security.Ledger.Balance
 import Zcash.Security.Ledger.SpendAuthority

@@ -1,3 +1,4 @@
+import Mathlib.Algebra.Field.GeomSum
 import Zcash.Arithmetic.Domain
 
 /-!

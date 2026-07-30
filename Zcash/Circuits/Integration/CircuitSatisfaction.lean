@@ -1,4 +1,4 @@
-import Mathlib
+import Mathlib.Tactic
 import Clean.Halo2.Operations
 import Zcash.Arithmetic
 

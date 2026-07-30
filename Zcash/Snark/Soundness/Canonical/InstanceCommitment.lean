@@ -349,20 +349,8 @@ theorem ofFullList_commitInstance_eq
 
 end LagrangeCommitmentKey
 
-/--
-Binding an augmented opening of a public-instance commitment identifies all three coordinates, or
-computes a nontrivial relation among `(urs.g, urs.u, urs.w)`.
-
-This is where the break enters the circuit-integration stack, so it is where the coordinates are
-compared: everything above only threads the outcome. The comparison is a real decision, not a
-classical case split — `DecidableEq Fp` is pinned through `ZMod` so the `Fin (2 ^ urs.k) → Fp`
-instance synthesises, and the refuted branch hands its disagreement to
-`NontrivialRelation.ofCombinationCollision`, which computes the coordinate differences.
-
-`instanceCoefficients` is executable, so the comparison and its collision branch are executable
-as well.  The polynomial interpolation is finite arithmetic over `Fp`; it does not select a
-propositional witness.
--/
+/-- Compares an augmented instance opening with its executable coefficients, returning equality
+of all coordinates or their explicit nontrivial relation. -/
 def instanceOpening_eq_or_relation
     {urs : URS G} {omega : Fp}
     (key : LagrangeCommitmentKey urs omega)

@@ -4,31 +4,8 @@ import Zcash.Snark.Soundness.Composition.ZeroStraightLine
 /-!
 # Captured-data straight-line interface test, with eleven live IPA rounds
 
-This instantiates the shape-generic zero prover of `Composition.ZeroStraightLine` at the captured
-Post-NU6.3 key's own scalar data — `ω`, `n`, blinding count, `δ`, chunk length, gates, the three
-query layouts, permutation chunks and lookup expressions — over the captured domain `k = 11`.  So
-the staged IPA trace carries **eleven live rounds**, and the six deployed root events run against
-the captured query layouts instead of an empty grouping.  `Composition.StraightLineWitness` does
-the same at the witness shape, where `k = 0` empties the round obligations.
-
-## What the instantiation gives up
-
-* The group commitment families are zero, not the captured Vesta points.
-  `CapturedVerifierKeyProfile` already omits them: in the AGM the verifier's points need
-  representations over the *sampled* basis, so pinning them to fixture constants would leave the
-  premise uninhabited for most bases.
-* The instance-free instantiation is kept as the simplest model; the full-shape family
-  (`§ The full family at the full captured shape` below) discharges every layer with both
-  sub-proofs live, using issue #127's total constraint-`x` event.
-
-## Scope
-
-This is a fixture-local interface test, not the deployed Action family.  Its declarations are
-nevertheless checked by `Fixtures.MultiAction.TrustBoundary`: trust-census coverage records the
-axioms used by a test and does not designate that test as the deployed adversary.  The deployed
-family comes from `ComputedStraightLineDeployedFSFamily.ofCovered`, which packages an online
-representation-carrying prover with its staged traces; the captured-key endpoint applies the
-fixture metadata to that.
+This interface fixture runs the zero prover against captured scalar/layout data at `k = 11`.
+Commitments remain zero because sampled AGM bases need not represent captured points.
 -/
 namespace Zcash.Snark.Fixture2
 
@@ -126,15 +103,8 @@ noncomputable def capturedZeroConstraintSchedule :
 
 /-! ## The full family at the full captured shape
 
-With the total constraint-`x` event of issue #127 the instance-free restriction is gone: the
-stage prices the explicit zero-data difference from the `θ`/`β`/`γ`/`y` squeezes alone, so the
-zero prover carries every layer — member family, six root events, constant-walk IPA trace, and
-the constraint-`x` stage — with both sub-proofs live.  (Under the previous decode-guarded event
-this layer was unstageable for zero columns, because witness existence read the verifier-computed
-`expectedHEval`, a function of the `x` answer itself.)
-
-This family remains a fixture-local interface smoke test.  Its explicit fixture-census entries
-check its trust base without reclassifying it as the deployed Action adversary.
+The total constraint-`x` event lets the zero prover exercise every stage with both sub-proofs live.
+This remains a fixture-local interface test, pinned by the fixture census.
 -/
 
 /-- The captured key at the full captured shape — `numProofs = 2` live — with zero group

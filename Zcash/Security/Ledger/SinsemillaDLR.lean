@@ -7,8 +7,8 @@ import Zcash.Common.DiscreteLogRelation
 The onward reduction step for the classified Action escapes: a plain `def`
 converting an `ActionBreakData` — the site and escape datum computed by
 `classifyAction` — into a `NontrivialRelationOne`, the games-facing
-discrete-log-relation break among the deployed Sinsemilla generator table and the
-escaped site's domain point.  This is protocol-spec Theorem 5.4.4 made
+discrete-log-relation break among the Orchard-protocol Sinsemilla generator table and
+the escaped site's domain point.  This is protocol-spec Theorem 5.4.4 made
 computational end to end: the coefficients of the relation are read off the break
 datum's consumed prefix (`breakCoeffs`), and its `Prop` fields are discharged from
 `ValidBreak` alone.
@@ -36,9 +36,9 @@ open Zcash.Security.Concrete
 
 /-! ## The lifted generator table -/
 
-/-- The deployed Sinsemilla generator table, lifted into the Pallas group.  Total on
-`ℕ` for convenient use under chunk lists; off-table indices (never produced by a
-`K`-bit chunk) map to the identity. -/
+/-- The Orchard-protocol Sinsemilla generator table, lifted into the Pallas group.
+Total on `ℕ` for convenient use under chunk lists; off-table indices (never produced
+by a `K`-bit chunk) map to the identity. -/
 def pallasSAt (m : ℕ) : PallasGroup :=
   if h : m < 2 ^ K then
     PallasGroup.ofPoint (orchardGenerators.S m) (orchardGenerators.valid h)
@@ -454,8 +454,8 @@ def relationOfBreakData (wit : ActionData) (abr : ActionBreakData)
     (break_bounds h).1 (break_bounds h).2
 
 /-- A classified Action escape reduced onward: the site together with a nontrivial
-discrete-log relation among the deployed generator table and that site's domain
-point. -/
+discrete-log relation among the Orchard-protocol generator table and that site's
+domain point. -/
 structure ActionDLBreak where
   site : BreakSite
   rel : NontrivialRelationOne (F := Fq) pallasS (sitePoint site)
@@ -611,9 +611,9 @@ point, blinded by `r₁ • W` and `r₂ • W`, whose outputs agree up to sign,
 nontrivial relation among the table, the domain point, and `W` — provided the pair
 `(chunk list, blinding scalar)` differs. The equality case rests on
 `preCoeffs_inj` — chunk lists of length at most 253 are determined by their
-coefficients, and every deployed Sinsemilla message is far shorter. The negation case is
-unconditional: the domain-point coefficients `2^n` and `-2^n` cannot agree because
-`2^(n+1) ≠ 0` in the odd-order scalar field. -/
+coefficients, and every Orchard-protocol Sinsemilla message is far shorter. The
+negation case is unconditional: the domain-point coefficients `2^n` and `-2^n` cannot
+agree because `2^(n+1) ≠ 0` in the odd-order scalar field. -/
 def relationOfChainPmEq {Q : Point Fp} (hQ : Q.Valid) {W : PallasGroup}
     {l₁ l₂ : List ℕ} (hb₁ : ∀ m ∈ l₁, m < 2 ^ K) (hb₂ : ∀ m ∈ l₂, m < 2 ^ K)
     (hlen : l₁.length = l₂.length)

@@ -1,4 +1,4 @@
-import Mathlib
+import Mathlib.Tactic
 import Zcash.Snark.Soundness.GoodChallenge
 import Zcash.Snark.Soundness.FoldSplit
 import Zcash.Snark.Soundness.GrandProductBridge
@@ -321,10 +321,10 @@ theorem lookup_beta_failure_measure_le (a s inp tbl : Multiset Fp) :
 /-- The complete `γ` exclusion for one deployed lookup: the product-difference roots together
 with the table-column zero factors used to eliminate the residual running-product branch. -/
 noncomputable def resolverLookupGammaBadSet
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u : ℕ) : Finset Fp :=
+    (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) : Finset Fp :=
   szBadSet ((resolverLookupProductDifference vk ch poly p l u).map
     (evalRingHom ch.beta)) ∪
   lookupColumnZeroBadSet vk.omega
@@ -334,10 +334,10 @@ noncomputable def resolverLookupGammaBadSet
 the product difference together with the input-column zero factors. There are at most `u + 2`
 coefficients because the `γ` degree is at most `u + 1`. -/
 noncomputable def resolverLookupBetaBadSet
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u : ℕ) : Finset Fp :=
+    (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) : Finset Fp :=
   ((Finset.range (u + 2)).biUnion fun j =>
     szBadSet ((resolverLookupProductDifference vk ch poly p l u).coeff j)) ∪
   lookupColumnZeroBadSet vk.omega
@@ -346,10 +346,10 @@ noncomputable def resolverLookupBetaBadSet
 /-- Avoiding the two finite bad sets supplies exactly the four challenge facts consumed by one
 resolver-backed lookup endpoint. -/
 theorem ResolverLookupGoodChallenges.ofBadSets
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u : ℕ)
+    (p : ℕ) (l : Fin shape.numLookups) (u : ℕ)
     (hgamma : ch.gamma ∉ resolverLookupGammaBadSet vk ch poly p l u)
     (hbeta : ch.beta ∉ resolverLookupBetaBadSet vk ch poly p l u) :
     ResolverLookupGoodChallenges vk ch poly p l u where
@@ -376,10 +376,10 @@ theorem ResolverLookupGoodChallenges.ofBadSets
 /-- One deployed lookup's full `γ` exclusion costs at most two values per participating row: one
 for multiset recovery and one for the table-column zero factor. -/
 theorem resolverLookupGammaBadSet_card_le
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u : ℕ) :
+    (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) :
     (resolverLookupGammaBadSet vk ch poly p l u).card ≤ 2 * (u + 1) := by
   have hroot :
       (szBadSet ((resolverLookupProductDifference vk ch poly p l u).map
@@ -422,10 +422,10 @@ theorem resolverLookupGammaBadSet_card_le
 /-- Uniform `γ` hits one deployed lookup's complete bad set with probability at most two values
 per participating row over the scalar-field size. -/
 theorem uniformChallenge_resolverLookupGammaBadSet
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u : ℕ) :
+    (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) :
     uniformChallenge.toOuterMeasure
         (resolverLookupGammaBadSet vk ch poly p l u)
       ≤ (2 * (u + 1) : ℕ) / (Fintype.card Fp : ℝ≥0∞) := by
@@ -436,10 +436,10 @@ theorem uniformChallenge_resolverLookupGammaBadSet
 /-- One deployed lookup's full `β` exclusion costs at most
 `(u + 2)·(u + 1) + (u + 1) = (u + 3)·(u + 1)` challenge values. -/
 theorem resolverLookupBetaBadSet_card_le
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u : ℕ) :
+    (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) :
     (resolverLookupBetaBadSet vk ch poly p l u).card ≤
       (u + 2) * (u + 1) + (u + 1) := by
   have hcoeff : ∀ j,
@@ -487,10 +487,10 @@ theorem resolverLookupBetaBadSet_card_le
 /-- Uniform `β` hits one deployed lookup's complete coefficient/zero-factor bad set with the
 corresponding root-count probability. -/
 theorem uniformChallenge_resolverLookupBetaBadSet
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u : ℕ) :
+    (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) :
     uniformChallenge.toOuterMeasure
         (resolverLookupBetaBadSet vk ch poly p l u)
       ≤ ((u + 2) * (u + 1) + (u + 1) : ℕ) /
@@ -502,29 +502,29 @@ theorem uniformChallenge_resolverLookupBetaBadSet
 /-- The union of all lookup `γ` exclusions in one proof bundle. The challenge is shared by every
 proof and lookup argument, so this is the event the transcript squeeze must avoid. -/
 noncomputable def allResolverLookupGammaBadSet
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (numProofs : ℕ) (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp) (u : ℕ) : Finset Fp :=
-  (Finset.univ : Finset (Fin shape.numProofs × Fin shape.numLookups)).biUnion fun q =>
+  (Finset.univ : Finset (Fin numProofs × Fin shape.numLookups)).biUnion fun q =>
     resolverLookupGammaBadSet vk ch poly q.1 q.2 u
 
 /-- The union of all lookup `β` exclusions in one proof bundle. -/
 noncomputable def allResolverLookupBetaBadSet
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (numProofs : ℕ) (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp) (u : ℕ) : Finset Fp :=
-  (Finset.univ : Finset (Fin shape.numProofs × Fin shape.numLookups)).biUnion fun q =>
+  (Finset.univ : Finset (Fin numProofs × Fin shape.numLookups)).biUnion fun q =>
     resolverLookupBetaBadSet vk ch poly q.1 q.2 u
 
 /-- Avoiding the bundle-wide lookup bad sets supplies the good-challenge record for every proof
 and every deployed lookup argument. -/
 theorem resolverLookupGoodChallenges_of_not_mem
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (numProofs : ℕ) (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp) (u : ℕ)
-    (hgamma : ch.gamma ∉ allResolverLookupGammaBadSet vk ch poly u)
-    (hbeta : ch.beta ∉ allResolverLookupBetaBadSet vk ch poly u) :
-    ∀ (p : Fin shape.numProofs) (l : Fin shape.numLookups),
+    (hgamma : ch.gamma ∉ allResolverLookupGammaBadSet numProofs vk ch poly u)
+    (hbeta : ch.beta ∉ allResolverLookupBetaBadSet numProofs vk ch poly u) :
+    ∀ (p : Fin numProofs) (l : Fin shape.numLookups),
       ResolverLookupGoodChallenges vk ch poly p l u := by
   intro p l
   apply ResolverLookupGoodChallenges.ofBadSets
@@ -538,10 +538,10 @@ theorem resolverLookupGoodChallenges_of_not_mem
 /-- Compute one lookup good-challenge package from finite point tests.  As with the permutation
 adapter, the specification-level root sets appear only in erased proofs. -/
 def resolverLookupGoodChallenges?
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u : ℕ) :
+    (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) :
     Option (PLift (ResolverLookupGoodChallenges vk ch poly p l u)) := by
   let gammaDifference := resolverLookupProductDifferenceGammaData vk ch poly p l u
   let input := lookupInputPolyOfResolver vk ch poly p l
@@ -588,12 +588,12 @@ def resolverLookupGoodChallenges?
 
 /-- Executable bundle-wide lookup `β`/`γ` exclusions. -/
 def resolverLookupBundleExclusions?
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (numProofs : ℕ) (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp) (u : ℕ) :
-    Option (PLift ((ch.gamma ∉ allResolverLookupGammaBadSet vk ch poly u) ∧
-      ch.beta ∉ allResolverLookupBetaBadSet vk ch poly u)) :=
-  match finForallOption (fun p : Fin shape.numProofs =>
+    Option (PLift ((ch.gamma ∉ allResolverLookupGammaBadSet numProofs vk ch poly u) ∧
+      ch.beta ∉ allResolverLookupBetaBadSet numProofs vk ch poly u)) :=
+  match finForallOption (fun p : Fin numProofs =>
       finForallOption (fun l : Fin shape.numLookups =>
         resolverLookupGoodChallenges? vk ch poly p l u)) with
   | none => none
@@ -612,10 +612,10 @@ def resolverLookupBundleExclusions?
         · exact (good q.1 q.2).down.inputNonzero hzero⟩⟩
 
 theorem resolverLookupGoodChallenges?_isSome_of
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (l : Fin shape.numLookups) (u : ℕ)
+    (p : ℕ) (l : Fin shape.numLookups) (u : ℕ)
     (hgood : ResolverLookupGoodChallenges vk ch poly p l u) :
     (resolverLookupGoodChallenges? vk ch poly p l u).isSome := by
   let gammaDifference := resolverLookupProductDifferenceGammaData vk ch poly p l u
@@ -653,24 +653,24 @@ theorem resolverLookupGoodChallenges?_isSome_of
   rfl
 
 theorem resolverLookupBundleExclusions?_isSome_of
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (numProofs : ℕ) (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp) (u : ℕ)
-    (hgamma : ch.gamma ∉ allResolverLookupGammaBadSet vk ch poly u)
-    (hbeta : ch.beta ∉ allResolverLookupBetaBadSet vk ch poly u) :
-    (resolverLookupBundleExclusions? vk ch poly u).isSome := by
-  have hall : ∀ q : Fin shape.numProofs × Fin shape.numLookups,
+    (hgamma : ch.gamma ∉ allResolverLookupGammaBadSet numProofs vk ch poly u)
+    (hbeta : ch.beta ∉ allResolverLookupBetaBadSet numProofs vk ch poly u) :
+    (resolverLookupBundleExclusions? numProofs vk ch poly u).isSome := by
+  have hall : ∀ q : Fin numProofs × Fin shape.numLookups,
       (resolverLookupGoodChallenges? vk ch poly q.1 q.2 u).isSome :=
     fun q => resolverLookupGoodChallenges?_isSome_of vk ch poly q.1 q.2 u
-      (resolverLookupGoodChallenges_of_not_mem vk ch poly u hgamma hbeta q.1 q.2)
-  have hinner : ∀ p : Fin shape.numProofs,
+      (resolverLookupGoodChallenges_of_not_mem numProofs vk ch poly u hgamma hbeta q.1 q.2)
+  have hinner : ∀ p : Fin numProofs,
       (finForallOption (fun l : Fin shape.numLookups =>
         resolverLookupGoodChallenges? vk ch poly p l u)).isSome :=
     fun p => finForallOption_isSome_of _ (fun l => hall (p, l))
   obtain ⟨good, hgood⟩ := Option.isSome_iff_exists.mp
     (finForallOption_isSome_of _ hinner)
   unfold resolverLookupBundleExclusions?
-  generalize hresult : finForallOption (fun p : Fin shape.numProofs =>
+  generalize hresult : finForallOption (fun p : Fin numProofs =>
       finForallOption (fun l : Fin shape.numLookups =>
         resolverLookupGoodChallenges? vk ch poly p l u)) = result at hgood ⊢
   cases result <;> simp_all
@@ -678,51 +678,51 @@ theorem resolverLookupBundleExclusions?_isSome_of
 /-- The bundle-wide lookup `γ` surface is the number of proof/lookup pairs times the per-argument
 two-values-per-row budget. -/
 theorem uniformChallenge_allResolverLookupGammaBadSet
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (numProofs : ℕ) (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp) (u : ℕ) :
     uniformChallenge.toOuterMeasure
-        (allResolverLookupGammaBadSet vk ch poly u)
-      ≤ (shape.numProofs * shape.numLookups * (2 * (u + 1)) : ℕ) /
+        (allResolverLookupGammaBadSet numProofs vk ch poly u)
+      ≤ (numProofs * shape.numLookups * (2 * (u + 1)) : ℕ) /
           (Fintype.card Fp : ℝ≥0∞) := by
   rw [uniformChallenge_badSet]
   gcongr
   rw [allResolverLookupGammaBadSet]
   calc
-    ((Finset.univ : Finset (Fin shape.numProofs × Fin shape.numLookups)).biUnion
+    ((Finset.univ : Finset (Fin numProofs × Fin shape.numLookups)).biUnion
         fun q => resolverLookupGammaBadSet vk ch poly q.1 q.2 u).card
-      ≤ ∑ q ∈ (Finset.univ : Finset (Fin shape.numProofs × Fin shape.numLookups)),
+      ≤ ∑ q ∈ (Finset.univ : Finset (Fin numProofs × Fin shape.numLookups)),
           (resolverLookupGammaBadSet vk ch poly q.1 q.2 u).card :=
         Finset.card_biUnion_le
-    _ ≤ ∑ _q ∈ (Finset.univ : Finset (Fin shape.numProofs × Fin shape.numLookups)),
+    _ ≤ ∑ _q ∈ (Finset.univ : Finset (Fin numProofs × Fin shape.numLookups)),
           2 * (u + 1) := Finset.sum_le_sum fun q _ =>
             resolverLookupGammaBadSet_card_le vk ch poly q.1 q.2 u
-    _ = shape.numProofs * shape.numLookups * (2 * (u + 1)) := by simp
+    _ = numProofs * shape.numLookups * (2 * (u + 1)) := by simp
 
 /-- The bundle-wide lookup `β` surface is the number of proof/lookup pairs times the
 coefficient-and-zero-factor budget for one argument. -/
 theorem uniformChallenge_allResolverLookupBetaBadSet
-    {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {shape : Shape} {k : ℕ} {G : Type*}
+    (numProofs : ℕ) (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp) (u : ℕ) :
     uniformChallenge.toOuterMeasure
-        (allResolverLookupBetaBadSet vk ch poly u)
-      ≤ (shape.numProofs * shape.numLookups *
+        (allResolverLookupBetaBadSet numProofs vk ch poly u)
+      ≤ (numProofs * shape.numLookups *
           ((u + 2) * (u + 1) + (u + 1)) : ℕ) /
           (Fintype.card Fp : ℝ≥0∞) := by
   rw [uniformChallenge_badSet]
   gcongr
   rw [allResolverLookupBetaBadSet]
   calc
-    ((Finset.univ : Finset (Fin shape.numProofs × Fin shape.numLookups)).biUnion
+    ((Finset.univ : Finset (Fin numProofs × Fin shape.numLookups)).biUnion
         fun q => resolverLookupBetaBadSet vk ch poly q.1 q.2 u).card
-      ≤ ∑ q ∈ (Finset.univ : Finset (Fin shape.numProofs × Fin shape.numLookups)),
+      ≤ ∑ q ∈ (Finset.univ : Finset (Fin numProofs × Fin shape.numLookups)),
           (resolverLookupBetaBadSet vk ch poly q.1 q.2 u).card :=
         Finset.card_biUnion_le
-    _ ≤ ∑ _q ∈ (Finset.univ : Finset (Fin shape.numProofs × Fin shape.numLookups)),
+    _ ≤ ∑ _q ∈ (Finset.univ : Finset (Fin numProofs × Fin shape.numLookups)),
           ((u + 2) * (u + 1) + (u + 1)) := Finset.sum_le_sum fun q _ =>
             resolverLookupBetaBadSet_card_le vk ch poly q.1 q.2 u
-    _ = shape.numProofs * shape.numLookups *
+    _ = numProofs * shape.numLookups *
         ((u + 2) * (u + 1) + (u + 1)) := by simp
 
 /-- **A vanishing-factor escape priced.** The event that some listed factor `v + challenge` vanishes

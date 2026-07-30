@@ -1,4 +1,3 @@
-import Mathlib
 import Zcash.Common.RelationWitness
 import Zcash.Snark.Soundness.Canonical.LookupInstantiation
 import Zcash.Snark.Soundness.Multiopen.NodeBinding

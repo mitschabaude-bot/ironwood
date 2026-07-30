@@ -376,7 +376,7 @@ theorem straightLineConstraintSuccess_eq_of_outcome
   simp [straightLineConstraintSuccess?, hout]
 
 set_option maxHeartbeats 800000 in
-/-- The root-containment construction lands in the same computed success option.  This is
+/-- The legacy root-containment construction lands in the same computed success option.  This is
 the proof bridge used by the existing probability decomposition; all data in the conclusion is
 nevertheless the value returned by `straightLineConstraintOutcome?`. -/
 theorem straightLineConstraintDecoded_of_root
@@ -392,26 +392,18 @@ theorem straightLineConstraintDecoded_of_root
     (root : DeployedRootDecodeWitness family.toRootFamily basis O)
     (hxgood : (wrappedPreIpaRecord
         (deployedRootRunOutput family.toRootFamily basis O)).x ∉
-      szBadSet (deployedConstraintDifferencePreX family.toRootFamily basis
-        O))
+      szBadSet (deployedConstraintDifferencePreX family.toRootFamily basis O))
     (constraint : DeployedConstraintWitness
       (ursOfAugmentedBasis shape.k basis) rfl (family.vk basis)
       (family.instanceCommitment basis)
       (deployedRootRunOutput family.toRootFamily basis O).1.proof.1
-      (wrappedPreIpaRecord (deployedRootRunOutput family.toRootFamily basis
-        O))
-      ((deployedRootRunOutput family.toRootFamily basis
-        O).1.aMulti
-          (wrappedPreIpaReads (deployedRootRunOutput family.toRootFamily basis
-            O)))
-      ((deployedRootRunOutput family.toRootFamily basis
-        O).1.multiU
-          (wrappedPreIpaReads (deployedRootRunOutput family.toRootFamily basis
-            O)))
-      ((deployedRootRunOutput family.toRootFamily basis
-        O).1.multiBlind
-          (wrappedPreIpaReads (deployedRootRunOutput family.toRootFamily basis
-            O))))
+      (wrappedPreIpaRecord (deployedRootRunOutput family.toRootFamily basis O))
+      ((deployedRootRunOutput family.toRootFamily basis O).1.aMulti
+        (wrappedPreIpaReads (deployedRootRunOutput family.toRootFamily basis O)))
+      ((deployedRootRunOutput family.toRootFamily basis O).1.multiU
+        (wrappedPreIpaReads (deployedRootRunOutput family.toRootFamily basis O)))
+      ((deployedRootRunOutput family.toRootFamily basis O).1.multiBlind
+        (wrappedPreIpaReads (deployedRootRunOutput family.toRootFamily basis O))))
     (hout : deployedConstraintOutcomeOfRoot family.toRootFamily static basis
       O haccept root hxgood = PSum.inl constraint) :
     family.straightLineConstraintDecoded static basis O := by

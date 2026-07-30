@@ -3,10 +3,8 @@ import Zcash.Snark.Soundness.AGM.AdaptiveRootComposition
 /-!
 # IPA-round surfaces for arbitrary adaptive online-AGM adversaries
 
-The quadratic at round `j` is rebuilt from representations carried by the first actual query of
-that round transcript.  The construction below separates the ordinary proof prefix from the
-three pieces of algebraic data that can affect the quadratic: the canonical multiopen assembly,
-`S`, and the round pairs through `j`.
+Each round quadratic is rebuilt from its first-query representations: the multiopen assembly,
+`S`, and round pairs through that round.
 -/
 
 namespace Zcash.Snark

@@ -180,7 +180,7 @@ def resolverEnvironment
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (usableRows : ℕ) :
+    (p : ℕ) (usableRows : ℕ) :
     Environment Fp :=
   polynomialEnvironment vk.omega usableRows
     (fun column => poly (.fixedCol column))
@@ -191,7 +191,7 @@ def resolverEnvironment
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (usableRows : ℕ)
+    (p : ℕ) (usableRows : ℕ)
     (column : Column .fixed) (row : ℤ) :
     (resolverEnvironment vk poly p usableRows).fixed column row =
       (poly (.fixedCol column.index)).eval (vk.omega ^ row) := rfl
@@ -200,7 +200,7 @@ def resolverEnvironment
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (usableRows : ℕ)
+    (p : ℕ) (usableRows : ℕ)
     (column : Column .advice) (row : ℤ) :
     (resolverEnvironment vk poly p usableRows).advice column row =
       (poly (.adviceCol p column.index)).eval (vk.omega ^ row) := rfl
@@ -209,7 +209,7 @@ def resolverEnvironment
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (usableRows : ℕ)
+    (p : ℕ) (usableRows : ℕ)
     (column : Column .instance) (row : ℤ) :
     (resolverEnvironment vk poly p usableRows).inst column row =
       (poly (.instanceCol p column.index)).eval (vk.omega ^ row) := rfl
@@ -222,7 +222,7 @@ theorem resolverEnvironment_instance_of_rowPolynomial
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (usableRows : ℕ)
+    (p : ℕ) (usableRows : ℕ)
     (column : Column .instance) (values : List Fp)
     (hpoly : poly (.instanceCol p column.index) =
       instanceRowPolynomial (2 ^ shape.k) vk.omega values)
@@ -249,7 +249,7 @@ def circuitSatViaResolverOperations
     (vk : VerifyingKey shape Fp G)
     (decodePoly :
       (Fin (2 ^ shape.k) → Fp) → CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (usableRows : ℕ)
+    (p : ℕ) (usableRows : ℕ)
     (place : RegionIndex → ℕ) (ops : Operations Fp)
     (initialRegion : RegionIndex)
     (witness : Fin (2 ^ shape.k) → Fp) : Prop :=

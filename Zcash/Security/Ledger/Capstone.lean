@@ -1,4 +1,5 @@
-import Mathlib
+import Mathlib.Tactic
+import Mathlib.Probability.Distributions.Uniform
 import Zcash.Security.Ledger.Balance
 import Zcash.Security.Ledger.SpendAuthority
 
@@ -73,77 +74,80 @@ abbrev ValidAnnotated :=
   {ledger : Ledger KW F G RHO PSI MHASH MENC MSG SIG P.depth //
     ValidLedger P kv issuance maxActions ledger}
 
-/-! ## Balance-value -/
+/-! ## Balance conservation and shielded balance cap -/
 
-/-- The value-premiss arm event: the samples on which the per-transaction value
-premiss hands the conservation reduction a break of the abstract type `VB`. -/
-def valueBreakEvent {VB : Type*}
+/-- The transaction-balance premiss violation event: the samples on which the
+transaction-balance premiss hands the conservation reduction a break of the abstract
+type `VB`. -/
+def txBalanceBreakEvent {VB : Type*}
     (perTx : ∀ ω : ValidAnnotated P kv issuance maxActions,
       (tx : Tx KW F G RHO PSI MHASH MENC MSG SIG P.depth) → tx ∈ ω.1 →
         (txNetValue tx = tx.vBalance) ⊕' VB) (i : ℕ) :
     Set (ValidAnnotated P kv issuance maxActions) :=
-  {ω | ∃ b : VB, valueConservationOrBreak (issuance := issuance) (perTx ω) i = .inr b}
+  {ω | ∃ b : VB, balanceConservationOrBreak (issuance := issuance) (perTx ω) i = .inr b}
 
-/-- The value-conservation violation event: the shielded pool plus the transparent
+/-- The balance-conservation violation event: the shielded pool plus the transparent
 pool differs from the minted issuance after the first `i` transactions. -/
-def valueConservationViolation (i : ℕ) :
+def balanceConservationViolation (i : ℕ) :
     Set (ValidAnnotated P kv issuance maxActions) :=
-  {ω | poolValueBalance ω.1 i + transparentPoolBalance issuance ω.1 i
+  {ω | shieldedPoolBalance ω.1 i + transparentPoolBalance issuance ω.1 i
     ≠ issuanceTotal issuance ω.1 i}
 
-/-- The Balance-value violation event: the shielded pool exceeds the minted issuance
-after the first `i` transactions. -/
-def balanceValueViolation (i : ℕ) :
+/-- The shielded-balance-cap violation event: the shielded pool exceeds the minted
+issuance after the first `i` transactions. -/
+def shieldedBalanceCapViolation (i : ℕ) :
     Set (ValidAnnotated P kv issuance maxActions) :=
-  {ω | ¬ poolValueBalance ω.1 i ≤ issuanceTotal issuance ω.1 i}
+  {ω | ¬ shieldedPoolBalance ω.1 i ≤ issuanceTotal issuance ω.1 i}
 
-/-- A conservation-violating sample lands in the value-premiss arm: on it, the
-conservation reduction cannot return the equation. -/
-theorem valueConservationViolation_subset {VB : Type*}
+/-- A conservation-violating sample lands in the transaction-balance premiss arm: on
+it, the conservation reduction cannot return the equation. -/
+theorem balanceConservationViolation_subset {VB : Type*}
     (perTx : ∀ ω : ValidAnnotated P kv issuance maxActions,
       (tx : Tx KW F G RHO PSI MHASH MENC MSG SIG P.depth) → tx ∈ ω.1 →
         (txNetValue tx = tx.vBalance) ⊕' VB) (i : ℕ) :
-    valueConservationViolation (P := P) (kv := kv) (maxActions := maxActions) i
-      ⊆ valueBreakEvent perTx i := by
+    balanceConservationViolation (P := P) (kv := kv) (maxActions := maxActions) i
+      ⊆ txBalanceBreakEvent perTx i := by
   intro ω hω
-  rcases h : valueConservationOrBreak (issuance := issuance) (perTx ω) i with heq | b
+  rcases h : balanceConservationOrBreak (issuance := issuance) (perTx ω) i with heq | b
   · exact absurd heq hω
   · exact ⟨b, h⟩
 
-/-- A balance-violating sample lands in the value-premiss arm too: if the reduction
-returned the conservation equation, transparent nonnegativity would force the bound. -/
-theorem balanceValueViolation_subset {VB : Type*}
+/-- A cap-violating sample lands in the transaction-balance premiss arm too: if the
+reduction returned the conservation equation, transparent nonnegativity would force the
+bound. -/
+theorem shieldedBalanceCapViolation_subset {VB : Type*}
     (perTx : ∀ ω : ValidAnnotated P kv issuance maxActions,
       (tx : Tx KW F G RHO PSI MHASH MENC MSG SIG P.depth) → tx ∈ ω.1 →
         (txNetValue tx = tx.vBalance) ⊕' VB) (i : ℕ) :
-    balanceValueViolation (P := P) (kv := kv) (maxActions := maxActions) i
-      ⊆ valueBreakEvent perTx i := by
+    shieldedBalanceCapViolation (P := P) (kv := kv) (maxActions := maxActions) i
+      ⊆ txBalanceBreakEvent perTx i := by
   intro ω hω
-  rcases h : valueConservationOrBreak (issuance := issuance) (perTx ω) i with heq | b
+  rcases h : balanceConservationOrBreak (issuance := issuance) (perTx ω) i with heq | b
   · exact absurd (by have := ω.2.transparent_nonneg i; omega) hω
   · exact ⟨b, h⟩
 
-/-- **Value conservation, probabilistically.** For any adversary, the probability that
-the value ledger fails to balance is at most the value-premiss arm's ε. -/
-theorem valueConservation_measure_le {VB : Type*}
+/-- **Balance conservation, probabilistically.** For any adversary, the probability
+that the ledger fails to balance is at most the transaction-balance premiss arm's ε. -/
+theorem balanceConservation_measure_le {VB : Type*}
     (A : PMF (ValidAnnotated P kv issuance maxActions))
     (perTx : ∀ ω : ValidAnnotated P kv issuance maxActions,
       (tx : Tx KW F G RHO PSI MHASH MENC MSG SIG P.depth) → tx ∈ ω.1 →
-        (txNetValue tx = tx.vBalance) ⊕' VB) (i : ℕ) {εvb : ℝ≥0∞}
-    (hvb : A.toOuterMeasure (valueBreakEvent perTx i) ≤ εvb) :
-    A.toOuterMeasure (valueConservationViolation i) ≤ εvb :=
-  le_trans (MeasureTheory.measure_mono (valueConservationViolation_subset perTx i)) hvb
+        (txNetValue tx = tx.vBalance) ⊕' VB) (i : ℕ) {ε_conservation : ℝ≥0∞}
+    (hvb : A.toOuterMeasure (txBalanceBreakEvent perTx i) ≤ ε_conservation) :
+    A.toOuterMeasure (balanceConservationViolation i) ≤ ε_conservation :=
+  le_trans (MeasureTheory.measure_mono (balanceConservationViolation_subset perTx i)) hvb
 
-/-- **Balance-value, probabilistically.** For any adversary, the probability that the
-shielded pool exceeds the minted issuance is at most the value-premiss arm's ε. -/
-theorem balanceValue_measure_le {VB : Type*}
+/-- **Shielded balance cap, probabilistically.** For any adversary, the probability
+that the shielded pool exceeds the minted issuance is at most the transaction-balance
+premiss arm's ε. -/
+theorem shieldedBalanceCap_measure_le {VB : Type*}
     (A : PMF (ValidAnnotated P kv issuance maxActions))
     (perTx : ∀ ω : ValidAnnotated P kv issuance maxActions,
       (tx : Tx KW F G RHO PSI MHASH MENC MSG SIG P.depth) → tx ∈ ω.1 →
-        (txNetValue tx = tx.vBalance) ⊕' VB) (i : ℕ) {εvb : ℝ≥0∞}
-    (hvb : A.toOuterMeasure (valueBreakEvent perTx i) ≤ εvb) :
-    A.toOuterMeasure (balanceValueViolation i) ≤ εvb :=
-  le_trans (MeasureTheory.measure_mono (balanceValueViolation_subset perTx i)) hvb
+        (txNetValue tx = tx.vBalance) ⊕' VB) (i : ℕ) {ε_cap : ℝ≥0∞}
+    (hvb : A.toOuterMeasure (txBalanceBreakEvent perTx i) ≤ ε_cap) :
+    A.toOuterMeasure (shieldedBalanceCapViolation i) ≤ ε_cap :=
+  le_trans (MeasureTheory.measure_mono (shieldedBalanceCapViolation_subset perTx i)) hvb
 
 /-! ## Balance-subset -/
 

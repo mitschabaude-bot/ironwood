@@ -4,10 +4,8 @@ import Zcash.Snark.Soundness.AGM.OnlineConstraint
 /-!
 # Deterministic decode for arbitrary adaptive online-AGM families
 
-The adaptive probability surfaces isolate the exact pre-answer representations at each deployed
-squeeze.  This module identifies their normalized coordinates with the inputs retained by the
-executable unbatcher, then feeds the resulting good-root facts into the existing constraint and
-Action decoders.  No phase object, semantic cut, or existential relation witness is introduced.
+This module connects pre-answer AGM coordinates to the executable unbatcher and existing
+constraint and Action decoders, without phase objects or existential relation witnesses.
 -/
 
 namespace Zcash.Snark

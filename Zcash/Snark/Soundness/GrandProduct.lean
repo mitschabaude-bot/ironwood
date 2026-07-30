@@ -1,4 +1,4 @@
-import Mathlib
+import Mathlib.Tactic
 
 /-!
 # The grand-product-to-multiset kernel (permutation & lookup soundness)

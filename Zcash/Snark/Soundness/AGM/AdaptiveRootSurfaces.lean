@@ -3,11 +3,8 @@ import Zcash.Snark.Soundness.AGM.AdaptiveStraightLine
 /-!
 # Direct root surfaces for arbitrary adaptive online-AGM adversaries
 
-The final reverse-unbatch data may be chosen after an earlier challenge.  These definitions
-therefore rebuild each Schwartz--Zippel surface from the ordinary proof prefix and the AGM
-coordinates attached to the first actual query of that prefix.  Later prover output is never
-used to define an earlier bad set.  Representation discrepancies are handled by the executable
-finder in `AdaptiveStraightLine`.
+Each root surface is rebuilt from the ordinary prefix and its first-query AGM coordinates.
+`AdaptiveStraightLine` handles later representation mismatches.
 -/
 
 namespace Zcash.Snark

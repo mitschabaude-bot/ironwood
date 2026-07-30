@@ -237,7 +237,6 @@ assert_axioms Zcash.Security.Ledger.Bridge.guardedPath_of_exact +native(
   Zcash.Circuits.Ecc.MulFixed.Certs.valueCommitVCert_check)
 assert_axioms Zcash.Security.Ledger.BridgeTests.spec_post_bridge_smoke +native(
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
-  Zcash.Security.Concrete.PallasGroup.pallas_base_card_lt_scalar_card,
   Zcash.Security.Ledger.Pool.unc_thirteen_not_isSquare,
   Zcash.Circuits.Ecc.MulFixed.Certs.commitIvkRCert_check,
   Zcash.Circuits.Ecc.MulFixed.Certs.noteCommitRCert_check,

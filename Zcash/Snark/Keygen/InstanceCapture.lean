@@ -1,10 +1,11 @@
 import Zcash.Snark.Keygen.Certificate
 import Zcash.Snark.Keygen.Lagrange
+import Mathlib.Util.AssertNoSorry
 
 /-!
 # The captured instance commitments are the circuit-derived ones
 
-The deployed Action capstone (`Soundness.Deployed.ActionVesta`) states its conclusion at the
+The Action soundness stack states its conclusion at the
 *circuit-derived* public-instance family `actionCircuit.instanceCommitment actionProofParams
 capturedURS inputs` — commitments computed from the public inputs, as halo2's `verify_proof`
 computes them from its `instances` argument. The captured artifacts, meanwhile, are exercised
@@ -193,10 +194,11 @@ theorem actionCircuit_domainExponent : actionCircuit.domainExponent = capturedUR
 `omega` is a key at the captured domain. -/
 theorem toVerifierKey_omega_captured :
     (actionCircuit.toVerifierKey actionProofParams capturedURS).omega = omegaOf capturedURS.k := by
-  rw [TopLevelCircuit.toVerifierKey_omega, actionCircuit_domainExponent]
+  rw [TopLevelCircuit.toVerifierKey_omega, TopLevelCircuit.omega,
+    actionCircuit_domainExponent]
 
-/-- **The circuit-derived public-instance family is the fixture's.** The deployed capstone
-(`Soundness.Deployed.ActionVesta`) reads its instance commitments from
+/-- **The circuit-derived public-instance family is the fixture's.** The soundness stack reads its
+instance commitments from
 `actionCircuit.instanceCommitment`, computing them from the public inputs the way halo2's
 `verify_proof` computes them from `instances`. At the captured public inputs that family is
 `Fixture.derivedInstanceCommitment`, the family the captured artifacts are exercised against.

@@ -1,4 +1,4 @@
-import Mathlib
+import Mathlib.Tactic
 import Zcash.Snark.Soundness.InnerProduct
 import Zcash.Snark.Soundness.Constraints
 import Zcash.Snark.Soundness.CommitFold
@@ -30,11 +30,8 @@ variable {G : Type*} [AddCommGroup G] [Module Fp G]
 
 -- Decode gap (closed by the multiopen decode layer): the two conjuncts of `SnarkRelation` share
 -- only the symbol `a`, so a free decode function feeding `circuitSatViaGates` could be instantiated
--- independently of `a` and `circuitSat a` would not constrain the extracted witness. The deployed
--- capstones close this by stating `circuitSat` at the canonical decode of the extracted witness —
--- the rewound-opening decode chain of `Soundness.Multiopen.Decode` (the `batch_open_soundV`-shaped
--- premises carried by `OpenedBatchOpenings`, unbatched to member columns by
--- `openedMemberDecode_of_x1Prob`), consumed by the deployed Vesta constraint capstones.
+-- independently of `a`. The current terminal instead consumes the canonical member decode carried
+-- by the straight-line algebraic execution.
 /-- A witness that both opens the IPA commitment and satisfies the circuit predicate. -/
 structure SnarkRelation (urs : URS G) (P : G) (b : Fin (2 ^ urs.k) → Fp) (v : Fp)
     (circuitSat : (Fin (2 ^ urs.k) → Fp) → Prop) (a : Fin (2 ^ urs.k) → Fp) : Prop where

@@ -1,4 +1,4 @@
-import Mathlib
+import Mathlib.Algebra.Group.Nat.Defs
 
 /-!
 # The verifier group `E_q` and the uniform reference string
@@ -12,8 +12,8 @@ so the argument stays curve-agnostic and never reaches into concrete curve arith
 The concrete instantiation is unconditional: CompElliptic's Vesta curve
 (`SWPoint Vesta.curve`) is a proven `AddCommGroup` — not an assumption — and
 `Pasta.Vesta.card_eq` pins its order `p` with no assumption, making it a
-`Module (ZMod p)` (`vestaFpModule`). The Vesta capstones (`Soundness.Vesta`) instantiate `G`
-there with no change to this argument.
+`Module (ZMod p)` (`vestaFpModule`). The deployed soundness stack instantiates
+`G` there with no change to this argument.
 -/
 
 namespace Zcash.Arithmetic

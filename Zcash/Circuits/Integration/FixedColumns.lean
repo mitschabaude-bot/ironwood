@@ -27,8 +27,6 @@ open Zcash.Arithmetic (derivedUrsGLagrange)
 open Halo2 Polynomial
 open CompElliptic.Curves.Pasta
 
-set_option maxHeartbeats 20000
-
 variable {G : Type} [AddCommGroup G] [Module Fp G]
   [DecidableEq G] [Inhabited G]
 
@@ -206,11 +204,11 @@ def topLevelSingletonLookupSelectorEntries
                   0)
           else
             some
-              (top.pinnedCS.numFixedColumns,
+              (top.fixedColumnCount,
                 starts.getD lookup.region 0 + lookup.row, 0)
       | none =>
           some
-            (top.pinnedCS.numFixedColumns,
+            (top.fixedColumnCount,
               starts.getD lookup.region 0 + lookup.row, 0)
 
 /-- Fixed cells allocated for `constrainConstant` values by the V1 floor planner. -/
@@ -244,11 +242,10 @@ interfaces should consume that theorem, not this computation.
 -/
 def interimFixedQueryCoverageFailures
     (top : TopLevelCircuit Fp Config PublicInput) : List ℕ :=
-  let pinned := top.pinnedCS
-  let queried := pinned.fixedQueryLayout.map Prod.fst
-  (List.range pinned.numFixedColumns).filter
+  let queried := top.fixedQueryLayout.map Prod.fst
+  (List.range top.fixedColumnCount).filter
       (fun column => decide (column ∉ queried)) ++
-    queried.filter (fun column => decide (pinned.numFixedColumns ≤ column))
+    queried.filter (fun column => decide (top.fixedColumnCount ≤ column))
 
 /--
 An empty interim query-coverage diagnostic supplies the current
@@ -258,15 +255,15 @@ theorem fixedQueryCoverage_of_interimFailures_eq_nil
     (top : TopLevelCircuit Fp Config PublicInput)
     (hfail : interimFixedQueryCoverageFailures top = []) :
     ∀ column,
-      column < top.pinnedCS.numFixedColumns →
-        ∃ rotation, (column, rotation) ∈ top.pinnedCS.fixedQueryLayout := by
+      column < top.fixedColumnCount →
+        ∃ rotation, (column, rotation) ∈ top.fixedQueryLayout := by
   intro column hcolumn
   have hnotFailure :
       column ∉ interimFixedQueryCoverageFailures top := by
     rw [hfail]
     simp
   have hcolumnMem :
-      column ∈ top.pinnedCS.fixedQueryLayout.map Prod.fst := by
+      column ∈ top.fixedQueryLayout.map Prod.fst := by
     by_contra hmissing
     apply hnotFailure
     simp [interimFixedQueryCoverageFailures, hcolumn, hmissing]
@@ -282,15 +279,15 @@ theorem fixedQueryBounded_of_interimFailures_eq_nil
     (top : TopLevelCircuit Fp Config PublicInput)
     (hfail : interimFixedQueryCoverageFailures top = []) :
     ∀ column rotation,
-      (column, rotation) ∈ top.pinnedCS.fixedQueryLayout →
-        column < top.pinnedCS.numFixedColumns := by
+      (column, rotation) ∈ top.fixedQueryLayout →
+        column < top.fixedColumnCount := by
   intro column rotation hentry
   have hnotFailure :
       column ∉ interimFixedQueryCoverageFailures top := by
     rw [hfail]
     simp
   have hqueried :
-      column ∈ top.pinnedCS.fixedQueryLayout.map Prod.fst := by
+      column ∈ top.fixedQueryLayout.map Prod.fst := by
     exact List.mem_map.mpr ⟨(column, rotation), hentry, rfl⟩
   by_contra hbound
   apply hnotFailure
@@ -317,8 +314,8 @@ This diagnostic is deliberately named `interim` so a successful whole-circuit
 def interimFixedRealizationFailures
     (top : TopLevelCircuit Fp Config PublicInput) :
     List (ℕ × ℕ × ℕ) :=
-  let n := 2 ^ top.domainExponent
-  let numFixedColumns := top.pinnedCS.numFixedColumns
+  let n := top.n
+  let numFixedColumns := top.fixedColumnCount
   let rows := top.fixedRows
   let required := topLevelRequiredFixedEntries top
   required.filter fun entry =>
@@ -338,14 +335,14 @@ theorem fixedRowsRealize_of_interimFailures_eq_nil
     ∀ column row value,
       (column, row, value) ∈
           topLevelRequiredFixedEntries top →
-        row < 2 ^ top.domainExponent ∧
-          column < top.pinnedCS.numFixedColumns ∧
+        row < top.n ∧
+          column < top.fixedColumnCount ∧
           (top.fixedRows.getD column []).getD row 0 =
             (value : Fp) := by
   intro column row value hentry
   let property : Prop :=
-    row < 2 ^ top.domainExponent ∧
-      column < top.pinnedCS.numFixedColumns ∧
+    row < top.n ∧
+      column < top.fixedColumnCount ∧
       (top.fixedRows.getD column []).getD row 0 = (value : Fp)
   have hnotFailure :
       (column, row, value) ∉ interimFixedRealizationFailures top := by
@@ -372,30 +369,27 @@ structure TopLevelFixedCoherence
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams) (urs : URS G) where
+    (urs : URS G) where
   key :
-    LagrangeCommitmentKey urs (top.toVerifierKey pp urs).omega
+    LagrangeCommitmentKey urs top.omega
   commitment : ∀ column,
-    column < top.pinnedCS.numFixedColumns →
-      (top.toVerifierKey pp urs).fixedCommitment column =
+    column < top.fixedColumnCount →
+      (top.fixedCommitments urs).getD column 0 =
         key.commitInstance (top.fixedRows.getD column []) 1
-  fixedQueryCount :
-    (top.toVerifierKey pp urs).fixedQueryLayout.length =
-      (pp.mergeDerived top).numFixedQueries
   queryLayout : ∀ column,
-    column < top.pinnedCS.numFixedColumns →
+    column < top.fixedColumnCount →
       ∃ rotation,
         (column, rotation) ∈
-          (top.toVerifierKey pp urs).fixedQueryLayout
+          top.fixedQueryLayout
   queryLayoutBounded : ∀ column rotation,
     (column, rotation) ∈
-        (top.toVerifierKey pp urs).fixedQueryLayout →
-      column < top.pinnedCS.numFixedColumns
+        top.fixedQueryLayout →
+      column < top.fixedColumnCount
   realizes : ∀ column row value,
     (column, row, value) ∈
         topLevelRequiredFixedEntries top →
-        row < (top.toVerifierKey pp urs).n ∧
-        column < top.pinnedCS.numFixedColumns ∧
+        row < top.n ∧
+        column < top.fixedColumnCount ∧
         (top.fixedRows.getD column []).getD row 0 = (value : Fp)
 
 namespace TopLevelFixedCoherence
@@ -407,21 +401,20 @@ theorem fixedCommitment_eq_commitInstance
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams) (urs : URS G)
+    (urs : URS G)
     (hk : top.domainExponent = urs.k)
     (hlen : (derivedUrsGLagrange urs).length = 2 ^ urs.k)
     (hgenerators : ∀ i : Fin (2 ^ urs.k),
       (derivedUrsGLagrange urs).getD (i : ℕ) 0 =
         commit urs (polynomialCoefficients (2 ^ urs.k)
-          (rowPolynomial (top.toVerifierKey pp urs).omega
+          (rowPolynomial top.omega
             (Pi.single i (1 : Fp)))))
-    (column : ℕ) (hcolumn : column < top.pinnedCS.numFixedColumns) :
-    (top.toVerifierKey pp urs).fixedCommitment column =
+    (column : ℕ) (hcolumn : column < top.fixedColumnCount) :
+    (top.fixedCommitments urs).getD column 0 =
       (LagrangeCommitmentKey.ofFullList
-        urs (top.toVerifierKey pp urs).omega
+        urs top.omega
         (derivedUrsGLagrange urs) hgenerators).commitInstance
           (top.fixedRows.getD column []) 1 := by
-  rw [top.toVerifierKey_fixedCommitment]
   have hcolumnRows : column < top.fixedRows.length := by
     simpa only [top.fixedRows_length] using hcolumn
   have hget :
@@ -440,8 +433,9 @@ theorem fixedCommitment_eq_commitInstance
     rfl
   rw [TopLevelCircuit.fixedCommitments, List.parMap_eq_map, hget]
   apply Keygen.commitLagrangeFastWith_eq_ofFullList_commitInstance
-    urs (top.toVerifierKey pp urs).omega hlen hgenerators
-  rw [top.fixedRows_getD_length column hcolumn, hk]
+    urs top.omega hlen hgenerators
+  rw [top.fixedRows_getD_length column hcolumn]
+  simp only [TopLevelCircuit.n, hk]
 
 /--
 Construct fixed coherence from the exact circuit-derived keygen rows.
@@ -456,46 +450,45 @@ def ofKeygen
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams) (urs : URS G)
+    (urs : URS G)
     (hk : top.domainExponent = urs.k)
     (hlen : (derivedUrsGLagrange urs).length = 2 ^ urs.k)
     (hgenerators : ∀ i : Fin (2 ^ urs.k),
       (derivedUrsGLagrange urs).getD (i : ℕ) 0 =
         commit urs (polynomialCoefficients (2 ^ urs.k)
-          (rowPolynomial (top.toVerifierKey pp urs).omega
+          (rowPolynomial top.omega
             (Pi.single i (1 : Fp)))))
     (queryLayout : ∀ column,
-      column < top.pinnedCS.numFixedColumns →
+      column < top.fixedColumnCount →
         ∃ rotation,
           (column, rotation) ∈
-            (top.toVerifierKey pp urs).fixedQueryLayout)
+            top.fixedQueryLayout)
     (queryLayoutBounded : ∀ column rotation,
       (column, rotation) ∈
-          (top.toVerifierKey pp urs).fixedQueryLayout →
-        column < top.pinnedCS.numFixedColumns)
+          top.fixedQueryLayout →
+        column < top.fixedColumnCount)
     (realizes : ∀ column row value,
       (column, row, value) ∈
-          topLevelRequiredFixedEntries top →
-        row < (top.toVerifierKey pp urs).n ∧
-          column < top.pinnedCS.numFixedColumns ∧
+        topLevelRequiredFixedEntries top →
+        row < top.n ∧
+          column < top.fixedColumnCount ∧
           (top.fixedRows.getD column []).getD row 0 =
             (value : Fp)) :
-    TopLevelFixedCoherence top pp urs where
+    TopLevelFixedCoherence top urs where
   key :=
     LagrangeCommitmentKey.ofFullList
-      urs (top.toVerifierKey pp urs).omega
+      urs top.omega
       (derivedUrsGLagrange urs) hgenerators
   commitment :=
     fixedCommitment_eq_commitInstance
-      top pp urs hk hlen hgenerators
-  fixedQueryCount := top.toVerifierKey_fixedQueryCount pp urs
+      top urs hk hlen hgenerators
   queryLayout := queryLayout
   queryLayoutBounded := queryLayoutBounded
   realizes := realizes
 
 end TopLevelFixedCoherence
 
-omit [Module Fp G] [DecidableEq G] in
+omit [AddCommGroup G] [Inhabited G] [Module Fp G] [DecidableEq G] in
 /--
 Binding every fixed-column resolver polynomial to the circuit's dense keygen rows
 supplies the exact fixed-column encoding expected by `TopLevelAssignment`.
@@ -504,46 +497,45 @@ theorem topLevelFixedColumnEncoding_of_binding
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     {top : TopLevelCircuit Fp Config PublicInput}
-    {pp : Keygen.ProofParams} {urs : URS G}
-    {proofIndex : Fin (pp.mergeDerived top).numProofs}
+    {numProofs : ℕ} {proofIndex : Fin numProofs}
     (assignment :
-      TopLevelAssignment top (pp.mergeDerived top).numProofs proofIndex)
+      TopLevelAssignment top numProofs proofIndex)
     (hrows : Function.Injective
-      fun row : Fin (2 ^ top.domainExponent) =>
-        (top.toVerifierKey pp urs).omega ^ (row : ℕ))
+      fun row : Fin top.n =>
+        top.omega ^ (row : ℕ))
     (hroot :
-      (top.toVerifierKey pp urs).omega ^
-        (2 ^ top.domainExponent) = 1)
+      top.omega ^
+        top.n = 1)
     (binding : ∀ column,
       assignment.polynomial (.fixedCol column) =
-        instanceRowPolynomial (2 ^ top.domainExponent)
-          (top.toVerifierKey pp urs).omega
+        instanceRowPolynomial top.n
+          top.omega
           (top.fixedRows.getD column [])) :
-    assignment.FixedColumnEncoding pp urs := by
+    assignment.FixedColumnEncoding := by
   intro column row
   rw [binding column.index]
-  let domainRow : Fin (2 ^ top.domainExponent) :=
-    ⟨row.natMod (2 ^ top.domainExponent),
-      Int.natMod_lt (by positivity)⟩
+  let domainRow : Fin top.n :=
+    ⟨row.natMod top.n,
+      Int.natMod_lt top.n_ne_zero⟩
   have hpow :
-      (top.toVerifierKey pp urs).omega ^ row =
-        (top.toVerifierKey pp urs).omega ^ (domainRow : ℕ) := by
+      top.omega ^ row =
+        top.omega ^ (domainRow : ℕ) := by
     simpa only [domainRow] using
       zpow_eq_pow_natMod
-        (top.toVerifierKey pp urs).omega
-        (2 ^ top.domainExponent) (by positivity) hroot row
+        top.omega
+        top.n top.n_pos hroot row
   rw [hpow]
   have heval :=
     instanceRowPolynomial_eval
       (values := top.fixedRows.getD column.index [])
       hrows domainRow
   change
-    (instanceRowPolynomial (2 ^ top.domainExponent)
-      (top.toVerifierKey pp urs).omega
+    (instanceRowPolynomial top.n
+      top.omega
       (top.fixedRows.getD column.index [])).eval
-        ((top.toVerifierKey pp urs).omega ^ (domainRow : ℕ)) =
+        (top.omega ^ (domainRow : ℕ)) =
       (top.fixedRows.getD column.index []).getD
-        (row.natMod (2 ^ top.domainExponent)) 0
+        (row.natMod top.n) 0
   simpa only [domainRow] using heval
 
 omit [Module Fp G] [DecidableEq G] in
@@ -563,20 +555,20 @@ theorem topLevelFixedEntryRead_of_column
     (rows : ℕ → List Fp)
     (hrows : Function.Injective
       fun i : Fin (2 ^ urs.k) =>
-        (top.toVerifierKey pp urs).omega ^ (i : ℕ))
-    (hn : (top.toVerifierKey pp urs).n = 2 ^ urs.k)
+        top.omega ^ (i : ℕ))
+    (hn : top.n = 2 ^ urs.k)
     (realizes : ∀ column row value,
       (column, row, value) ∈ topLevelRequiredFixedEntries top →
-        row < (top.toVerifierKey pp urs).n ∧
-          column < top.pinnedCS.numFixedColumns ∧
+        row < top.n ∧
+          column < top.fixedColumnCount ∧
           (rows column).getD row 0 = (value : Fp))
-    (proofIndex : Fin (pp.mergeDerived top).numProofs)
+    (proofIndex : Fin pp.numProofs)
     {column row value : ℕ}
     (hentry :
       (column, row, value) ∈ topLevelRequiredFixedEntries top)
     (hpolyEq : poly (.fixedCol column) =
       instanceRowPolynomial (2 ^ urs.k)
-        (top.toVerifierKey pp urs).omega (rows column)) :
+        top.omega (rows column)) :
     (resolverEnvironment
         (top.toVerifierKey pp urs) poly proofIndex
         (top.usableRowsAt top.domainExponent)).fixed
@@ -604,21 +596,21 @@ def topLevelFixedEntryRead_or_bad
     (rows : ℕ → List Fp)
     (hrows : Function.Injective
       fun i : Fin (2 ^ urs.k) =>
-        (top.toVerifierKey pp urs).omega ^ (i : ℕ))
-    (hn : (top.toVerifierKey pp urs).n = 2 ^ urs.k)
+        top.omega ^ (i : ℕ))
+    (hn : top.n = 2 ^ urs.k)
     (realizes : ∀ column row value,
       (column, row, value) ∈ topLevelRequiredFixedEntries top →
-        row < (top.toVerifierKey pp urs).n ∧
-          column < top.pinnedCS.numFixedColumns ∧
+        row < top.n ∧
+          column < top.fixedColumnCount ∧
           (rows column).getD row 0 = (value : Fp))
     {Bad : Type}
     (binding : ∀ column,
-      column < top.pinnedCS.numFixedColumns →
+      column < top.fixedColumnCount →
         poly (.fixedCol column) =
             instanceRowPolynomial (2 ^ urs.k)
-              (top.toVerifierKey pp urs).omega (rows column) ⊕'
+              top.omega (rows column) ⊕'
           Bad)
-    (proofIndex : Fin (pp.mergeDerived top).numProofs)
+    (proofIndex : Fin pp.numProofs)
     {column row value : ℕ}
     (hentry :
       (column, row, value) ∈ topLevelRequiredFixedEntries top) :
@@ -646,22 +638,22 @@ def topLevelFixedConstraints_or_bad
     (rows : ℕ → List Fp)
     (hrows : Function.Injective
       fun i : Fin (2 ^ urs.k) =>
-        (top.toVerifierKey pp urs).omega ^ (i : ℕ))
-    (hn : (top.toVerifierKey pp urs).n = 2 ^ urs.k)
+        top.omega ^ (i : ℕ))
+    (hn : top.n = 2 ^ urs.k)
     (realizes : ∀ column row value,
       (column, row, value) ∈
           topLevelRequiredFixedEntries top →
-        row < (top.toVerifierKey pp urs).n ∧
-          column < top.pinnedCS.numFixedColumns ∧
+        row < top.n ∧
+          column < top.fixedColumnCount ∧
           (rows column).getD row 0 = (value : Fp))
     {Bad : Type}
     (binding : ∀ column,
-      column < top.pinnedCS.numFixedColumns →
+      column < top.fixedColumnCount →
         poly (.fixedCol column) =
             instanceRowPolynomial (2 ^ urs.k)
-              (top.toVerifierKey pp urs).omega (rows column) ⊕'
+              top.omega (rows column) ⊕'
           Bad)
-    (proofIndex : Fin (pp.mergeDerived top).numProofs) :
+    (proofIndex : Fin pp.numProofs) :
     (SelectorActivationsRealized
         top.selectorMap top.selectorActivations
         (resolverEnvironment
@@ -673,7 +665,7 @@ def topLevelFixedConstraints_or_bad
           (top.usableRowsAt top.domainExponent))
         (top.operations) 0) ⊕' Bad :=
   bindOrRelationWitness
-    (boundedForallOrRelationWitness (n := top.pinnedCS.numFixedColumns) binding)
+    (boundedForallOrRelationWitness (n := top.fixedColumnCount) binding)
     fun hbinding => by
     let environment :=
       resolverEnvironment
@@ -934,7 +926,7 @@ def topLevelFixedConstraints_or_relation
     {hk : (pp.mergeDerived top).k = urs.k}
     {vk : VerifyingKey (pp.mergeDerived top) Fp G}
     {instanceCommitment :
-      Fin (pp.mergeDerived top).numProofs → ℕ → G}
+      Fin pp.numProofs → ℕ → G}
     {ps : ProofString (pp.mergeDerived top) Fp G}
     {ch : Challenges (pp.mergeDerived top).k Fp}
     {pU pW : Fp} {a : Fin (2 ^ urs.k) → Fp}
@@ -961,12 +953,12 @@ def topLevelFixedConstraints_or_relation
         urs hk vk instanceCommitment ps ch pU pW a
         batchOpenings memberDecode hblinding y hpoly vk.n)
     (hvk : vk = top.toVerifierKey pp urs)
-    (coherence : TopLevelFixedCoherence top pp urs)
+    (coherence : TopLevelFixedCoherence top urs)
     (hrows : Function.Injective
       fun i : Fin (2 ^ urs.k) =>
-        (top.toVerifierKey pp urs).omega ^ (i : ℕ))
-    (hn : (top.toVerifierKey pp urs).n = 2 ^ urs.k)
-    (proofIndex : Fin (pp.mergeDerived top).numProofs) :
+        top.omega ^ (i : ℕ))
+    (hn : top.n = 2 ^ urs.k)
+    (proofIndex : Fin pp.numProofs) :
     (SelectorActivationsRealized
         top.selectorMap top.selectorActivations
         (resolverEnvironment
@@ -984,15 +976,21 @@ def topLevelFixedConstraints_or_relation
       (fun column => top.fixedRows.getD column [])
       hrows hn coherence.realizes
   · intro column hcolumn
+    have hcommitment :
+        (top.toVerifierKey pp urs).fixedCommitment column =
+          coherence.key.commitInstance
+            (top.fixedRows.getD column []) 1 := by
+      rw [top.toVerifierKey_fixedCommitment]
+      exact coherence.commitment column hcolumn
     exact relation.fixedColumn_eq_rowPolynomial_or_relation
       column coherence.key (top.fixedRows.getD column [])
-      (coherence.commitment column hcolumn) hrows
+      hcommitment hrows
       (by
         obtain ⟨rotation, hlayout⟩ :=
           coherence.queryLayout column hcolumn
         exact fixedQuery_of_layout
           (top.toVerifierKey pp urs) instanceCommitment ps ch
-          column rotation coherence.fixedQueryCount hlayout)
+          column rotation (top.toVerifierKey_fixedQueryCount pp urs) hlayout)
 
 /--
 Pointwise fixed-cell realization at the canonical decoded-member relation.
@@ -1008,7 +1006,7 @@ def topLevelFixedEntryRead_or_relation
     {hk : (pp.mergeDerived top).k = urs.k}
     {vk : VerifyingKey (pp.mergeDerived top) Fp G}
     {instanceCommitment :
-      Fin (pp.mergeDerived top).numProofs → ℕ → G}
+      Fin pp.numProofs → ℕ → G}
     {ps : ProofString (pp.mergeDerived top) Fp G}
     {ch : Challenges (pp.mergeDerived top).k Fp}
     {pU pW : Fp} {a : Fin (2 ^ urs.k) → Fp}
@@ -1035,12 +1033,12 @@ def topLevelFixedEntryRead_or_relation
         urs hk vk instanceCommitment ps ch pU pW a
         batchOpenings memberDecode hblinding y hpoly vk.n)
     (hvk : vk = top.toVerifierKey pp urs)
-    (coherence : TopLevelFixedCoherence top pp urs)
+    (coherence : TopLevelFixedCoherence top urs)
     (hrows : Function.Injective
       fun i : Fin (2 ^ urs.k) =>
-        (top.toVerifierKey pp urs).omega ^ (i : ℕ))
-    (hn : (top.toVerifierKey pp urs).n = 2 ^ urs.k)
-    (proofIndex : Fin (pp.mergeDerived top).numProofs)
+        top.omega ^ (i : ℕ))
+    (hn : top.n = 2 ^ urs.k)
+    (proofIndex : Fin pp.numProofs)
     {column row value : ℕ}
     (hentry :
       (column, row, value) ∈ topLevelRequiredFixedEntries top) :
@@ -1055,15 +1053,21 @@ def topLevelFixedEntryRead_or_relation
       (fun column => top.fixedRows.getD column [])
       hrows hn coherence.realizes
   · intro fixedColumn hcolumn
+    have hcommitment :
+        (top.toVerifierKey pp urs).fixedCommitment fixedColumn =
+          coherence.key.commitInstance
+            (top.fixedRows.getD fixedColumn []) 1 := by
+      rw [top.toVerifierKey_fixedCommitment]
+      exact coherence.commitment fixedColumn hcolumn
     exact relation.fixedColumn_eq_rowPolynomial_or_relation
       fixedColumn coherence.key (top.fixedRows.getD fixedColumn [])
-      (coherence.commitment fixedColumn hcolumn) hrows
+      hcommitment hrows
       (by
         obtain ⟨rotation, hlayout⟩ :=
           coherence.queryLayout fixedColumn hcolumn
         exact fixedQuery_of_layout
           (top.toVerifierKey pp urs) instanceCommitment ps ch
-          fixedColumn rotation coherence.fixedQueryCount hlayout)
+          fixedColumn rotation (top.toVerifierKey_fixedQueryCount pp urs) hlayout)
   · exact hentry
 
 end CanonicalMemberConstraintRelation

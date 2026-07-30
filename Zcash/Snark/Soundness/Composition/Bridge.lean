@@ -1,17 +1,16 @@
 import Zcash.Snark.Soundness.Vesta
 import Zcash.Snark.Soundness.Forking.Adversary.Algebraic
 import Zcash.Snark.Soundness.AGM.Peel
+import Zcash.Snark.Soundness.Multiopen.Deployed
 
 /-!
-# Composing the algebraic AGM extraction with the deployed decoded capstone
+# Composing algebraic AGM extraction with the deployed decode
 
-`Soundness.Forking.Adversary.Algebraic` models the algebraic adversary family; `Soundness.Vesta`
-proves the deployed decoded capstone. The two are architecturally
-disjoint — one runs over an adversary-produced `AlgebraicWfProof` at oracle-derived challenges
-`chRecord ν`, the other over a deployed `(vk, ps, ch)` run. This module builds the identification
-bridge the composition needs on the *computed path*: `commit_aMulti_eq_multiopen` rewrites the
-adversary's aggregate witness as the deployed opened commitment `deployedCommitment − pU•u − pW•w`
-the capstone consumes.
+`Soundness.Forking.Adversary.Algebraic` models the algebraic adversary family,
+while the deployed decoder works over a `(vk, ps, ch)` run. This module identifies
+the two on the computed path: `commit_aMulti_eq_multiopen` rewrites the adversary's
+aggregate witness as the deployed opened commitment
+`deployedCommitment − pU•u − pW•w`.
 
 ## The extracted `U`/`W` coordinates (`pU`, `pW`)
 

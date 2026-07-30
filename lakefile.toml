@@ -10,7 +10,7 @@ autoImplicit = false
 [[require]]
 name = "Clean"
 git = "https://github.com/Verified-zkEVM/clean"
-rev = "d196ac9e"
+rev = "6e6328d7"
 
 [[require]]
 name = "CompElliptic"
@@ -42,14 +42,21 @@ globs = ["Zcash.Meta.Tests.+"]
 # This dedicated target keeps the fixtures out of `lake build Zcash` for local dev, while plain
 # `lake build` (the default targets -- what CI runs) compiles them, so the empirical checks are
 # exercised alongside the parametric verifier obligations in `Zcash`. New modules under `Fixtures/`
-# are picked up by the glob automatically.
+# are picked up by the glob automatically. Through their imports the capstone entries pull in the
+# verifying-key COMMITMENT certificate chain `Keygen/Certificate`.
 #
-# The deployed Action/Vesta capstone entry extends the same instance-level lane beyond the
-# `Fixtures/` directory. Through its imports it pulls in the verifying-key COMMITMENT certificate
-# chain `Keygen/Certificate`.
+# `Keygen/Certificate` and `Keygen/InstanceCapture` (the ironwood#86 join of the captured
+# instance commitments to the circuit-derived family) are pinned explicitly: InstanceCapture lost
+# its only importer when the rewind-based capstones were removed, and Certificate is otherwise
+# reachable only through the capstone entries' imports — the pins keep CI checking both even if
+# those importers move out of `Fixtures/`.
 [[lean_lib]]
 name = "FixtureCheck"
-globs = ["Zcash.Snark.Fixtures.+", "Zcash.Snark.Soundness.Deployed.ActionVesta"]
+globs = [
+  "Zcash.Snark.Fixtures.+",
+  "Zcash.Snark.Keygen.Certificate",
+  "Zcash.Snark.Keygen.InstanceCapture",
+]
 
 # The circuit-side VK matching and layout tests: `Zcash/Circuits/Tests/TestVk*` compare the
 # ported `configure`/`synthesize` against the CS and layout fixtures dumped from the actual

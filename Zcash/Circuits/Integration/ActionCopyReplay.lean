@@ -30,11 +30,11 @@ canonical relation, or retain the shared augmented-commitment relation branch.
 -/
 def actionCopyReplayWitness_or_relation
     (pp : Keygen.ProofParams) (urs : URS G)
-    (hk : (actionShape pp).k = urs.k)
+    (hk : actionCircuit.domainExponent = urs.k)
     {instanceCommitment :
-      Fin (actionShape pp).numProofs → ℕ → G}
+      Fin pp.numProofs → ℕ → G}
     {ps : ProofString (actionShape pp) Fp G}
-    {ch : Challenges (actionShape pp).k Fp}
+    {ch : Challenges actionCircuit.domainExponent Fp}
     {pU pW : Fp} {a : Fin (2 ^ urs.k) → Fp}
     {batchOpenings :
       OpenedBatchOpenings urs (evalVector urs.k ch.x3)
@@ -56,16 +56,17 @@ def actionCopyReplayWitness_or_relation
     (relation : CanonicalMemberConstraintRelation
       urs hk (actionVk pp urs) instanceCommitment ps ch pU pW a
       batchOpenings memberDecode
-        (blindingFactors_lt pp urs) y hpoly (actionVk pp urs).n)
+        (actionCircuit.toVerifierKey_blindingFactors_lt_n pp urs)
+        y hpoly (actionVk pp urs).n)
     (hgoodY : ∀ j,
       y ∉ szBadSet
         (foldSplitWitness relation.model.constraints
           (actionVk pp urs).n j))
     (fixedCoherence :
-      TopLevelFixedCoherence actionCircuit pp urs)
+      TopLevelFixedCoherence actionCircuit urs)
     (exclusions : ResolverPermutationChallengeExclusions
       (actionVk pp urs) ch relation.polynomial actionActiveRows)
-    (proofIndex : Fin (actionShape pp).numProofs) :
+    (proofIndex : Fin pp.numProofs) :
     CopyReplayWitness actionCircuit.placement
         (resolverEnvironment
           (actionVk pp urs) relation.polynomial proofIndex
@@ -75,8 +76,8 @@ def actionCopyReplayWitness_or_relation
         (NontrivialRelation (F := Fp) urs.g urs.u urs.w) ⊕'
       NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
   have hn : (actionVk pp urs).n ≠ 0 := by
-    change 2 ^ actionCircuit.domainExponent ≠ 0
-    positivity
+    rw [actionCircuit.toVerifierKey_n]
+    exact actionCircuit.n_ne_zero
   have hsatisfaction :=
     relation.constraintSatisfaction hn hgoodY
   have hdomain : ResolverPermutationDomain
@@ -103,7 +104,7 @@ def actionCopyReplayWitness_or_relation
     have hdomainSize :
         (actionVk pp urs).n = 2 ^ urs.k := by
       change
-        2 ^ actionCircuit.domainExponent = 2 ^ urs.k
+        actionCircuit.n = 2 ^ urs.k
       exact congrArg (2 ^ ·) hk
     have hfixedRead : ∀ {column row value : ℕ},
         (column, row, value) ∈

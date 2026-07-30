@@ -3,9 +3,8 @@ import Zcash.Snark.Soundness.AGM.AdaptiveIpaSurfaces
 /-!
 # Composed root pricing for arbitrary adaptive online-AGM adversaries
 
-This file identifies the query-local IPA quadratics with the verifier's ordinary straight-line
-quadratics, then sums their table-level bounds.  No phased execution, cut, or freshness witness is
-an input: chronology comes from the actual transcript prefix and online-AGM query annotations.
+Query-local IPA quadratics are identified with the verifier's quadratics and their table bounds
+are summed. Chronology comes from transcript prefixes and query annotations.
 -/
 
 namespace Zcash.Snark

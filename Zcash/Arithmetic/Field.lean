@@ -1,4 +1,4 @@
-import Mathlib
+import Mathlib.Logic.Equiv.PartialEquiv
 import CompElliptic.Fields.Pasta
 
 /-!

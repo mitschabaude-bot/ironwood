@@ -1,8 +1,9 @@
 import Zcash.Circuits.Integration.InstanceColumns
 import Zcash.Common.RelationWitness
-import Zcash.Circuits.Integration.QueryLayouts
 import Zcash.Circuits.Integration.TopLevelCorrectness
 import Mathlib.Util.AssertNoSorry
+
+set_option maxHeartbeats 20000
 
 /-!
 # Generic top-level public-instance commitments
@@ -47,23 +48,28 @@ layout. It supports arbitrary proof multiplicity and any number of instance colu
 -/
 def instanceCommitment
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G) {numProofs : ℕ}
-    (inputs : Fin numProofs → PublicInput Fp) :
-    Fin numProofs → ℕ → G :=
+    (pp : ProofParams) (urs : URS G)
+    (inputs : Fin pp.numProofs → PublicInput Fp) :
+    Fin (pp.mergeDerived top).numProofs → ℕ → G :=
   fun proofIndex column =>
     (top.instanceCommitmentKey pp urs).commitInstance
-      (top.publicInputRows (inputs proofIndex) ⟨column⟩) 1
+      (top.publicInputRows
+        (inputs (Fin.cast (pp.mergeDerived_numProofs top) proofIndex))
+        ⟨column⟩) 1
 
 omit [DecidableEq G] in
 @[simp] theorem instanceCommitment_column
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G) {numProofs : ℕ}
-    (inputs : Fin numProofs → PublicInput Fp)
-    (proofIndex : Fin numProofs) (column : Column .instance) :
-    top.instanceCommitment pp urs inputs proofIndex column.index =
+    (pp : ProofParams) (urs : URS G)
+    (inputs : Fin pp.numProofs → PublicInput Fp)
+    (proofIndex : Fin pp.numProofs) (column : Column .instance) :
+    top.instanceCommitment pp urs inputs
+        (Fin.cast (pp.mergeDerived_numProofs top).symm proofIndex)
+        column.index =
       (top.instanceCommitmentKey pp urs).commitInstance
         (top.publicInputRows (inputs proofIndex) column) 1 :=
-  rfl
+  by
+    simp [instanceCommitment]
 
 assert_no_sorry instanceCommitment_column
 
@@ -74,17 +80,20 @@ layout-derived row polynomial, with Halo 2's default blind.
 -/
 theorem instanceCommitment_column_eq_commit
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G) {numProofs : ℕ}
-    (inputs : Fin numProofs → PublicInput Fp)
-    (proofIndex : Fin numProofs) (column : Column .instance) :
-    top.instanceCommitment pp urs inputs proofIndex column.index =
+    (pp : ProofParams) (urs : URS G)
+    (inputs : Fin pp.numProofs → PublicInput Fp)
+    (proofIndex : Fin pp.numProofs) (column : Column .instance) :
+    top.instanceCommitment pp urs inputs
+        (Fin.cast (pp.mergeDerived_numProofs top).symm proofIndex)
+        column.index =
       commit urs
           (instanceCoefficients (2 ^ urs.k)
-            (top.toVerifierKey pp urs).omega
+            top.omega
             (top.publicInputRows (inputs proofIndex) column)) +
         urs.w := by
   rw [top.instanceCommitment_column,
     LagrangeCommitmentKey.commitInstance_eq, one_smul]
+  rw [top.toVerifierKey_omega]
 
 assert_no_sorry instanceCommitment_column_eq_commit
 
@@ -104,7 +113,7 @@ variable
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G)
     (hk : (pp.mergeDerived top).k = urs.k)
-    (inputs : Fin (pp.mergeDerived top).numProofs → PublicInput Fp)
+    (inputs : Fin pp.numProofs → PublicInput Fp)
     (ps : ProofString (pp.mergeDerived top) Fp G)
     (ch : Challenges (pp.mergeDerived top).k Fp)
     (pU pW : Fp) (a : Fin (2 ^ urs.k) → Fp)
@@ -135,43 +144,65 @@ Verifier acceptance binds one cell's circuit-derived instance column to its
 layout-derived row polynomial, or yields the augmented-basis relation.
 -/
 def acceptedColumn_eq_rowPolynomial_or_relation
-    (proofIndex : Fin (pp.mergeDerived top).numProofs)
+    (proofIndex : Fin pp.numProofs)
     (index : Fin (size PublicInput))
     (hrows : Function.Injective
-      fun i : Fin (2 ^ urs.k) =>
-        (top.toVerifierKey pp urs).omega ^ (i : ℕ)) :
+      fun i : Fin (2 ^ top.domainExponent) =>
+        top.omega ^ (i : ℕ)) :
     CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode := memberDecode) haccepts
         (.instanceCol proofIndex
           (top.publicInputLayout.cells index).1.index) =
-      instanceRowPolynomial (2 ^ top.domainExponent)
-        (Zcash.Arithmetic.omegaOf top.domainExponent)
+      instanceRowPolynomial top.n
+        (top.omega)
         (top.publicInputRows (inputs proofIndex)
           (top.publicInputLayout.cells index).1) ⊕'
       NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
   let column := (top.publicInputLayout.cells index).1
+  let verifierProofIndex : Fin (pp.mergeDerived top).numProofs :=
+    Fin.cast (pp.mergeDerived_numProofs top).symm proofIndex
+  have hk' : top.domainExponent = urs.k :=
+    (pp.mergeDerived_k top).symm.trans hk
+  have hn : 2 ^ urs.k = 2 ^ top.domainExponent :=
+    congrArg (2 ^ ·) hk'.symm
+  have hrows' : Function.Injective
+      (fun i : Fin (2 ^ urs.k) => top.omega ^ (i : ℕ)) := by
+    intro i j hij
+    have hcast :
+        Fin.cast hn i = Fin.cast hn j :=
+      hrows (by simpa only [Fin.val_cast] using hij)
+    exact Fin.ext (by
+      simpa only [Fin.val_cast] using congrArg Fin.val hcast)
   have hquery : ∃ q ∈ assembleQueries (top.toVerifierKey pp urs)
       (top.instanceCommitment pp urs inputs) ps ch,
       q.commId = .instanceCol proofIndex column.index := by
     obtain ⟨instanceRotation, hregistered⟩ :=
       top.exists_rotation_mem_instanceQueries_of_publicInputLayout_cell index
-    exact instanceQuery_of_layout
-      (top.toVerifierKey pp urs) (top.instanceCommitment pp urs inputs) ps ch proofIndex
-      column.index instanceRotation (top.toVerifierKey_instanceQueryCount pp urs)
-      (QueryLayouts.instanceQueryLayout_of_constraintSystem
-        top pp urs column instanceRotation hregistered)
+    simpa only [verifierProofIndex, Fin.val_cast] using
+      (instanceQuery_of_layout
+        (top.toVerifierKey pp urs) (top.instanceCommitment pp urs inputs) ps ch
+        verifierProofIndex column.index instanceRotation
+        (top.toVerifierKey_instanceQueryCount pp urs)
+        (top.mem_instanceQueryLayout_of_mem_constraintSystem
+          column instanceRotation hregistered))
   have hbound :=
     CanonicalMemberConstraintRelation.acceptedInstanceColumn_eq_rowPolynomial_or_relation
       (pU := pU) (pW := pW) (a := a)
       (batchOpenings := batchOpenings)
       (memberDecode := memberDecode)
-      haccepts proofIndex column.index
+      haccepts verifierProofIndex column.index
       (top.instanceCommitmentKey pp urs)
       (top.publicInputRows (inputs proofIndex) column) 1
       (top.instanceCommitment_column pp urs inputs proofIndex column)
-      hrows
+      (by simpa only [top.toVerifierKey_omega] using hrows')
       hquery
-  simpa only [← hk, column] using hbound
+  refine bindOrRelationWitness hbound fun heq => ?_
+  have hn' : 2 ^ urs.k = top.n := by
+    rw [← hk, pp.mergeDerived_k, top.n_eq_two_pow_domainExponent]
+  rw [show (verifierProofIndex : ℕ) = proofIndex by
+        simp only [verifierProofIndex, Fin.val_cast],
+      hn', top.toVerifierKey_omega] at heq
+  exact heq
 
 assert_no_sorry
   acceptedColumn_eq_rowPolynomial_or_relation
@@ -181,17 +212,17 @@ Verifier acceptance binds one decoded assignment to the public input supplied fo
 that proof, or yields the augmented-basis relation.
 -/
 def publicInputEncoding_or_relation
-    (proofIndex : Fin (pp.mergeDerived top).numProofs)
+    (proofIndex : Fin pp.numProofs)
     (domainExponent_lt : top.domainExponent < 33) :
     (let assignment : TopLevelAssignment top
-          (pp.mergeDerived top).numProofs proofIndex :=
+          pp.numProofs proofIndex :=
         { polynomial :=
             CanonicalMemberConstraintRelation.acceptedPolynomial
               (memberDecode := memberDecode) haccepts };
       assignment.PublicInputEncoding (inputs proofIndex)) ⊕'
       NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
   let assignment : TopLevelAssignment top
-      (pp.mergeDerived top).numProofs proofIndex :=
+      pp.numProofs proofIndex :=
     { polynomial :=
         CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode := memberDecode) haccepts }
@@ -202,13 +233,8 @@ def publicInputEncoding_or_relation
       acceptedColumn_eq_rowPolynomial_or_relation
         top pp urs hk inputs ps ch pU pW a batchOpenings
         memberDecode haccepts proofIndex index
-        (by
-          change Function.Injective
-            fun i : Fin (2 ^ urs.k) =>
-              Zcash.Arithmetic.omegaOf top.domainExponent ^ (i : ℕ)
-          rw [← hk]
-          exact Zcash.Arithmetic.omegaOf_powers_injective
-            top.domainExponent (by omega)))
+        (Zcash.Arithmetic.omegaOf_powers_injective
+          top.domainExponent (by omega)))
     fun hcolumns => ?_
   apply TopLevelAssignment.publicInputEncoding_of_publicInputRowPolynomials
       (assignment := assignment) (inputs proofIndex)
@@ -240,9 +266,9 @@ def statements_or_relation_of_accepted_topLevelBundleStatement
   change TopLevelBundleStatement top pp poly at htop
   refine bindOrRelationWitness
     (finForallOrRelationWitness
-      (A := fun proofIndex : Fin (pp.mergeDerived top).numProofs =>
+      (A := fun proofIndex : Fin pp.numProofs =>
         let assignment : TopLevelAssignment top
-            (pp.mergeDerived top).numProofs proofIndex :=
+            pp.numProofs proofIndex :=
           { polynomial := poly }
         assignment.PublicInputEncoding (inputs proofIndex))
       fun proofIndex =>
@@ -253,8 +279,38 @@ def statements_or_relation_of_accepted_topLevelBundleStatement
       TopLevelBundleStatement.of_publicInputEncoding
         top pp poly inputs hencoding htop
 
+/-- Present retained private witnesses at the public inputs bound by the accepted instance
+commitments, preserving a computed relation on binding failure. -/
+def witnesses_or_relation_of_accepted_topLevelBundleWitness
+    (domainExponent_lt : top.domainExponent < 33)
+    (witness : TopLevelBundleWitness top pp
+      (CanonicalMemberConstraintRelation.acceptedPolynomial
+        (memberDecode := memberDecode) haccepts)) :
+    TopLevelExternalBundleWitness top inputs ⊕'
+      NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
+  let poly :=
+    CanonicalMemberConstraintRelation.acceptedPolynomial
+      (memberDecode := memberDecode) haccepts
+  change TopLevelBundleWitness top pp poly at witness
+  refine bindOrRelationWitness
+    (finForallOrRelationWitness
+      (A := fun proofIndex : Fin pp.numProofs =>
+        let assignment : TopLevelAssignment top
+            pp.numProofs proofIndex :=
+          { polynomial := poly }
+        assignment.PublicInputEncoding (inputs proofIndex))
+      fun proofIndex =>
+        publicInputEncoding_or_relation
+          top pp urs hk inputs ps ch pU pW a batchOpenings memberDecode
+          haccepts proofIndex domainExponent_lt)
+    fun hencoding =>
+      TopLevelBundleWitness.of_publicInputEncoding
+        top pp poly inputs hencoding witness
+
 assert_no_sorry
   statements_or_relation_of_accepted_topLevelBundleStatement
+assert_no_sorry
+  witnesses_or_relation_of_accepted_topLevelBundleWitness
 
 end TopLevelInstanceCommitment
 

@@ -1,6 +1,7 @@
 import Zcash.Circuits.Action.SelectorCoherence
 import Zcash.Circuits.Action.TopLevel
 import Zcash.Circuits.Integration.TopLevelGates
+import Mathlib.Util.AssertNoSorry
 
 /-!
 # Closed computations for Action gate coherence

@@ -111,9 +111,7 @@ structure CanonicalMemberConstraintRelation
       decodedPolynomialResolver
         (instanceCommitment := instanceCommitment)
         urs hk vk ps ch memberDecode route
-    let model :=
-      canonicalConstraintModelOfPermutationResolver
-        vk ch poly hblinding
+    let model := vk.constraintModel ch poly hblinding
     model.CircuitSat y hpoly deg a
 
 namespace CanonicalMemberConstraintRelation
@@ -220,11 +218,10 @@ def acceptedModel
     (haccepts :
       DeployedAccepts urs hk vk instanceCommitment ps ch) :
     ConstraintPolyModel shape.numProofs :=
-  canonicalConstraintModelOfPermutationResolver
-    vk ch
-      (acceptedPolynomial
-        (memberDecode := memberDecode) haccepts)
-      hblinding
+  vk.constraintModel ch
+    (acceptedPolynomial
+      (memberDecode := memberDecode) haccepts)
+    hblinding
 
 /--
 Satisfaction of the accepted canonical model constructs the exact relation consumed
@@ -250,15 +247,14 @@ def ofAcceptedCircuitSat
       noDuplicateQueries := routing.2
       satisfiesCircuit := ?_ }
   change
-    (canonicalConstraintModelOfPermutationResolver
-      vk ch
-        (decodedPolynomialResolver
+    (vk.constraintModel ch
+      (decodedPolynomialResolver
+        (instanceCommitment := instanceCommitment)
+        urs hk vk ps ch memberDecode
+        (assembledQueryMemberRoute
           (instanceCommitment := instanceCommitment)
-          urs hk vk ps ch memberDecode
-          (assembledQueryMemberRoute
-            (instanceCommitment := instanceCommitment)
-            vk ps ch routing.1 routing.2))
-        hblinding).CircuitSat y hpoly deg a
+          vk ps ch routing.1 routing.2))
+      hblinding).CircuitSat y hpoly deg a
   simpa only [acceptedModel, acceptedPolynomial, acceptedRoute, routing] using
     hsatisfied
 
@@ -291,8 +287,7 @@ def model
       urs hk vk instanceCommitment ps ch pU pW a
       batchOpenings memberDecode hblinding y hpoly deg) :
     ConstraintPolyModel shape.numProofs :=
-  canonicalConstraintModelOfPermutationResolver
-    vk ch relation.polynomial hblinding
+  vk.constraintModel ch relation.polynomial hblinding
 
 /--
 A good folding challenge splits the canonical bundle-wide identity into the exact

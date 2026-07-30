@@ -1,3 +1,4 @@
+import Zcash.Meta.LibrarySuggestionsDeny
 import Zcash.Snark.Soundness.AGM.DeployedCoordinateDecode
 import Zcash.Snark.Soundness.AGM.DeployedX1
 

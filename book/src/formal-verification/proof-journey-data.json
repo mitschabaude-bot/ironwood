@@ -24,7 +24,7 @@
     },
     "runtimeAgmStack": {
       "label": "PR #114 runtime AGM head",
-      "ref": "cbbcb0d0ab2266062ad41e8bb7d08b7903681835",
+      "ref": "9675704b8a953cb7e8a0c33b420fd1818342fe0c",
       "fetch": "pull/114/head"
     }
   },
@@ -291,7 +291,7 @@
       "chapter": "AGM to discrete log",
       "title": "Price the relation branch",
       "claim": "The algebraic Fiat-Shamir game produces PR #28's deployed instances, states binding as a computable value mismatch against the carried aggregate opening (never as nonexistence of an opening, which holds vacuously in a prime-order group), and feeds every mismatch run's explicit relation to the plain-DL probability bound.",
-      "summary": "PR #28 defines AlgebraicDForkCert and the deployed AGM instance. The programmed-basis relation-to-DL reduction plants the challenge in every basis slot and loses only one 1/|F| hyperplane. PR #56 supplies the executable adaptive side and computed certificate producer. The primary straight-line and bare-adaptive Action finders use explicit finite-resource profiles; the recursive finder remains a separately priced structural alternative using the Attema-Fehr-Klooß 2021 expected-time approach (https://eprint.iacr.org/2021/1377).",
+      "summary": "The programmed-basis relation-to-DL reduction plants the challenge in every basis slot and loses only one 1/|F| hyperplane. The live straight-line and bare-adaptive Action finders use executable outcomes and explicit finite-resource profiles. The earlier recursive finder remains visible only in the pinned historical stages; #142 removed it from the live reduction stack.",
       "nodes": [
         "relation",
         "fsAdversary",
@@ -341,11 +341,6 @@
           "symbol": "deployedAlgebraicForkingRelation",
           "path": "Zcash/Snark/Soundness/AGM/Capstone.lean",
           "source": "agmStack"
-        },
-        {
-          "symbol": "orchardDeployedAlgebraicForkingProgrammed",
-          "path": "Zcash/Snark/Soundness/AGM/ProbabilityVesta.lean",
-          "source": "runtimeAgmStack"
         },
         {
           "symbol": "programmedExtractOrMiss",
@@ -398,18 +393,8 @@
           "source": "fsStack"
         },
         {
-          "symbol": "recursiveAlgebraicFork_oracle_tape_sum_runs_le_poly",
-          "path": "Zcash/Snark/Soundness/Forking/Adversary/ExpectedRunsPoly.lean",
-          "source": "runtimeAgmStack"
-        },
-        {
           "symbol": "relationWithCoins_prob_le_of_truncated_textbookDL",
           "path": "Zcash/Snark/Soundness/AGM/ProbabilityCoins.lean",
-          "source": "runtimeAgmStack"
-        },
-        {
-          "symbol": "snarkConstraintsDeployed_prob_le_of_root_schedule_runtime",
-          "path": "Zcash/Snark/Soundness/Composition/DeployedConstraintContainment.lean",
           "source": "runtimeAgmStack"
         },
         {
@@ -433,8 +418,23 @@
           "source": "runtimeAgmStack"
         },
         {
-          "symbol": "orchard_action_acceptFalseStatement_adaptive_2pow123_workFactor_generatorRO_for",
+          "symbol": "orchard_action_knowledgeFailure_adaptive_2pow123_workFactor_generatorRO_for",
           "path": "Zcash/Snark/Fixtures/MultiAction/ActionCapstone.lean",
+          "source": "runtimeAgmStack"
+        },
+        {
+          "symbol": "adaptiveActionKnowledgeExtractor",
+          "path": "Zcash/Circuits/Integration/AdaptiveActionEvent.lean",
+          "source": "runtimeAgmStack"
+        },
+        {
+          "symbol": "actionKnowledgeExtractor",
+          "path": "Zcash/Circuits/Integration/StraightLineActionTerminal.lean",
+          "source": "runtimeAgmStack"
+        },
+        {
+          "symbol": "actionKnowledgeFailure_prob_le_of_base_union_bound",
+          "path": "Zcash/Circuits/Integration/StraightLineActionEvent.lean",
           "source": "runtimeAgmStack"
         },
         {
@@ -448,7 +448,12 @@
           "source": "runtimeAgmStack"
         },
         {
-          "symbol": "adaptiveActionRelationFinderCalls_le_traversalSlots",
+          "symbol": "adaptiveActionKnowledgeExtractorCalls_le_traversalSlots",
+          "path": "Zcash/Circuits/Integration/AdaptiveActionEvent.lean",
+          "source": "runtimeAgmStack"
+        },
+        {
+          "symbol": "AdaptiveActionDirectDlogProfile.knowledgeExtractorCost_le",
           "path": "Zcash/Circuits/Integration/AdaptiveActionEvent.lean",
           "source": "runtimeAgmStack"
         }
@@ -460,15 +465,15 @@
       ],
       "proves": [
         "Every group point in the adaptive Fiat-Shamir adversary's proof output carries its representation over (g,U,W).",
-        "The recursive extractor computes an AlgebraicDForkCert from explicit oracle and tape coins, and every returned certificate records real accepting runs.",
+        "The pinned historical stack records how the retired recursive extractor computed an AlgebraicDForkCert; the live reduction no longer imports that route.",
         "Every binding mismatch yields explicit relation data, and the programmed-basis conversion loses only one 1/|F| miss hyperplane.",
-        "The recursive extractor has the unconditional field-independent expected-call bound (8·Q+1)·10^k in the style of Attema-Fehr-Klooß 2021, with no FamilyForkSpread premise.",
-        "The straight-line constraint finder has a pointwise four-run bound; the composed sequential Action finder uses six runs, while the bare-adaptive Action finder caches each provenance aggregate's output and annotation log and charges eight independently traversed slots.",
+        "The straight-line constraint finder has a pointwise four-run bound; the composed sequential Action finder uses six runs, while the bare-adaptive Action knowledge outcome caches each provenance aggregate's output and annotation log and charges eight independently traversed slots.",
+        "The Action knowledge extractors are executable and return the actual private witnesses for every proof in the bundle together with proofs that they satisfy the compiled Action specification; both the adaptive and straight-line/sequential relation projections share their route's data-bearing outcome.",
         "The direct profiles separately account for random-oracle, group, and direct-coordinate work while leaving the finite-security Vesta DLOG advantage as a caller premise.",
-        "For every numProofs at or below Orchard's consensus maximum, the generic adaptive Action endpoint bounds acceptance of a false literal BundleStatement by Adv_DLOG(2^127,2^127) + 2^-83, prices all five semantic challenge surfaces, and exposes an explicit PMFEventBiasLE transport conjunct; it requires no externally supplied traces, cuts, or views."
+        "For every numProofs at or below Orchard's consensus maximum, the generic adaptive Action knowledge endpoint bounds verifier acceptance when executable private-witness extraction fails by Adv_DLOG(2^127,2^127) + 2^-83, prices all five semantic challenge surfaces, profiles the shared extractor, and exposes an explicit PMFEventBiasLE transport conjunct; it requires no externally supplied traces, cuts, or views."
       ],
       "residuals": [
-        "Identify Blake2b and halo2's concrete hash-to-curve with their modeled random oracles; supply finite-security Vesta DL hardness and implementation work bounds; and connect the circuit-level BundleStatement to the ledger security statement. The result covers represented online-AGM adversaries, not arbitrary non-algebraic random-oracle adversaries."
+        "Identify Blake2b and halo2's concrete hash-to-curve with their modeled random oracles; supply finite-security Vesta DL hardness and implementation work bounds; and identify the extracted circuit private witnesses and compiled Action specification with the ledger-level Orchard witness relation. The result covers represented online-AGM adversaries, not arbitrary non-algebraic random-oracle adversaries."
       ],
       "durationMs": 10000
     },

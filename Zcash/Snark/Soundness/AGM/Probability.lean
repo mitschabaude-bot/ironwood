@@ -4,32 +4,8 @@ import Zcash.Snark.Soundness.UniformMeasure
 /-!
 # From relation probability to DL probability
 
-`Soundness.AGM.Adapter` extracts the challenge's discrete log from a relation whose challenge
-component is nonzero. This module prices that reduction: relation finding costs the textbook DL
-advantage plus `1/|F|`.
-
-## Experiment
-
-The textbook DL game supplies the challenge `z • B` for uniform `z`. The reduction draws fresh
-uniform pairs `(x i, y i)` and presents the basis whose slot `i` has log `x i + z * y i`. It
-solves for the challenge unless the returned relation annihilates `y` (Lemma 3 of Jaeger–Tessaro,
-<https://eprint.iacr.org/2020/1213>).
-
-## What is proven
-
-* `programmedRelSet_card`: the simulation is perfect — the relation event on programmed coins has
-  exactly the honest relation probability.
-* `missSet_card_le`: annihilation costs at most a `1/|F|` fraction of the coins.
-* `relation_prob_le_of_textbookDL`: textbook DL hardness bounds relation finding by
-  `bound + 1/|F|`. No multiplicative factor appears; the fixed-slot reduction this replaces
-  guessed the challenge slot and paid `|ι|`.
-
-## Boundary
-
-The relation finder `A` is a deterministic total function. These are information-theoretic counting
-theorems; efficiency is modeled outside Lean. `Soundness.Composition.StraightLineConstraint`
-supplies the deployed finder and `.ProbabilityVesta` specializes the bounds; plain-DL hardness,
-the AGM, and the generator random-oracle model remain assumptions there.
+Programming every basis slot converts a relation into a discrete log except on one `1/|F|`
+hyperplane. Finder efficiency and finite-resource DLOG hardness remain premises.
 -/
 
 open scoped ENNReal
@@ -230,7 +206,13 @@ theorem missSet_card_le :
 
 /-- The reduction built from `A` wins the textbook single-generator DL game with probability at
 most `bound`. Its winning coins are those on which `discreteLogOfChallenge_of_relation`, applied
-to `programmedEmbedding`, computes the discrete log of `z • B`. -/
+to `programmedEmbedding`, computes the discrete log of `z • B`.
+
+Only a nonzero `B` makes this a hardness claim. At `B = 0` the presented basis is constant and
+carries no challenge, so a fixed nonzero relation wins on all but a `1/|F|` fraction of coins and
+no `bound` below `1 - 1/|F|` holds. The degenerate case is not unsound — the bounds below stay
+true and go trivial — and `B ≠ 0` is demanded where it is load-bearing, at
+`orchard_uniformURSIdentification_of_generatorRO`. -/
 def TextbookDLAdvantageLE (bound : ℝ≥0∞) : Prop :=
   (PMF.uniformOfFintype (F × (ι → F) × (ι → F))).toOuterMeasure (winSet B A) ≤ bound
 

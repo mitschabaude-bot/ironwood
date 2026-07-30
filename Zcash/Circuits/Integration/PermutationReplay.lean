@@ -851,7 +851,10 @@ theorem chunkRowValue_eq_of_mem_copies
     (poly : CommitmentId → Polynomial Fp)
     (l0 lLast lBlind : Polynomial Fp) (p : Fin shape.numProofs) {n m : ℕ}
     (h : ConstraintSatisfaction
-      (constraintModelOfPermutationResolver vk ch poly l0 lLast lBlind) n)
+      (constraintModelOfResolver vk ch poly
+        (permutationSetsOfResolver vk poly)
+        (permutationChunksOfResolver vk poly)
+        l0 lLast lBlind) n)
     (hdom : ResolverPermutationDomain vk l0 lLast lBlind n m)
     (hcycle : ResolverPermutationCycle vk poly p m)
     (hgood : ResolverPermutationGoodChallenges vk ch poly p m)

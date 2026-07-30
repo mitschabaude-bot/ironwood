@@ -1,4 +1,4 @@
-import Mathlib
+import Mathlib.Algebra.Lie.OfAssociative
 
 /-!
 # The verifier's gate-polynomial AST

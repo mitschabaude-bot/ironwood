@@ -7,9 +7,9 @@ import Zcash.Snark.Soundness.Composition.StraightLineConstraint
 constraint witness.  The Action terminal recovers the exact retained `DeployedAlgebraicDecode`
 with `Option.get`; no existential selection is involved.
 
-The artifacts are the run's, not the Action circuit's.  Identifying the two is the caller's job;
-`ActionTerminal.action_bundleStatement_or_relation_of_straightLineDecoded` does it with the keygen
-certificate equalities.
+The artifacts are the run's, not a particular circuit's. Identifying them with a
+top-level circuit's derived key and instance commitment is the caller's job;
+`straightLineRunDecodeAt` performs that transport.
 -/
 
 namespace Zcash.Snark

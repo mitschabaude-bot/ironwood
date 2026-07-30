@@ -1,4 +1,9 @@
-import Mathlib
+import Mathlib.Algebra.BigOperators.GroupWithZero.Action
+import Mathlib.Algebra.Field.Defs
+import Mathlib.Algebra.Lie.OfAssociative
+import Mathlib.Algebra.Module.Defs
+import Mathlib.Data.Fintype.Basic
+import Mathlib.Tactic.Abel
 
 /-!
 # Nontrivial linear (discrete-log) relations, as computed data

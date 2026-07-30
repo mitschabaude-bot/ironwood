@@ -480,11 +480,8 @@ def zeroOnlineMemberProofData
   assemblyCovered := zeroMultiopenAssemblyCovered basis vkS hfixed hperm
   membersCovered := zeroFamily_membersCovered basis vkS hfixed hperm
 
-/-- **A concrete inhabitant of the bare adaptive online-AGM interface.**  The query-free
-adversary returns the represented zero proof.  All three verifier-known representation fields
-(instance, fixed, and common permutation commitments) are populated by the same explicit zero
-algebraic point, so their joint satisfiability is checked rather than merely asserted field by
-field. -/
+/-- Query-free adaptive family whose instance, fixed, and permutation representations share the
+explicit zero algebraic point. -/
 def zeroAdaptiveOnlineMemberFamily
     (hfixed : ∀ i, vkS.fixedCommitment i = 0)
     (hperm : ∀ i, vkS.permutationCommonCommitment i = 0) :

@@ -36,6 +36,30 @@ theorem topLevelSoundness
 
 end FullCircuitSatisfaction
 
+/-- Type-valued semantic evidence for a top-level circuit.  Unlike
+`TopLevelCircuit.Statement`, this retains the private witness as executable data. -/
+structure TopLevelSemanticWitness
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (publicInput : PublicInput Fp) where
+  privateWitness : top.PrivateWitness
+  valid : top.Spec publicInput privateWitness
+
+namespace TopLevelSemanticWitness
+
+/-- Forget the retained data and recover the ordinary existential statement. -/
+theorem statement
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
+    {top : TopLevelCircuit Fp Config PublicInput}
+    {publicInput : PublicInput Fp}
+    (witness : TopLevelSemanticWitness top publicInput) :
+    top.Statement publicInput :=
+  ⟨witness.privateWitness, witness.valid⟩
+
+end TopLevelSemanticWitness
+
 namespace FullCircuitBridge
 
 variable
@@ -97,6 +121,22 @@ def statement_or_bad
       (by
         rw [witness.operations_eq]
         exact witness.environment_eq ▸ hsatisfied)
+
+/-- Preserve the circuit's extracted private witness on the successful bridge branch. -/
+def semanticWitness_or_bad
+    {top : TopLevelCircuit Fp Config PublicInput}
+    {assignment : ProofAssignment Fp}
+    (witness : TopLevelBridgeWitness top assignment cell Bad) :
+    TopLevelSemanticWitness top
+      (top.extractPublicInput (top.environment assignment)) ⊕' Bad :=
+  bindOrRelationWitness witness.bridge.satisfaction_or_bad fun hsatisfied =>
+    { privateWitness :=
+        top.extractPrivateWitness (top.placedEnvironment assignment)
+      valid := top.soundness assignment
+        (by
+          rw [witness.operations_eq]
+          exact FullCircuitSatisfaction.constraints
+            (witness.environment_eq ▸ hsatisfied)) }
 
 end TopLevelBridgeWitness
 

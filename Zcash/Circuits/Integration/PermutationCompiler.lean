@@ -721,22 +721,26 @@ theorem decodedChunkAddress_eq_sourceColumn
 /-- The verifier query reference assigned by the permutation compiler to one
 concrete column. -/
 def permutationQueryReference
-    (pinnedCS : PinnedConstraintSystem Fp) : AnyColumn → ColumnRef
+    (adviceQueryLayout fixedQueryLayout instanceQueryLayout :
+      List (ℕ × ℤ)) :
+    AnyColumn → ColumnRef
   | ⟨.advice, index⟩ =>
-      .advice (pinnedCS.adviceQueryLayout.findIdx (· = (index, 0)))
+      .advice (adviceQueryLayout.findIdx (· = (index, 0)))
   | ⟨.fixed, index⟩ =>
-      .fixed (pinnedCS.fixedQueryLayout.findIdx (· = (index, 0)))
+      .fixed (fixedQueryLayout.findIdx (· = (index, 0)))
   | ⟨.instance, index⟩ =>
-      .instance (pinnedCS.instanceQueryLayout.findIdx (· = (index, 0)))
+      .instance (instanceQueryLayout.findIdx (· = (index, 0)))
 
-/-- The compiler's variable-width chunking preserves its indexed reference
+/-- The verifier CS's variable-width chunking preserves its indexed reference
 stream exactly. -/
-theorem permutationChunksOf_flatten
-    (pinnedCS : PinnedConstraintSystem Fp) (chunkLen : ℕ) :
-    (Keygen.permutationChunksOf pinnedCS chunkLen).flatten =
-      (pinnedCS.permutationColumns.map
-        (permutationQueryReference pinnedCS)).zipIdx := by
-  unfold Keygen.permutationChunksOf
+theorem verifierCS_permutationChunks_flatten
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput) :
+    top.verifierCS.permutationChunks.flatten =
+      (top.permutationColumns.map
+        (permutationQueryReference top.adviceQueryLayout
+          top.fixedQueryLayout top.instanceQueryLayout)).zipIdx := by
+  unfold TopLevelCircuit.verifierCS
   rw [listToChunks_flatten]
   congr 2
   funext column
@@ -762,40 +766,46 @@ theorem constraintSystem_chunkLen_pos (cs : ConstraintSystem Fp) :
     le_max_left _ _
   omega
 
-/-- The compiler emits exactly the ceiling number of chunks recorded in `Shape`. -/
-theorem permutationChunksOf_length
-    (pinnedCS : PinnedConstraintSystem Fp) (cs : ConstraintSystem Fp) :
-    (Keygen.permutationChunksOf pinnedCS cs.chunkLen).length =
-      (pinnedCS.permutationColumns.length + cs.chunkLen - 1) / cs.chunkLen := by
-  unfold Keygen.permutationChunksOf
-  rw [listToChunks_length _ _ (constraintSystem_chunkLen_pos cs)]
+/-- The verifier CS emits exactly the circuit-owned ceiling number of chunks. -/
+theorem verifierCS_permutationChunks_length
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput) :
+    top.verifierCS.permutationChunks.length =
+      top.permutationSetCount := by
+  unfold TopLevelCircuit.verifierCS TopLevelCircuit.permutationSetCount
+    TopLevelCircuit.permutationColumnCount TopLevelCircuit.chunkLen
+  rw [listToChunks_length _ _
+    (constraintSystem_chunkLen_pos top.constraintSystem)]
   simp
 
 /-- Each compiler chunk has the standard full-or-final-remainder width. -/
-theorem permutationChunksOf_getD_length
-    (pinnedCS : PinnedConstraintSystem Fp) (cs : ConstraintSystem Fp)
-    (i : ℕ)
-    (hi : i < (Keygen.permutationChunksOf pinnedCS cs.chunkLen).length) :
-    ((Keygen.permutationChunksOf pinnedCS cs.chunkLen).getD i []).length =
-      min cs.chunkLen
-        (pinnedCS.permutationColumns.length - i * cs.chunkLen) := by
-  unfold Keygen.permutationChunksOf at hi ⊢
-  rw [listToChunks_getD_length _ _
-    (constraintSystem_chunkLen_pos cs) i hi]
-  simp
+theorem verifierCS_permutationChunks_getD_length
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (i : ℕ) (hi : i < top.verifierCS.permutationChunks.length) :
+    (top.verifierCS.permutationChunks.getD i []).length =
+      min top.chunkLen
+        (top.permutationColumnCount - i * top.chunkLen) := by
+  simp only [TopLevelCircuit.verifierCS] at hi ⊢
+  have hchunkLen : 0 < top.chunkLen := by
+    exact constraintSystem_chunkLen_pos top.constraintSystem
+  rw [listToChunks_getD_length top.chunkLen _ hchunkLen i hi]
+  simp only [List.length_zipIdx, List.length_map,
+    TopLevelCircuit.permutationColumnCount,
+    TopLevelCircuit.chunkLen]
 
 /-- Every prefix ending before a valid compiler chunk contains `i * chunkLen`
 permutation columns. -/
-theorem permutationChunksOf_take_flatten_length
-    (pinnedCS : PinnedConstraintSystem Fp) (cs : ConstraintSystem Fp)
-    (i : ℕ)
-    (hi : i < (Keygen.permutationChunksOf pinnedCS cs.chunkLen).length) :
-    ((Keygen.permutationChunksOf pinnedCS cs.chunkLen).take i).flatten.length =
-      i * cs.chunkLen := by
-  unfold Keygen.permutationChunksOf at hi ⊢
+theorem verifierCS_permutationChunks_take_flatten_length
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (i : ℕ) (hi : i < top.verifierCS.permutationChunks.length) :
+    (top.verifierCS.permutationChunks.take i).flatten.length =
+      i * top.chunkLen := by
+  unfold TopLevelCircuit.verifierCS at hi ⊢
   apply take_flatten_length_of_dropLast_full
   · exact listToChunks_dropLast_full _ _
-      (constraintSystem_chunkLen_pos cs)
+      (constraintSystem_chunkLen_pos top.constraintSystem)
   · exact hi
 
 /-- Top-level keygen exposes the compiler prefix law without requiring downstream
@@ -808,76 +818,81 @@ theorem topLevelPermutationChunks_take_flatten_length
     (i : ℕ) (hi : i < (top.toVerifierKey pp urs).permutationChunks.length) :
     (((top.toVerifierKey pp urs).permutationChunks.take i).flatten.length) =
       i * (top.toVerifierKey pp urs).chunkLen := by
-  exact permutationChunksOf_take_flatten_length
-    top.pinnedCS top.constraintSystem i hi
+  rw [top.toVerifierKey_permutationChunks] at hi ⊢
+  rw [top.toVerifierKey_chunkLen]
+  exact verifierCS_permutationChunks_take_flatten_length top i hi
 
 /-- The compiler's chunk family has enough total slots for every permutation
 column, without requiring the family itself to be nonempty. -/
 theorem permutationColumns_length_le_chunks_mul
-    (pinnedCS : PinnedConstraintSystem Fp) (cs : ConstraintSystem Fp) :
-    pinnedCS.permutationColumns.length ≤
-      (Keygen.permutationChunksOf pinnedCS cs.chunkLen).length * cs.chunkLen := by
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput) :
+    top.permutationColumnCount ≤
+      top.verifierCS.permutationChunks.length * top.chunkLen := by
   let source :=
-    (pinnedCS.permutationColumns.map
-      (permutationQueryReference pinnedCS)).zipIdx
+    (top.permutationColumns.map
+      (permutationQueryReference top.adviceQueryLayout
+        top.fixedQueryLayout top.instanceQueryLayout)).zipIdx
   have hall :
-      (source.toChunks cs.chunkLen).Forall
-        fun chunk => chunk.length ≤ cs.chunkLen :=
-    listToChunks_all_le cs.chunkLen source
-      (constraintSystem_chunkLen_pos cs)
+      (source.toChunks top.chunkLen).Forall
+        fun chunk => chunk.length ≤ top.chunkLen :=
+    listToChunks_all_le top.chunkLen source
+      (constraintSystem_chunkLen_pos top.constraintSystem)
   have hbound :=
     flatten_length_le_mul_of_forall
-      (source.toChunks cs.chunkLen) cs.chunkLen hall
+      (source.toChunks top.chunkLen) top.chunkLen hall
   rw [listToChunks_flatten] at hbound
   have hchunks :
-      Keygen.permutationChunksOf pinnedCS cs.chunkLen =
-        source.toChunks cs.chunkLen := by
-    simp only [Keygen.permutationChunksOf, source]
-    apply congrArg (List.toChunks cs.chunkLen)
+      top.verifierCS.permutationChunks =
+        source.toChunks top.chunkLen := by
+    unfold TopLevelCircuit.verifierCS
+    dsimp only
+    apply congrArg (List.toChunks top.chunkLen)
     congr 2
     funext column
     rcases column with ⟨kind, index⟩
     cases kind <;> rfl
   rw [hchunks]
-  simpa only [source, List.length_zipIdx, List.length_map] using hbound
+  simpa only [source, List.length_zipIdx, List.length_map,
+    TopLevelCircuit.permutationColumnCount] using hbound
 
 /-- A coherent compiled query reference decodes to the concrete column from
 which the compiler created it. -/
 theorem permutationColumnAddress_queryReference
     {shape : Shape} {F G : Type}
     (vk : VerifyingKey shape F G)
-    (pinnedCS : PinnedConstraintSystem Fp)
-    (hadvice :
-      vk.adviceQueryLayout = pinnedCS.adviceQueryLayout)
-    (hfixed :
-      vk.fixedQueryLayout = pinnedCS.fixedQueryLayout)
-    (hinstance :
-      vk.instanceQueryLayout = pinnedCS.instanceQueryLayout)
+    (adviceQueryLayout fixedQueryLayout instanceQueryLayout :
+      List (ℕ × ℤ))
+    (hadvice : vk.adviceQueryLayout = adviceQueryLayout)
+    (hfixed : vk.fixedQueryLayout = fixedQueryLayout)
+    (hinstance : vk.instanceQueryLayout = instanceQueryLayout)
     (column : AnyColumn)
     (hcoherent :
       PermutationColumnRef.Coherent vk
-        (permutationQueryReference pinnedCS column)) :
+        (permutationQueryReference adviceQueryLayout fixedQueryLayout
+          instanceQueryLayout column)) :
     permutationColumnAddress vk
-        (permutationQueryReference pinnedCS column) = column := by
+        (permutationQueryReference adviceQueryLayout fixedQueryLayout
+          instanceQueryLayout column) = column := by
   rcases column with ⟨kind, index⟩
   cases kind with
   | advice =>
       rcases hcoherent with ⟨-, hin, -⟩
       simp only [permutationQueryReference, permutationColumnAddress]
       rw [hadvice] at hin ⊢
-      rw [getD_findIdx_eq_target pinnedCS.adviceQueryLayout
+      rw [getD_findIdx_eq_target adviceQueryLayout
         (index, 0) (0, 0) hin]
   | fixed =>
       rcases hcoherent with ⟨-, hin, -⟩
       simp only [permutationQueryReference, permutationColumnAddress]
       rw [hfixed] at hin ⊢
-      rw [getD_findIdx_eq_target pinnedCS.fixedQueryLayout
+      rw [getD_findIdx_eq_target fixedQueryLayout
         (index, 0) (0, 0) hin]
   | «instance» =>
       rcases hcoherent with ⟨-, hin, -⟩
       simp only [permutationQueryReference, permutationColumnAddress]
       rw [hinstance] at hin ⊢
-      rw [getD_findIdx_eq_target pinnedCS.instanceQueryLayout
+      rw [getD_findIdx_eq_target instanceQueryLayout
         (index, 0) (0, 0) hin]
 
 /--
@@ -891,13 +906,12 @@ theorem topLevelPermutationColumnAddresses_eq
     (pp : Keygen.ProofParams) (urs : URS G)
     (hcoherent :
       PermutationChunkRoutingCoherent (top.toVerifierKey pp urs)) :
-    (Keygen.permutationChunksOf
-        top.pinnedCS top.constraintSystem.chunkLen).flatten.map
+    top.verifierCS.permutationChunks.flatten.map
           (fun reference =>
             permutationColumnAddress (top.toVerifierKey pp urs) reference.1) =
       (Keygen.permColsOf top.constraintSystem).map
         Halo2.Layout.ColRef.toAny := by
-  rw [permutationChunksOf_flatten]
+  rw [verifierCS_permutationChunks_flatten]
   change
     List.map
         (permutationColumnAddress (top.toVerifierKey pp urs) ∘ Prod.fst)
@@ -908,44 +922,35 @@ theorem topLevelPermutationColumnAddresses_eq
   apply List.map_congr_left
   intro column hcolumn
   simp only [Function.comp_apply]
-  let reference :=
-    permutationQueryReference top.pinnedCS column
+  let referenceOf :=
+    permutationQueryReference top.adviceQueryLayout
+      top.fixedQueryLayout top.instanceQueryLayout
+  let reference := referenceOf column
   have hreference :
       reference ∈
-        top.pinnedCS.permutationColumns.map
-          (permutationQueryReference top.pinnedCS) :=
-    by
-      rw [top.pinnedCS_permutationColumns]
-      exact List.mem_map.mpr ⟨column, hcolumn, rfl⟩
+        top.permutationColumns.map referenceOf :=
+    List.mem_map.mpr ⟨column, hcolumn, rfl⟩
   have hindexed :
       ∃ indexed ∈
-          (top.pinnedCS.permutationColumns.map
-            (permutationQueryReference top.pinnedCS)).zipIdx,
+          (top.permutationColumns.map referenceOf).zipIdx,
         indexed.1 = reference := by
     have hfst :
         reference ∈
-          ((top.pinnedCS.permutationColumns.map
-            (permutationQueryReference top.pinnedCS)).zipIdx).map Prod.fst := by
+          ((top.permutationColumns.map referenceOf).zipIdx).map Prod.fst := by
       rw [List.zipIdx_map_fst]
       exact hreference
     simpa only using List.mem_map.mp hfst
   obtain ⟨indexed, hindexed, hindexedReference⟩ := hindexed
   have hindexedFlat :
       indexed ∈
-        (Keygen.permutationChunksOf
-          top.pinnedCS top.constraintSystem.chunkLen).flatten := by
-    rw [permutationChunksOf_flatten]
-    exact hindexed
+        top.verifierCS.permutationChunks.flatten := by
+    rw [verifierCS_permutationChunks_flatten]
+    simpa only [referenceOf] using hindexed
   obtain ⟨chunk, hchunk, hindexedChunk⟩ :=
     List.mem_flatten.mp hindexedFlat
-  have hvkChunks :
-      (top.toVerifierKey pp urs).permutationChunks =
-        Keygen.permutationChunksOf
-          top.pinnedCS top.constraintSystem.chunkLen := by
-    rfl
   have hrouted := hcoherent chunk (by
-    rw [hvkChunks]
-    exact hchunk) indexed hindexedChunk
+    simpa only [top.toVerifierKey_permutationChunks] using hchunk)
+    indexed hindexedChunk
   have hreferenceCoherent :
       PermutationColumnRef.Coherent
         (top.toVerifierKey pp urs) reference := by
@@ -955,14 +960,15 @@ theorem topLevelPermutationColumnAddresses_eq
       permutationColumnAddress (top.toVerifierKey pp urs) reference =
         column :=
     permutationColumnAddress_queryReference
-      (top.toVerifierKey pp urs) top.pinnedCS
-      (top.toVerifierKey_adviceQueryLayout_derived pp urs)
-      (top.toVerifierKey_fixedQueryLayout_derived pp urs)
-      (top.toVerifierKey_instanceQueryLayout_derived pp urs)
+      (top.toVerifierKey pp urs)
+      top.adviceQueryLayout top.fixedQueryLayout top.instanceQueryLayout
+      (top.toVerifierKey_adviceQueryLayout pp urs)
+      (top.toVerifierKey_fixedQueryLayout pp urs)
+      (top.toVerifierKey_instanceQueryLayout pp urs)
       column hreferenceCoherent
   rcases column with ⟨kind, index⟩
   cases kind <;>
-    simpa [reference, permutationQueryReference,
+    simpa [reference, referenceOf, permutationQueryReference,
       Halo2.Layout.ColRef.toAny] using hdecoded
 
 end Zcash.Snark

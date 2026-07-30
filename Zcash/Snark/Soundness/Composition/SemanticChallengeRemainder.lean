@@ -73,10 +73,13 @@ theorem allResolverPermutationBetaBadSet_measure_le
 
 /-- The bundle-wide lookup `γ` exclusion costs `2(u+1)` per (proof, lookup) pair. -/
 theorem allResolverLookupGammaBadSet_measure_le
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {k : ℕ} (numProofs : ℕ)
+    (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp) (u : ℕ) :
-    uniformChallenge.toOuterMeasure (allResolverLookupGammaBadSet vk ch poly u) ≤
-      ((shape.numProofs * shape.numLookups * (2 * (u + 1)) : ℕ) : ℝ≥0∞) / Fintype.card Fp := by
+    uniformChallenge.toOuterMeasure
+        (allResolverLookupGammaBadSet numProofs vk ch poly u) ≤
+      ((numProofs * shape.numLookups * (2 * (u + 1)) : ℕ) : ℝ≥0∞) /
+        Fintype.card Fp := by
   refine le_trans (le_of_eq (uniformChallenge_badSet _)) (ENNReal.div_le_div_right ?_ _)
   refine_lift Nat.cast_le.mpr ?_
   refine le_trans (Finset.card_biUnion_le) ?_
@@ -86,10 +89,12 @@ theorem allResolverLookupGammaBadSet_measure_le
 
 /-- The bundle-wide lookup `β` exclusion costs `(u+2)(u+1) + (u+1)` per pair. -/
 theorem allResolverLookupBetaBadSet_measure_le
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {k : ℕ} (numProofs : ℕ)
+    (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → Polynomial Fp) (u : ℕ) :
-    uniformChallenge.toOuterMeasure (allResolverLookupBetaBadSet vk ch poly u) ≤
-      ((shape.numProofs * shape.numLookups * ((u + 2) * (u + 1) + (u + 1)) : ℕ) : ℝ≥0∞) /
+    uniformChallenge.toOuterMeasure
+        (allResolverLookupBetaBadSet numProofs vk ch poly u) ≤
+      ((numProofs * shape.numLookups * ((u + 2) * (u + 1) + (u + 1)) : ℕ) : ℝ≥0∞) /
         Fintype.card Fp := by
   refine le_trans (le_of_eq (uniformChallenge_badSet _)) (ENNReal.div_le_div_right ?_ _)
   refine_lift Nat.cast_le.mpr ?_
@@ -106,7 +111,7 @@ theorem allResolverLookupBetaBadSet_measure_le
 `θ` is not folded in here: `enabledLookupThetaBadSetFamily_card_le` prices it against an
 environment family rather than a verifying key, so it is charged where that family is fixed. -/
 noncomputable def semanticChallengeRemainder
-    (vk : VerifyingKey shape Fp G)
+    (numProofs : ℕ) (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → Polynomial Fp) (constraints : List (Polynomial Fp))
     (m u : ℕ) : ℝ≥0∞ :=
   ((vk.n * constraints.length : ℕ) : ℝ≥0∞) / Fintype.card Fp +
@@ -115,8 +120,8 @@ noncomputable def semanticChallengeRemainder
     ((∑ p : Fin shape.numProofs,
       (Fintype.card (ResolverPermutationCell vk poly p m) + 1) *
         Fintype.card (ResolverPermutationCell vk poly p m) : ℕ) : ℝ≥0∞) / Fintype.card Fp +
-    ((shape.numProofs * shape.numLookups * (2 * (u + 1)) : ℕ) : ℝ≥0∞) / Fintype.card Fp +
-    ((shape.numProofs * shape.numLookups * ((u + 2) * (u + 1) + (u + 1)) : ℕ) : ℝ≥0∞) /
+    ((numProofs * shape.numLookups * (2 * (u + 1)) : ℕ) : ℝ≥0∞) / Fintype.card Fp +
+    ((numProofs * shape.numLookups * ((u + 2) * (u + 1) + (u + 1)) : ℕ) : ℝ≥0∞) /
       Fintype.card Fp
 
 /-- **Each semantic exclusion is charged once, and the four bundle-wide events sum to the
@@ -124,23 +129,25 @@ remainder.**  The `y` event is priced over its own squeeze by `goodY_failure_mea
 other three are the bundle-wide unions above.  Stated as a sum because each challenge is a
 separate squeeze. -/
 theorem semanticChallengeRemainder_covers
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    (numProofs : ℕ) (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → Polynomial Fp) (constraints : List (Polynomial Fp))
     (m u : ℕ) (hn : vk.n ≠ 0) :
     uniformChallenge.toOuterMeasure
         {y : Fp | ∃ j, y ∈ szBadSet (foldSplitWitness constraints vk.n j)} +
       uniformChallenge.toOuterMeasure (allResolverPermutationGammaBadSet vk ch poly m) +
       uniformChallenge.toOuterMeasure (allResolverPermutationBetaBadSet vk poly m) +
-      uniformChallenge.toOuterMeasure (allResolverLookupGammaBadSet vk ch poly u) +
-      uniformChallenge.toOuterMeasure (allResolverLookupBetaBadSet vk ch poly u) ≤
-      semanticChallengeRemainder vk poly constraints m u := by
+      uniformChallenge.toOuterMeasure
+          (allResolverLookupGammaBadSet numProofs vk ch poly u) +
+      uniformChallenge.toOuterMeasure
+          (allResolverLookupBetaBadSet numProofs vk ch poly u) ≤
+      semanticChallengeRemainder numProofs vk poly constraints m u := by
   unfold semanticChallengeRemainder
   gcongr
   · exact goodY_failure_measure_le constraints hn
   · exact allResolverPermutationGammaBadSet_measure_le vk ch poly m
   · exact allResolverPermutationBetaBadSet_measure_le vk poly m
-  · exact allResolverLookupGammaBadSet_measure_le vk ch poly u
-  · exact allResolverLookupBetaBadSet_measure_le vk ch poly u
+  · exact allResolverLookupGammaBadSet_measure_le numProofs vk ch poly u
+  · exact allResolverLookupBetaBadSet_measure_le numProofs vk ch poly u
 
 
 /-! ## The four surfaces at their squeeze indices

@@ -247,7 +247,8 @@ theorem missSetWithCoins_card_le :
 
 /-- A textbook DL bound for the actual randomized relation finder. Its winning coins are those
 on which `discreteLogOfChallenge_of_relation`, applied to `programmedEmbedding`, computes the
-discrete log of `z • B`. -/
+discrete log of `z • B`. It is a hardness claim only for `B ≠ 0`, for the reason recorded at
+`TextbookDLAdvantageLE`. -/
 def TextbookDLWithCoinsAdvantageLE (bound : ℝ≥0∞) : Prop :=
   (PMF.uniformOfFintype (F × (ι → F) × (ι → F) × ρ)).toOuterMeasure
       (textbookWinSetWithCoins B A) ≤ bound

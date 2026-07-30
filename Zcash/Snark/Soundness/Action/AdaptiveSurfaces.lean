@@ -1,5 +1,5 @@
-import Zcash.Circuits.Integration.AdaptiveActionTerminal
-import Zcash.Circuits.Integration.StraightLineActionBudgets
+import Zcash.Snark.Soundness.Action.AdaptiveTerminal
+import Zcash.Snark.Soundness.Action.StraightLineBudgets
 import Zcash.Snark.Soundness.AGM.AdaptiveSurfaces
 
 /-!
@@ -382,10 +382,10 @@ theorem adaptiveActionAdviceLayout_column_lt
     (column : ℕ) (rotation : ℤ)
     (hmem : (column, rotation) ∈ (ActionTerminal.vkAt pp basis).adviceQueryLayout) :
     column < (pp.mergeDerived actionCircuit).numAdviceColumns := by
-  exact
-    (ActionGateCoherence.topLevelGateCoherence pp
-      (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
-      |>.adviceQueryColumnsAllocated (column, rotation) hmem
+  rw [ProofParams.mergeDerived_numAdviceColumns]
+  apply ActionGateCoherence.adviceQueryColumnsAllocated (column, rotation)
+  simpa only [ActionTerminal.vkAt,
+    actionCircuit.toVerifierKey_adviceQueryLayout] using hmem
 
 /-- Every active Action commitment identity has a concrete query in the deployed assembly. -/
 theorem adaptiveActionActive_query
@@ -404,14 +404,14 @@ theorem adaptiveActionActive_query
   let ic := actionCircuit.instanceCommitment pp
     (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) inputs
   have hadviceCount :=
-    (ActionGateCoherence.topLevelGateCoherence pp
-      (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)).adviceQueryCount
+    actionCircuit.toVerifierKey_adviceQueryCount pp
+      (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)
   have hinstanceCount :=
-    (ActionGateCoherence.topLevelGateCoherence pp
-      (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)).instanceQueryCount
+    actionCircuit.toVerifierKey_instanceQueryCount pp
+      (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)
   have hfixedCount :=
-    (ActionGateCoherence.topLevelGateCoherence pp
-      (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)).fixedQueryCount
+    actionCircuit.toVerifierKey_fixedQueryCount pp
+      (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)
   cases id with
   | instanceCol p column =>
       rcases hactive with ⟨hp, rotation, hlayout⟩
@@ -764,7 +764,7 @@ def adaptiveActionCommittedModelOf
     (ch : Challenges shape.k Fp)
     (hblinding : vk.blindingFactors < vk.n) :
     ConstraintPolyModel shape.numProofs :=
-  canonicalConstraintModelOfPermutationResolver vk ch
+  vk.constraintModel ch
     (adaptiveActionCommitmentPolynomialOf vk ic ps source ch) hblinding
 
 noncomputable def adaptiveActionCommittedModel
@@ -778,7 +778,7 @@ noncomputable def adaptiveActionCommittedModel
   adaptiveActionCommittedModelOf (ActionTerminal.vkAt pp basis)
     (actionCircuit.instanceCommitment pp
       (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) inputs)
-    ps source ch (ActionPermutationDomain.blindingFactors_lt pp
+    ps source ch (actionCircuit.toVerifierKey_blindingFactors_lt_n pp
       (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
 
 /-- Executable fixed pre-`x` constraint difference.  Every coefficient is computed from the
@@ -814,7 +814,7 @@ noncomputable def adaptiveActionPreXDifference
   adaptiveActionPreXDifferenceOf (ActionTerminal.vkAt pp basis)
     (actionCircuit.instanceCommitment pp
       (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) inputs)
-    ps source ch (ActionPermutationDomain.blindingFactors_lt pp
+    ps source ch (actionCircuit.toVerifierKey_blindingFactors_lt_n pp
       (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
 
 /-- Supplying the deployed Action key and instance commitment to the executable resolver recovers
@@ -880,7 +880,7 @@ theorem adaptiveActionPreXDifference_eq
   exact adaptiveActionPreXDifferenceOf_eq (ActionTerminal.vkAt pp basis)
     (actionCircuit.instanceCommitment pp
       (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) inputs)
-    ps source ch (ActionPermutationDomain.blindingFactors_lt pp
+    ps source ch (actionCircuit.toVerifierKey_blindingFactors_lt_n pp
       (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
 
 /-- The stage-local model reads only `theta`, `beta`, and `gamma`; later challenge fields do not
@@ -912,22 +912,21 @@ theorem adaptiveActionCommittedModel_challenge_congr
         adaptiveActionCommitmentActive]
     · exact adaptiveActionCommitmentPolynomial_challenge_congr
         pp basis inputs ps source ch₁ ch₂ id hvanishing
-  unfold canonicalConstraintModelOfPermutationResolver
-    constraintModelOfPermutationResolver constraintModelOfResolver
+  unfold VerifyingKey.constraintModel constraintModelOfResolver
   dsimp only
   rw [hpoly, htheta, hbeta, hgamma]
 
 /-- The canonical constraint model never reads the quotient or random-polynomial terminal slots,
 so pointwise agreement on every other identity determines the whole model. -/
-theorem canonicalConstraintModelOfPermutationResolver_congr_nonterminal
+theorem VerifyingKey.constraintModel_congr_nonterminal
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly₁ poly₂ : CommitmentId → Polynomial Fp)
     (hblinding : vk.blindingFactors < vk.n)
     (hpoly : ∀ id, id ≠ .vanishingH → id ≠ .randomPoly →
       poly₁ id = poly₂ id) :
-    canonicalConstraintModelOfPermutationResolver vk ch poly₁ hblinding =
-      canonicalConstraintModelOfPermutationResolver vk ch poly₂ hblinding := by
+    vk.constraintModel ch poly₁ hblinding =
+      vk.constraintModel ch poly₂ hblinding := by
   have hcolumn : ∀ id, id.isColumnInput → poly₁ id = poly₂ id := by
     intro id hid
     apply hpoly id <;> cases id <;> simp_all [CommitmentId.isColumnInput]
@@ -977,8 +976,7 @@ theorem canonicalConstraintModelOfPermutationResolver_congr_nonterminal
     rw [hpoly (.lookupProduct p l) (by simp) (by simp),
       hpoly (.lookupPermInput p l) (by simp) (by simp),
       hpoly (.lookupPermTable p l) (by simp) (by simp)]
-  unfold canonicalConstraintModelOfPermutationResolver
-    constraintModelOfPermutationResolver constraintModelOfResolver
+  unfold VerifyingKey.constraintModel constraintModelOfResolver
   dsimp only
   rw [hfixed, hadvice, hinstance, hsets, hchunks, hlookups]
 
@@ -1147,17 +1145,21 @@ noncomputable def adaptiveActionSurfaceAt
   let vk := ActionTerminal.vkAt pp basis
   let poly := adaptiveActionCommitmentPolynomial pp basis inputs ps source ch
   if _h0 : (n : Nat) = 0 then
-    ↑(TopLevelLookupCoherence.allTopLevelLookupThetaBadSet
+    ↑(TopLevelLookup.thetaBadSet
       actionCircuit pp urs poly)
   else if _h1 : (n : Nat) = 1 then
     ↑(allResolverPermutationBetaBadSet vk poly actionActiveRows) ∪
-      ↑(allResolverLookupBetaBadSet vk (ActionTerminal.semanticChRecord ch.theta 0) poly
+      ↑(allResolverLookupBetaBadSet (pp.mergeDerived actionCircuit).numProofs vk
+        (ActionTerminal.semanticChRecord ch.theta 0
+          (k := (pp.mergeDerived actionCircuit).k)) poly
         (vk.n - vk.blindingFactors - 2))
   else if _h2 : (n : Nat) = 2 then
     ↑(allResolverPermutationGammaBadSet vk
-        (ActionTerminal.semanticChRecord ch.theta ch.beta) poly actionActiveRows) ∪
-      ↑(allResolverLookupGammaBadSet vk
-        (ActionTerminal.semanticChRecord ch.theta ch.beta) poly
+        (ActionTerminal.semanticChRecord ch.theta ch.beta
+          (k := (pp.mergeDerived actionCircuit).k)) poly actionActiveRows) ∪
+      ↑(allResolverLookupGammaBadSet (pp.mergeDerived actionCircuit).numProofs vk
+        (ActionTerminal.semanticChRecord ch.theta ch.beta
+          (k := (pp.mergeDerived actionCircuit).k)) poly
           (vk.n - vk.blindingFactors - 2))
   else if _h3 : (n : Nat) = 3 then
     let model := adaptiveActionCommittedModel pp basis inputs ps source ch
@@ -1291,7 +1293,7 @@ theorem adaptiveActionSurfaceAt_congr
     have hp := adaptiveActionCommitmentPolynomial_column_eq
       pp basis inputs ps ps' source source ch rfl ha
     have hs := congrArg (fun s : Finset Fp => (↑s : Set Fp))
-      (TopLevelLookupCoherence.allTopLevelLookupThetaBadSet_congr
+      (TopLevelLookup.thetaBadSet_congr
         actionCircuit pp
           (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) hp)
     simpa [adaptiveActionSurfaceAt, nu, ch] using hs
@@ -1304,11 +1306,14 @@ theorem adaptiveActionSurfaceAt_congr
       (allResolverPermutationBetaBadSet_congr
         (ActionTerminal.vkAt pp basis) actionActiveRows hpPerm)
     have hsLookup := congrArg (fun s : Finset Fp => (↑s : Set Fp))
-      (allResolverLookupBetaBadSet_congr (ActionTerminal.vkAt pp basis)
+      (allResolverLookupBetaBadSet_congr
+        (pp.mergeDerived actionCircuit).numProofs (ActionTerminal.vkAt pp basis)
         ((ActionTerminal.vkAt pp basis).n -
           (ActionTerminal.vkAt pp basis).blindingFactors - 2)
-        (ch₁ := ActionTerminal.semanticChRecord ch.theta 0)
-        (ch₂ := ActionTerminal.semanticChRecord ch.theta 0) rfl hpLookup)
+        (ch₁ := ActionTerminal.semanticChRecord ch.theta 0
+          (k := (pp.mergeDerived actionCircuit).k))
+        (ch₂ := ActionTerminal.semanticChRecord ch.theta 0
+          (k := (pp.mergeDerived actionCircuit).k)) rfl hpLookup)
     simpa [adaptiveActionSurfaceAt, nu, ch] using
       congrArg₂ (fun a b : Set Fp => a ∪ b) hsPerm hsLookup
   · obtain ⟨ha, hi, ht⟩ := preGammaSqueezePoint_inj init hprefix
@@ -1319,14 +1324,19 @@ theorem adaptiveActionSurfaceAt_congr
     have hsPerm := congrArg (fun s : Finset Fp => (↑s : Set Fp))
       (allResolverPermutationGammaBadSet_congr
         (ActionTerminal.vkAt pp basis) actionActiveRows
-        (ch₁ := ActionTerminal.semanticChRecord ch.theta ch.beta)
-        (ch₂ := ActionTerminal.semanticChRecord ch.theta ch.beta) rfl hpPerm)
+        (ch₁ := ActionTerminal.semanticChRecord ch.theta ch.beta
+          (k := (pp.mergeDerived actionCircuit).k))
+        (ch₂ := ActionTerminal.semanticChRecord ch.theta ch.beta
+          (k := (pp.mergeDerived actionCircuit).k)) rfl hpPerm)
     have hsLookup := congrArg (fun s : Finset Fp => (↑s : Set Fp))
-      (allResolverLookupGammaBadSet_congr (ActionTerminal.vkAt pp basis)
+      (allResolverLookupGammaBadSet_congr
+        (pp.mergeDerived actionCircuit).numProofs (ActionTerminal.vkAt pp basis)
         ((ActionTerminal.vkAt pp basis).n -
           (ActionTerminal.vkAt pp basis).blindingFactors - 2)
-        (ch₁ := ActionTerminal.semanticChRecord ch.theta ch.beta)
-        (ch₂ := ActionTerminal.semanticChRecord ch.theta ch.beta) rfl rfl hpLookup)
+        (ch₁ := ActionTerminal.semanticChRecord ch.theta ch.beta
+          (k := (pp.mergeDerived actionCircuit).k))
+        (ch₂ := ActionTerminal.semanticChRecord ch.theta ch.beta
+          (k := (pp.mergeDerived actionCircuit).k)) rfl rfl hpLookup)
     simpa [adaptiveActionSurfaceAt, nu, ch] using
       congrArg₂ (fun a b : Set Fp => a ∪ b) hsPerm hsLookup
   · obtain ⟨ha, hi, ht, hp, hl, hr⟩ := preYSqueezePoint_inj init hprefix
@@ -1386,7 +1396,7 @@ theorem adaptiveActionThetaSurface_measure_le
     (source : List (AlgebraicPoint (F := Fp) basis)) (earlier : Fin 0 → Fp) :
     uniformChallenge.toOuterMeasure
         (adaptiveActionSurfaceAt pp basis inputs 0 ps source earlier) ≤
-      (TopLevelLookupCoherence.topLevelLookupThetaBudget actionCircuit pp
+      (TopLevelLookup.thetaBudget actionCircuit pp
         (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)
         (adaptiveActionCommitmentPolynomial pp basis inputs ps source
           (chRecord (fun _ => 0) (fun _ => 0))) : ENNReal) /
@@ -1424,7 +1434,9 @@ theorem adaptiveActionBetaSurface_measure_le
             (ActionTerminal.vkAt pp basis).blindingFactors - 2 + 1)) : Nat) : ENNReal) /
         Fintype.card Fp := by
   dsimp only
-  simpa [adaptiveActionSurfaceAt] using
+  simpa [adaptiveActionSurfaceAt, actionActiveRows,
+    ProofParams.mergeDerived_numProofs,
+    ProofParams.mergeDerived_numLookups] using
     (ActionTerminal.actionBetaBadSets_measure_le pp basis (earlier 0)
       (adaptiveActionCommitmentPolynomial pp basis inputs ps source
         (chRecord (fun i => if h : (i : Nat) < 1 then earlier ⟨i, h⟩ else 0)
@@ -1451,7 +1463,9 @@ theorem adaptiveActionGammaSurface_measure_le
           (ActionTerminal.vkAt pp basis).blindingFactors - 2 + 1)) : Nat) : ENNReal) /
         Fintype.card Fp := by
   dsimp only
-  simpa [adaptiveActionSurfaceAt] using
+  simpa [adaptiveActionSurfaceAt, actionActiveRows,
+    ProofParams.mergeDerived_numProofs,
+    ProofParams.mergeDerived_numLookups] using
     (ActionTerminal.actionGammaBadSets_measure_le pp basis (earlier 0) (earlier ⟨1, by omega⟩)
       (adaptiveActionCommitmentPolynomial pp basis inputs ps source
         (chRecord (fun i => if h : (i : Nat) < 2 then earlier ⟨i, h⟩ else 0)
@@ -2529,7 +2543,7 @@ theorem adaptiveActionExclusions_of_no_surface
       pp family basis O inputs hvk hI haccepts
     let actionModel := CanonicalMemberConstraintRelation.acceptedModel
       (memberDecode := fun i hi => decode.toMemberDecode hchar i hi)
-      (hblinding := ActionPermutationDomain.blindingFactors_lt pp
+      (hblinding := actionCircuit.toVerifierKey_blindingFactors_lt_n pp
         (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)) hacceptsAction
     let actionPoly := CanonicalMemberConstraintRelation.acceptedPolynomial
       (memberDecode := fun i hi => decode.toMemberDecode hchar i hi) hacceptsAction
@@ -2539,7 +2553,7 @@ theorem adaptiveActionExclusions_of_no_surface
         (ActionTerminal.vkAt pp basis).n j)) ∧
       ResolverPermutationChallengeExclusions (ActionTerminal.vkAt pp basis) ch
         actionPoly actionActiveRows ∧
-      TopLevelLookupCoherence.TopLevelLookupChallengeExclusions actionCircuit pp
+      TopLevelLookup.ChallengeExclusions actionCircuit pp
         (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) ch actionPoly := by
   simp only
   let pnu := ActionTerminal.adaptiveActionRunOutput family basis O
@@ -2556,7 +2570,7 @@ theorem adaptiveActionExclusions_of_no_surface
     pp family basis O inputs hvk hI haccepts
   let actionModel := CanonicalMemberConstraintRelation.acceptedModel
     (memberDecode := fun i hi => decode.toMemberDecode hchar i hi)
-    (hblinding := ActionPermutationDomain.blindingFactors_lt pp
+    (hblinding := actionCircuit.toVerifierKey_blindingFactors_lt_n pp
       (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)) hacceptsAction
   let actionPoly := CanonicalMemberConstraintRelation.acceptedPolynomial
     (memberDecode := fun i hi => decode.toMemberDecode hchar i hi) hacceptsAction
@@ -2640,15 +2654,15 @@ theorem adaptiveActionExclusions_of_no_surface
       CommitmentId.isLookupInput] at hid ⊢
   have hs0 := hsurface (0 : Fin 5)
   have hthetaStage : nu 0 ∉
-      TopLevelLookupCoherence.allTopLevelLookupThetaBadSet actionCircuit pp
+      TopLevelLookup.thetaBadSet actionCircuit pp
         (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) (stagePoly 0) := by
     simpa [adaptiveActionSurfaceAt, stagePoly, stageCh, stageSource] using hs0
-  have hthetaSet := TopLevelLookupCoherence.allTopLevelLookupThetaBadSet_congr
+  have hthetaSet := TopLevelLookup.thetaBadSet_congr
     actionCircuit pp (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)
     (poly₁ := actionPoly) (poly₂ := stagePoly 0) (fun id hid =>
       hpolySurface 0 id (hcolumnAvailable id hid) (hnonterminal id (Or.inl hid)))
   have htheta : ch.theta ∉
-      TopLevelLookupCoherence.allTopLevelLookupThetaBadSet actionCircuit pp
+      TopLevelLookup.thetaBadSet actionCircuit pp
         (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) actionPoly := by
     rw [hthetaSet]
     simpa only [hthetaRead] using hthetaStage
@@ -2669,8 +2683,10 @@ theorem adaptiveActionExclusions_of_no_surface
       (↑(allResolverPermutationBetaBadSet (ActionTerminal.vkAt pp basis)
           (adaptiveActionCommitmentPolynomial pp basis inputs data.algebraicProof.erase
             (stageSource 1) betaCh) actionActiveRows) : Set Fp) ∪
-        (↑(allResolverLookupBetaBadSet (ActionTerminal.vkAt pp basis)
-          (ActionTerminal.semanticChRecord betaCh.theta 0)
+        (↑(allResolverLookupBetaBadSet
+          (pp.mergeDerived actionCircuit).numProofs (ActionTerminal.vkAt pp basis)
+          (ActionTerminal.semanticChRecord betaCh.theta 0
+            (k := (pp.mergeDerived actionCircuit).k))
           (adaptiveActionCommitmentPolynomial pp basis inputs data.algebraicProof.erase
             (stageSource 1) betaCh)
           ((ActionTerminal.vkAt pp basis).n -
@@ -2679,8 +2695,10 @@ theorem adaptiveActionExclusions_of_no_surface
   have hbetaStage : nu 1 ∉
       (↑(allResolverPermutationBetaBadSet (ActionTerminal.vkAt pp basis)
           (stagePoly 1) actionActiveRows) : Set Fp) ∪
-        (↑(allResolverLookupBetaBadSet (ActionTerminal.vkAt pp basis)
-          (ActionTerminal.semanticChRecord (nu 0) 0) (stagePoly 1)
+        (↑(allResolverLookupBetaBadSet
+          (pp.mergeDerived actionCircuit).numProofs (ActionTerminal.vkAt pp basis)
+          (ActionTerminal.semanticChRecord (nu 0) 0
+            (k := (pp.mergeDerived actionCircuit).k)) (stagePoly 1)
           ((ActionTerminal.vkAt pp basis).n -
             (ActionTerminal.vkAt pp basis).blindingFactors - 2)) : Set Fp) := by
     rw [hbetaCh] at hbetaSurface
@@ -2696,14 +2714,16 @@ theorem adaptiveActionExclusions_of_no_surface
     rw [hbetaPermSet]
     simpa only [hbetaRead] using hbetaStage.1
   have hbetaLookupSet := allResolverLookupBetaBadSet_congr
-    (ActionTerminal.vkAt pp basis)
+    (pp.mergeDerived actionCircuit).numProofs (ActionTerminal.vkAt pp basis)
       ((ActionTerminal.vkAt pp basis).n -
         (ActionTerminal.vkAt pp basis).blindingFactors - 2)
-      (ch₁ := ch) (ch₂ := ActionTerminal.semanticChRecord (nu 0) 0)
+      (ch₁ := ch) (ch₂ := ActionTerminal.semanticChRecord (nu 0) 0
+        (k := (pp.mergeDerived actionCircuit).k))
       (by simpa using hthetaRead)
       (fun id hid => hpolySurface 1 id (hlookupAvailable 1 (by omega) id hid)
         (hnonterminal id (Or.inr (Or.inr hid))))
   have hbetaLookup : ch.beta ∉ allResolverLookupBetaBadSet
+      (pp.mergeDerived actionCircuit).numProofs
       (ActionTerminal.vkAt pp basis) ch actionPoly
       ((ActionTerminal.vkAt pp basis).n -
         (ActionTerminal.vkAt pp basis).blindingFactors - 2) := by
@@ -2724,11 +2744,14 @@ theorem adaptiveActionExclusions_of_no_surface
     simp [gammaNu]
   have hgammaSurface : nu 2 ∉
       (↑(allResolverPermutationGammaBadSet (ActionTerminal.vkAt pp basis)
-          (ActionTerminal.semanticChRecord gammaCh.theta gammaCh.beta)
+          (ActionTerminal.semanticChRecord gammaCh.theta gammaCh.beta
+            (k := (pp.mergeDerived actionCircuit).k))
           (adaptiveActionCommitmentPolynomial pp basis inputs data.algebraicProof.erase
             (stageSource 2) gammaCh) actionActiveRows) : Set Fp) ∪
-        (↑(allResolverLookupGammaBadSet (ActionTerminal.vkAt pp basis)
-          (ActionTerminal.semanticChRecord gammaCh.theta gammaCh.beta)
+        (↑(allResolverLookupGammaBadSet
+          (pp.mergeDerived actionCircuit).numProofs (ActionTerminal.vkAt pp basis)
+          (ActionTerminal.semanticChRecord gammaCh.theta gammaCh.beta
+            (k := (pp.mergeDerived actionCircuit).k))
           (adaptiveActionCommitmentPolynomial pp basis inputs data.algebraicProof.erase
             (stageSource 2) gammaCh)
           ((ActionTerminal.vkAt pp basis).n -
@@ -2736,10 +2759,13 @@ theorem adaptiveActionExclusions_of_no_surface
     simpa [adaptiveActionSurfaceAt, gammaNu, gammaCh] using hs2
   have hgammaStage : nu 2 ∉
       (↑(allResolverPermutationGammaBadSet (ActionTerminal.vkAt pp basis)
-          (ActionTerminal.semanticChRecord (nu 0) (nu 1)) (stagePoly 2)
+          (ActionTerminal.semanticChRecord (nu 0) (nu 1)
+            (k := (pp.mergeDerived actionCircuit).k)) (stagePoly 2)
           actionActiveRows) : Set Fp) ∪
-        (↑(allResolverLookupGammaBadSet (ActionTerminal.vkAt pp basis)
-          (ActionTerminal.semanticChRecord (nu 0) (nu 1)) (stagePoly 2)
+        (↑(allResolverLookupGammaBadSet
+          (pp.mergeDerived actionCircuit).numProofs (ActionTerminal.vkAt pp basis)
+          (ActionTerminal.semanticChRecord (nu 0) (nu 1)
+            (k := (pp.mergeDerived actionCircuit).k)) (stagePoly 2)
           ((ActionTerminal.vkAt pp basis).n -
             (ActionTerminal.vkAt pp basis).blindingFactors - 2)) : Set Fp) := by
     rw [hgammaCh] at hgammaSurface
@@ -2747,7 +2773,8 @@ theorem adaptiveActionExclusions_of_no_surface
   rw [Set.mem_union, not_or] at hgammaStage
   have hgammaPermSet := allResolverPermutationGammaBadSet_congr
     (ActionTerminal.vkAt pp basis) actionActiveRows
-      (ch₁ := ch) (ch₂ := ActionTerminal.semanticChRecord (nu 0) (nu 1))
+      (ch₁ := ch) (ch₂ := ActionTerminal.semanticChRecord (nu 0) (nu 1)
+        (k := (pp.mergeDerived actionCircuit).k))
       (by simpa using hbetaRead)
       (poly₁ := actionPoly) (poly₂ := stagePoly 2) (fun id hid =>
         hpolySurface 2 id (hpermutationAvailable 2 (by omega) id hid)
@@ -2757,15 +2784,17 @@ theorem adaptiveActionExclusions_of_no_surface
     rw [hgammaPermSet]
     simpa only [hgammaRead] using hgammaStage.1
   have hgammaLookupSet := allResolverLookupGammaBadSet_congr
-    (ActionTerminal.vkAt pp basis)
+    (pp.mergeDerived actionCircuit).numProofs (ActionTerminal.vkAt pp basis)
       ((ActionTerminal.vkAt pp basis).n -
         (ActionTerminal.vkAt pp basis).blindingFactors - 2)
-      (ch₁ := ch) (ch₂ := ActionTerminal.semanticChRecord (nu 0) (nu 1))
+      (ch₁ := ch) (ch₂ := ActionTerminal.semanticChRecord (nu 0) (nu 1)
+        (k := (pp.mergeDerived actionCircuit).k))
       (by simpa using hthetaRead)
       (by simpa using hbetaRead)
       (fun id hid => hpolySurface 2 id (hlookupAvailable 2 (by omega) id hid)
         (hnonterminal id (Or.inr (Or.inr hid))))
   have hgammaLookup : ch.gamma ∉ allResolverLookupGammaBadSet
+      (pp.mergeDerived actionCircuit).numProofs
       (ActionTerminal.vkAt pp basis) ch actionPoly
       ((ActionTerminal.vkAt pp basis).n -
         (ActionTerminal.vkAt pp basis).blindingFactors - 2) := by
@@ -2785,7 +2814,7 @@ theorem adaptiveActionExclusions_of_no_surface
     have hfull : actionModel = adaptiveActionCommittedModel pp basis inputs
         data.algebraicProof.erase (stageSource n) ch := by
       unfold actionModel adaptiveActionCommittedModel
-      exact canonicalConstraintModelOfPermutationResolver_congr_nonterminal
+      exact VerifyingKey.constraintModel_congr_nonterminal
         (ActionTerminal.vkAt pp basis) ch _ _ _ (fun id hv hr =>
           hpolyStage n id (hallAvailable n hn3 id hv hr) ⟨hv, hr⟩)
     have h0n : (0 : Nat) < (n : Nat) := lt_of_lt_of_le (by decide) hn3
@@ -2937,7 +2966,7 @@ theorem adaptiveActionAcceptedDifference_eval_eq_preX
       pp family basis O inputs hvk hI haccepts
     let actionModel := CanonicalMemberConstraintRelation.acceptedModel
       (memberDecode := fun i hi => decode.toMemberDecode hchar i hi)
-      (hblinding := ActionPermutationDomain.blindingFactors_lt pp
+      (hblinding := actionCircuit.toVerifierKey_blindingFactors_lt_n pp
         (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)) hacceptsAction
     let actionPoly := CanonicalMemberConstraintRelation.acceptedPolynomial
       (memberDecode := fun i hi => decode.toMemberDecode hchar i hi) hacceptsAction
@@ -2960,7 +2989,7 @@ theorem adaptiveActionAcceptedDifference_eval_eq_preX
     pp family basis O inputs hvk hI haccepts
   let actionModel := CanonicalMemberConstraintRelation.acceptedModel
     (memberDecode := fun i hi => decode.toMemberDecode hchar i hi)
-    (hblinding := ActionPermutationDomain.blindingFactors_lt pp
+    (hblinding := actionCircuit.toVerifierKey_blindingFactors_lt_n pp
       (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)) hacceptsAction
   let actionPoly := CanonicalMemberConstraintRelation.acceptedPolynomial
     (memberDecode := fun i hi => decode.toMemberDecode hchar i hi) hacceptsAction
@@ -3038,7 +3067,7 @@ theorem adaptiveActionAcceptedDifference_eval_eq_preX
       (data.algebraicProof.actionRepresentationsBefore (4 : Fin 5) ++
         family.fixedRepresentations basis) ch := by
     unfold actionModel adaptiveActionCommittedModel adaptiveActionCommittedModelOf
-    exact canonicalConstraintModelOfPermutationResolver_congr_nonterminal
+    exact VerifyingKey.constraintModel_congr_nonterminal
       (ActionTerminal.vkAt pp basis) ch _ _ _ hpolyStage
   have hsource4 :
       data.algebraicProof.actionRepresentationsBefore (4 : Fin 5) ++

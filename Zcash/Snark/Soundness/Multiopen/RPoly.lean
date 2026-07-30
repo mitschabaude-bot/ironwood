@@ -1,4 +1,5 @@
-import Mathlib
+import Mathlib.Tactic
+import Mathlib.LinearAlgebra.Lagrange
 import Zcash.Snark.Soundness.Main
 import Zcash.Snark.Soundness.Multiopen.Deployed
 

@@ -1,4 +1,4 @@
-import Mathlib
+import Mathlib.Tactic
 import Zcash.Security.Ledger.Balance
 import Zcash.Security.Ledger.Spendability
 
@@ -22,7 +22,7 @@ The Merkle side rests on `Merkle.path_of_root`: the honest authentication data
 exists because the referenced tree is defined (`root_defined`). Inclusion is only
 required of nonzero-valued spends, so zero-valued dummy spends — whose path data is
 arbitrary — are covered; `HonestAction.withDummySpend` constructs one. The honest
-transaction declares its true net value, so the Balance game's per-transaction value
+transaction declares its true net value, so the Balance game's transaction-balance
 premiss holds for it (`txNetValue_honestTx`).
 
 The Actions of one honest transaction may reference different anchors, matching the
@@ -255,7 +255,7 @@ def honestTx (spends : List (HonestAction P kv ledger × SIG)) (sighash : MSG)
   bindingSig := bindingSig
 
 /-- The honest transaction declares its true net value, so the Balance game's
-per-transaction value premiss holds for it. -/
+transaction-balance premiss holds for it. -/
 theorem txNetValue_honestTx (spends : List (HonestAction P kv ledger × SIG))
     (sighash : MSG) (bindingSig : SIG) :
     txNetValue (honestTx spends sighash bindingSig) = (honestTx spends sighash bindingSig).vBalance := by

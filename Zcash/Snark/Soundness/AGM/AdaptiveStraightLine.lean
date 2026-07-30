@@ -5,10 +5,8 @@ import Zcash.Snark.Soundness.AGM.StraightLinePinnedRoots
 /-!
 # Direct straight-line finders for arbitrary adaptive online-AGM adversaries
 
-These finders consume `ComputedAdaptiveOnlineAGMFSFamily` directly.  They do not construct a
-sequential execution or a pinned-root trace.  Probability pricing is supplied separately by the
-annotation-aware adaptive squeeze theorems; this file establishes that the relation-producing
-branches themselves are executable on the bare adversary model.
+These executable relation finders consume the bare adaptive family directly. Annotation-aware
+squeeze theorems price their failure events separately.
 -/
 
 namespace Zcash.Snark

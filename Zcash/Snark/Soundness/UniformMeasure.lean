@@ -1,4 +1,6 @@
-import Mathlib
+import Mathlib.Tactic
+import Mathlib.Algebra.Order.Chebyshev
+import Mathlib.Probability.Distributions.Uniform
 
 /-!
 # Uniform-measure and accepting-count lemmas

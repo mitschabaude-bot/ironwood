@@ -3,17 +3,9 @@ import Zcash.Snark.Soundness.AGM.OnlineMembers
 /-!
 # Arbitrary adaptive online-AGM random-oracle adversaries
 
-`OracleComp` records the transcript point at each random-oracle query, but an online AGM also has
-to expose algebraic representations of the group elements already present in that point.  Keeping
-those representations only in the final proof output is too weak: a malicious adaptive adversary
-may change them after learning the query answer, and no pre-squeeze chronology can then be derived.
-
-`LabeledOracleComp` adds proof-irrelevant query data while still consulting the ordinary oracle at
-the ordinary query point.  `AlgebraicTranscriptQuery` is the Halo2 instantiation: every group point
-in the queried transcript carries coefficients over the sampled augmented basis.  The resulting
-`ComputedAdaptiveOnlineAGMFSFamily` is the bare bounded adversary model intended by the public
-soundness endpoint.  It permits arbitrary query order and arbitrary adaptive continuations; it
-does not require root, IPA, constraint-`x`, or semantic phase objects.
+`LabeledOracleComp` records pre-answer AGM representations at each ordinary oracle query.
+`ComputedAdaptiveOnlineAGMFSFamily` permits arbitrary query order and continuation without
+requiring phase, cut, or trace objects.
 -/
 
 namespace Zcash.Snark

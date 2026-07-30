@@ -1,5 +1,7 @@
 import Zcash.Arithmetic
 import Mathlib.Algebra.Ring.MinimalAxioms
+import Mathlib.Algebra.Ring.Ext
+import Mathlib.RingTheory.MvPolynomial.Symmetric.Defs
 
 /-!
 # Executable operations on `Polynomial Fp`

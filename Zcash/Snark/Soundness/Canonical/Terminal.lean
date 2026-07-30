@@ -206,7 +206,7 @@ def ofOpenings
   let selectors :=
     canonicalLagrangePolynomials vk.omega hblinding
   have hselectorEvaluations :=
-    canonicalConstraintModelOfPermutationResolver_selectorEvaluations
+    VerifyingKey.constraintModel_selectorEvaluations
       vk ch polynomial hblinding hrows hroot hnFp hxDomain
   refine
     { fixed := ?_
@@ -220,8 +220,7 @@ def ofOpenings
       lBlind := ?_ }
   · intro query
     simpa [CanonicalMemberConstraintRelation.acceptedModel,
-      canonicalConstraintModelOfPermutationResolver,
-      constraintModelOfPermutationResolver,
+      VerifyingKey.constraintModel,
       constraintModelOfResolver, fixedQueryFeedOfResolver, polynomial] using
       resolverQueryFeed_eval_of_columnQueries
         (k := shape.k)
@@ -235,8 +234,7 @@ def ofOpenings
         query
   · intro proofIndex query
     simpa [CanonicalMemberConstraintRelation.acceptedModel,
-      canonicalConstraintModelOfPermutationResolver,
-      constraintModelOfPermutationResolver,
+      VerifyingKey.constraintModel,
       constraintModelOfResolver, adviceQueryFeedOfResolver, polynomial] using
       resolverQueryFeed_eval_of_columnQueries
         (k := shape.k)
@@ -257,8 +255,7 @@ def ofOpenings
         query
   · intro proofIndex query
     simpa [CanonicalMemberConstraintRelation.acceptedModel,
-      canonicalConstraintModelOfPermutationResolver,
-      constraintModelOfPermutationResolver,
+      VerifyingKey.constraintModel,
       constraintModelOfResolver, instanceQueryFeedOfResolver, polynomial] using
       resolverQueryFeed_eval_of_columnQueries
         (k := shape.k)
@@ -279,24 +276,21 @@ def ofOpenings
         query
   · intro proofIndex
     simpa [CanonicalMemberConstraintRelation.acceptedModel,
-      canonicalConstraintModelOfPermutationResolver,
-      constraintModelOfPermutationResolver,
+      VerifyingKey.constraintModel,
       constraintModelOfResolver, polynomial, selectors] using
       eval_permutationSetsOfResolver
         vk instanceCommitment ps ch polynomial
         hpermutationWellFormed proofIndex hopen
   · intro proofIndex
     simpa [CanonicalMemberConstraintRelation.acceptedModel,
-      canonicalConstraintModelOfPermutationResolver,
-      constraintModelOfPermutationResolver,
+      VerifyingKey.constraintModel,
       constraintModelOfResolver, polynomial, selectors] using
       eval_permutationChunksOfResolver
         vk instanceCommitment ps ch polynomial
         hpermutationWellFormed hpermutationRouting proofIndex hopen
   · intro proofIndex
     simpa [CanonicalMemberConstraintRelation.acceptedModel,
-      canonicalConstraintModelOfPermutationResolver,
-      constraintModelOfPermutationResolver,
+      VerifyingKey.constraintModel,
       constraintModelOfResolver, polynomial, selectors] using
       eval_lookupEntriesOfResolver_of_assembleQueries
         vk instanceCommitment ps ch polynomial proofIndex hopen
@@ -538,8 +532,7 @@ def acceptedModel_circuitSat_or_relation
     model.chunkLen model.l0 model.lLast model.lBlind
     hpoly vk.n a ch.x
   · simpa [model, CanonicalMemberConstraintRelation.acceptedModel,
-      canonicalConstraintModelOfPermutationResolver,
-      constraintModelOfPermutationResolver,
+      VerifyingKey.constraintModel,
       constraintModelOfResolver] using hcheck
   · apply hgood_of_good_challenge
     simpa only [model] using hxgood
@@ -719,8 +712,7 @@ theorem acceptedModel_circuitSat_of_openings
     model.chunkLen model.l0 model.lLast model.lBlind
     hpoly vk.n a ch.x
   · simpa [model, CanonicalMemberConstraintRelation.acceptedModel,
-      canonicalConstraintModelOfPermutationResolver,
-      constraintModelOfPermutationResolver,
+      VerifyingKey.constraintModel,
       constraintModelOfResolver] using hcheck
   · apply hgood_of_good_challenge
     simpa only [model] using hxgood

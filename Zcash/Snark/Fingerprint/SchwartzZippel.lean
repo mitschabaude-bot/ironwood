@@ -1,4 +1,5 @@
-import Mathlib
+import Mathlib.Tactic
+import Mathlib.Algebra.MvPolynomial.SchwartzZippel
 import Zcash.Arithmetic
 
 /-!

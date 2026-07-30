@@ -24,9 +24,9 @@ The Action fixed-row boundary realizes the exact packed-selector rows needed by
 every enabled lookup. No proof-specific verifier data enters this statement.
 -/
 theorem actionLookupInputSelectorLeafRowsExact
-    {pp : Keygen.ProofParams} {urs : URS G}
+    {urs : URS G}
     (coherence :
-      TopLevelFixedCoherence actionCircuit pp urs)
+      TopLevelFixedCoherence actionCircuit urs)
     (lookup : EnabledLookup Fp)
     (henabled :
       lookup ∈ operationEnabledLookups

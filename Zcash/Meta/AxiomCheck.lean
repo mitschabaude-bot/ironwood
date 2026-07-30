@@ -1,6 +1,7 @@
 import Lean.Util.CollectAxioms
 import Lean.Elab.Command
 import Lean.DeclarationRange
+import Mathlib.Util.AssertNoSorry
 
 /-!
 # `assert_axioms` — a concise, build-checked trust-boundary bound
@@ -14,16 +15,25 @@ declared tier (a `sorry`, an unexpected axiom, or `native_decide` where none was
 The `#guard_msgs`-pinned form remains the right tool when the *exact* axiom set is the claim.
 
 Scope: these commands catch *inadvertent* drift — an entry silently reaching more than it
-claims. They are not a defense against a deliberately deceptive author, and there may be
-obscure elaboration corners in which an axiom is still misattributed.
+claims. They are not a full defense against a deliberately deceptive author. The provenance
+check (`rangeStartsInside`) does reject the cheapest deliberate attack, a macro that emits an
+auxiliary-named `axiom` alongside the theorem using it; what it cannot reject is code that
+manipulates declaration ranges outright (`Lean.addDeclarationRanges` under `run_cmd`), which has
+no innocuous reading in a diff. Treat any declaration-emitting metaprogram entering this
+repository as census-relevant on review.
 
 Both commands require their argument to be written fully qualified (`checkFullyQualified`):
 an unqualified name resolves through the census file's `open`s, so a same-base-name cousin in
 an opened namespace can silently capture an entry meant for a declaration that is not in scope
 at all — the assertion then reads as covering one theorem while checking another.
 
-This command is also used in CompElliptic (`CompElliptic/Meta/AxiomCheck.lean`); changes here
-should be reflected there and vice versa.
+CompElliptic has a sibling `CompElliptic/Meta/AxiomCheck.lean`, but the two have diverged: this
+version is a strict superset, adding the `+native(D₁, …)` owner list (upstream takes a bare
+`+native`, so it cannot state *which* certificate it trusts), the marker parsing and
+owner/module/range provenance checks, `checkFullyQualified`, the exact-set staleness check, and
+the negative regression suite. Ironwood re-checks every inherited axiom itself, so the census here
+does not depend on the upstream version's strength; porting this file upstream is tracked
+separately. Improvements made here should be considered for upstream, not assumed present there.
 -/
 
 open Lean Elab Command
@@ -72,15 +82,29 @@ def ownersText (owners : List Name) : String :=
 def positionLE (a b : Position) : Bool :=
   decide (a.line < b.line ∨ (a.line = b.line ∧ a.column ≤ b.column))
 
-/-- Whether `inner` *starts* inside `outer`. Only the start position is compared: Lean records an
-auxiliary's end position at the start of the next token, so it runs past the end of the declaration
-that emitted it whenever the emitting syntax is followed by whitespace or a comment — the shape a
-`native_decide` auto-param discharged inside a structure instance always has. The start is still a
-faithful witness of where the auxiliary was elaborated, and that is all the check needs: a
-hand-written `axiom` is a top-level command of its own, and one the owner depends on must be
-declared before the owner, so its start never lands inside the owner's range. -/
+/-- Strict lexicographic source-position comparison. -/
+def positionLT (a b : Position) : Bool :=
+  decide (a.line < b.line ∨ (a.line = b.line ∧ a.column < b.column))
+
+/-- Whether `inner` *starts* strictly inside `outer`. Only the start position is compared against
+the owner's end: Lean records an auxiliary's end position at the start of the next token, so it
+runs past the end of the declaration that emitted it whenever the emitting syntax is followed by
+whitespace or a comment — the shape a `native_decide` auto-param discharged inside a structure
+instance always has. The start is still a faithful witness of where the auxiliary was elaborated,
+and that is all the check needs: a hand-written `axiom` is a top-level command of its own, and one
+the owner depends on must be declared before the owner, so its start never lands inside the owner's
+range.
+
+The leading comparison is **strict**, and the strictness is load-bearing. A declaration produced by
+macro expansion inherits the macro *invocation site* as its declaration range, so a macro emitting
+both an `axiom` named like an auxiliary and a theorem using it gives the two identical ranges —
+which satisfies a non-strict test automatically, laundering an arbitrary axiom (up to `False`) past
+the census as a compiler-trust certificate. `Zcash.Meta.Tests.AxiomCheck.MacroForged` pins the
+rejection. A genuine auxiliary is always emitted by elaborating syntax *within* the owner's
+declaration — a tactic in its proof body, or an auto-param inside a structure instance — so in both
+shapes its start is strictly after the owner's first token. -/
 def rangeStartsInside (outer inner : DeclarationRange) : Bool :=
-  positionLE outer.pos inner.pos && positionLE inner.pos outer.endPos
+  positionLT outer.pos inner.pos && positionLE inner.pos outer.endPos
 
 /-- The `native_decide` axioms genuinely owned by `owner`: each must occur in the owner's own
 transitive axiom footprint, have the compiler-generated owner prefix, come from the same module,

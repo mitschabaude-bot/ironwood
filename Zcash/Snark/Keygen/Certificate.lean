@@ -1,6 +1,8 @@
-import Zcash.Snark.Keygen.Derivation
+import Zcash.Snark.Keygen.Pipeline
+import Zcash.Circuits.Action.TopLevel
 import Zcash.Arithmetic.CommitLagrange
 import Zcash.Snark.Fixtures.SingleAction.Fixture
+import Mathlib.Util.AssertNoSorry
 
 /-!
 # Concrete certificate for the derived Action verifying key
@@ -40,9 +42,8 @@ Lagrange prefix the
   The monomial basis as `ℕ` triples (`monomialBasis`) is nullary and shared by every MSM
   in the bundle — the sharing discipline below is unchanged.
 
-The `FixtureCheck` target builds this module (as an import of its deployed
-Action/Vesta capstone entry); ordinary clients of `derivedActionVk` only need
-`Derivation`.
+The `FixtureCheck` target builds this module; ordinary clients only need the
+generic keygen pipeline.
 -/
 
 namespace Zcash.Snark.Keygen
@@ -97,6 +98,46 @@ private def lagrangeBasis : List G :=
     commitNatPre Fast.Msm.defaultWindow 0 monomialBasis
       (lagrangeRow capturedURS.k (j : ℕ))
 
+/-- The shared pinned view used by the native certificate bundle. -/
+private def actionPinned : PinnedConstraintSystem Fp :=
+  actionCircuit.pinnedCS
+
+/--
+The certificate's evaluation-shared spelling of the Action permutation chunks.
+The theorem immediately below identifies it with the public verifier-CS view.
+-/
+private def actionPermutationChunks :
+    List (List (ColumnRef × ℕ)) :=
+  let reference : AnyColumn → ColumnRef := fun column =>
+    match column.kind with
+    | .advice =>
+        .advice (actionPinned.adviceQueryLayout.findIdx
+          (· = (column.index, 0)))
+    | .fixed =>
+        .fixed (actionPinned.fixedQueryLayout.findIdx
+          (· = (column.index, 0)))
+    | .instance =>
+        .instance (actionPinned.instanceQueryLayout.findIdx
+          (· = (column.index, 0)))
+  ((actionCircuit.constraintSystem.permutationColumns.map
+    reference).zipIdx).toChunks actionCircuit.constraintSystem.chunkLen
+
+/-- The evaluation-shared certificate computation is the circuit-owned
+verifier permutation layout. -/
+private theorem actionPermutationChunks_eq_verifierCS :
+    actionPermutationChunks =
+      actionCircuit.verifierCS.permutationChunks := by
+  simp only [actionPermutationChunks, TopLevelCircuit.verifierCS,
+    actionPinned, TopLevelCircuit.chunkLen,
+    TopLevelCircuit.permutationColumns]
+  apply congrArg (fun references : List ColumnRef =>
+    references.zipIdx.toChunks
+      actionCircuit.constraintSystem.chunkLen)
+  apply List.map_congr_left
+  intro column _
+  cases column.kind <;> rfl
+
+
 /-- `Decidable` instance for the bundle, CONSTRUCTED leaf-by-leaf (see the module
 docstring). -/
 private instance bundleDecEq : DecidableEq (List G × List G × List G ×
@@ -109,6 +150,67 @@ private instance bundleDecEq : DecidableEq (List G × List G × List G ×
   repeat' first
     | refine @instDecidableEqProd _ _ ?_ ?_
     | infer_instance
+
+/-- A fieldwise equality across a `Shape` transport reconstructs equality of
+the dependent verifying-key records. -/
+private theorem verifyingKey_eq_cast_of_fields
+    {s₁ s₂ : Shape} {F G : Type*}
+    (hshape : s₁ = s₂)
+    (left : VerifyingKey s₁ F G)
+    (right : VerifyingKey s₂ F G)
+    (omega : left.omega = right.omega)
+    (n : left.n = right.n)
+    (blindingFactors : left.blindingFactors = right.blindingFactors)
+    (delta : left.delta = right.delta)
+    (chunkLen : left.chunkLen = right.chunkLen)
+    (gates : left.gates = right.gates)
+    (instanceQueryLayout :
+      left.instanceQueryLayout = right.instanceQueryLayout)
+    (adviceQueryLayout :
+      left.adviceQueryLayout = right.adviceQueryLayout)
+    (fixedQueryLayout :
+      left.fixedQueryLayout = right.fixedQueryLayout)
+    (fixedCommitment :
+      left.fixedCommitment = right.fixedCommitment)
+    (permutationCommonCommitment :
+      ∀ column,
+        left.permutationCommonCommitment column =
+          right.permutationCommonCommitment
+            (Fin.cast
+              (congrArg Shape.numPermutationColumns hshape)
+              column))
+    (permutationChunks :
+      left.permutationChunks = right.permutationChunks)
+    (lookupInputExprs :
+      ∀ lookup,
+        left.lookupInputExprs lookup =
+          right.lookupInputExprs
+            (Fin.cast (congrArg Shape.numLookups hshape) lookup))
+    (lookupTableExprs :
+      ∀ lookup,
+        left.lookupTableExprs lookup =
+          right.lookupTableExprs
+            (Fin.cast (congrArg Shape.numLookups hshape) lookup)) :
+    hshape ▸ left = right := by
+  cases hshape
+  have permutationCommonCommitment' :
+      left.permutationCommonCommitment =
+        right.permutationCommonCommitment :=
+    funext fun column => by
+      simpa using permutationCommonCommitment column
+  have lookupInputExprs' :
+      left.lookupInputExprs = right.lookupInputExprs :=
+    funext fun lookup => by
+      simpa using lookupInputExprs lookup
+  have lookupTableExprs' :
+      left.lookupTableExprs = right.lookupTableExprs :=
+    funext fun lookup => by
+      simpa using lookupTableExprs lookup
+  have hkey : left = right := by
+    cases left
+    cases right
+    simp_all
+  simpa only using hkey
 
 /-- **The derived verifying key matches the capture, field by field** — bundled into ONE
 `native_decide` so the shared work (the monomial basis, fixed contents, keygen mapping
@@ -129,16 +231,17 @@ theorem certificate :
         2 ^ actionCircuit.domainExponent,
         actionCircuit.constraintSystem.blindingFactors, deltaFp,
         actionCircuit.constraintSystem.chunkLen),
-      actionCircuit.pinnedCS.gates.map RichExpression.toExpr,
-      (actionCircuit.pinnedCS.instanceQueryLayout,
-        actionCircuit.pinnedCS.adviceQueryLayout,
-        actionCircuit.pinnedCS.fixedQueryLayout),
-      permutationChunksOf actionCircuit.pinnedCS
-        actionCircuit.constraintSystem.chunkLen,
-      (List.ofFn fun l : Fin shape.numLookups =>
-          (actionCircuit.pinnedCS.lookupInputExprs.getD l.val []).map RichExpression.toExpr,
-       List.ofFn fun l : Fin shape.numLookups =>
-          (actionCircuit.pinnedCS.lookupTableExprs.getD l.val []).map RichExpression.toExpr),
+      actionPinned.gates.map RichExpression.toExpr,
+      (actionPinned.instanceQueryLayout,
+        actionPinned.adviceQueryLayout,
+        actionPinned.fixedQueryLayout),
+      actionPermutationChunks,
+      (List.ofFn fun lookup : Fin shape.numLookups =>
+          (actionPinned.lookupInputExprs.getD lookup.val []).map
+            RichExpression.toExpr,
+       List.ofFn fun lookup : Fin shape.numLookups =>
+          (actionPinned.lookupTableExprs.getD lookup.val []).map
+            RichExpression.toExpr),
       actionProofParams.mergeDerived actionCircuit)
     = (capturedUrsGLagrange,
        capturedFixedCommitments,
@@ -184,24 +287,24 @@ set_option maxRecDepth 1000000 in
 Lagrange basis**, on every full-domain column: `commitInvDftNatWith_eq` is the
 bilinearity theorem with the kernel MSM on the group half. -/
 private theorem committer_eq (l : List Fp)
-    (hl : l.length = 2 ^ actionCircuit.domainExponent) :
+    (hl : l.length = actionCircuit.n) :
     commitProj l = Fast.Msm.commitLagrangeFastWith Fast.Msm.defaultWindow capturedURS.w
       (derivedUrsGLagrange capturedURS) l := by
   rw [Fast.Msm.commitLagrangeFastWith_eq _ (by decide)]
   simp only [commitProj, monomialBasis]
   rw [commitInvDftNatWith_eq Fast.Msm.defaultWindow (by decide)
-    capturedURS (by decide) l (by rw [hl, domainExponent_eq])]
+    capturedURS (by decide) l
+      (by
+        rw [hl, actionCircuit.n_eq_two_pow_domainExponent,
+          domainExponent_eq])]
 
 /-- Every Clean-compiled Action fixed row spans the full evaluation domain. -/
 private theorem fixedRowLength (row : List Fp)
     (hrow : row ∈ actionCircuit.fixedRows) :
-    row.length = 2 ^ actionCircuit.domainExponent := by
+    row.length = actionCircuit.n := by
   obtain ⟨column, hcolumn, rfl⟩ := List.mem_iff_getElem.mp hrow
   have hcolumn' :
-      column <
-        (PinnedConstraintSystem.derive
-          actionCircuit.constraintSystem
-          actionCircuit.selectorMap).numFixedColumns := by
+      column < actionCircuit.fixedColumnCount := by
     simpa only [actionCircuit.fixedRows_length] using hcolumn
   have hlength :=
     actionCircuit.fixedRows_getD_length column hcolumn'
@@ -224,7 +327,8 @@ theorem derivedUrsGLagrange_prefix_eq :
 set_option maxRecDepth 1000000 in
 /-- The derived fixed-column commitments are the captured ones. -/
 theorem derivedFixedCommitments_eq :
-    derivedFixedCommitments capturedURS = capturedFixedCommitments := by
+    actionCircuit.fixedCommitments capturedURS =
+      capturedFixedCommitments := by
   have h := certificate
   simp only [Prod.mk.injEq] at h
   have hfc := h.2.1
@@ -233,53 +337,22 @@ theorem derivedFixedCommitments_eq :
       (fun row hrow => committer_eq row (fixedRowLength row hrow)),
     fixedCommitmentsSeqWith_eq] at hfc
   simp only [fixedCommitmentsWith] at hfc
-  simp only [derivedFixedCommitments, Halo2.TopLevelCircuit.fixedCommitments]
+  simp only [Halo2.TopLevelCircuit.fixedCommitments]
   exact hfc
 
 set_option maxRecDepth 1000000 in
 /-- The derived permutation common commitments are the captured ones. -/
 theorem derivedPermutationCommonCommitments_eq :
-    derivedPermutationCommonCommitments capturedURS
+    actionCircuit.permutationCommitments capturedURS
       = capturedPermutationCommonCommitments := by
   have h := certificate
   simp only [Prod.mk.injEq] at h
   have hpc := h.2.2.1
   rw [permutationCommitmentsSeqWith_congr _ _ _ committer_eq,
     permutationCommitmentsSeqWith_eq] at hpc
-  simp only [derivedPermutationCommonCommitments,
-    Halo2.TopLevelCircuit.permutationCommitments, permutationCommitmentsOf]
+  simp only [Halo2.TopLevelCircuit.permutationCommitments,
+    permutationCommitmentsOf]
   exact hpc
-
-set_option maxRecDepth 1000000 in
-/-- **The captured Action verifying key is fully derived.** Both sides are opened with
-`simp only` on the named definitions (`vk`, the derivation chain, and the
-`TopLevelCircuit` keygen views) until the field spellings coincide, then assembled
-field-wise from the bundle's equalities. -/
-theorem vk_eq_derived : vk = derivedActionVk shape capturedURS := by
-  have h := certificate
-  simp only [Prod.mk.injEq] at h
-  obtain ⟨-, hfc, hpc, ⟨ho, hn, hb, hd, hc⟩, hg, ⟨hiq, haq, hfq⟩, hpch, ⟨hli, hlt⟩, -⟩ := h
-  -- align the bundle's spellings with the keygen internals
-  rw [fixedCommitmentsSeqWith_congr
-      actionCircuit.fixedRows
-      (fun row hrow => committer_eq row (fixedRowLength row hrow)),
-    fixedCommitmentsSeqWith_eq] at hfc
-  rw [permutationCommitmentsSeqWith_congr _ _ _ committer_eq,
-    permutationCommitmentsSeqWith_eq] at hpc
-  simp only [Halo2.TopLevelCircuit.domainExponent]
-    at ho hn hb hc hg hiq haq hfq hpch hli hlt hfc hpc
-  -- open both records
-  unfold vk
-  simp only [derivedActionVk, Halo2.TopLevelCircuit.verifierKeyAt,
-    VerifyingKey.ofOperations, fixedCommitmentsOf, permutationCommitmentsOf]
-  rw [VerifyingKey.mk.injEq]
-  refine ⟨ho.symm, hn.symm, hb.symm, hd.symm, hc.symm, hg.symm, hiq.symm, haq.symm,
-    hfq.symm, ?_, ?_, hpch.symm, ?_, ?_⟩
-  · rw [← hfc]
-  · rw [← hpc]
-    rfl
-  · exact (List.ofFn_inj.mp hli).symm
-  · exact (List.ofFn_inj.mp hlt).symm
 
 set_option maxRecDepth 1000000 in
 /-- **`vk = actionCircuit.toVerifierKey actionProofParams capturedURS`**
@@ -289,11 +362,58 @@ the type, comes from the circuit plus the URS and the two proof-shape counts. -/
 theorem vk_eq_toVerifierKey :
     vk = shape_eq_mergeDerived
       ▸ actionCircuit.toVerifierKey actionProofParams capturedURS := by
-  rw [toVerifierKey_action, vk_eq_derived]
-  exact (derivedActionVk_cast shape_eq_mergeDerived capturedURS).symm
+  have h := certificate
+  simp only [Prod.mk.injEq] at h
+  obtain ⟨-, -, -, ⟨ho, hn, hb, hd, hc⟩, hg,
+    ⟨hiq, haq, hfq⟩, hpch, ⟨hli, hlt⟩, -⟩ := h
+  symm
+  apply verifyingKey_eq_cast_of_fields shape_eq_mergeDerived
+  · simpa only [actionCircuit.toVerifierKey_omega,
+      TopLevelCircuit.omega] using ho
+  · simpa only [actionCircuit.toVerifierKey_n,
+      actionCircuit.n_eq_two_pow_domainExponent] using hn
+  · simpa only [actionCircuit.toVerifierKey_blindingFactors,
+      TopLevelCircuit.blindingFactors] using hb
+  · simpa only [actionCircuit.toVerifierKey_delta] using hd
+  · simpa only [actionCircuit.toVerifierKey_chunkLen,
+      TopLevelCircuit.chunkLen] using hc
+  · simpa only [actionCircuit.toVerifierKey_gates,
+      actionCircuit.verifierCS_gates, actionPinned] using hg
+  · simpa only [actionCircuit.toVerifierKey_instanceQueryLayout,
+      TopLevelCircuit.instanceQueryLayout, actionPinned] using hiq
+  · simpa only [actionCircuit.toVerifierKey_adviceQueryLayout,
+      TopLevelCircuit.adviceQueryLayout, actionPinned] using haq
+  · simpa only [actionCircuit.toVerifierKey_fixedQueryLayout,
+      TopLevelCircuit.fixedQueryLayout, actionPinned] using hfq
+  · funext column
+    rw [actionCircuit.toVerifierKey_fixedCommitment,
+      derivedFixedCommitments_eq]
+    simp only [Fixture.vk]
+  · intro column
+    rw [actionCircuit.toVerifierKey_permutationCommonCommitment,
+      derivedPermutationCommonCommitments_eq]
+    simp only [Fixture.vk, Fin.val_cast]
+  · rw [actionCircuit.toVerifierKey_permutationChunks,
+      ← actionPermutationChunks_eq_verifierCS]
+    exact hpch
+  · intro lookup
+    rw [actionCircuit.toVerifierKey_lookupInputExprs]
+    have hlookup := congrFun (List.ofFn_inj.mp hli)
+      (Fin.cast
+        (congrArg Shape.numLookups shape_eq_mergeDerived)
+        lookup)
+    simpa only [actionCircuit.verifierCS_lookupInputExprs,
+      actionPinned, Fin.val_cast] using hlookup
+  · intro lookup
+    rw [actionCircuit.toVerifierKey_lookupTableExprs]
+    have hlookup := congrFun (List.ofFn_inj.mp hlt)
+      (Fin.cast
+        (congrArg Shape.numLookups shape_eq_mergeDerived)
+        lookup)
+    simpa only [actionCircuit.verifierCS_lookupTableExprs,
+      actionPinned, Fin.val_cast] using hlookup
 
 assert_no_sorry certificate
-assert_no_sorry vk_eq_derived
 assert_no_sorry vk_eq_toVerifierKey
 
 end Zcash.Snark.Keygen

@@ -65,9 +65,11 @@ theorem straightLineDirectDecodeOps_le
 
 /-- Finite-security DLOG premise for the complete straight-line finder.  The advantage function
 receives random-oracle queries and group operations separately; the profile also records the
-prover and postprocessing components used to obtain the latter. -/
+prover and postprocessing components used to obtain the latter.  `hB` keeps the generator
+nondegenerate, without which `hardness` bounds nothing (see `TextbookDLAdvantageLE`). -/
 structure StraightLineConstraintDlogProfile (B : VestaG)
     (family : ComputedStraightLineDeployedFSFamily shape) where
+  hB : B ≠ 0
   proverGroupWork : Nat
   reductionGroupWork : Nat
   advantage : Nat -> Nat -> ENNReal
@@ -256,6 +258,7 @@ reduction group-work bound remains an explicit profile premise until the verifie
 instrumented with an operational counter. -/
 structure StraightLineDirectDlogProfile (B : VestaG)
     (family : ComputedStraightLineDeployedFSFamily shape) (T : Nat) where
+  hB : B ≠ 0
   proverGroupWork : Nat
   reductionGroupWork : Nat
   advantage : Nat -> Nat -> ENNReal
@@ -278,6 +281,7 @@ def StraightLineDirectDlogProfile.toStraightLineConstraintDlogProfile
     {B : VestaG} {family : ComputedStraightLineDeployedFSFamily shape} {T : Nat}
     (profile : StraightLineDirectDlogProfile B family T) :
     StraightLineConstraintDlogProfile B family where
+  hB := profile.hB
   proverGroupWork := profile.proverGroupWork
   reductionGroupWork := profile.reductionGroupWork
   advantage := profile.advantage

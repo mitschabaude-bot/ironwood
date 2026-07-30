@@ -1,4 +1,4 @@
-import Mathlib
+import Mathlib.Tactic
 import Zcash.Snark.Soundness.IpaSoundness
 import Zcash.Snark.Soundness.KnowledgeSoundness
 import Zcash.Snark.Verifier.Assemble
@@ -20,10 +20,8 @@ statement is proven to have exactly this shape in the `x₄` squeeze, over the g
 aggregates (`deployedCommitment_x4_batch`/`multiopenValue_x4_batch`), and the `x₁` layer un-batches
 the aggregates down to the member commitments.
 
-The decoded capstones state `hquot`/`hgood` for the *canonical* decode of the supplied batch
-not for every family opening the same commitments: quantified over all openings the
-pair is jointly unsatisfiable — tweak one column by a kernel vector vanishing at the opened point
-and at `x`. The `∀`-witness endpoints are kept only as compatibility forms.
+The decoded terminal uses the *canonical* decode of the supplied batch, not an
+arbitrary family opening the same commitments.
 
 ## What is proven
 
@@ -45,12 +43,9 @@ verifier computes over the same `vk` — is the fingerprint (`Fingerprint.Match`
 
 ## What remains
 
-The forking-floor accept measures (the RO-uniformity axiom, as everywhere), `hfold`/`hgood` at the
-terminal, the layout identities, and the bookkeeping floors. Producing the batch and member decode
-from a bare accepting run — coupling the coin measure to the multiopen budget, so that *the verifier
-accepted* becomes *a witness can be extracted* — is done in `Soundness.Composition`. Do **not**
-generalize the free-decode endpoint `orchard_verifier_vesta_constraint_of_forked`; it stays
-compatibility-shaped.
+The layout identities and bookkeeping floors. Producing the batch and member decode from a bare
+accepting run — coupling the coin measure to the multiopen budget, so that *the verifier accepted*
+becomes *a witness can be extracted* — is done in `Soundness.Composition`.
 -/
 
 namespace Zcash.Snark

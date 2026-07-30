@@ -197,7 +197,7 @@ theorem toPoint_x_eq_iff (P Q : PallasGroup) :
 def embedFp (x : Zcash.Circuits.Fp) : Zcash.Circuits.Fq := (x.val : Zcash.Circuits.Fq)
 
 theorem pallas_base_card_lt_scalar_card : PALLAS_BASE_CARD < PALLAS_SCALAR_CARD := by
-  native_decide
+  decide
 
 @[simp] theorem embedFp_val (x : Zcash.Circuits.Fp) : (embedFp x).val = x.val := by
   exact ZMod.val_natCast_of_lt <|

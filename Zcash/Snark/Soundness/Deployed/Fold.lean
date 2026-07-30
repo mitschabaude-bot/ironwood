@@ -1,3 +1,4 @@
+import Mathlib.Data.List.GetD
 import Zcash.Snark.Soundness.IpaSoundness
 import Zcash.Snark.Verifier.Ipa
 

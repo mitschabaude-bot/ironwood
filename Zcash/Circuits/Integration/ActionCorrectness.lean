@@ -34,14 +34,14 @@ statement.
 def ofAcceptedCircuitSat
     (pp : ProofParams) (urs : URS G)
     (hk :
-      (pp.mergeDerived actionCircuit).k = urs.k)
+      actionCircuit.domainExponent = urs.k)
     (inputs :
-      Fin (pp.mergeDerived actionCircuit).numProofs →
+      Fin pp.numProofs →
         PublicInputs Fp)
     (ps : ProofString
       (pp.mergeDerived actionCircuit) Fp G)
     (ch : Challenges
-      (pp.mergeDerived actionCircuit).k Fp)
+      actionCircuit.domainExponent Fp)
     (pU pW : Fp) (a : Fin (2 ^ urs.k) → Fp)
     (batchOpenings :
       OpenedBatchOpenings urs (evalVector urs.k ch.x3)
@@ -69,7 +69,7 @@ def ofAcceptedCircuitSat
       (CanonicalMemberConstraintRelation.acceptedModel
         (memberDecode := memberDecode)
         (hblinding :=
-          ActionPermutationDomain.blindingFactors_lt pp urs)
+          actionCircuit.toVerifierKey_blindingFactors_lt_n pp urs)
         haccepts).CircuitSat
           ch.y hpoly
           (actionCircuit.toVerifierKey pp urs).n a)
@@ -79,7 +79,7 @@ def ofAcceptedCircuitSat
           (CanonicalMemberConstraintRelation.acceptedModel
             (memberDecode := memberDecode)
             (hblinding :=
-              ActionPermutationDomain.blindingFactors_lt pp urs)
+              actionCircuit.toVerifierKey_blindingFactors_lt_n pp urs)
             haccepts).constraints
           (actionCircuit.toVerifierKey pp urs).n j))
     (permutationExclusions :
@@ -90,7 +90,7 @@ def ofAcceptedCircuitSat
           (memberDecode := memberDecode) haccepts)
         actionActiveRows)
     (lookupExclusions :
-      TopLevelLookupCoherence.TopLevelLookupChallengeExclusions
+      TopLevelLookup.ChallengeExclusions
         actionCircuit pp urs ch
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode := memberDecode) haccepts)) :

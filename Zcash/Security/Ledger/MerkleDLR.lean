@@ -1,10 +1,10 @@
-import Mathlib
+import Mathlib.Tactic
 import Zcash.Security.Common.RandomOracle
 import Zcash.Security.Ledger.Pool
 import Zcash.Security.Ledger.SinsemillaDLR
 
 /-!
-# A deployed Merkle collision computes a Sinsemilla discrete-log relation
+# An Orchard-protocol Merkle collision computes a Sinsemilla discrete-log relation
 
 The pre-quantum discharge of the Merkle arm: a defined collision of the layer-`i`
 compression — two distinct child pairs with the same defined output — computes a
@@ -64,9 +64,10 @@ theorem merkleCompress_get_valid {i : Fin 32} {ch : Encoding × Encoding} {out :
   hashToPoint_valid (Or.inl merkleQ_onCurve) (fun _ hm => merkleChunks_mem_lt hm)
     (Option.some_get (merkleCompress_isSome h)).symm
 
-/-- **A deployed Merkle collision computes a Sinsemilla discrete-log relation.** The
-collision's two children are unpacked into their defined Sinsemilla chains, and the
-chain-collision reducer is applied with zero blinding at the Merkle domain point.
+/-- **An Orchard-protocol Merkle collision computes a Sinsemilla discrete-log
+relation.** The collision's two children are unpacked into their defined Sinsemilla
+chains, and the chain-collision reducer is applied with zero blinding at the Merkle
+domain point.
 The relation then converts to the one-generator form, because its randomness-base
 coefficient is zero. -/
 def relationOfMerkleCollision {i : Fin 32}

@@ -21,26 +21,23 @@ namespace CompElliptic.Curves.Pasta.Pallas
 
 open CompElliptic.CurveForms.ShortWeierstrass
 
-/-- `-5` is not a cube in the Pallas base field, so `y = 0` is impossible for a curve point. -/
+/-- `-5` is not a cube in the Pallas base field, so `y = 0` is impossible for a curve point.
+
+The kernel-tier twin of CompElliptic's Vesta `neg_five_not_isCube`, proved the same way: `3 ∣ p - 1`,
+so `not_exists_pow_eq_of_pow_ne_one` reduces the claim to the single power `(-5)^((p-1)/3) ≠ 1`,
+which `reduce_mod_char` (fast modular exponentiation) evaluates with the kernel re-checking the
+result. No `native_decide`, hence no compiler-trust axiom: this used to carry two, which read in
+the census as an inherited CompElliptic dependency when it is in fact declared here. -/
 theorem neg_five_not_isCube : ¬ ∃ x : Fields.Pasta.PallasBaseField, x ^ 3 = -(5 : Fields.Pasta.PallasBaseField) := by
-  rintro ⟨x, hx⟩
-  have hx0 : x ≠ 0 := by
-    intro hzero
-    have hneg : (-(5 : Fields.Pasta.PallasBaseField)) = 0 := by
-      rw [← hx, hzero]
-      norm_num
-    exact (by decide : (-(5 : Fields.Pasta.PallasBaseField)) ≠ 0) hneg
-  have hfermat : x ^ (Fields.Pasta.PALLAS_BASE_CARD - 1) = 1 := by
-    simpa [ZMod.card] using FiniteField.pow_card_sub_one_eq_one x hx0
-  have hpow : (-(5 : Fields.Pasta.PallasBaseField)) ^ ((Fields.Pasta.PALLAS_BASE_CARD - 1) / 3) = 1 := by
-    rw [← hx, ← pow_mul]
-    have hm : 3 * ((Fields.Pasta.PALLAS_BASE_CARD - 1) / 3) = Fields.Pasta.PALLAS_BASE_CARD - 1 := by
-      native_decide
-    rw [hm]
-    exact hfermat
-  have hnon : (-(5 : Fields.Pasta.PallasBaseField)) ^ ((Fields.Pasta.PALLAS_BASE_CARD - 1) / 3) ≠ 1 := by
-    native_decide
-  exact hnon hpow
+  have hcard : Fintype.card Fields.Pasta.PallasBaseField = Fields.Pasta.PALLAS_BASE_CARD :=
+    ZMod.card _
+  refine Fields.not_exists_pow_eq_of_pow_ne_one (n := 3) (by rw [hcard]; decide) (by decide) ?_
+  rw [hcard]
+  -- `reduce_mod_char` keys on the `ZMod` spelling of the type, which the `PallasBaseField` abbrev
+  -- hides; `show` re-exposes it (the `Field` instances agree definitionally).
+  show (-(5 : ZMod Fields.Pasta.PALLAS_BASE_CARD)) ^ ((Fields.Pasta.PALLAS_BASE_CARD - 1) / 3) ≠ 1
+  reduce_mod_char
+  decide
 
 /-- No point on the Pallas curve has `y`-coordinate `0`. -/
 theorem no_onCurve_y_zero (x : Fields.Pasta.PallasBaseField) : ¬ OnCurve a b (x, 0) := by

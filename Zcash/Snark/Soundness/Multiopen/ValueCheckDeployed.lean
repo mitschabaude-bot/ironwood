@@ -1,4 +1,4 @@
-import Mathlib
+import Mathlib.Tactic
 import Zcash.Snark.Soundness.Multiopen.ValueCheck
 import Zcash.Snark.Soundness.Multiopen.Deployed
 import Zcash.Snark.Soundness.Multiopen.Opened
