@@ -14,7 +14,7 @@ separate in the computed-family adapter.
 
 namespace Zcash.Snark
 
-open Classical Polynomial
+open Classical CompPoly.CPolynomial
 open scoped ENNReal
 
 set_option maxRecDepth 10000
@@ -39,7 +39,7 @@ structure DeployedAlgebraicBatches [DecidableEq G] [Inhabited G] {shape : Shape}
       (x4.wComp ⟨deployedX4PairCount vk instanceCommitment ps ch - 1 - i, by omega⟩) ch.x1
 
 /-- The `x4` value-unbatching root set. -/
-noncomputable def deployedX4RootSet [DecidableEq G] [Inhabited G] {shape : Shape}
+def deployedX4RootSet [DecidableEq G] [Inhabited G] {shape : Shape}
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → Nat → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
@@ -50,7 +50,7 @@ noncomputable def deployedX4RootSet [DecidableEq G] [Inhabited G] {shape : Shape
     batches.x4.coeffs (x4BatchEvals vk instanceCommitment ps ch))
 
 /-- The `x3` cleared-quotient root set, including collisions with any opened point. -/
-noncomputable def deployedX3RootSet [DecidableEq G] [Inhabited G] {shape : Shape}
+def deployedX3RootSet [DecidableEq G] [Inhabited G] {shape : Shape}
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → Nat → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
@@ -61,7 +61,7 @@ noncomputable def deployedX3RootSet [DecidableEq G] [Inhabited G] {shape : Shape
     deployedAllPts vk instanceCommitment ps ch)
 
 /-- All `x2` set-separation roots, united over deployed opened nodes. -/
-noncomputable def deployedX2RootSet [DecidableEq G] [Inhabited G] {shape : Shape}
+def deployedX2RootSet [DecidableEq G] [Inhabited G] {shape : Shape}
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → Nat → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
@@ -75,7 +75,7 @@ noncomputable def deployedX2RootSet [DecidableEq G] [Inhabited G] {shape : Shape
       (deployedAlgebraicSetInterpolants vk instanceCommitment ps ch) node)}
 
 /-- The member-binding polynomial for one deployed point set and one node in that set. -/
-noncomputable def deployedX1RootPolynomial [DecidableEq G] [Inhabited G] {shape : Shape}
+def deployedX1RootPolynomial [DecidableEq G] [Inhabited G] {shape : Shape}
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → Nat → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
@@ -83,7 +83,7 @@ noncomputable def deployedX1RootPolynomial [DecidableEq G] [Inhabited G] {shape 
     (batches : DeployedAlgebraicBatches urs hk vk instanceCommitment ps ch aggregate aggregateU aggregateW)
     (i : Nat) (hi : i < deployedX4PairCount vk instanceCommitment ps ch)
     (idx : Fin ((deployedSetsForEval vk instanceCommitment ps ch).getD i ([], [], 0)).1.length) :
-    Polynomial Fp :=
+    CPoly :=
   memberBindingErrorPolynomial
     (fun m : Fin (deployedSetQueries vk instanceCommitment ps ch i).length =>
       coeffsToPoly ((batches.x1 i hi).coeffs m))
@@ -94,7 +94,7 @@ noncomputable def deployedX1RootPolynomial [DecidableEq G] [Inhabited G] {shape 
 
 /-- All `x1` member-separation roots for one point set, united over that set's nodes.  Out-of-range
 shape slots are empty, allowing the final root family to use the fixed size `shape.numPointSets`. -/
-noncomputable def deployedX1RootSet [DecidableEq G] [Inhabited G] {shape : Shape}
+def deployedX1RootSet [DecidableEq G] [Inhabited G] {shape : Shape}
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → Nat → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
@@ -195,7 +195,7 @@ theorem deployedX1RootSet_measure_le [DecidableEq G] [Inhabited G] {shape : Shap
   next hi => simp
 
 /-- All deployed `x1` root sets, united into the single event at the one `x1` squeeze. -/
-noncomputable def deployedX1AllRootSet [DecidableEq G] [Inhabited G] {shape : Shape}
+def deployedX1AllRootSet [DecidableEq G] [Inhabited G] {shape : Shape}
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → Nat → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)

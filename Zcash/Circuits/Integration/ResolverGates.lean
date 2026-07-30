@@ -17,7 +17,7 @@ namespace Zcash.Snark
 
 open Zcash.Arithmetic (scalarFieldOrder)
 
-open Halo2 Polynomial
+open Halo2 CompPoly.CPolynomial
 
 set_option maxHeartbeats 20000
 
@@ -120,11 +120,10 @@ theorem selectorScale_ne_zero_of_enabledGate
 def resolverGatePolynomial
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (proofIndex : ℕ)
-    (gateIndex : Fin vk.gates.length) : Polynomial Fp :=
-  letI : CommRing (Polynomial Fp) := ComputablePolynomial.commRing
-  (vk.gates[gateIndex].map ComputablePolynomial.const).eval
+    (gateIndex : Fin vk.gates.length) : CPoly :=
+  (vk.gates[gateIndex].map C).eval
     (fixedQueryFeedOfResolver vk poly)
     (adviceQueryFeedOfResolver vk poly proofIndex)
     (instanceQueryFeedOfResolver vk poly proofIndex)
@@ -132,7 +131,7 @@ def resolverGatePolynomial
 theorem resolverGatePolynomial_eq
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (proofIndex : ℕ)
     (gateIndex : Fin vk.gates.length) :
     resolverGatePolynomial vk poly proofIndex gateIndex =
@@ -140,15 +139,11 @@ theorem resolverGatePolynomial_eq
         (fixedQueryFeedOfResolver vk poly)
         (adviceQueryFeedOfResolver vk poly proofIndex)
         (instanceQueryFeedOfResolver vk poly proofIndex) := by
-  have hconst : (ComputablePolynomial.const : Fp → Polynomial Fp) = C := by
-    funext c
-    exact ComputablePolynomial.const_eq c
-  unfold resolverGatePolynomial
-  rw [← ComputablePolynomial.commRing_eq (R := Fp), hconst]
+  rfl
 
 /-- Polynomial evaluation commutes with lifting a verifier expression by `C`. -/
 private theorem eval_map_C
-    (fixed advice instanceFeed : ℕ → Polynomial Fp)
+    (fixed advice instanceFeed : ℕ → CPoly)
     (expression : Expr Fp) (x : Fp) :
     ((expression.map C).eval fixed advice instanceFeed).eval x =
       expression.eval
@@ -161,7 +156,7 @@ private theorem eval_map_C
 theorem resolverGatePolynomial_eval
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (proofIndex : ℕ)
     (gateIndex : Fin vk.gates.length) (x : Fp) :
     (resolverGatePolynomial vk poly proofIndex gateIndex).eval x =
@@ -184,12 +179,11 @@ theorem resolverGatePolynomial_mem
     {shape : Shape} {numProofs k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp)
-    (sets : Fin numProofs → List (PermSetEval (Polynomial Fp)))
+    (poly : CommitmentId → CPoly)
+    (sets : Fin numProofs → List (PermSetEval CPoly))
     (chunks : Fin numProofs →
-      List (PermSetEval (Polynomial Fp) ×
-        List (Polynomial Fp × Polynomial Fp)))
-    (l0 lLast lBlind : Polynomial Fp)
+      List (PermSetEval CPoly × List (CPoly × CPoly)))
+    (l0 lLast lBlind : CPoly)
     (proofIndex : Fin numProofs)
     (gateIndex : Fin vk.gates.length) :
     resolverGatePolynomial vk poly proofIndex gateIndex ∈
@@ -218,12 +212,11 @@ def enabledGatePolynomialWitnessOfResolver
     (vk : VerifyingKey shape Fp G)
     (cs : ConstraintSystem Fp) (map : SelCompressMap)
     (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp)
-    (sets : Fin numProofs → List (PermSetEval (Polynomial Fp)))
+    (poly : CommitmentId → CPoly)
+    (sets : Fin numProofs → List (PermSetEval CPoly))
     (chunks : Fin numProofs →
-      List (PermSetEval (Polynomial Fp) ×
-        List (Polynomial Fp × Polynomial Fp)))
-    (l0 lLast lBlind : Polynomial Fp)
+      List (PermSetEval CPoly × List (CPoly × CPoly)))
+    (l0 lLast lBlind : CPoly)
     (proofIndex : Fin numProofs)
     (place : RegionIndex → ℕ) (usableRows : ℕ)
     (enabled : EnabledGate Fp) (constraint : Constraint Fp)

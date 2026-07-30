@@ -22,7 +22,7 @@ the multiset identities place in the real table.
 
 namespace Zcash.Snark
 
-open Polynomial Finset
+open CompPoly.CPolynomial Finset
 
 /-- **The lookup assembly.** Every input value occurs in the table. The input identity moves an input
 into the permuted columns, the run structure moves it across to the permuted table, and the table
@@ -51,10 +51,10 @@ challenge conditions are the priced root sets. The conclusion is the lookup rela
 value appears in the table. -/
 theorem lookup_subset_of_prod_eval_eq {n : ℕ} (a s inp tbl : Fin (n + 1) → Fp) (β γ aPrev : Fp)
     (hprod : (∏ i, (β + a i)) * (∏ i, (γ + s i)) = (∏ i, (β + inp i)) * (∏ i, (γ + tbl i)))
-    (hgoodγ : γ ∉ szBadSet ((lookupProdDiff (univ.val.map a) (univ.val.map s)
-      (univ.val.map inp) (univ.val.map tbl)).map (evalRingHom β)))
-    (hgoodβ : ∀ j, β ∉ szBadSet ((lookupProdDiff (univ.val.map a) (univ.val.map s)
-      (univ.val.map inp) (univ.val.map tbl)).coeff j))
+    (hgoodγ : γ ∉ szBadSet (lookupProdDiffGamma (univ.val.map a) (univ.val.map s)
+      (univ.val.map inp) (univ.val.map tbl) β))
+    (hgoodβ : ∀ j, β ∉ szBadSet (lookupProdDiffCoeff (univ.val.map a) (univ.val.map s)
+      (univ.val.map inp) (univ.val.map tbl) j))
     (h0 : a 0 = s 0) (hstep0 : a 0 = s 0 ∨ a 0 = aPrev)
     (hstep : ∀ i : Fin n, a i.succ = s i.succ ∨ a i.succ = a i.castSucc) (i : Fin (n + 1)) :
     ∃ j, inp i = tbl j := by
@@ -76,28 +76,26 @@ hypotheses `run_structure` consumes. -/
 
 /-- The lookup evaluations as polynomials: the running product with its next-row rotation, and the
 permuted input with its previous-row rotation. -/
-def lookupEvalPolys (omega : Fp) (z aP sP : Polynomial Fp) :
-    LookupEval (Polynomial Fp) :=
+def lookupEvalPolys (omega : Fp) (z aP sP : CPoly) :
+    LookupEval (CPoly) :=
   { productEval := z
-    productNextEval := ComputablePolynomial.comp z
-      (ComputablePolynomial.mul (ComputablePolynomial.const omega) ComputablePolynomial.X)
+    productNextEval := comp z (C omega * X)
     permutedInputEval := aP
-    permutedInputInvEval := ComputablePolynomial.comp aP
-      (ComputablePolynomial.mul (ComputablePolynomial.const omega⁻¹) ComputablePolynomial.X)
+    permutedInputInvEval := comp aP (C omega⁻¹ * X)
     permutedTableEval := sP }
 
 /-- The last-row rule in the lookup's order, `ℓ_last·(z² − z)`. -/
-theorem running_product_end_flipped {lLastP zP : Polynomial Fp} {n : ℕ}
-    (hdvd : (X ^ n - 1 : Polynomial Fp) ∣ lLastP * (zP ^ 2 - zP)) {r : Fp} (hr : r ^ n = 1)
+theorem running_product_end_flipped {lLastP zP : CPoly} {n : ℕ}
+    (hdvd : (X ^ n - 1 : CPoly) ∣ lLastP * (zP ^ 2 - zP)) {r : Fp} (hr : r ^ n = 1)
     (hlast : lLastP.eval r ≠ 0) : zP.eval r = 0 ∨ zP.eval r = 1 :=
-  running_product_end (by rwa [mul_comm] at hdvd) hr hlast
+  running_product_end (by rwa [_root_.mul_comm] at hdvd) hr hlast
 
 /-- **The lookup step rule is the recurrence.** At a row the verifier has switched on, the rule
 vanishing says the running product advances by the ratio of the permuted factors to the compressed
 input and table factors. -/
-theorem lookup_row_recurrence {zP aP sP inpP tblP lLastP lBlindP : Polynomial Fp}
+theorem lookup_row_recurrence {zP aP sP inpP tblP lLastP lBlindP : CPoly}
     (beta gamma : Fp) (omega : Fp) {n : ℕ}
-    (hdvd : (X ^ n - 1 : Polynomial Fp) ∣
+    (hdvd : (X ^ n - 1 : CPoly) ∣
       ((zP.comp (C omega * X)) * (aP + C beta) * (sP + C gamma)
         - zP * (inpP + C beta) * (tblP + C gamma)) * (1 - (lLastP + lBlindP)))
     {i : ℕ} (hpow : (omega ^ i) ^ n = 1)
@@ -108,13 +106,13 @@ theorem lookup_row_recurrence {zP aP sP inpP tblP lLastP lBlindP : Polynomial Fp
   have hzero := eval_eq_zero_of_dvd_vanishing hdvd hpow
   simp only [eval_mul, eval_sub, eval_add, eval_C, eval_one, eval_comp_rotate] at hzero
   rcases mul_eq_zero.mp hzero with hbr | hact
-  · rw [pow_succ, mul_comm (omega ^ i) omega]
+  · rw [pow_succ, _root_.mul_comm (omega ^ i) omega]
     exact sub_eq_zero.mp hbr
   · exact absurd hact hactive
 
 /-- The row-`0` rule `ℓ₀·(A′ − S′)` gives the run structure's base case. -/
-theorem lookup_row_zero {l0P aP sP : Polynomial Fp} {n : ℕ}
-    (hdvd : (X ^ n - 1 : Polynomial Fp) ∣ l0P * (aP - sP)) {r : Fp} (hr : r ^ n = 1)
+theorem lookup_row_zero {l0P aP sP : CPoly} {n : ℕ}
+    (hdvd : (X ^ n - 1 : CPoly) ∣ l0P * (aP - sP)) {r : Fp} (hr : r ^ n = 1)
     (hl0 : l0P.eval r ≠ 0) : aP.eval r = sP.eval r := by
   have hzero := eval_eq_zero_of_dvd_vanishing hdvd hr
   rw [eval_mul, eval_sub] at hzero
@@ -124,8 +122,8 @@ theorem lookup_row_zero {l0P aP sP : Polynomial Fp} {n : ℕ}
 
 /-- The run-structure rule `(A′ − S′)·(A′ − A′_prev)` gives the step disjunction: each row's
 permuted input either matches the table there or repeats the previous row. -/
-theorem lookup_row_step {aP sP aPrevP lLastP lBlindP : Polynomial Fp} {n : ℕ}
-    (hdvd : (X ^ n - 1 : Polynomial Fp) ∣
+theorem lookup_row_step {aP sP aPrevP lLastP lBlindP : CPoly} {n : ℕ}
+    (hdvd : (X ^ n - 1 : CPoly) ∣
       (aP - sP) * (aP - aPrevP) * (1 - (lLastP + lBlindP))) {r : Fp} (hr : r ^ n = 1)
     (hactive : 1 - (lLastP.eval r + lBlindP.eval r) ≠ 0) :
     aP.eval r = sP.eval r ∨ aP.eval r = aPrevP.eval r := by
@@ -143,42 +141,41 @@ open Finset in
 deployed constraint list, so the identity's consequence — every constraint vanishes on the domain —
 transfers to each rule individually. -/
 theorem lookup_rules_dvd_of_identity (omega beta gamma delta theta y : Fp) (chunkLen : ℕ)
-    (z aP sP : Polynomial Fp) (inputExprs tableExprs : List (Expr Fp))
-    {np : ℕ} (fixedCols : ℕ → Polynomial Fp)
-    (adviceCols instanceCols : Fin np → ℕ → Polynomial Fp) (gates : List (Expr Fp))
-    (sets : Fin np → List (PermSetEval (Polynomial Fp)))
+    (z aP sP : CPoly) (inputExprs tableExprs : List (Expr Fp))
+    {np : ℕ} (fixedCols : ℕ → CPoly)
+    (adviceCols instanceCols : Fin np → ℕ → CPoly) (gates : List (Expr Fp))
+    (sets : Fin np → List (PermSetEval (CPoly)))
     (chunks : Fin np →
-      List (PermSetEval (Polynomial Fp) × List (Polynomial Fp × Polynomial Fp)))
-    (lookups : Fin np → List (LookupEval (Polynomial Fp) × List (Expr Fp) × List (Expr Fp)))
-    (l0P lLastP lBlindP hpoly : Polynomial Fp) {n : ℕ} (hn : n ≠ 0) (p : Fin np)
+      List (PermSetEval (CPoly) × List (CPoly × CPoly)))
+    (lookups : Fin np → List (LookupEval (CPoly) × List (Expr Fp) × List (Expr Fp)))
+    (l0P lLastP lBlindP hpoly : CPoly) {n : ℕ} (hn : n ≠ 0) (p : Fin np)
     (hlk : (lookupEvalPolys omega z aP sP, inputExprs, tableExprs) ∈ lookups p)
     (hidentity : combineConstraints fixedCols adviceCols instanceCols gates sets chunks lookups
       beta gamma delta theta y chunkLen l0P lLastP lBlindP = hpoly * (X ^ n - 1))
     (hgoodY : ∀ j, y ∉ szBadSet (foldSplitWitness (constraintPolys fixedCols adviceCols
       instanceCols gates sets chunks lookups beta gamma delta theta chunkLen l0P lLastP lBlindP)
       n j)) :
-    (X ^ n - 1 : Polynomial Fp) ∣ l0P * (1 - z)
-    ∧ (X ^ n - 1 : Polynomial Fp) ∣ lLastP * (z ^ 2 - z)
-    ∧ (X ^ n - 1 : Polynomial Fp) ∣
+    (X ^ n - 1 : CPoly) ∣ l0P * (1 - z)
+    ∧ (X ^ n - 1 : CPoly) ∣ lLastP * (z ^ 2 - z)
+    ∧ (X ^ n - 1 : CPoly) ∣
         ((z.comp (C omega * X)) * (aP + C beta) * (sP + C gamma)
           - z * (compressExprs fixedCols (adviceCols p) (instanceCols p) (C theta)
               (inputExprs.map (Expr.map C)) + C beta)
             * (compressExprs fixedCols (adviceCols p) (instanceCols p) (C theta)
               (tableExprs.map (Expr.map C)) + C gamma)) * (1 - (lLastP + lBlindP))
-    ∧ (X ^ n - 1 : Polynomial Fp) ∣ l0P * (aP - sP)
-    ∧ (X ^ n - 1 : Polynomial Fp) ∣
+    ∧ (X ^ n - 1 : CPoly) ∣ l0P * (aP - sP)
+    ∧ (X ^ n - 1 : CPoly) ∣
         (aP - sP) * (aP - aP.comp (C omega⁻¹ * X)) * (1 - (lLastP + lBlindP)) := by
   have hall := constraints_dvd_of_good_y _ hpoly hn hidentity hgoodY
-  have hmem : ∀ v : Polynomial Fp,
+  have hmem : ∀ v : CPoly,
       v ∈ lookupExpressions (lookupEvalPolys omega z aP sP) (inputExprs.map (Expr.map C))
         (tableExprs.map (Expr.map C)) fixedCols (adviceCols p) (instanceCols p)
         (C theta) (C beta) (C gamma) l0P lLastP lBlindP →
-      (X ^ n - 1 : Polynomial Fp) ∣ v := fun v hv =>
+      (X ^ n - 1 : CPoly) ∣ v := fun v hv =>
     hall v (mem_constraintPolys_of_mem_lookupExpressions fixedCols adviceCols instanceCols gates
       sets chunks lookups beta gamma delta theta chunkLen l0P lLastP lBlindP p hlk hv)
   refine ⟨hmem _ ?_, hmem _ ?_, hmem _ ?_, hmem _ ?_, hmem _ ?_⟩ <;>
-    simp [lookupExpressions_eq, lookupEvalPolys, ComputablePolynomial.comp_eq,
-      ComputablePolynomial.mul_eq, ComputablePolynomial.const_eq, ComputablePolynomial.X_eq]
+    simp [lookupExpressions_eq, lookupEvalPolys]
 
 open Finset in
 /-- **The lookup relation from the constraint identity.** Every hypothesis is either the verifier's
@@ -186,14 +183,14 @@ polynomial identity, a challenge avoiding a priced root set, or a condition on t
 constants. The conclusion is the lookup relation: each input value appears in the table — unless one
 of the priced branches fires. -/
 theorem deployed_lookup_subset_of_identity (omega beta gamma delta theta y : Fp) (chunkLen : ℕ)
-    (z aP sP : Polynomial Fp) (inputExprs tableExprs : List (Expr Fp))
-    {np : ℕ} (fixedCols : ℕ → Polynomial Fp)
-    (adviceCols instanceCols : Fin np → ℕ → Polynomial Fp) (gates : List (Expr Fp))
-    (sets : Fin np → List (PermSetEval (Polynomial Fp)))
+    (z aP sP : CPoly) (inputExprs tableExprs : List (Expr Fp))
+    {np : ℕ} (fixedCols : ℕ → CPoly)
+    (adviceCols instanceCols : Fin np → ℕ → CPoly) (gates : List (Expr Fp))
+    (sets : Fin np → List (PermSetEval (CPoly)))
     (chunks : Fin np →
-      List (PermSetEval (Polynomial Fp) × List (Polynomial Fp × Polynomial Fp)))
-    (lookups : Fin np → List (LookupEval (Polynomial Fp) × List (Expr Fp) × List (Expr Fp)))
-    (l0P lLastP lBlindP hpoly : Polynomial Fp) {n u : ℕ} (hn : n ≠ 0) (p : Fin np)
+      List (PermSetEval (CPoly) × List (CPoly × CPoly)))
+    (lookups : Fin np → List (LookupEval (CPoly) × List (Expr Fp) × List (Expr Fp)))
+    (l0P lLastP lBlindP hpoly : CPoly) {n u : ℕ} (hn : n ≠ 0) (p : Fin np)
     (hlk : (lookupEvalPolys omega z aP sP, inputExprs, tableExprs) ∈ lookups p)
     (hidentity : combineConstraints fixedCols adviceCols instanceCols gates sets chunks lookups
       beta gamma delta theta y chunkLen l0P lLastP lBlindP = hpoly * (X ^ n - 1))
@@ -228,14 +225,14 @@ open Finset in
 structure both come from the verifier's own rules, located inside the constraint list, so every
 input value appears in the table — unless one of the priced branches fires. -/
 theorem deployed_lookup_relation_of_identity (omega beta gamma delta theta y : Fp) (chunkLen : ℕ)
-    (z aP sP : Polynomial Fp) (inputExprs tableExprs : List (Expr Fp))
-    {np : ℕ} (fixedCols : ℕ → Polynomial Fp)
-    (adviceCols instanceCols : Fin np → ℕ → Polynomial Fp) (gates : List (Expr Fp))
-    (sets : Fin np → List (PermSetEval (Polynomial Fp)))
+    (z aP sP : CPoly) (inputExprs tableExprs : List (Expr Fp))
+    {np : ℕ} (fixedCols : ℕ → CPoly)
+    (adviceCols instanceCols : Fin np → ℕ → CPoly) (gates : List (Expr Fp))
+    (sets : Fin np → List (PermSetEval (CPoly)))
     (chunks : Fin np →
-      List (PermSetEval (Polynomial Fp) × List (Polynomial Fp × Polynomial Fp)))
-    (lookups : Fin np → List (LookupEval (Polynomial Fp) × List (Expr Fp) × List (Expr Fp)))
-    (l0P lLastP lBlindP hpoly : Polynomial Fp) {n m : ℕ} (hn : n ≠ 0) (p : Fin np)
+      List (PermSetEval (CPoly) × List (CPoly × CPoly)))
+    (lookups : Fin np → List (LookupEval (CPoly) × List (Expr Fp) × List (Expr Fp)))
+    (l0P lLastP lBlindP hpoly : CPoly) {n m : ℕ} (hn : n ≠ 0) (p : Fin np)
     (homega : omega ≠ 0)
     (hlk : (lookupEvalPolys omega z aP sP, inputExprs, tableExprs) ∈ lookups p)
     (hidentity : combineConstraints fixedCols adviceCols instanceCols gates sets chunks lookups
@@ -246,7 +243,7 @@ theorem deployed_lookup_relation_of_identity (omega beta gamma delta theta y : F
     (hrow : ∀ i : ℕ, (omega ^ i) ^ n = 1)
     (hactive : ∀ i < m + 1, 1 - (lLastP.eval (omega ^ i) + lBlindP.eval (omega ^ i)) ≠ 0)
     (hl0 : l0P.eval (omega ^ 0) ≠ 0) (hlast : lLastP.eval (omega ^ (m + 1)) ≠ 0)
-    (hgoodγ : gamma ∉ szBadSet ((lookupProdDiff
+    (hgoodγ : gamma ∉ szBadSet (lookupProdDiffGamma
       (univ.val.map fun i : Fin (m + 1) => aP.eval (omega ^ (i : ℕ)))
       (univ.val.map fun i : Fin (m + 1) => sP.eval (omega ^ (i : ℕ)))
       (univ.val.map fun i : Fin (m + 1) =>
@@ -254,8 +251,8 @@ theorem deployed_lookup_relation_of_identity (omega beta gamma delta theta y : F
           (inputExprs.map (Expr.map C))).eval (omega ^ (i : ℕ)))
       (univ.val.map fun i : Fin (m + 1) =>
         (compressExprs fixedCols (adviceCols p) (instanceCols p) (C theta)
-          (tableExprs.map (Expr.map C))).eval (omega ^ (i : ℕ)))).map (evalRingHom beta)))
-    (hgoodβ : ∀ j, beta ∉ szBadSet ((lookupProdDiff
+          (tableExprs.map (Expr.map C))).eval (omega ^ (i : ℕ))) beta))
+    (hgoodβ : ∀ j, beta ∉ szBadSet (lookupProdDiffCoeff
       (univ.val.map fun i : Fin (m + 1) => aP.eval (omega ^ (i : ℕ)))
       (univ.val.map fun i : Fin (m + 1) => sP.eval (omega ^ (i : ℕ)))
       (univ.val.map fun i : Fin (m + 1) =>
@@ -263,7 +260,7 @@ theorem deployed_lookup_relation_of_identity (omega beta gamma delta theta y : F
           (inputExprs.map (Expr.map C))).eval (omega ^ (i : ℕ)))
       (univ.val.map fun i : Fin (m + 1) =>
         (compressExprs fixedCols (adviceCols p) (instanceCols p) (C theta)
-          (tableExprs.map (Expr.map C))).eval (omega ^ (i : ℕ)))).coeff j))
+          (tableExprs.map (Expr.map C))).eval (omega ^ (i : ℕ))) j))
     (i : Fin (m + 1)) :
     (∃ j : Fin (m + 1),
         (compressExprs fixedCols (adviceCols p) (instanceCols p) (C theta)
@@ -292,8 +289,8 @@ theorem deployed_lookup_relation_of_identity (omega beta gamma delta theta y : F
       intro t
       have hprev : (aP.comp (C omega⁻¹ * X)).eval (omega ^ ((t : ℕ) + 1))
           = aP.eval (omega ^ (t : ℕ)) := by
-        rw [eval_comp_rotate, pow_succ, mul_comm (omega ^ (t : ℕ)) omega, ← mul_assoc,
-          inv_mul_cancel₀ homega, one_mul]
+        rw [eval_comp_rotate, pow_succ, _root_.mul_comm (omega ^ (t : ℕ)) omega, ← _root_.mul_assoc,
+          inv_mul_cancel₀ homega, _root_.one_mul]
       have := lookup_row_step hrunStep (hrow ((t : ℕ) + 1))
         (hactive ((t : ℕ) + 1) (by omega))
       rw [hprev] at this
@@ -313,7 +310,7 @@ theorem deployed_lookup_relation_of_identity (omega beta gamma delta theta y : F
                 (inputExprs.map (Expr.map C))).eval (omega ^ x))
               * (gamma + (compressExprs fixedCols (adviceCols p) (instanceCols p) (C theta)
                 (tableExprs.map (Expr.map C))).eval (omega ^ x))) (m + 1)]
-      simpa [add_comm] using hprod
+      simpa [_root_.add_comm] using hprod
     exact lookup_subset_of_prod_eval_eq _ _ _ _ beta gamma
       ((aP.comp (C omega⁻¹ * X)).eval (omega ^ ((0 : Fin (m + 1)) : ℕ)))
       hsplit hgoodγ hgoodβ h0 (Or.inl h0) hstep i
@@ -328,7 +325,7 @@ back to the tuples: the compression is the `foldPoly` of the row's expression va
 outside each pair's collision root set turns compressed equality into tuple equality. -/
 
 /-- The values of a row of expressions at `ωⁱ` — the tuple the compression folds. -/
-def rowTuple (fixedCols adviceCols instanceCols : ℕ → Polynomial Fp) (omega : Fp)
+def rowTuple (fixedCols adviceCols instanceCols : ℕ → CPoly) (omega : Fp)
     (exprs : List (Expr Fp)) (i : ℕ) : List Fp :=
   exprs.map (fun e => e.eval (fun t => (fixedCols t).eval (omega ^ i))
     (fun t => (adviceCols t).eval (omega ^ i)) (fun t => (instanceCols t).eval (omega ^ i)))
@@ -341,7 +338,7 @@ theorem compressExprs_eq_foldPoly_eval (fixedEvals adviceEvals instanceEvals : �
   rw [eval_foldPoly, compressExprs, List.foldl_map]
 
 /-- The polynomial-level compression, evaluated at a row, is the row tuple's fold at `θ`. -/
-theorem compress_eval_eq_foldPoly (fixedCols adviceCols instanceCols : ℕ → Polynomial Fp)
+theorem compress_eval_eq_foldPoly (fixedCols adviceCols instanceCols : ℕ → CPoly)
     (theta : Fp) (exprs : List (Expr Fp)) (omega : Fp) (i : ℕ) :
     (compressExprs fixedCols adviceCols instanceCols (C theta)
         (exprs.map (Expr.map C))).eval (omega ^ i)
@@ -351,7 +348,7 @@ theorem compress_eval_eq_foldPoly (fixedCols adviceCols instanceCols : ℕ → P
   simp only [coe_evalRingHom, eval_C] at h
   rw [h, List.map_map]
   have hid : ∀ e : Expr Fp,
-      ((Expr.map (fun q : Polynomial Fp => q.eval (omega ^ i))) ∘ Expr.map C) e = e := by
+      ((Expr.map (fun q : CPoly => q.eval (omega ^ i))) ∘ Expr.map C) e = e := by
     intro e
     simp only [Function.comp_apply, Expr.map_map, eval_C]
     exact Expr.map_id e
@@ -364,14 +361,14 @@ open Finset in
 collision root set, the compressed membership becomes membership of whole rows: every input row of
 the lookup appears as a table row. The surviving branch is the priced vanishing factor. -/
 theorem deployed_lookup_tuple_of_identity (omega beta gamma delta theta y : Fp) (chunkLen : ℕ)
-    (zP aP sP : Polynomial Fp) (inputExprs tableExprs : List (Expr Fp))
-    {np : ℕ} (fixedCols : ℕ → Polynomial Fp)
-    (adviceCols instanceCols : Fin np → ℕ → Polynomial Fp) (gates : List (Expr Fp))
-    (sets : Fin np → List (PermSetEval (Polynomial Fp)))
+    (zP aP sP : CPoly) (inputExprs tableExprs : List (Expr Fp))
+    {np : ℕ} (fixedCols : ℕ → CPoly)
+    (adviceCols instanceCols : Fin np → ℕ → CPoly) (gates : List (Expr Fp))
+    (sets : Fin np → List (PermSetEval (CPoly)))
     (chunks : Fin np →
-      List (PermSetEval (Polynomial Fp) × List (Polynomial Fp × Polynomial Fp)))
-    (lookups : Fin np → List (LookupEval (Polynomial Fp) × List (Expr Fp) × List (Expr Fp)))
-    (l0P lLastP lBlindP hpoly : Polynomial Fp) {n m : ℕ} (hn : n ≠ 0) (p : Fin np)
+      List (PermSetEval (CPoly) × List (CPoly × CPoly)))
+    (lookups : Fin np → List (LookupEval (CPoly) × List (Expr Fp) × List (Expr Fp)))
+    (l0P lLastP lBlindP hpoly : CPoly) {n m : ℕ} (hn : n ≠ 0) (p : Fin np)
     (homega : omega ≠ 0)
     (harity : inputExprs.length = tableExprs.length)
     (hlk : (lookupEvalPolys omega zP aP sP, inputExprs, tableExprs) ∈ lookups p)
@@ -383,7 +380,7 @@ theorem deployed_lookup_tuple_of_identity (omega beta gamma delta theta y : Fp) 
     (hrow : ∀ i : ℕ, (omega ^ i) ^ n = 1)
     (hactive : ∀ i < m + 1, 1 - (lLastP.eval (omega ^ i) + lBlindP.eval (omega ^ i)) ≠ 0)
     (hl0 : l0P.eval (omega ^ 0) ≠ 0) (hlast : lLastP.eval (omega ^ (m + 1)) ≠ 0)
-    (hgoodγ : gamma ∉ szBadSet ((lookupProdDiff
+    (hgoodγ : gamma ∉ szBadSet (lookupProdDiffGamma
       (univ.val.map fun i : Fin (m + 1) => aP.eval (omega ^ (i : ℕ)))
       (univ.val.map fun i : Fin (m + 1) => sP.eval (omega ^ (i : ℕ)))
       (univ.val.map fun i : Fin (m + 1) =>
@@ -391,8 +388,8 @@ theorem deployed_lookup_tuple_of_identity (omega beta gamma delta theta y : Fp) 
           (inputExprs.map (Expr.map C))).eval (omega ^ (i : ℕ)))
       (univ.val.map fun i : Fin (m + 1) =>
         (compressExprs fixedCols (adviceCols p) (instanceCols p) (C theta)
-          (tableExprs.map (Expr.map C))).eval (omega ^ (i : ℕ)))).map (evalRingHom beta)))
-    (hgoodβ : ∀ j, beta ∉ szBadSet ((lookupProdDiff
+          (tableExprs.map (Expr.map C))).eval (omega ^ (i : ℕ))) beta))
+    (hgoodβ : ∀ j, beta ∉ szBadSet (lookupProdDiffCoeff
       (univ.val.map fun i : Fin (m + 1) => aP.eval (omega ^ (i : ℕ)))
       (univ.val.map fun i : Fin (m + 1) => sP.eval (omega ^ (i : ℕ)))
       (univ.val.map fun i : Fin (m + 1) =>
@@ -400,7 +397,7 @@ theorem deployed_lookup_tuple_of_identity (omega beta gamma delta theta y : Fp) 
           (inputExprs.map (Expr.map C))).eval (omega ^ (i : ℕ)))
       (univ.val.map fun i : Fin (m + 1) =>
         (compressExprs fixedCols (adviceCols p) (instanceCols p) (C theta)
-          (tableExprs.map (Expr.map C))).eval (omega ^ (i : ℕ)))).coeff j))
+          (tableExprs.map (Expr.map C))).eval (omega ^ (i : ℕ))) j))
     (hgoodθ : ∀ i j : Fin (m + 1), theta ∉ szBadSet
       (foldPoly (rowTuple fixedCols (adviceCols p) (instanceCols p) omega inputExprs (i : ℕ))
         - foldPoly (rowTuple fixedCols (adviceCols p) (instanceCols p) omega tableExprs (j : ℕ))))

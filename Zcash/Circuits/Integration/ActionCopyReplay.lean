@@ -15,7 +15,7 @@ complete Clean copy witness.
 
 namespace Zcash.Snark
 
-open Halo2 Polynomial
+open Halo2 CompPoly.CPolynomial
 open ActionPermutationDomain
 open Zcash.Circuits.Action (actionCircuit)
 
@@ -52,7 +52,7 @@ def actionCopyReplayWitness_or_relation
       OpenedMemberDecode
         (instanceCommitment := instanceCommitment)
         urs hk (actionVk pp urs) ps ch batchOpenings i hi}
-    {y : Fp} {hpoly : Polynomial Fp}
+    {y : Fp} {hpoly : CPoly}
     (relation : CanonicalMemberConstraintRelation
       urs hk (actionVk pp urs) instanceCommitment ps ch pU pW a
       batchOpenings memberDecode

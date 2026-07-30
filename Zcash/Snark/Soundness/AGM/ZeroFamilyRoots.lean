@@ -370,7 +370,7 @@ variable (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
   (vkS : VerifyingKey shape Fp VestaG)
 
 /-- The `ξ` event's root set at zero data: the shifted-commitment discrepancy quadratic. -/
-noncomputable def zeroXiRootSet (_basis : AugmentedIndex (2 ^ shape.k) → VestaG) (vkS : VerifyingKey shape Fp VestaG)
+def zeroXiRootSet (_basis : AugmentedIndex (2 ^ shape.k) → VestaG) (vkS : VerifyingKey shape Fp VestaG)
     (ch : Challenges shape.k Fp) : Set Fp :=
   ↑(szBadSet (ipaShiftXiPolynomial
     (commitGen (evalVector shape.k ch.x3) (fun _ : Fin (2 ^ shape.k) => (0 : Fp)) -
@@ -378,7 +378,7 @@ noncomputable def zeroXiRootSet (_basis : AugmentedIndex (2 ^ shape.k) → Vesta
     (commitGen (evalVector shape.k ch.x3) (fun _ : Fin (2 ^ shape.k) => (0 : Fp)))))
 
 /-- The `z` event's root set at zero data. -/
-noncomputable def zeroZRootSet (_basis : AugmentedIndex (2 ^ shape.k) → VestaG) (vkS : VerifyingKey shape Fp VestaG)
+def zeroZRootSet (_basis : AugmentedIndex (2 ^ shape.k) → VestaG) (vkS : VerifyingKey shape Fp VestaG)
     (ch : Challenges shape.k Fp) : Set Fp :=
   ↑(szBadSet (ipaShiftZPolynomial
     (commitGen (evalVector shape.k ch.x3) (fun _ : Fin (2 ^ shape.k) => (0 : Fp)) -
@@ -386,7 +386,7 @@ noncomputable def zeroZRootSet (_basis : AugmentedIndex (2 ^ shape.k) → VestaG
     (commitGen (evalVector shape.k ch.x3) (fun _ : Fin (2 ^ shape.k) => (0 : Fp))) ch.xi))
 
 /-- The `x₄` event's root set at zero data: the batch error over zero columns. -/
-noncomputable def zeroX4RootSet (basis : AugmentedIndex (2 ^ shape.k) → VestaG) (vkS : VerifyingKey shape Fp VestaG)
+def zeroX4RootSet (basis : AugmentedIndex (2 ^ shape.k) → VestaG) (vkS : VerifyingKey shape Fp VestaG)
     (ch : Challenges shape.k Fp) : Set Fp :=
   ↑(szBadSet (algebraicBatchErrorPolynomial
     (urs := ursOfAugmentedBasis shape.k basis) (evalVector shape.k ch.x3)
@@ -395,7 +395,7 @@ noncomputable def zeroX4RootSet (basis : AugmentedIndex (2 ^ shape.k) → VestaG
 
 /-- The `x₃` event's root set at zero data: the cleared quotient error, plus the opening points
 the `x₃` squeeze must avoid. -/
-noncomputable def zeroX3RootSet (_basis : AugmentedIndex (2 ^ shape.k) → VestaG) (vkS : VerifyingKey shape Fp VestaG)
+def zeroX3RootSet (_basis : AugmentedIndex (2 ^ shape.k) → VestaG) (vkS : VerifyingKey shape Fp VestaG)
     (ch : Challenges shape.k Fp) : Set Fp :=
   ↑(szBadSet (clearedQuotientErrorPolynomial
       (deployedAllPts vkS (fun _ _ => 0) (zeroProofString shape Fp VestaG) ch)
@@ -408,7 +408,7 @@ noncomputable def zeroX3RootSet (_basis : AugmentedIndex (2 ^ shape.k) → Vesta
     deployedAllPts vkS (fun _ _ => 0) (zeroProofString shape Fp VestaG) ch)
 
 /-- The `x₂` event's root set at zero data: node binding at every opening point. -/
-noncomputable def zeroX2RootSet (_basis : AugmentedIndex (2 ^ shape.k) → VestaG) (vkS : VerifyingKey shape Fp VestaG)
+def zeroX2RootSet (_basis : AugmentedIndex (2 ^ shape.k) → VestaG) (vkS : VerifyingKey shape Fp VestaG)
     (ch : Challenges shape.k Fp) : Set Fp :=
   {x | ∃ node, node ∈ deployedAllPts vkS (fun _ _ => 0)
       (zeroProofString shape Fp VestaG) ch ∧
@@ -420,7 +420,7 @@ noncomputable def zeroX2RootSet (_basis : AugmentedIndex (2 ^ shape.k) → Vesta
         (zeroProofString shape Fp VestaG) ch) node)}
 
 /-- The `x₁` event's root set at zero data: member binding within every routed point set. -/
-noncomputable def zeroX1RootSet (_basis : AugmentedIndex (2 ^ shape.k) → VestaG) (vkS : VerifyingKey shape Fp VestaG)
+def zeroX1RootSet (_basis : AugmentedIndex (2 ^ shape.k) → VestaG) (vkS : VerifyingKey shape Fp VestaG)
     (ch : Challenges shape.k Fp) : Set Fp :=
   {x | ∃ i : Fin shape.numPointSets,
     ∃ _hi : (i : ℕ) < deployedX4PairCount vkS (fun _ _ => 0)
@@ -442,7 +442,7 @@ noncomputable def zeroX1RootSet (_basis : AugmentedIndex (2 ^ shape.k) → Vesta
 
 /-- **The zero family's six root sets in closed form**: pure functions of the challenge record,
 mentioning no batch structure, no run, and no oracle.  The stages compute exactly these. -/
-noncomputable def zeroRootSetCh (ch : Challenges shape.k Fp) (i : Fin 6) : Set Fp :=
+def zeroRootSetCh (ch : Challenges shape.k Fp) (i : Fin 6) : Set Fp :=
   if i.val = 0 then zeroXiRootSet basis vkS ch
   else if i.val = 1 then zeroZRootSet basis vkS ch
   else if i.val = 2 then zeroX4RootSet basis vkS ch
@@ -469,7 +469,7 @@ noncomputable def zeroRootSetCh (ch : Challenges shape.k Fp) (i : Fin 6) : Set F
     zeroRootSetCh basis vkS ch 5 = zeroX1RootSet basis vkS ch := rfl
 
 /-- The closed forms at the pre-IPA reads. -/
-noncomputable def zeroRootSet (ν : Fin 11 → Fp) (i : Fin 6) : Set Fp :=
+def zeroRootSet (ν : Fin 11 → Fp) (i : Fin 6) : Set Fp :=
   zeroRootSetCh basis vkS (chRecord ν (fun _ => 0)) i
 
 end ClosedForms
@@ -769,7 +769,7 @@ theorem rootDodge_ne (i : Fin 6) (j : Fin 11) :
 
 /-- **The zero family's six staged root computations.**  Stage `i` reads the pre-IPA squeeze
 answers, dodging its own event's point, and computes the event's closed-form root set from them. -/
-noncomputable def zeroRootStage (i : Fin 6) :
+def zeroRootStage (i : Fin 6) :
     OracleComp
       (BTranscript Fp VestaG
         (preIpaLen shape (zeroOnlineMemberFamily vkS hfixed hperm).init.length 10 +
@@ -884,7 +884,7 @@ theorem zeroRootStage_fresh (i : Fin 6)
   exact zeroFamily_prefixesPre_injective basis vkS hfixed hperm (rootDodge_ne i j) hj
 
 /-- **The zero family's staged root trace, at any shape.** -/
-noncomputable def zeroRootTrace :
+def zeroRootTrace :
     DeployedRootOnlineTrace (zeroOnlineMemberFamily vkS hfixed hperm).toFamily
       (zeroRootOutcome vkS hfixed hperm) where
   stage := fun basis i => zeroRootStage basis vkS hfixed hperm i
@@ -894,7 +894,7 @@ noncomputable def zeroRootTrace :
 /-- **An inhabitant of the deployed root family interface at any shape**, over any key with zero
 group commitment families: the constant zero prover, the always-batch outcome, and the six-stage
 root trace with live value-side root sets. -/
-noncomputable def zeroDeployedRootFamily :
+def zeroDeployedRootFamily :
     ComputedDeployedRootFSFamily shape where
   toComputedOnlineMemberFSFamily := zeroOnlineMemberFamily vkS hfixed hperm
   outcome := zeroRootOutcome vkS hfixed hperm

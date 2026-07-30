@@ -1,27 +1,11 @@
-import Zcash.Snark.Soundness.Multiopen.Claimed
 import Zcash.Snark.Soundness.Multiopen.ValueCheckDeployed
 
 /-!
-# F3: the deployed `x₃` value bridge
+# Deployed multiopen algebra
 
-The multiopen value check binds each decoded aggregate column to its claimed interpolation. The
-counting-floor core (`Soundness.Multiopen.Claimed.claimedEval_of_x3Prob`) already turns an `x₃`
-accept measure plus a per-accepting-run *consistency* — the decoded column reproduces the deployed
-`r`-value at the accepting interpolation challenge — into the node binding: at each rotated set
-point, the aggregate column's value is the claimed evaluation.
-
-Two routes to that instantiation once lived here. The *aggregate route* fixed the decoded column to
-the fingerprinted `x₄`-slot aggregate for point set `j` and the accept event to `OpenedX3Accept`,
-leaving the per-run consistency `hconsistent` — equivalently the inner `hx2cons` — as an open
-obligation. It was abandoned (`X2Run` re-sends `q′` across `x₂`-rewinds, so there is no fixed-`q′`
-anchor at `x₂` to discharge `hx2cons` against) and has been removed.
-
-The *fixed-`q′` route* anchored on the `q′` absorbed before `x₃`
-(`openedDecodedCols_top_eval_x3`), discharging `hconsistent`/`hx2cons` end-to-end from the accept
-floors. Its node-binding chain has been removed: every rung concluded an ∃-closed binding disjunct,
-which a prime-order group satisfies unconditionally and so cannot be charged to DLOG. The deployed
-capstones now take the rewind-free AGM route, which returns explicit augmented-basis coefficients
-on disagreement; what remains here is the grid and decode apparatus that route reads.
+Algebraic identities connecting Halo2's deployed multiopen grouping, compressed evaluations, and
+decoded columns. The live capstones consume these through the AGM route, which returns explicit
+augmented-basis coefficients on disagreement.
 -/
 
 namespace Zcash.Snark
@@ -34,7 +18,7 @@ open Zcash.Arithmetic (Msm Msm.zero)
 attribute [local irreducible] deployedSetQueries deployedSetCommIds deployedX4PairCount
   x4BatchCommitments x4BatchEvals
 
-open Polynomial
+open CompPoly.CPolynomial
 open scoped ENNReal
 open Classical
 
@@ -69,14 +53,14 @@ theorem prod_inv_range_getD_eq_toFinset {l : List Fp} (hnd : l.Nodup) (χ : Fp) 
     (∏ m ∈ Finset.range l.length, (χ - l.getD m 0)⁻¹) = (∏ p ∈ l.toFinset, (χ - p))⁻¹ := by
   rw [← prod_range_getD_eq_toFinset hnd χ, ← Finset.prod_inv_distrib]
 
-/-- **`hsamp` from the value-check power form (reversed convention).** The per-`x₂`-value multiopen
-identity in exactly the shape `node_binding_of_samples` consumes, set index reversed (`ζʲ` pairs
-with `sets.reverse.getD j`, resolving the power/index convention gap): given the run's opening and
+/-- **The value-check power form (reversed convention).** The per-`x₂`-value multiopen identity,
+with set index reversed (`ζʲ` pairs with `sets.reverse.getD j`, resolving the power/index
+convention gap): given the run's opening and
 the field identifications, the value expands to `∑ⱼ ζʲ (colⱼ − rⱼ)(χ)·(∏ p∈pts j, (χ − p))⁻¹`.
 Pure algebra over `multiopenEval_powerForm`. -/
 theorem hsamp_of_multiopenEval_reversed {numSets : ℕ}
     (sets : List (List Fp × List Fp × Fp)) (hlen : sets.length = numSets)
-    (col r : Fin numSets → Polynomial Fp) (pts : Fin numSets → Finset Fp)
+    (col r : Fin numSets → CPoly) (pts : Fin numSets → Finset Fp)
     (ζ χ qv : Fp)
     (hqv : qv = multiopenEval ζ χ sets)
     (hnd : ∀ j : Fin numSets, (sets.reverse.getD (j : ℕ) ([], [], 0)).1.Nodup)
@@ -244,15 +228,16 @@ theorem deployedSetsForEval_reverse_getD_u [DecidableEq G] [Inhabited G] {shape 
 
 
 /-- A coefficient-vector polynomial has degree below its length: each summand `C aᵢ · Xⁱ` has
-`natDegree ≤ i < n`. The decoded batch columns (`openedDecodedCols`) are `coeffsToPoly` of
-`Fin (2 ^ k)` vectors, so their degree is below `2 ^ k`. -/
+`natDegree ≤ i < n`. In particular, decoded `Fin (2 ^ k)` coefficient vectors have degree below
+`2 ^ k`. -/
 theorem coeffsToPoly_natDegree_lt {n : ℕ} (hn : 0 < n) (a : Fin n → Fp) :
     (coeffsToPoly a).natDegree < n := by
   have hle : (coeffsToPoly a).natDegree ≤ n - 1 := by
-    rw [coeffsToPoly_eq_sum]
+    rw [coeffsToPoly, natDegree_toPoly, toPoly_sum]
     refine Polynomial.natDegree_sum_le_of_forall_le _ _ (fun i _ => ?_)
+    rw [toPoly_mul, C_toPoly, toPoly_pow, X_toPoly]
     calc (Polynomial.C (a i) * Polynomial.X ^ (i : ℕ)).natDegree
-        ≤ (Polynomial.X ^ (i : ℕ) : Polynomial Fp).natDegree :=
+        ≤ ((Polynomial.X : Polynomial Fp) ^ (i : ℕ)).natDegree :=
           Polynomial.natDegree_C_mul_le _ _
       _ = (i : ℕ) := Polynomial.natDegree_X_pow _
       _ ≤ n - 1 := by have := i.isLt; omega
@@ -265,8 +250,8 @@ theorem lagrangePoly_natDegree_le {points evals : List Fp}
     (lagrangePoly points evals).natDegree ≤ points.length := by
   rcases Nat.eq_zero_or_pos points.length with h0 | hpos
   · haveI : IsEmpty (Fin points.length) := by rw [h0]; exact Fin.isEmpty
-    rw [lagrangePoly, Finset.univ_eq_empty, Lagrange.interpolate_empty,
-      Polynomial.natDegree_zero]
+    rw [natDegree_toPoly, toPoly_lagrangePoly, Finset.univ_eq_empty,
+      Lagrange.interpolate_empty, Polynomial.natDegree_zero]
     exact Nat.zero_le _
   · exact le_of_lt (lagrangePoly_natDegree_lt hpos hnode)
 
@@ -275,8 +260,11 @@ theorem vanishingProd_natDegree_le (pts : Finset Fp) :
     (vanishingProd pts).natDegree ≤ pts.card := by
   rw [vanishingProd]
   calc (∏ p ∈ pts, (X - C p)).natDegree
-      ≤ ∑ p ∈ pts, (X - C p).natDegree := Polynomial.natDegree_prod_le _ _
-    _ = pts.card := by simp
+      ≤ ∑ p ∈ pts, ((X : CPoly) - C p).natDegree := natDegree_prod_le _ _
+    _ = pts.card := by
+        have hone : ∀ p : Fp, ((X : CPoly) - C p).natDegree = 1 := fun p => by
+          rw [natDegree_toPoly, toPoly_sub, X_toPoly, C_toPoly, Polynomial.natDegree_X_sub_C]
+        simp [hone]
 
 /-- The complementary product's degree is at most the full point count. -/
 theorem coProd_natDegree_le (all pts : Finset Fp) :
@@ -321,7 +309,7 @@ theorem compressSet_evals_foldl {k' : ℕ} {F G' : Type*} [Field F]
           List.getD_eq_getElem _ _ (by rw [hqclen]; exact hidx)]
         simp [List.getElem_zip]
       rw [hentry, List.length_cons, Finset.sum_range_succ']
-      simp only [List.getD_cons_succ, List.getD_cons_zero, pow_zero, one_mul, mul_add,
+      simp only [List.getD_cons_succ, List.getD_cons_zero, pow_zero, _root_.one_mul, _root_.mul_add,
         Finset.mul_sum]
       rw [show (∑ m ∈ Finset.range sq.length,
             pw * x1 * (x1 ^ m * ((sq.getD m d₀).2.getD idx 0)))
@@ -343,7 +331,7 @@ theorem compressSet_snd_getD {k' : ℕ} {F G' : Type*} [Field F]
     (List.replicate np (0 : F)) 1 (by simp)
   simp only [compressSet]
   rw [h, List.getD_eq_getElem _ _ (by rw [List.length_replicate]; exact hidx),
-    List.getElem_replicate, one_mul, zero_add]
+    List.getElem_replicate, _root_.one_mul, _root_.zero_add]
 
 omit [AddCommGroup G] [Module Fp G] in
 /-- The `k`-th value-check set's compressed evaluation vector is `compressSet`'s — the evals-field
@@ -415,21 +403,18 @@ theorem deployedSetQueries_eval_length [DecidableEq G] [Inhabited G] {shape : Sh
 query point: `rotatedFeed` composes the column with `ω^rot·X`, so evaluation at `x` lands at
 `ω^rot·x = rotateOmega ω x rot`. -/
 theorem rotatedFeed_eval {n : ℕ} (omega : Fp) (layout : List (ℕ × ℤ))
-    (col : Fin n → Polynomial Fp) {j : ℕ} (hj : j < n) (x : Fp) :
+    (col : Fin n → CPoly) {j : ℕ} (hj : j < n) (x : Fp) :
     (rotatedFeed omega layout col j).eval x
       = (col ⟨j, hj⟩).eval (rotateOmega omega x (layout.getD j (0, 0)).2) := by
-  simp only [rotatedFeed, dif_pos hj, ComputablePolynomial.comp_eq,
-    ComputablePolynomial.mul_eq, ComputablePolynomial.const_eq, ComputablePolynomial.X_eq,
-    Polynomial.eval_comp, Polynomial.eval_mul, Polynomial.eval_C, Polynomial.eval_X, rotateOmega]
-  exact congrArg (fun t => Polynomial.eval t (col ⟨j, hj⟩))
-    (mul_comm (omega ^ (layout.getD j (0, 0)).2) x)
+  simp only [rotatedFeed, dif_pos hj, eval_comp, eval_mul, eval_C, eval_X, rotateOmega]
+  exact congrArg (fun t => (col ⟨j, hj⟩).eval t)
+    (_root_.mul_comm (omega ^ (layout.getD j (0, 0)).2) x)
 
 /-- Out of the layout's range the rotated feed is the zero polynomial. -/
 theorem rotatedFeed_eval_of_ge {n : ℕ} (omega : Fp) (layout : List (ℕ × ℤ))
-    (col : Fin n → Polynomial Fp) {j : ℕ} (hj : n ≤ j) (x : Fp) :
+    (col : Fin n → CPoly) {j : ℕ} (hj : n ≤ j) (x : Fp) :
     (rotatedFeed omega layout col j).eval x = 0 := by
-  simp only [rotatedFeed, dif_neg (Nat.not_lt.mpr hj), ComputablePolynomial.zero_eq,
-    Polynomial.eval_zero]
+  simp only [rotatedFeed, dif_neg (Nat.not_lt.mpr hj), eval_zero]
 
 
 

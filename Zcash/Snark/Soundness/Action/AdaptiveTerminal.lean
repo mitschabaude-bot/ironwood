@@ -12,7 +12,7 @@ namespace Zcash.Snark
 
 namespace ActionTerminal
 
-open Halo2 Polynomial Keygen
+open Halo2 CompPoly.CPolynomial Keygen
 open Zcash.Circuits
 open Zcash.Circuits.Action
 open Zcash.Arithmetic (scalarFieldOrder)
@@ -245,15 +245,11 @@ def adaptiveActionWitnessOrRelationOfDecode?
   let polynomial := CanonicalMemberConstraintRelation.acceptedPolynomial
     (memberDecode := fun i hi => decode.toMemberDecode hchar i hi) haccepts
   match hxgood : szBadSetAvoidance?
-      (ComputablePolynomial.sub
-        (combineConstraintsData model.fixedCols model.adviceCols model.instanceCols model.gates
+      ((combineConstraints model.fixedCols model.adviceCols model.instanceCols model.gates
           model.sets model.chunks model.lookups model.beta model.gamma model.delta model.theta
           ch.y model.chunkLen model.l0 model.lLast model.lBlind)
-        (ComputablePolynomial.mul (polynomial CommitmentId.vanishingH)
-          (ComputablePolynomial.sub
-            (ComputablePolynomial.pow ComputablePolynomial.X
-              actionCircuit.n)
-            (ComputablePolynomial.const 1)))) ch.x with
+        - polynomial CommitmentId.vanishingH
+          * (X ^ actionCircuit.n - 1)) ch.x with
   | none => none
   | some hxgoodProof =>
       let hn : actionCircuit.n ≠ 0 := actionCircuit.n_ne_zero
@@ -286,11 +282,7 @@ def adaptiveActionWitnessOrRelationOfDecode?
                       (ActionPermutationDomain.routingCoherent_of_derived pp urs)
                       (ActionPermutationDomain.rowsInjective pp urs)
                       (ActionPermutationDomain.root pp urs) hnFp
-                      (by
-                        simpa only [ComputablePolynomial.sub_eq, ComputablePolynomial.mul_eq,
-                          ComputablePolynomial.pow_eq, ComputablePolynomial.X_eq,
-                          ComputablePolynomial.const_eq, Polynomial.C_1,
-                          combineConstraintsData_eq] using hxgoodProof.down) with
+                      (by exact hxgoodProof.down) with
                   | PSum.inr relation =>
                       some (Sum.inr (augmentedBasis_ursOfAugmentedBasis
                         (pp.mergeDerived actionCircuit).k basis ▸
@@ -429,7 +421,7 @@ theorem adaptiveActionWitnessOrRelationOfDecode?_isSome_of
           model.sets model.chunks model.lookups model.beta model.gamma model.delta model.theta
           (adaptiveActionRunRecord family basis O).y model.chunkLen model.l0 model.lLast
           model.lBlind - polynomial .vanishingH *
-            (Polynomial.X ^ actionCircuit.n - 1)))
+            (X ^ actionCircuit.n - 1)))
     (hgoodY :
       let model := CanonicalMemberConstraintRelation.acceptedModel
           (memberDecode := fun i hi => decode.toMemberDecode hchar i hi)
@@ -457,14 +449,7 @@ theorem adaptiveActionWitnessOrRelationOfDecode?_isSome_of
     (hblinding := actionCircuit.toVerifierKey_blindingFactors_lt_n pp
       (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)) haccepts
   dsimp only at hxgood hgoodY
-  have hxgoodData := hxgood
-  rw [← combineConstraintsData_eq, ← ComputablePolynomial.sub_eq,
-    ← ComputablePolynomial.mul_eq, ← ComputablePolynomial.sub_eq,
-    ← ComputablePolynomial.pow_eq, ← ComputablePolynomial.X_eq] at hxgoodData
-  have hone : (1 : Polynomial Fp) = ComputablePolynomial.const 1 := by
-    rw [ComputablePolynomial.const_eq, Polynomial.C_1]
-  rw [hone] at hxgoodData
-  have hxSome := (szBadSetAvoidance?_isSome_iff _ _).2 hxgoodData
+  have hxSome := (szBadSetAvoidance?_isSome_iff _ _).2 hxgood
   have hn : actionCircuit.n ≠ 0 := actionCircuit.n_ne_zero
   have hySome := foldSplitAvoidance?_isSome_of model.constraints _ hn _ hgoodY
   have hpSome := resolverPermutationChallengeExclusions?_isSome_of _ _ _ _ hpermutation
@@ -532,7 +517,7 @@ theorem adaptiveActionRelationOfDecode?_isSome_of
           model.sets model.chunks model.lookups model.beta model.gamma model.delta model.theta
           (adaptiveActionRunRecord family basis O).y model.chunkLen model.l0 model.lLast
           model.lBlind - polynomial .vanishingH *
-            (Polynomial.X ^ (actionCircuit.toVerifierKey pp
+            (X ^ (actionCircuit.toVerifierKey pp
               (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)).n - 1)))
     (hgoodY :
       let model := CanonicalMemberConstraintRelation.acceptedModel

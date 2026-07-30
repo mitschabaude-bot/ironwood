@@ -20,58 +20,55 @@ read later challenges, so no classical truth-table adapter sits on the executabl
 
 namespace Zcash.Snark
 
-open Polynomial
+open CompPoly.CPolynomial
 open scoped ENNReal
 
 /-! ## Degree bounds for the committed carriers -/
 
 /-- Rotation preserves a degree bound: composing with `C w · X` rescales `X`. -/
-theorem natDegree_comp_rotate_le (col : Polynomial Fp) (w : Fp) {B : ℕ}
+theorem natDegree_comp_rotate_le (col : CPoly) (w : Fp) {B : ℕ}
     (h : col.natDegree ≤ B) :
-    (col.comp (Polynomial.C w * Polynomial.X)).natDegree ≤ B := by
-  refine le_trans natDegree_comp_le ?_
-  calc col.natDegree * (Polynomial.C w * Polynomial.X).natDegree
-      ≤ B * 1 := Nat.mul_le_mul h (le_trans (natDegree_C_mul_le _ _) natDegree_X_le)
-    _ = B := mul_one B
+    (comp col (C w * X)).natDegree ≤ B := by
+  rcases eq_or_ne w 0 with rfl | hw
+  · refine le_trans (le_of_eq ?_) (Nat.zero_le B)
+    rw [natDegree_toPoly, toPoly_comp]
+    simp
+  · rw [natDegree_comp_C_mul_X col hw]
+    exact h
 
 /-- The executable polynomial wrapper for rotation has the same degree bound. -/
-theorem natDegree_comp_rotateData_le (col : Polynomial Fp) (w : Fp) {B : ℕ}
+theorem natDegree_comp_rotateData_le (col : CPoly) (w : Fp) {B : ℕ}
     (h : col.natDegree ≤ B) :
-    (ComputablePolynomial.comp col
-      (ComputablePolynomial.mul (ComputablePolynomial.const w)
-        ComputablePolynomial.X)).natDegree ≤ B := by
-  rw [ComputablePolynomial.comp_eq, ComputablePolynomial.mul_eq,
-    ComputablePolynomial.const_eq, ComputablePolynomial.X_eq]
+    (comp col (C w * X)).natDegree ≤ B := by
   exact natDegree_comp_rotate_le col w h
 
 /-- A rotated feed keeps its columns' degree bound. -/
 theorem natDegree_rotatedFeed_le {n : ℕ} (omega : Fp) (layout : List (ℕ × ℤ))
-    (col : Fin n → Polynomial Fp) {B : ℕ} (h : ∀ j, (col j).natDegree ≤ B) (i : ℕ) :
+    (col : Fin n → CPoly) {B : ℕ} (h : ∀ j, (col j).natDegree ≤ B) (i : ℕ) :
     (rotatedFeed omega layout col i).natDegree ≤ B := by
   unfold rotatedFeed
   split
-  · rw [ComputablePolynomial.comp_eq, ComputablePolynomial.mul_eq,
-      ComputablePolynomial.const_eq, ComputablePolynomial.X_eq]
-    exact natDegree_comp_rotate_le _ _ (h _)
-  · rw [ComputablePolynomial.zero_eq]
-    simp
+  · exact natDegree_comp_rotate_le _ _ (h _)
+  · simp
 
 /-- The Lagrange basis polynomial has degree below the domain size. -/
 theorem natDegree_lagrangeBasisPoly_le (omega : Fp) (n : ℕ) (i : ℤ) :
     (lagrangeBasisPoly omega n i).natDegree ≤ n - 1 := by
-  rw [lagrangeBasisPoly_eq]
-  refine le_trans (natDegree_C_mul_le _ _) (natDegree_sum_le_of_forall_le _ _ ?_)
+  rw [lagrangeBasisPoly, natDegree_toPoly, toPoly_mul, C_toPoly, toPoly_sum]
+  simp only [toPoly_mul, C_toPoly, toPoly_pow, X_toPoly]
+  refine le_trans (Polynomial.natDegree_C_mul_le _ _)
+    (Polynomial.natDegree_sum_le_of_forall_le _ _ ?_)
   intro k hk
-  refine le_trans (natDegree_C_mul_le _ _) ?_
-  rw [natDegree_X_pow]
+  refine le_trans (Polynomial.natDegree_C_mul_le _ _) ?_
+  rw [Polynomial.natDegree_X_pow]
   have := Finset.mem_range.mp hk
   omega
 
 /-- A fold of sums keeps the members' degree bound. -/
-theorem natDegree_foldl_add_le {B : ℕ} (ps : List (Polynomial Fp))
+theorem natDegree_foldl_add_le {B : ℕ} (ps : List (CPoly))
     (h : ∀ q ∈ ps, q.natDegree ≤ B) :
     (ps.foldl (· + ·) 0).natDegree ≤ B := by
-  suffices h' : ∀ acc : Polynomial Fp, acc.natDegree ≤ B →
+  suffices h' : ∀ acc : CPoly, acc.natDegree ≤ B →
       (ps.foldl (· + ·) acc).natDegree ≤ B by
     exact h' 0 (by simp)
   induction ps with
@@ -84,9 +81,9 @@ theorem natDegree_foldl_add_le {B : ℕ} (ps : List (Polynomial Fp))
 
 /-- The pre-`x` quotient against the vanishing factor: `d` pieces of degree `≤ Bq`, each shifted
 by `n` per slot, and the `Xⁿ − 1` factor — `n·d + Bq` in total. -/
-theorem natDegree_preXQuotient_mul_le {d : ℕ} (n : ℕ) (hp : Fin d → Polynomial Fp) {Bq : ℕ}
+theorem natDegree_preXQuotient_mul_le {d : ℕ} (n : ℕ) (hp : Fin d → CPoly) {Bq : ℕ}
     (h : ∀ j, (hp j).natDegree ≤ Bq) :
-    (preXQuotient n hp * (Polynomial.X ^ n - 1)).natDegree ≤ n * d + Bq := by
+    (preXQuotient n hp * (X ^ n - 1)).natDegree ≤ n * d + Bq := by
   rcases Nat.eq_zero_or_pos d with rfl | hd
   · simp [preXQuotient]
   · obtain ⟨d', rfl⟩ := Nat.exists_eq_succ_of_ne_zero (Nat.pos_iff_ne_zero.mp hd)
@@ -96,10 +93,11 @@ theorem natDegree_preXQuotient_mul_le {d : ℕ} (n : ℕ) (hp : Fin d → Polyno
       refine natDegree_sum_le_of_forall_le _ _ ?_
       intro i _
       refine le_trans natDegree_mul_le ?_
-      rw [natDegree_X_pow]
+      rw [show ((X : CPoly) ^ (n * i.val)).natDegree = n * i.val from by
+        rw [natDegree_toPoly, toPoly_pow, X_toPoly, Polynomial.natDegree_X_pow]]
       exact Nat.add_le_add (Nat.mul_le_mul_left n (Nat.lt_succ_iff.mp i.isLt)) (h i)
-    have h2 : ((Polynomial.X : Polynomial Fp) ^ n - 1).natDegree ≤ n :=
-      le_trans (natDegree_sub_le _ _) (max_le (by simp) (by simp))
+    have h2 : ((X : CPoly) ^ n - 1).natDegree ≤ n :=
+      le_trans (natDegree_sub_le _ _) (max_le (natDegree_X_pow_le n) (by simp))
     refine le_trans (Nat.add_le_add h1 h2) ?_
     rw [Nat.mul_succ]
     omega
@@ -111,8 +109,8 @@ the constraint families and the quotient tail, the pre-`x` constraint difference
 most `max D Dq`. -/
 theorem natDegree_committedPreXConstraintDifference_le {G : Type*} [Inhabited G]
     [AddCommGroup G] [Module Fp G]
-    {shape : Shape} (poly : G → Polynomial Fp)
-    (piecePoly : Fin shape.numQuotientPieces → Polynomial Fp)
+    {shape : Shape} (poly : G → CPoly)
+    (piecePoly : Fin shape.numQuotientPieces → CPoly)
     (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → ℕ → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
     {B W Dc D Dq : ℕ} (hB : 1 ≤ B)
@@ -139,8 +137,7 @@ theorem natDegree_committedPreXConstraintDifference_le {G : Type*} [Inhabited G]
     unfold committedPermCommonFeed
     split
     · exact hpoly _
-    · rw [ComputablePolynomial.zero_eq]
-      simp
+    · simp
   rw [committedPreXConstraintDifference_eq]
   refine le_trans (natDegree_sub_le _ _) (max_le_max ?_ ?_)
   · refine natDegree_combineConstraints_le hB _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
@@ -153,13 +150,12 @@ theorem natDegree_committedPreXConstraintDifference_le {G : Type*} [Inhabited G]
       dsimp only
       refine ⟨hpoly _, ?_⟩
       rcases (ps.permutationSetEvals p j).lastEval with _ | le
-      · change (0 : Polynomial Fp).natDegree ≤ B
+      · change (0 : CPoly).natDegree ≤ B
         simp
       · simp only [Option.map_some, Option.getD_some]
         split
         · exact natDegree_comp_rotateData_le _ _ (hpoly _)
-        · rw [ComputablePolynomial.const_eq]
-          simp
+        · simp
     · -- permutation chunks
       intro p c hc
       obtain ⟨sc, hsc, rfl⟩ := List.mem_map.mp hc

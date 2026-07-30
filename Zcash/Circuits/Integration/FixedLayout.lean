@@ -14,7 +14,7 @@ products; they are not needed for the explicit fixed requirements extracted here
 
 namespace Zcash.Snark
 
-open Halo2
+open Halo2 CompPoly.CPolynomial
 
 set_option maxHeartbeats 20000
 
@@ -303,7 +303,7 @@ independent of how the domain size was chosen.
 theorem constraints_of_fixedRowPolynomials
     {n : ℕ} (omega : Fp)
     (fixedRows : ℕ → List Fp)
-    (adviceCols instanceCols : ℕ → Polynomial Fp)
+    (adviceCols instanceCols : ℕ → CPoly)
     (starts : List ℕ) (usable : ℕ)
     (ops : Operations Fp) (i : RegionIndex)
     (hrows :

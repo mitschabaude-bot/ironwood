@@ -1,4 +1,4 @@
-import Zcash.Snark.Soundness.Forking.Adversary.Adaptive
+import Zcash.Snark.Soundness.FiatShamir.Adversary.Adaptive
 
 /-!
 # Reduce an unbounded oracle domain to finite support
@@ -141,7 +141,7 @@ def extendOn (S : Finset T) (assign : {t // t ∈ S} → F) (f₀ : F) : T → F
 
 /-- The finite set of game points of a machine's attainable outputs: attainable outputs are runs
 over the finitely many reach-set assignments. -/
-noncomputable def gamePoints {n : ℕ} (A : OracleComp T F α) (pts : α → Fin n → T)
+def gamePoints {n : ℕ} (A : OracleComp T F α) (pts : α → Fin n → T)
     (f₀ : F) : Finset T :=
   Finset.univ.biUnion fun assign : {t // t ∈ A.reachSet} → F =>
     Finset.univ.image fun j : Fin n => pts (A.run (extendOn A.reachSet assign f₀)) j

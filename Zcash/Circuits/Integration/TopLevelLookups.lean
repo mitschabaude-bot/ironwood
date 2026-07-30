@@ -21,7 +21,7 @@ namespace Zcash.Snark
 
 open Zcash.Arithmetic (omegaOf)
 
-open Halo2 Polynomial Keygen
+open Halo2 CompPoly.CPolynomial Keygen
 
 variable
     {G : Type} [AddCommGroup G] [Inhabited G]
@@ -247,7 +247,7 @@ namespace TopLevelGateCoherence
 /-- The resolver feeds interpret the complete circuit-derived pinned query state. -/
 theorem resolverInterpretsPinned
     (coherence : TopLevelGateCoherence top)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
     (usableRows row : ℕ) :
     Interprets
@@ -330,7 +330,7 @@ enabled Clean lookup's concrete input and table tuples.
 -/
 theorem projectedValues
     (gateCoherence : TopLevelGateCoherence top)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
     (lookup : EnabledLookup Fp)
     (henabled :
@@ -470,7 +470,7 @@ theorem projectedPolynomialValues
     {k : ℕ}
     (gateCoherence : TopLevelGateCoherence top)
     (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
     (lookup : EnabledLookup Fp)
     (henabled :
@@ -541,7 +541,7 @@ def deployedWitness
     {k : ℕ}
     (gateCoherence : TopLevelGateCoherence top)
     (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
     (satisfaction :
       ConstraintSatisfaction
@@ -696,7 +696,7 @@ structure WitnessConditions
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G)
     (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs) : Prop where
   inputSelectorValues : ∀ lookup
       (_henabled :
@@ -740,7 +740,7 @@ so the event must be unioned across both indices.
 noncomputable def thetaBadSet
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G)
-    (poly : CommitmentId → Polynomial Fp) : Finset Fp :=
+    (poly : CommitmentId → CPoly) : Finset Fp :=
   enabledLookupThetaBadSetFamily
     (ι := ActivationIndex top pp)
     (fun _ => top.placement)
@@ -755,7 +755,7 @@ noncomputable def thetaBadSet
 def thetaBudget
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G)
-    (poly : CommitmentId → Polynomial Fp) : ℕ :=
+    (poly : CommitmentId → CPoly) : ℕ :=
   ∑ index : ActivationIndex top pp,
     (resolverEnvironment
       (top.toVerifierKey pp urs) poly index.1
@@ -774,7 +774,7 @@ The bundle-wide top-level `θ` surface has exactly the generic
 activation.
 -/
 theorem uniformChallenge_thetaBadSet
-    (poly : CommitmentId → Polynomial Fp) :
+    (poly : CommitmentId → CPoly) :
     uniformChallenge.toOuterMeasure
         (thetaBadSet top pp urs poly)
       ≤ (thetaBudget top pp urs poly : ENNReal) /
@@ -798,7 +798,7 @@ structure ChallengeExclusions
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G)
     (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp) : Prop where
+    (poly : CommitmentId → CPoly) : Prop where
   gamma :
     ch.gamma ∉ allResolverLookupGammaBadSet
       pp.numProofs (top.toVerifierKey pp urs) ch poly
@@ -820,7 +820,7 @@ def topLevelLookupChallengeExclusions?
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G)
     (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp) :
+    (poly : CommitmentId → CPoly) :
     Option (PLift (ChallengeExclusions top pp urs ch poly)) :=
   let vk := top.toVerifierKey pp urs
   let u := vk.n - vk.blindingFactors - 2
@@ -855,7 +855,7 @@ theorem topLevelLookupChallengeExclusions?_isSome_of
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G)
     (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (hexclusions : ChallengeExclusions top pp urs ch poly) :
     (topLevelLookupChallengeExclusions? top pp urs ch poly).isSome := by
   let vk := top.toVerifierKey pp urs
@@ -904,7 +904,7 @@ per-proof conditions consumed by the deployed lookup witnesses.
 def WitnessConditions.ofChallengeExclusions
     {k : ℕ}
     (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
     (inputSelectorValues : ∀ lookup
       (_henabled :
@@ -950,7 +950,7 @@ def deployedWitnesses
     {k : ℕ}
     (gateCoherence : TopLevelGateCoherence top)
     (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
     (satisfaction :
       ConstraintSatisfaction
@@ -993,7 +993,7 @@ theorem constraints
     {k : ℕ}
     (gateCoherence : TopLevelGateCoherence top)
     (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
     (satisfaction :
       ConstraintSatisfaction

@@ -21,7 +21,7 @@ namespace Zcash.Snark
 
 open Zcash.Arithmetic (omegaOf scalarFieldOrder)
 
-open Halo2 Polynomial Keygen
+open Halo2 CompPoly.CPolynomial Keygen
 
 /--
 Static coherence for a top-level circuit's own derived verifying key.
@@ -57,7 +57,7 @@ intermediate gate-erasure state because lookup erasure only appends query entrie
 -/
 theorem resolverInterpretsGates
     (coherence : TopLevelGateCoherence top)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
     (usableRows row : ℕ) :
     Interprets
@@ -134,13 +134,12 @@ opaque polynomialWitness
     {k : ℕ}
     (coherence : TopLevelGateCoherence top)
     (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (sets : Fin pp.numProofs →
-      List (PermSetEval (Polynomial Fp)))
+      List (PermSetEval CPoly))
     (chunks : Fin pp.numProofs →
-      List (PermSetEval (Polynomial Fp) ×
-        List (Polynomial Fp × Polynomial Fp)))
-    (l0 lLast lBlind : Polynomial Fp)
+      List (PermSetEval CPoly × List (CPoly × CPoly)))
+    (l0 lLast lBlind : CPoly)
     (proofIndex : Fin pp.numProofs)
     (usableRows : ℕ)
     (hfixed : SelectorActivationsRealized top.selectorMap
@@ -259,7 +258,7 @@ theorem canonicalConstraints
     {k : ℕ}
     (coherence : TopLevelGateCoherence top)
     (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
     (satisfaction :
       ConstraintSatisfaction

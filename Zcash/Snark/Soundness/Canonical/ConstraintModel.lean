@@ -17,7 +17,7 @@ fixed polynomials with the verifier's deployed `lagrangeBasis` computation.
 
 namespace Zcash.Snark
 
-open Polynomial
+open CompPoly.CPolynomial
 
 set_option maxHeartbeats 20000
 
@@ -30,7 +30,7 @@ by the verification key's domain and blinding count.
 def constraintModel
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n) :
     ConstraintPolyModel shape.numProofs :=
   let selectors :=
@@ -43,7 +43,7 @@ def constraintModel
 @[simp] theorem constraintModel_fixedCols
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n) :
     (vk.constraintModel ch poly hblinding).fixedCols =
       fixedQueryFeedOfResolver vk poly :=
@@ -52,7 +52,7 @@ def constraintModel
 @[simp] theorem constraintModel_adviceCols
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n) :
     (vk.constraintModel ch poly hblinding).adviceCols =
       fun proofIndex : Fin shape.numProofs =>
@@ -62,7 +62,7 @@ def constraintModel
 @[simp] theorem constraintModel_instanceCols
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n) :
     (vk.constraintModel ch poly hblinding).instanceCols =
       fun proofIndex : Fin shape.numProofs =>
@@ -72,7 +72,7 @@ def constraintModel
 @[simp] theorem constraintModel_gates
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n) :
     (vk.constraintModel ch poly hblinding).gates = vk.gates :=
   rfl
@@ -80,7 +80,7 @@ def constraintModel
 @[simp] theorem constraintModel_sets
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n)
     (proofIndex : Fin shape.numProofs) :
     (vk.constraintModel ch poly hblinding).sets proofIndex =
@@ -90,7 +90,7 @@ def constraintModel
 @[simp] theorem constraintModel_chunks
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n)
     (proofIndex : Fin shape.numProofs) :
     (vk.constraintModel ch poly hblinding).chunks proofIndex =
@@ -100,7 +100,7 @@ def constraintModel
 @[simp] theorem constraintModel_lookups
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n)
     (proofIndex : Fin shape.numProofs) :
     (vk.constraintModel ch poly hblinding).lookups proofIndex =
@@ -114,7 +114,7 @@ unfold the computable polynomial implementation.
 theorem constraintModel_eq_constraintModelOfResolver
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n) :
     vk.constraintModel ch poly hblinding =
       constraintModelOfResolver vk ch poly
@@ -128,7 +128,7 @@ theorem constraintModel_eq_constraintModelOfResolver
 @[simp] theorem constraintModel_l0
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n) :
     (vk.constraintModel ch poly hblinding).l0 =
       (canonicalLagrangePolynomials vk.omega hblinding).1 :=
@@ -137,7 +137,7 @@ theorem constraintModel_eq_constraintModelOfResolver
 @[simp] theorem constraintModel_lLast
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n) :
     (vk.constraintModel ch poly hblinding).lLast =
       (canonicalLagrangePolynomials vk.omega hblinding).2.1 :=
@@ -146,7 +146,7 @@ theorem constraintModel_eq_constraintModelOfResolver
 @[simp] theorem constraintModel_lBlind
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n) :
     (vk.constraintModel ch poly hblinding).lBlind =
       (canonicalLagrangePolynomials vk.omega hblinding).2.2 :=
@@ -160,7 +160,7 @@ evaluation domain.
 theorem constraintModel_selectorEvaluations
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n)
     (hrows : Function.Injective fun i : Fin vk.n =>
       vk.omega ^ (i : ℕ))
@@ -186,7 +186,7 @@ the actual VK chunk facts and root-domain facts.
 theorem ResolverPermutationDomain.ofCanonicalConstraintModel
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n)
     (hrows : Function.Injective fun i : Fin vk.n =>
       vk.omega ^ (i : ℕ))

@@ -19,7 +19,7 @@ verifier-side vanishing on every domain row.
 
 namespace Zcash.Snark
 
-open Halo2 Polynomial
+open Halo2 CompPoly.CPolynomial
 
 set_option maxHeartbeats 20000
 
@@ -107,7 +107,7 @@ structure PolynomialWitness
     {np : ℕ} (M : ConstraintPolyModel np) (proofIndex : Fin np)
     (omega : Fp) (place : RegionIndex → ℕ) (env : Environment Fp)
     (enabled : EnabledGate Fp) (constraint : Constraint Fp) where
-  polynomial : Polynomial Fp
+  polynomial : CPoly
   member : polynomial ∈ M.gateConstraints proofIndex
   zero_imp :
     polynomial.eval (omega ^ (place enabled.region + enabled.row)) = 0 →

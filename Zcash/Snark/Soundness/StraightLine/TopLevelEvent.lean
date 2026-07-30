@@ -11,7 +11,7 @@ circuit-specific correctness argument or numerical budget.
 
 namespace Zcash.Snark
 
-open Halo2 Polynomial Keygen
+open Halo2 CompPoly.CPolynomial Keygen
 open Zcash.Arithmetic (scalarFieldOrder)
 
 local instance topLevelStraightLineEventInhabitedVesta : Inhabited VestaG := ⟨0⟩

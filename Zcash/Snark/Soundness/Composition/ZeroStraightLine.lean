@@ -25,7 +25,7 @@ stage prices the explicit zero-data difference from the four folding squeezes al
 
 namespace Zcash.Snark
 
-open Polynomial
+open CompPoly.CPolynomial
 open scoped ENNReal
 
 local instance vestaInhabitedZeroStraightLine : Inhabited VestaG := ⟨0⟩
@@ -40,15 +40,15 @@ variable (vkS : VerifyingKey shape Fp VestaG)
 
 /-- With no sub-proofs the folded constraint list is empty. -/
 theorem constraintPolys_nil_of_no_proofs (hproofs : shape.numProofs = 0)
-    (fixedCols : ℕ → Polynomial Fp)
-    (adviceCols instanceCols : Fin shape.numProofs → ℕ → Polynomial Fp)
+    (fixedCols : ℕ → CPoly)
+    (adviceCols instanceCols : Fin shape.numProofs → ℕ → CPoly)
     (gates : List (Expr Fp))
-    (sets : Fin shape.numProofs → List (PermSetEval (Polynomial Fp)))
+    (sets : Fin shape.numProofs → List (PermSetEval (CPoly)))
     (chunks : Fin shape.numProofs →
-      List (PermSetEval (Polynomial Fp) × List (Polynomial Fp × Polynomial Fp)))
+      List (PermSetEval (CPoly) × List (CPoly × CPoly)))
     (lookups : Fin shape.numProofs →
-      List (LookupEval (Polynomial Fp) × List (Expr Fp) × List (Expr Fp)))
-    (beta gamma delta theta : Fp) (chunkLen : ℕ) (l0 lLast lBlind : Polynomial Fp) :
+      List (LookupEval (CPoly) × List (Expr Fp) × List (Expr Fp)))
+    (beta gamma delta theta : Fp) (chunkLen : ℕ) (l0 lLast lBlind : CPoly) :
     constraintPolys fixedCols adviceCols instanceCols gates sets chunks lookups
       beta gamma delta theta chunkLen l0 lLast lBlind = [] := by
   unfold constraintPolys allConstraints
@@ -88,13 +88,13 @@ theorem zeroConstraintDifference_eq_zero (hproofs : shape.numProofs = 0)
     unfold deployedConstraintPieceCoordinates
     rw [onlinePointCoordinates_zeroSource basis hsource]
     show coeffsToPoly (fun _ => (0 : Fp)) = 0
-    rw [coeffsToPoly_eq_sum]
+    rw [coeffsToPoly]
     simp
   unfold deployedConstraintDifferencePreX
   rw [committedPreXConstraintDifference_eq, committedPreXQuotient_eq]
   simp only [combineConstraints, constraintPolys_nil_of_no_proofs hproofs, List.foldl_nil,
     preXQuotient]
-  rw [Finset.sum_congr rfl (fun i (_ : i ∈ Finset.univ) => by rw [hpieces i, mul_zero])]
+  rw [Finset.sum_congr rfl (fun i (_ : i ∈ Finset.univ) => by rw [hpieces i, MulZeroClass.mul_zero])]
   simp
 
 /-- Hence the zero family's constraint-`x` root set is empty on every oracle table. -/
@@ -112,7 +112,7 @@ theorem zeroConstraintXBadSet_empty (hproofs : shape.numProofs = 0)
 
 /-- **The zero family's executable constraint-`x` stage.**  The root set is empty, so the stage
 returns it without reading the oracle and freshness of the `x` squeeze is immediate. -/
-noncomputable def zeroConstraintXTrace (hproofs : shape.numProofs = 0) :
+def zeroConstraintXTrace (hproofs : shape.numProofs = 0) :
     DeployedConstraintXOnlineTrace (zeroDeployedRootFamily vkS hfixed hperm) where
   stage := fun _basis => .pure (∅ : Set Fp)
   agrees := fun basis O => by
@@ -129,7 +129,7 @@ squeezes alone — indices `0`–`3`, all before the `x` prefix.
 /-- The zero prover's constraint difference, as an explicit function of the four folding
 challenges: every feed reads the all-zero source, so only the key's own polynomials and the
 challenge scalars remain. -/
-noncomputable def zeroExplicitConstraintDifference (ν : Fin 11 → Fp) : Polynomial Fp :=
+def zeroExplicitConstraintDifference (ν : Fin 11 → Fp) : CPoly :=
   committedPreXConstraintDifference (fun _ => 0) (fun _ => 0)
     vkS (fun _ _ => 0) (zeroProofString shape Fp VestaG) (chRecord ν (fun _ => 0))
 
@@ -160,17 +160,17 @@ theorem zeroConstraintDifference_explicit
     unfold deployedConstraintPointPolynomial onlinePointPolynomial
     rw [onlinePointCoordinates_zeroSource basis hsource]
     show coeffsToPoly (fun _ => (0 : Fp)) = 0
-    rw [coeffsToPoly_eq_sum]
+    rw [coeffsToPoly]
     simp
   have hpieces : (fun i => coeffsToPoly (deployedConstraintPieceCoordinates
       (zeroDeployedRootFamily vkS hfixed hperm) basis
       (deployedRootRunOutput (zeroDeployedRootFamily vkS hfixed hperm) basis coins) i).1) =
-      fun _ => (0 : Polynomial Fp) := by
+      fun _ => (0 : CPoly) := by
     funext i
     unfold deployedConstraintPieceCoordinates
     rw [onlinePointCoordinates_zeroSource basis hsource]
     show coeffsToPoly (fun _ => (0 : Fp)) = 0
-    rw [coeffsToPoly_eq_sum]
+    rw [coeffsToPoly]
     simp
   have hps : (deployedRootRunOutput (zeroDeployedRootFamily vkS hfixed hperm) basis
       coins).1.proof.1 = zeroProofString shape Fp VestaG := by
@@ -192,7 +192,7 @@ theorem zeroExplicitConstraintDifference_reads (ν ν' : Fin 11 → Fp)
 
 /-- The constraint-`x` stage at any shape: read the four folding squeezes and return the explicit
 difference's root set.  The `x` prefix — index `4` — is never queried. -/
-noncomputable def zeroConstConstraintXStage (basis : AugmentedIndex (2 ^ shape.k) → VestaG) :
+def zeroConstConstraintXStage (basis : AugmentedIndex (2 ^ shape.k) → VestaG) :
     OracleComp
       (BTranscript Fp VestaG
         (preIpaLen shape (zeroDeployedRootFamily vkS hfixed hperm).toFamily.init.length 10 +
@@ -261,7 +261,7 @@ theorem zeroConstConstraintXStage_fresh (basis : AugmentedIndex (2 ^ shape.k) �
 
 /-- **The zero family's constraint-`x` trace at any shape** (issue #127 C10): the total event
 needs no decode, so the stage prices the explicit zero-data difference with sub-proofs live. -/
-noncomputable def zeroConstConstraintXTrace :
+def zeroConstConstraintXTrace :
     DeployedConstraintXOnlineTrace (zeroDeployedRootFamily vkS hfixed hperm) where
   stage := fun basis => zeroConstConstraintXStage vkS hfixed hperm basis
   agrees := fun basis O => zeroConstConstraintXStage_agrees vkS hfixed hperm basis O
@@ -296,12 +296,12 @@ theorem zeroWfProof_straightLineIpaRootPolynomial (hproofs : shape.numProofs = 0
 /-- **The zero family's staged IPA trace.**  The staged polynomial is zero at every one of the
 shape's `k` rounds, so `agrees` is a theorem about the discrepancy walk rather than an empty
 quantification. -/
-noncomputable def zeroStraightLineIpaTrace (hproofs : shape.numProofs = 0) :
+def zeroStraightLineIpaTrace (hproofs : shape.numProofs = 0) :
     StraightLineIpaOnlineTrace (zeroDeployedRootFamily vkS hfixed hperm).toFamily where
   stage := fun _basis _j => .pure 0
   agrees := fun basis j O => by
     rw [OracleComp.run_pure]
-    show (0 : Polynomial Fp) = _
+    show (0 : CPoly) = _
     rw [show ((zeroDeployedRootFamily vkS hfixed hperm).toFamily.adversary basis).run O =
       zeroWfProof basis vkS hfixed hperm from rfl]
     exact (zeroWfProof_straightLineIpaRootPolynomial vkS hfixed hperm hproofs basis _ _ j).symm
@@ -310,7 +310,7 @@ noncomputable def zeroStraightLineIpaTrace (hproofs : shape.numProofs = 0) :
 /-- **An inhabitant of the straight-line deployed family interface with live IPA rounds**: the
 zero prover's root family, its empty constraint-`x` stage, and the staged IPA trace over all `k`
 rounds. -/
-noncomputable def zeroStraightLineDeployedFamily (hproofs : shape.numProofs = 0) :
+def zeroStraightLineDeployedFamily (hproofs : shape.numProofs = 0) :
     ComputedStraightLineDeployedFSFamily shape where
   toComputedDeployedRootFSFamily := zeroDeployedRootFamily vkS hfixed hperm
   ipaTrace := zeroStraightLineIpaTrace vkS hfixed hperm hproofs
@@ -331,8 +331,8 @@ theorem zeroWfProof_straightLineIpaRootPolynomial_const
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
     (ν : Fin 11 → Fp) (χ : Fin shape.k → Fp) (j : Fin shape.k) :
     (zeroWfProof basis vkS hfixed hperm).straightLineIpaRootPolynomial ν χ j =
-      Polynomial.C (-(ν 10 * multiopenValue vkS (fun _ _ => 0)
-        (zeroProofString shape Fp VestaG) (chRecord ν (fun _ => 0)))) * Polynomial.X := by
+      C (-(ν 10 * multiopenValue vkS (fun _ _ => 0)
+        (zeroProofString shape Fp VestaG) (chRecord ν (fun _ => 0)))) * X := by
   rw [straightLineIpaRootPolynomial_of_zero_group_coordinates _ ν χ
     (fun _ => ⟨rfl, rfl, rfl, rfl⟩) j]
   rw [straightLineInitialDiscrepancy_of_zero_coordinates _ ν
@@ -346,18 +346,18 @@ theorem zeroWfProof_straightLineIpaRootPolynomial_const
 
 /-- The constant-walk staged polynomial: read the eleven pre-IPA squeezes, then return
 `C (-(ν₁₀ · v)) * X`.  No IPA-round point is read. -/
-noncomputable def zeroConstIpaStage (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
+def zeroConstIpaStage (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
     (_j : Fin shape.k) :
     OracleComp
       (BTranscript Fp VestaG
         (preIpaLen shape (zeroDeployedRootFamily vkS hfixed hperm).toFamily.init.length 10 +
-          3 * shape.k)) Fp (Polynomial Fp) :=
+          3 * shape.k)) Fp (CPoly) :=
   (OracleComp.readFin (F := Fp)
     (fun i : Fin 11 =>
       algebraicFullPrefixesPre (zeroDeployedRootFamily vkS hfixed hperm).toFamily.init
         (zeroWfProof basis vkS hfixed hperm) i)).bind
-    fun ν => .pure (Polynomial.C (-(ν 10 * multiopenValue vkS (fun _ _ => 0)
-      (zeroProofString shape Fp VestaG) (chRecord ν (fun _ => 0)))) * Polynomial.X)
+    fun ν => .pure (C (-(ν 10 * multiopenValue vkS (fun _ _ => 0)
+      (zeroProofString shape Fp VestaG) (chRecord ν (fun _ => 0)))) * X)
 
 /-- The staged polynomial is the run's actual root polynomial: both are the constant walk at the
 oracle's answers on the fixed squeeze points. -/
@@ -419,14 +419,14 @@ theorem zeroConstIpaStage_fresh (basis : AugmentedIndex (2 ^ shape.k) → VestaG
 
 /-- **The constant-walk staged IPA trace, at any shape.**  The instance-free zero trace above is
 its special case; this one leaves the multiopen value free. -/
-noncomputable def zeroConstStraightLineIpaTrace :
+def zeroConstStraightLineIpaTrace :
     StraightLineIpaOnlineTrace (zeroDeployedRootFamily vkS hfixed hperm).toFamily where
   stage := fun basis j => zeroConstIpaStage vkS hfixed hperm basis j
   agrees := fun basis j O => zeroConstIpaStage_agrees vkS hfixed hperm basis j O
   fresh := fun basis j O => zeroConstIpaStage_fresh vkS hfixed hperm basis j O
 
 /-- The zero family also inhabits the intermediate deployed constraint interface. -/
-noncomputable def zeroDeployedConstraintFamily (hproofs : shape.numProofs = 0) :
+def zeroDeployedConstraintFamily (hproofs : shape.numProofs = 0) :
     ComputedDeployedConstraintFSFamily shape :=
   .ofRoot (zeroDeployedRootFamily vkS hfixed hperm) (zeroConstraintXTrace vkS hfixed hperm hproofs)
 
@@ -434,7 +434,7 @@ noncomputable def zeroDeployedConstraintFamily (hproofs : shape.numProofs = 0) :
 the six root events, the constant-walk IPA trace, and the total constraint-`x` stage, with no
 instance-free hypothesis.  This is the interface smoke test — it is not the deployed Action
 adversary. -/
-noncomputable def zeroConstStraightLineDeployedFamily :
+def zeroConstStraightLineDeployedFamily :
     ComputedStraightLineDeployedFSFamily shape where
   toComputedDeployedRootFSFamily := zeroDeployedRootFamily vkS hfixed hperm
   ipaTrace := zeroConstStraightLineIpaTrace vkS hfixed hperm

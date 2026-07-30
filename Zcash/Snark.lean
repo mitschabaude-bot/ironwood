@@ -9,8 +9,8 @@
 -- * `Verifier/` — the transcription layer: the deployed halo2 verifier's MSM assembly as a pure
 --   Lean function (queries, expressions, multiopen, IPA fold, Fiat–Shamir schedule).
 -- * `Fingerprint/` — the faithfulness cross-check: the captured-fixture match (`native_decide`,
---   loaded in the auto-generated `Fixture.lean`) plus the Schwartz–Zippel and batch-RLC bounds.
--- * `Soundness/` — the soundness argument: IPA special soundness and extraction, binding as a
+--   loaded in the auto-generated `Fixture.lean`) plus the Schwartz–Zippel bound.
+-- * `Soundness/` — the soundness argument: straight-line and adaptive AGM extraction, binding as a
 --   DLR reduction, the constraint layer, the permutation/lookup kernels, and the composition
 --   (`Soundness/Main.lean`), instantiated at Vesta (`Soundness/Vesta.lean`).
 --
@@ -27,7 +27,6 @@ import Zcash.Snark.Core
 import Zcash.Snark.Core.ProofString
 import Zcash.Snark.Core.Challenges
 import Zcash.Snark.Fingerprint.SchwartzZippel
-import Zcash.Snark.Fingerprint.Batch
 import Zcash.Snark.Verifier.Ipa
 import Zcash.Snark.Verifier.Checks
 import Zcash.Snark.Verifier.Queries
@@ -59,21 +58,16 @@ import Zcash.Snark.Soundness.IpaSoundness
 import Zcash.Snark.Soundness.Canonical.ConstraintSatisfaction
 import Zcash.Snark.Soundness.Canonical.ConstraintModel
 import Zcash.Snark.Soundness.Canonical.InstanceCommitment
--- Deployed halo2-verifier soundness path: peel the deployed IPA (U/W/S apparatus) onto the clean
--- `ipa_soundV`, with commitment binding expressed as a discrete-log-relation reduction.
+-- Deployed halo2-verifier algebra and binding reductions.
 import Zcash.Snark.Soundness.Deployed.Binding
 import Zcash.Snark.Soundness.Deployed.Fold
-import Zcash.Snark.Soundness.Deployed.Ipa
-import Zcash.Snark.Soundness.Deployed.IpaPeel
 import Zcash.Snark.Soundness.Deployed.Verification
--- The reusable Fiat–Shamir forking kernel and its concrete adversary producer.
-import Zcash.Snark.Soundness.Forking
+-- The reusable Fiat–Shamir oracle kernel and its represented adversary model.
+import Zcash.Snark.Soundness.FiatShamir
 import Zcash.Snark.Soundness.Main
 -- Multiopen decode reconstruction: bind the IPA witness to real verifier columns recovered from
--- batched openings (`Multiopen.Decode`), the compatibility layer exposing the propositional binding
--- interface over fs-adversary's `NontrivialRelation`/`ForkedTranscript` apparatus (`Multiopen.Compat`),
--- the `x₄` multiopen rewinding (`Multiopen.Deployed`), and the opened chain threading the fork's
--- declared `U`/`W` components through the batch decode (`Multiopen.Opened`).
+-- the represented `x₄` power batch (`Multiopen.Decode`, `Multiopen.Deployed`), the MSM evaluation
+-- spine (`Multiopen.Compat`), and the explicit opened/member interfaces (`Multiopen.Opened`).
 -- Schwartz–Zippel good-challenge budgets and production (kills `hgood` at the `_xgood` rungs).
 import Zcash.Snark.Soundness.GoodChallenge
 import Zcash.Snark.Soundness.Multiopen.Decode
@@ -81,7 +75,6 @@ import Zcash.Snark.Soundness.Multiopen.Compat
 import Zcash.Snark.Soundness.Multiopen.Deployed
 import Zcash.Snark.Soundness.Multiopen.Opened
 import Zcash.Snark.Soundness.Multiopen.RPoly
-import Zcash.Snark.Soundness.Multiopen.Claimed
 import Zcash.Snark.Soundness.Multiopen.CanonicalRelation
 import Zcash.Snark.Soundness.Canonical.Terminal
 import Zcash.Snark.Soundness.TopLevelTerminal

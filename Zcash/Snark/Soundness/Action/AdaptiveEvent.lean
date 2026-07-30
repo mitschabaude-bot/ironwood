@@ -13,7 +13,7 @@ namespace Zcash.Snark
 
 namespace ActionTerminal
 
-open Halo2 Polynomial Keygen
+open Halo2 CompPoly.CPolynomial Keygen
 open Zcash.Circuits
 open Zcash.Circuits.Action
 open Zcash.Arithmetic (scalarFieldOrder)
@@ -75,7 +75,7 @@ def adaptiveActionPreXIdentityWitnessOrRelationFinder
       (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)
   let difference := adaptiveActionPreXDifferenceOf (family.vk basis)
     (family.instanceCommitment basis) data.algebraicProof.erase source ch hblinding
-  if hsupport : difference.toFinsupp.support = ∅ then
+  if hsupport : difference = 0 then
     let rawDecode := family.adaptiveAlgebraicDecode_of_deployedGoodRoots
       basis O witness hroots hshifted
     let fullDecode := rawDecode.reRound (runRounds family.toFamily basis O)
@@ -126,8 +126,7 @@ def adaptiveActionPreXIdentityWitnessOrRelationFinder
       unfold rawModel adaptiveActionCommittedModelOf
       exact VerifyingKey.constraintModel_congr_nonterminal
         (family.vk basis) ch _ _ _ hpolyStage
-    have hzero : difference = 0 :=
-      Polynomial.toFinsupp_injective (Finsupp.support_eq_empty.mp hsupport)
+    have hzero : difference = 0 := hsupport
     have hdiff := adaptiveActionPreXDifferenceOf_eq (family.vk basis)
       (family.instanceCommitment basis) data.algebraicProof.erase
       (data.algebraicProof.actionRepresentationsBefore (4 : Fin 5) ++
@@ -146,7 +145,7 @@ def adaptiveActionPreXIdentityWitnessOrRelationFinder
         combineConstraints model.fixedCols model.adviceCols model.instanceCols model.gates
             model.sets model.chunks model.lookups model.beta model.gamma model.delta model.theta
             ch.y model.chunkLen model.l0 model.lLast model.lBlind =
-          preXPoly * (Polynomial.X ^ (family.vk basis).n - 1) := by
+          preXPoly * (X ^ (family.vk basis).n - 1) := by
       dsimp only [preXPoly, piecePoly]
       rw [hsource4]
       apply sub_eq_zero.mp
@@ -284,7 +283,7 @@ theorem adaptiveActionPreXIdentityWitnessOrRelationFinder_isSome_of
       let difference := adaptiveActionPreXDifferenceOf (family.vk basis)
         (family.instanceCommitment basis) data.algebraicProof.erase source
         (adaptiveActionRunRecord family basis O) hblinding
-      difference.toFinsupp.support = ∅)
+      difference = 0)
     (hgoodY : let _pnu := adaptiveActionRunOutput family basis O
       let decode := hI basis ▸ hvk basis ▸
         (family.adaptiveAlgebraicDecode_of_deployedGoodRoots
@@ -408,7 +407,7 @@ theorem adaptiveActionPreXIdentityRelationFinder_isSome_of
       let difference := adaptiveActionPreXDifferenceOf (family.vk basis)
         (family.instanceCommitment basis) data.algebraicProof.erase source
         (adaptiveActionRunRecord family basis O) hblinding
-      difference.toFinsupp.support = ∅)
+      difference = 0)
     (hgoodY : let _pnu := adaptiveActionRunOutput family basis O
       let decode := hI basis ▸ hvk basis ▸
         (family.adaptiveAlgebraicDecode_of_deployedGoodRoots
@@ -683,7 +682,7 @@ theorem adaptiveActionCompleteTerminalWitnessOrRelationFinder_isSome_of
       PSum.inl ⟨witness, hsrc⟩ := by
     simpa only [hsrc] using
       adaptiveActionRootOutcomeWithSource_eq_inl pp family basis O witness hout
-  by_cases hsupport : difference.toFinsupp.support = ∅
+  by_cases hsupport : difference = 0
   · have hidentityDataSome :=
       adaptiveActionPreXIdentityWitnessOrRelationFinder_isSome_of
       pp family inputs hvk hI hchar basis O hprovenance witness hsrc hroots hshifted
@@ -708,11 +707,7 @@ theorem adaptiveActionCompleteTerminalWitnessOrRelationFinder_isSome_of
       (family.vk basis) (family.instanceCommitment basis) data.algebraicProof.erase source
       (adaptiveActionRunRecord family basis O) hblinding (hvk basis) (hI basis)
     rw [← hdiffData] at heval
-    have hdifferenceNe : difference ≠ 0 := by
-      intro hzero
-      apply hsupport
-      rw [hzero]
-      rfl
+    have hdifferenceNe : difference ≠ 0 := hsupport
     have hpreEval : difference.eval (adaptiveActionRunRecord family basis O).x ≠ 0 :=
       (not_mem_szBadSet.mp hx) hdifferenceNe
     have hactionGood : (adaptiveActionRunRecord family basis O).x ∉ szBadSet
@@ -720,7 +715,7 @@ theorem adaptiveActionCompleteTerminalWitnessOrRelationFinder_isSome_of
           model.sets model.chunks model.lookups model.beta model.gamma model.delta model.theta
           (adaptiveActionRunRecord family basis O).y model.chunkLen model.l0 model.lLast
           model.lBlind - polynomial .vanishingH *
-            (Polynomial.X ^ (ActionTerminal.vkAt pp basis).n - 1)) := by
+            (X ^ (ActionTerminal.vkAt pp basis).n - 1)) := by
       apply not_mem_szBadSet.mpr
       intro _
       rw [heval]
@@ -1115,9 +1110,9 @@ def adaptiveActionRootEvent :
           + 3 * (pp.mergeDerived actionCircuit).k) → Fp)) :=
   {q | ∃ i : Fin 6, q.2 ∈ family.adaptiveRootBadWithoutRelation q.1 i}
 
-/-- The remaining semantic-squeeze obligation after the executable algebraic branches have been
-removed.  Subsequent Action surface lemmas refine this residual into the `x/y/β/γ/θ` finite
-bad sets; importantly, it is stated directly on the bare adaptive family. -/
+/-- The semantic-squeeze obligation outside the executable algebraic branches. Subsequent Action
+surface lemmas refine this residual into the `x/y/β/γ/θ` finite bad sets; importantly, it is stated
+directly on the bare adaptive family. -/
 def adaptiveActionSemanticResidualEvent :
     Set ((AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG) ×
       (BTranscript Fp VestaG

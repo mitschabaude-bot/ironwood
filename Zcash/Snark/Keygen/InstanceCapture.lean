@@ -1,20 +1,21 @@
 import Zcash.Snark.Keygen.Certificate
 import Zcash.Snark.Keygen.Lagrange
+import Zcash.Circuits.Integration.TopLevelInstanceCommitment
 import Mathlib.Util.AssertNoSorry
 
 /-!
 # The captured instance commitments are the circuit-derived ones
 
-The Action soundness stack states its conclusion at the
-*circuit-derived* public-instance family `actionCircuit.instanceCommitment actionProofParams
-capturedURS inputs` — commitments computed from the public inputs, as halo2's `verify_proof`
-computes them from its `instances` argument. The captured artifacts, meanwhile, are exercised
+The Action model uses the *circuit-derived* public-instance family
+`actionCircuit.instanceCommitment actionProofParams capturedURS inputs` — commitments computed
+from the public inputs, as halo2's `verify_proof` computes them from its `instances` argument. The
+captured artifacts, meanwhile, are exercised
 against the fixture's own family `Fixture.derivedInstanceCommitment` (the Fiat–Shamir fingerprint,
 `assemble?`, the negative tests), which `instance_commitments_derived` pins to the captured points
 `capturedInstanceCommitments` (ironwood#65/#85).
 
-Nothing joined those two families, so the capstone could not be instantiated at the captured proof
-— the last open seam in sound handling of public instances (ironwood#86). This module closes it.
+Nothing joined those two families, so the circuit model could not be instantiated at the captured
+proof — the last open seam in sound handling of public instances (ironwood#86). This module closes it.
 
 Two steps, and the first carries the weight:
 
@@ -197,14 +198,13 @@ theorem toVerifierKey_omega_captured :
   rw [TopLevelCircuit.toVerifierKey_omega, TopLevelCircuit.omega,
     actionCircuit_domainExponent]
 
-/-- **The circuit-derived public-instance family is the fixture's.** The soundness stack reads its
-instance commitments from
-`actionCircuit.instanceCommitment`, computing them from the public inputs the way halo2's
+/-- **The circuit-derived public-instance family is the fixture's.**
+`actionCircuit.instanceCommitment` computes commitments from the public inputs the way halo2's
 `verify_proof` computes them from `instances`. At the captured public inputs that family is
 `Fixture.derivedInstanceCommitment`, the family the captured artifacts are exercised against.
 
-This is the join that was missing (ironwood#86): the capstone and the capture now speak of the same
-group elements, so the capstone can be instantiated at the captured proof. -/
+This is the join that was missing (ironwood#86): the circuit model and capture now speak of the same
+group elements. -/
 theorem instanceCommitment_capturedActionInputs :
     actionCircuit.instanceCommitment actionProofParams capturedURS capturedActionInputs =
       Fixture.derivedInstanceCommitment := by
@@ -228,9 +228,9 @@ theorem instanceCommitment_capturedActionInputs :
       commitLagrange]
     simp
 
-/-- **The capstone's family is the captured commitment points.** Composing the seam with the
-capture's own derivation (`instance_commitments_derived`, ironwood#65/#85): the commitments the
-deployed capstone quantifies over are exactly the points the deployed verifier used. -/
+/-- **The circuit model's family is the captured commitment points.** Composing the seam with the
+capture's own derivation (`instance_commitments_derived`, ironwood#65/#85): at the captured public
+inputs, the circuit-derived commitments are exactly the points the deployed verifier used. -/
 theorem instanceCommitment_eq_capturedInstanceCommitments
     (proofIndex : Fin Fixture.shape.numProofs) {column : ℕ}
     (hcolumn : column < capturedNumInstanceColumns) :

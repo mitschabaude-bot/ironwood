@@ -1,12 +1,11 @@
 import Zcash.Snark.Soundness.Composition.DeployedAcceptance
-import Zcash.Snark.Soundness.Forking.WithReads
+import Zcash.Snark.Soundness.FiatShamir.WithReads
 
 /-!
 # Runtime helpers for deployed algebraic extraction
 
-This module contains only the challenge-read wrapper and deployed-acceptance bookkeeping shared by
-the rewind-free root containment.  In particular, it does not define or import the historical
-four-level accepting-multiopen containment.
+This module contains the challenge-read wrapper and deployed-acceptance bookkeeping shared by the
+straight-line root containment.
 -/
 
 namespace Zcash.Snark

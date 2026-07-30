@@ -15,7 +15,9 @@ and ties that equation to the deployed accept condition:
 * the `…?_eq_some` lemmas — deployed acceptance uses the rejecting `assemble?`; when it
   returns `some m`, `m` is the non-rejecting `assembleFinalMsm`, so the equation transfers.
 
-`Soundness.Main` records the legacy bridge; `Forking.Adversary.Algebraic` gives the computed one.
+`Soundness.Main` transfers deployed acceptance to this equation;
+`FiatShamir.Adversary.Algebraic` supplies the represented execution consumed by the current
+straight-line and adaptive AGM reductions.
 -/
 
 namespace Zcash.Snark
@@ -130,18 +132,16 @@ theorem deployed_verification_eq {shape : Shape} (g : Fin (2 ^ shape.k) → G) (
 
 /-- halo2's explicit IPA verifier equation for the deployed proof, set to the group identity. By
 `deployed_verification_eq` this is exactly `(assembleFinalMsm …).eval = 0`. Stating it explicitly
-lets the forking bridge act on halo2's actual IPA equation, with `P`/`v` the pinned
-`multiopenCommitment`/`multiopenValue`.
+lets the represented-execution reduction consume halo2's actual IPA equation, with `P`/`v` the
+pinned `multiopenCommitment`/`multiopenValue`.
 
 Totality note: the closed form uses Lean's total inverse (`0⁻¹ = 0`), and the deployed code
 computes the same thing — halo2 batch-inverts the round challenges with ff's `batch_invert`,
 which leaves a zero challenge at zero — so at `uⱼ = 0` the equation and the Rust agree
 term for term. The corner is faithful in both directions: nothing about acceptance can be
-shown from this form that the deployed verifier would not exhibit. The forking *extractor*, by
-contrast, needs the three sibling challenges at each node to be nonzero (the Vandermonde recovery
-and `u⁻¹` fold need cancellable challenges), paying for that extra bad challenge per round in the
-knowledge-error count `Soundness.Forking.Tree.kerr` — so this totality concerns only the equation's
-definedness, not the extractor's admissible challenges. -/
+shown from this form that the deployed verifier would not exhibit. The current reduction treats
+inadmissible challenge values as explicit bad-root events rather than restricting this equation's
+domain. -/
 def DeployedIpaVerifierEq {shape : Shape} [DecidableEq F] [DecidableEq G] [Inhabited G]
     (g : Fin (2 ^ shape.k) → G) (w u : G)
     (vk : VerifyingKey shape F G) (instanceCommitment : Fin shape.numProofs → ℕ → G)

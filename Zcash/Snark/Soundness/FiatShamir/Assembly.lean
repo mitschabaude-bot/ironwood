@@ -1,20 +1,11 @@
 import Zcash.Snark.Soundness.Deployed.Verification
-import Zcash.Snark.Soundness.Deployed.IpaPeel
 
 /-!
-# Assemble forked transcripts into the deployed IPA tree
-
-The old `FiatShamirTree` assumption combined two jobs: producing forked transcripts by random-oracle
-rewinding, and converting those transcripts into `DeployedIpaAcceptV`. This module proves the second
-job.
+# Closed-form IPA assembly algebra
 
 The flat verifier equation folds one IPA round at a time. `roundSum_cons`, `computeB_cons`, and
-`CF_cons` match that fold to the recursive commitment, generator, value, and blinding updates.
-`CF_leaf_to_acceptV` identifies the final closed-form equation with the deployed leaf check, and
-`forkAccept_to_acceptV` assembles the full tree.
-
-`Soundness.Forking.Extractor` recovers the parent data, while the algebraic prover supplies AGM
-coefficients. Rewinding and query loss remain outside this structural step.
+`CF_cons` expose the commitment, generator, value, and blinding updates used by the straight-line
+AGM proof. `deployedVerifierEq_cf` identifies this algebra with halo2's deployed verifier equation.
 -/
 
 namespace Zcash.Snark
@@ -56,8 +47,7 @@ theorem computeB_cons {F : Type*} [CommRing F] (x u₀ : F) (tail : List F) :
 
 /-! ## The commitment/generator side of the closed-form equation folds per round
 
-`gPart` contains the adjusted commitment, round sum, and folded generator. It follows the same
-per-round commitment and generator recursion as `DeployedIpaAcceptV`. -/
+`gPart` contains the adjusted commitment, round sum, and folded generator. -/
 
 /-- The adjusted commitment, IPA round sum, and final folded-generator term. -/
 def gPart (rounds : List (G × G)) (u : List F) (g : Fin (2 ^ u.length) → G) (P' : G) (c : F) : G :=
@@ -133,65 +123,7 @@ theorem CF_cons (Lg Rg U W : G) (Lv Lw Rv Rw : F) (rounds : List (G × G)) (u₀
   simp only [gPart]
   module
 
-/-! ## Leaf reconciliation: the depth-0 closed form is the deployed tree's leaf check
-
-At depth zero, the flat equation rearranges to the deployed IPA leaf check. This step is pure group
-algebra; the later peel uses `z ≠ 0`.
--/
-
-/-- Convert the depth-zero flat equation to the deployed IPA leaf check. -/
-theorem CF_leaf_to_acceptV (g : Fin (2 ^ 0) → G) (b : Fin (2 ^ 0) → F) (U W : G) (z : F)
-    (aP : Fin (2 ^ 0) → F) (v blind c f : F)
-    (hCF : CF [] [] g (commitGen g aP + (z * v) • U + blind • W) c
-              (-(z * commitGen b (fun _ => c))) U (-f) W = 0) :
-    DeployedIpaAcceptV g b U W z (commitGen g aP) v blind (.leaf c f aP) := by
-  refine ⟨rfl, ?_⟩
-  have hg : commitGen g (fun _ => c) = c • g 0 := by simp [commitGen]
-  rw [hg, ← sub_eq_zero, ← hCF]
-  simp only [CF, gPart, roundSum, foldAll, List.zip_nil_left, List.map_nil, List.sum_nil, add_zero]
-  module
-
-/-! ## The tree assembly: the forking output yields `DeployedIpaAcceptV`
-
-`ForkAccept` records three accepting continuations at each round and a flat verifier equation at each
-leaf. `forkAccept_to_acceptV` converts those leaves and assembles `DeployedIpaAcceptV`.
--/
-
-/-- A ternary fork tree with the flat verifier equation at each leaf. -/
-def ForkAccept : {d : ℕ} → (Fin (2 ^ d) → G) → (Fin (2 ^ d) → F) → G → G → F → G → F → F →
-    DeployedIpaTreeV F G d → Prop
-  | 0, g, b, U, W, z, P, v, blind, .leaf c f aP =>
-      P = commitGen g aP ∧
-        CF [] [] g (P + (z * v) • U + blind • W) c (-(z * commitGen b (fun _ => c))) U (-f) W = 0
-  | _ + 1, g, b, U, W, z, P, v, blind, .node L R Lv Rv Lw Rw u₁ u₂ u₃ t₁ t₂ t₃ =>
-      u₁ ≠ u₂ ∧ u₁ ≠ u₃ ∧ u₂ ≠ u₃ ∧ u₁ ≠ 0 ∧ u₂ ≠ 0 ∧ u₃ ≠ 0 ∧
-        ForkAccept (foldGens g u₁) (foldGens b u₁) U W z
-          (P + u₁⁻¹ • L + u₁ • R) (v + u₁⁻¹ • Lv + u₁ • Rv) (blind + u₁⁻¹ • Lw + u₁ • Rw) t₁ ∧
-        ForkAccept (foldGens g u₂) (foldGens b u₂) U W z
-          (P + u₂⁻¹ • L + u₂ • R) (v + u₂⁻¹ • Lv + u₂ • Rv) (blind + u₂⁻¹ • Lw + u₂ • Rw) t₂ ∧
-        ForkAccept (foldGens g u₃) (foldGens b u₃) U W z
-          (P + u₃⁻¹ • L + u₃ • R) (v + u₃⁻¹ • Lv + u₃ • Rv) (blind + u₃⁻¹ • Lw + u₃ • Rw) t₃
-
-/-- Convert a `ForkAccept` tree to the deployed recursive acceptance predicate. -/
-theorem forkAccept_to_acceptV {U W : G} {z : F} :
-    {d : ℕ} → (g : Fin (2 ^ d) → G) → (b : Fin (2 ^ d) → F) → (P : G) → (v blind : F) →
-      (t : DeployedIpaTreeV F G d) → ForkAccept g b U W z P v blind t →
-      DeployedIpaAcceptV g b U W z P v blind t
-  | 0, g, b, P, v, blind, .leaf c f aP, h => by
-      obtain ⟨hP, hCF⟩ := h
-      rw [hP] at hCF ⊢
-      exact CF_leaf_to_acceptV g b U W z aP v blind c f hCF
-  | _ + 1, g, b, P, v, blind, .node L R Lv Rv Lw Rw u₁ u₂ u₃ t₁ t₂ t₃, h => by
-      obtain ⟨h12, h13, h23, hu₁, hu₂, hu₃, ha₁, ha₂, ha₃⟩ := h
-      exact ⟨h12, h13, h23, hu₁, hu₂, hu₃,
-        forkAccept_to_acceptV _ _ _ _ _ t₁ ha₁,
-        forkAccept_to_acceptV _ _ _ _ _ t₂ ha₂,
-        forkAccept_to_acceptV _ _ _ _ _ t₃ ha₃⟩
-
 /-! ## The adjusted-commitment connection: halo2's verifier equation is the closed form
-
-The forking proof uses `CF`. The theorem below shows that halo2's deployed verifier equation is the
-same expression with its adjusted commitment and concrete coefficients.
 -/
 
 /-- Halo2's deployed IPA verifier equation is the closed form `CF = 0`. -/

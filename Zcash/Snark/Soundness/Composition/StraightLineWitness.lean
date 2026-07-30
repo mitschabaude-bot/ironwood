@@ -25,6 +25,7 @@ of this module.
 namespace Zcash.Snark
 
 open scoped ENNReal
+open CompPoly.CPolynomial
 
 local instance vestaInhabitedStraightLineWitness : Inhabited VestaG := ⟨0⟩
 
@@ -132,7 +133,7 @@ theorem ipaDiscrepancyStep_const (v c : Fp) : ipaDiscrepancyStep v (0, 0) c = v 
 theorem ipaDiscrepancyPolynomialAt_const (v : Fp) :
     ∀ (rounds : List (Fp × Fp)) (challenges : List Fp) (j : ℕ),
       (∀ r ∈ rounds, r = (0, 0)) → j < rounds.length → j < challenges.length →
-      ipaDiscrepancyPolynomialAt v rounds challenges j = Polynomial.C v * Polynomial.X
+      ipaDiscrepancyPolynomialAt v rounds challenges j = C v * X
   | [], _, j, _, hj, _ => absurd hj (Nat.not_lt_zero j)
   | _round :: _rounds, [], j, _, _, hj => absurd hj (Nat.not_lt_zero j)
   | round :: _rounds, _c :: _challenges, 0, h, _, _ => by
@@ -210,7 +211,7 @@ theorem straightLineIpaRootPolynomial_of_zero_group_coordinates
       (p.rounds j).2.coeffs AugmentedIndex.u = 0)
     (j : Fin shape.k) :
     p.straightLineIpaRootPolynomial nu chi j =
-      Polynomial.C (p.straightLineInitialDiscrepancy nu) * Polynomial.X := by
+      C (p.straightLineInitialDiscrepancy nu) * X := by
   have hdisc : ∀ r ∈ p.straightLineRoundDiscrepancies nu, r = (0, 0) := by
     intro r hr
     unfold AlgebraicWfProof.straightLineRoundDiscrepancies at hr

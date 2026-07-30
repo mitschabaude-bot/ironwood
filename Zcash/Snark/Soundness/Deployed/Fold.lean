@@ -1,20 +1,18 @@
 import Mathlib.Data.List.GetD
 import Zcash.Snark.Soundness.IpaSoundness
+import Zcash.Snark.Soundness.Consistency
 import Zcash.Snark.Verifier.Ipa
 
 /-!
-# The deployed flattened IPA MSM unfolds into the recursive generator fold
+# The deployed flattened IPA MSM and generator fold
 
-`eval_assembleFinalMsm` gives the flattened deployed verification equation; `ipa_soundV` proves
-soundness of the recursive verifier. This module connects their generator terms, so the structural
-correspondence between the flattened MSM and the recursive fold is established here rather than
-left to the Fiat–Shamir bridge.
+`eval_assembleFinalMsm` gives the flattened deployed verification equation. This module rewrites
+its generator term as the same closed-form fold consumed by the straight-line AGM extractor.
 
 The key is the `compute_s` correspondence: the deployed `g`-scalars `computeS u init` halve at
 each round exactly as `commitGen_append` splits a commitment, so `commitGen g (sFun u init)` folds
 recursively with the generator step `loHalf g + uⱼ • hiHalf g`. That step is `Consistency.foldGens`
-at the inverted challenge (`foldGens g (uⱼ⁻¹) = loHalf g + uⱼ • hiHalf g`), which reconciles the
-deployed `u`-convention with `ipa_soundV`'s `u⁻¹`-convention.
+at the inverted challenge (`foldGens g (uⱼ⁻¹) = loHalf g + uⱼ • hiHalf g`).
 
 * `computeS_cons` — `computeS (uⱼ :: rest) = computeS rest ++ (computeS rest).map (· * uⱼ)`.
 * `computeS_length` — `|computeS u init| = 2 ^ |u|`.
@@ -88,8 +86,7 @@ theorem commitGen_sFun_cons (uⱼ init : F) (rest : List F) (g : Fin (2 ^ (rest.
 
 /-- The deployed `s`-vector commitment is one `foldGens` step (at the inverted challenge) — the
 convention reconciliation: the deployed flattening (`computeS` with `uⱼ`) folds the generators by
-`foldGens g uⱼ⁻¹ = loHalf g + uⱼ • hiHalf g`, exactly `ipa_soundV`'s `foldGens` at `uⱼ⁻¹`. So the
-deployed `g`-term unfolds into the same recursion `ipa_soundV` runs on. -/
+`foldGens g uⱼ⁻¹ = loHalf g + uⱼ • hiHalf g`. -/
 theorem sFun_fold (uⱼ init : F) (rest : List F) (g : Fin (2 ^ (rest.length + 1)) → G) :
     commitGen g (sFun (uⱼ :: rest) init) = commitGen (foldGens g uⱼ⁻¹) (sFun rest init) := by
   rw [commitGen_sFun_cons, foldGens, commitGen_add_gen, commitGen_smul_gen, inv_inv]

@@ -1,4 +1,5 @@
 import Zcash.Snark.Soundness.AGM.OnlineMultiopen
+import Zcash.Snark.Soundness.AGM.Peel
 import Zcash.Snark.Soundness.GoodChallenge
 
 /-!
@@ -11,7 +12,7 @@ makes the fresh challenge a root of one explicit error polynomial, priced separa
 
 namespace Zcash.Snark
 
-open Polynomial
+open CompPoly.CPolynomial
 open Classical
 
 variable {G : Type*} [AddCommGroup G] [Module Fp G]
@@ -43,8 +44,8 @@ theorem AlgebraicColumnRepresentations.power_commitment
     rw [commit_eq_commitGen, commitGen_sum, Finset.sum_smul, Finset.sum_smul,
       <- Finset.sum_add_distrib, <- Finset.sum_add_distrib]
     refine Finset.sum_congr rfl fun i _ => ?_
-    rw [smul_add, smul_add, commit_eq_commitGen, commitGen_smul_left,
-      mul_smul, mul_smul]
+    rw [_root_.smul_add, _root_.smul_add, commit_eq_commitGen, commitGen_smul_left,
+      SemigroupAction.mul_smul, SemigroupAction.mul_smul]
   rw [hlin]
   exact Finset.sum_congr rfl fun i _ => congrArg _ (cols.commitment i)
 
@@ -129,12 +130,12 @@ def algebraicPowerBatchOrRelation {urs : URS G} {numColumns : Nat}
 /-- The value-error polynomial of represented columns against the verifier's claimed column
 values.  Its coefficient at `i` is exactly
 `<coeffs i,b> - columnEvals i`. -/
-noncomputable def algebraicBatchErrorPolynomial {urs : URS G} {numColumns : Nat}
+def algebraicBatchErrorPolynomial {urs : URS G} {numColumns : Nat}
     (b : Fin (2 ^ urs.k) -> Fp)
     (cols : Fin numColumns -> (Fin (2 ^ urs.k) -> Fp))
-    (columnEvals : Fin numColumns -> Fp) : Polynomial Fp :=
+    (columnEvals : Fin numColumns -> Fp) : CPoly :=
   ∑ i : Fin numColumns,
-    Polynomial.C (commitGen b (cols i) - columnEvals i) * Polynomial.X ^ (i : Nat)
+    C (commitGen b (cols i) - columnEvals i) * X ^ (i : Nat)
 
 omit [AddCommGroup G] [Module Fp G] in
 /-- Evaluating the error polynomial is the difference between the power-batched represented
@@ -146,8 +147,8 @@ theorem algebraicBatchErrorPolynomial_eval {urs : URS G} {numColumns : Nat}
     (algebraicBatchErrorPolynomial b cols columnEvals).eval x =
       commitGen b (∑ i : Fin numColumns, x ^ (i : Nat) • cols i) -
         ∑ i : Fin numColumns, x ^ (i : Nat) * columnEvals i := by
-  rw [algebraicBatchErrorPolynomial, Polynomial.eval_finsetSum]
-  simp only [Polynomial.eval_mul, Polynomial.eval_C, Polynomial.eval_pow, Polynomial.eval_X]
+  rw [algebraicBatchErrorPolynomial, eval_finsetSum]
+  simp only [eval_mul, eval_C, eval_pow, eval_X]
   rw [commitGen_sum]
   rw [← Finset.sum_sub_distrib]
   refine Finset.sum_congr rfl fun i _ => ?_
@@ -162,11 +163,14 @@ theorem algebraicBatchErrorPolynomial_natDegree_le {urs : URS G} {numColumns : N
     (cols : Fin numColumns -> (Fin (2 ^ urs.k) -> Fp))
     (columnEvals : Fin numColumns -> Fp) :
     (algebraicBatchErrorPolynomial b cols columnEvals).natDegree <= numColumns := by
-  rw [algebraicBatchErrorPolynomial, Polynomial.natDegree_le_iff_coeff_eq_zero]
+  rw [algebraicBatchErrorPolynomial, natDegree_toPoly, toPoly_sum]
+  simp only [toPoly_mul, C_toPoly, toPoly_pow, X_toPoly]
+  rw [Polynomial.natDegree_le_iff_coeff_eq_zero]
   intro m hm
   rw [Polynomial.finsetSum_coeff]
   refine Finset.sum_eq_zero fun i _ => ?_
-  rw [Polynomial.coeff_C_mul, Polynomial.coeff_X_pow, if_neg (by omega), mul_zero]
+  rw [Polynomial.coeff_C_mul, Polynomial.coeff_X_pow, if_neg (by omega),
+    MulZeroClass.mul_zero]
 
 omit [AddCommGroup G] [Module Fp G] in
 /-- If the error polynomial is identically zero, every represented column opens to its claimed
@@ -178,15 +182,17 @@ theorem algebraicBatch_values_of_errorPolynomial_eq_zero {urs : URS G} {numColum
     (hzero : algebraicBatchErrorPolynomial b cols columnEvals = 0) :
     forall i, commitGen b (cols i) = columnEvals i := by
   intro i
-  have hcoeff : (algebraicBatchErrorPolynomial b cols columnEvals).coeff (i : Nat) = 0 := by
-    rw [hzero, Polynomial.coeff_zero]
-  rw [algebraicBatchErrorPolynomial, Polynomial.finsetSum_coeff,
-    Finset.sum_eq_single i] at hcoeff
-  · rw [Polynomial.coeff_C_mul, Polynomial.coeff_X_pow, if_pos rfl, mul_one] at hcoeff
+  have hcoeff : (algebraicBatchErrorPolynomial b cols columnEvals).toPoly.coeff (i : Nat)
+      = 0 := by
+    rw [hzero, toPoly_zero, Polynomial.coeff_zero]
+  rw [algebraicBatchErrorPolynomial, toPoly_sum] at hcoeff
+  simp only [toPoly_mul, C_toPoly, toPoly_pow, X_toPoly] at hcoeff
+  rw [Polynomial.finsetSum_coeff, Finset.sum_eq_single i] at hcoeff
+  · rw [Polynomial.coeff_C_mul, Polynomial.coeff_X_pow, if_pos rfl, _root_.mul_one] at hcoeff
     exact sub_eq_zero.mp hcoeff
   · intro j _ hji
     rw [Polynomial.coeff_C_mul, Polynomial.coeff_X_pow,
-      if_neg (fun h => hji (Fin.ext h.symm)), mul_zero]
+      if_neg (fun h => hji (Fin.ext h.symm)), MulZeroClass.mul_zero]
   · intro hni
     exact absurd (Finset.mem_univ i) hni
 

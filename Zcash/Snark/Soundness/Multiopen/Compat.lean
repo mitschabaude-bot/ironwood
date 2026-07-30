@@ -8,12 +8,9 @@ import Zcash.Snark.Soundness.Multiopen.Decode
 
 The `Msm` evaluation lemmas the decode proofs are stated over (`Msm.eval_{zero,scale,add}`).
 
-This module previously re-exposed a *propositional* binding interface on top of `fs-adversary`'s
-computed `NontrivialRelation` data, so that the decode development could conclude "…or binding
-breaks" as an existential rather than by producing coefficients. That interface has been removed:
-in a prime-order group such a relation exists unconditionally, so the ∃-closed form is vacuous and
-cannot be charged to DLOG. Every break the deployed route charges now travels as computed relation
-data, per the breaks-as-computed-data discipline in `Zcash.Security.RandomOracle`.
+Every break charged to DLOG travels as computed `NontrivialRelation` data, per the
+breaks-as-computed-data discipline in `Zcash.Security.RandomOracle`; an existential relation alone
+would be vacuous in a prime-order group.
 -/
 
 namespace Zcash.Snark

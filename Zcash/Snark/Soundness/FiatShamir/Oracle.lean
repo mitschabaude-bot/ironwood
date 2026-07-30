@@ -59,7 +59,7 @@ open scoped ENNReal
 
 variable {F G : Type*}
 
-/-! ## Reprogramming — the rewinding primitive -/
+/-! ## Oracle-table reprogramming -/
 
 open Classical in
 /-- Change the oracle's answer at `t` to `c`, leaving all other answers unchanged. -/

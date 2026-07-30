@@ -61,14 +61,14 @@ def fixedRepresentationsEqualityCertificate? {k : Nat}
   letI := algebraicPointDecidableEq basis
   equalityCertificate? xs ys
 
-/-- The total pre-`x` constraint difference on a straight-line oracle table.  This is the same
-polynomial as `deployedConstraintDifferencePreX`, written without manufacturing the proof-only
-recursive tape used by the legacy containment statement. -/
+/-- The total pre-`x` constraint difference on a straight-line oracle table. This is the same
+polynomial as `deployedConstraintDifferencePreX`, evaluated directly from the represented
+execution. -/
 def straightLineConstraintDifferencePreX
     (family : ComputedStraightLineDeployedFSFamily shape)
     (basis : AugmentedIndex (2 ^ shape.k) -> VestaG)
     (O : BTranscript Fp VestaG
-      (preIpaLen shape family.init.length 10 + 3 * shape.k) -> Fp) : Polynomial Fp :=
+      (preIpaLen shape family.init.length 10 + 3 * shape.k) -> Fp) : CPoly :=
   let pnu := (wrappedAdversary family.toFamily basis).run O
   committedPreXConstraintDifference
     (deployedConstraintPointPolynomial family.toRootFamily basis pnu)
@@ -376,9 +376,8 @@ theorem straightLineConstraintSuccess_eq_of_outcome
   simp [straightLineConstraintSuccess?, hout]
 
 set_option maxHeartbeats 800000 in
-/-- The legacy root-containment construction lands in the same computed success option.  This is
-the proof bridge used by the existing probability decomposition; all data in the conclusion is
-nevertheless the value returned by `straightLineConstraintOutcome?`. -/
+/-- The root-containment construction lands in the same computed success option. This bridges the
+root-event probability decomposition to the value returned by `straightLineConstraintOutcome?`. -/
 theorem straightLineConstraintDecoded_of_root
     (family : ComputedStraightLineDeployedFSFamily shape)
     (static : DeployedConstraintStaticChecks family.toRootFamily)
@@ -392,18 +391,27 @@ theorem straightLineConstraintDecoded_of_root
     (root : DeployedRootDecodeWitness family.toRootFamily basis O)
     (hxgood : (wrappedPreIpaRecord
         (deployedRootRunOutput family.toRootFamily basis O)).x ∉
-      szBadSet (deployedConstraintDifferencePreX family.toRootFamily basis O))
+      szBadSet (deployedConstraintDifferencePreX family.toRootFamily basis
+        O))
     (constraint : DeployedConstraintWitness
       (ursOfAugmentedBasis shape.k basis) rfl (family.vk basis)
       (family.instanceCommitment basis)
-      (deployedRootRunOutput family.toRootFamily basis O).1.proof.1
-      (wrappedPreIpaRecord (deployedRootRunOutput family.toRootFamily basis O))
-      ((deployedRootRunOutput family.toRootFamily basis O).1.aMulti
-        (wrappedPreIpaReads (deployedRootRunOutput family.toRootFamily basis O)))
-      ((deployedRootRunOutput family.toRootFamily basis O).1.multiU
-        (wrappedPreIpaReads (deployedRootRunOutput family.toRootFamily basis O)))
-      ((deployedRootRunOutput family.toRootFamily basis O).1.multiBlind
-        (wrappedPreIpaReads (deployedRootRunOutput family.toRootFamily basis O))))
+      (deployedRootRunOutput family.toRootFamily basis
+        O).1.proof.1
+      (wrappedPreIpaRecord (deployedRootRunOutput family.toRootFamily basis
+        O))
+      ((deployedRootRunOutput family.toRootFamily basis
+        O).1.aMulti
+          (wrappedPreIpaReads (deployedRootRunOutput family.toRootFamily basis
+            O)))
+      ((deployedRootRunOutput family.toRootFamily basis
+        O).1.multiU
+          (wrappedPreIpaReads (deployedRootRunOutput family.toRootFamily basis
+            O)))
+      ((deployedRootRunOutput family.toRootFamily basis
+        O).1.multiBlind
+          (wrappedPreIpaReads (deployedRootRunOutput family.toRootFamily basis
+            O))))
     (hout : deployedConstraintOutcomeOfRoot family.toRootFamily static basis
       O haccept root hxgood = PSum.inl constraint) :
     family.straightLineConstraintDecoded static basis O := by
@@ -789,10 +797,7 @@ theorem straightLineConstraintRelation_prob_le_of_textbookDL
       bound + 1 / Fintype.card Fp :=
   relationWithCoins_prob_le_of_textbookDL B family.straightLineConstraintRelationFinder hDL
 
-/-- The compressed constraint failure bound may price any computed finder that extends the
-existing constraint finder pointwise.  This is the composition hook used by the Action capstone:
-the Action finder returns the exact old result on the old finder's success branch, then adds its
-terminal fallback, so the union of relation causes is charged once. -/
+/-- Prices any computed relation finder that pointwise extends the constraint finder. -/
 theorem straightLineConstraintFailure_union_relation_prob_le_of_relationSupersetTextbookDL
     (B : VestaG) (family : ComputedStraightLineDeployedFSFamily shape)
     (static : DeployedConstraintStaticChecks family.toRootFamily)

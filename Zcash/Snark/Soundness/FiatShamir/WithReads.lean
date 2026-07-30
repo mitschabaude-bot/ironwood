@@ -1,4 +1,4 @@
-import Zcash.Snark.Soundness.Forking.Adversary.OracleComp
+import Zcash.Snark.Soundness.FiatShamir.Adversary.OracleComp
 
 /-!
 # Returning a run's own reads with its output

@@ -29,7 +29,7 @@ namespace Zcash.Snark
 /-- The permutation cell count is `m` rows per chunk pair — a layout count: the pair list is a
 `map` over the key's own `permutationChunks`. -/
 theorem resolverPermutationCell_card {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → Polynomial Fp)
+    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs) (m : ℕ) :
     Fintype.card (ResolverPermutationCell vk poly p m) =
       ∑ c : Fin shape.numPermutationSets,
@@ -38,7 +38,7 @@ theorem resolverPermutationCell_card {shape : Shape} {G : Type*}
 
 namespace ActionTerminal
 
-open Halo2 Polynomial Keygen
+open Halo2 CompPoly.CPolynomial Keygen
 open Zcash.Circuits
 open Zcash.Circuits.Action
 open Zcash.Arithmetic (scalarFieldOrder)
@@ -66,13 +66,13 @@ variable (pp : ProofParams)
     (straightLineRunRecord family basis O) < scalarFieldOrder)
 
 /-- The deployed Action key at one basis. -/
-noncomputable abbrev vkAt
+abbrev vkAt
     (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG) :
     VerifyingKey (pp.mergeDerived actionCircuit) Fp VestaG :=
   actionCircuit.toVerifierKey pp (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)
 
 /-- A challenge record carrying only `θ` and `β` — the fields a pre-`x` exclusion set reads. -/
-noncomputable def semanticChRecord (theta beta : Fp) {k : ℕ} : Challenges k Fp :=
+def semanticChRecord (theta beta : Fp) {k : ℕ} : Challenges k Fp :=
   chRecord (fun i => if i = 0 then theta else if i = 1 then beta else 0) (fun _ => 0)
 
 @[simp] theorem semanticChRecord_theta (theta beta : Fp) {k : ℕ} :
@@ -98,7 +98,7 @@ theorem straightLineRunRecord_read (basis : AugmentedIndex (2 ^ (pp.mergeDerived
 columns, which the index-0 view supplies. -/
 theorem actionThetaFailureEvent_subset
     (cut : SequentialCut family.toComputedAlgebraicFSFamily 0)
-    (view : cut.State → CommitmentId → Polynomial Fp)
+    (view : cut.State → CommitmentId → CPoly)
     (hview : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
       ∀ id, id.isColumnInput →
         topLevelRunPolynomial actionCircuit pp family static inputs hvk hI hchar basis O h id =
@@ -123,7 +123,7 @@ theorem actionThetaFailureEvent_subset
 theorem actionThetaFailureEvent_prob_le {T : Type*} [DecidableEq T]
     (query : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → T)
     (cut : SequentialCut family.toComputedAlgebraicFSFamily 0)
-    (view : cut.State → CommitmentId → Polynomial Fp)
+    (view : cut.State → CommitmentId → CPoly)
     (hview : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
       ∀ id, id.isColumnInput →
         topLevelRunPolynomial actionCircuit pp family static inputs hvk hI hchar basis O h id =
@@ -151,7 +151,7 @@ input slots; the lookup `β` set reads the lookup input slots and, of the record
 squeezed one index earlier, so the state supplies it. -/
 theorem actionBetaFailureEvent_subset
     (cut : SequentialCut family.toComputedAlgebraicFSFamily 1)
-    (view : cut.State → CommitmentId → Polynomial Fp)
+    (view : cut.State → CommitmentId → CPoly)
     (thetaOf : cut.State → Fp)
     (hview : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
       ∀ id, id.isPermutationInput ∨ id.isLookupInput →
@@ -188,7 +188,7 @@ theorem actionBetaFailureEvent_subset
 theorem actionBetaFailureEvent_prob_le {T : Type*} [DecidableEq T]
     (query : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → T)
     (cut : SequentialCut family.toComputedAlgebraicFSFamily 1)
-    (view : cut.State → CommitmentId → Polynomial Fp)
+    (view : cut.State → CommitmentId → CPoly)
     (thetaOf : cut.State → Fp)
     (hview : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
       ∀ id, id.isPermutationInput ∨ id.isLookupInput →
@@ -222,7 +222,7 @@ theorem actionBetaFailureEvent_prob_le {T : Type*} [DecidableEq T]
 the record, only `θ` and `β` — squeezed earlier, so the state supplies them. -/
 theorem actionGammaFailureEvent_subset
     (cut : SequentialCut family.toComputedAlgebraicFSFamily 2)
-    (view : cut.State → CommitmentId → Polynomial Fp)
+    (view : cut.State → CommitmentId → CPoly)
     (thetaOf betaOf : cut.State → Fp)
     (hview : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
       ∀ id, id.isPermutationInput ∨ id.isLookupInput →
@@ -264,7 +264,7 @@ theorem actionGammaFailureEvent_subset
 theorem actionGammaFailureEvent_prob_le {T : Type*} [DecidableEq T]
     (query : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → T)
     (cut : SequentialCut family.toComputedAlgebraicFSFamily 2)
-    (view : cut.State → CommitmentId → Polynomial Fp)
+    (view : cut.State → CommitmentId → CPoly)
     (thetaOf betaOf : cut.State → Fp)
     (hview : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
       ∀ id, id.isPermutationInput ∨ id.isLookupInput →
@@ -306,7 +306,7 @@ theorem actionXYFailureEvent_subset
     (cutX : SequentialCut family.toComputedAlgebraicFSFamily 4)
     (modelY : cutY.State → ConstraintPolyModel pp.numProofs)
     (modelX : cutX.State → ConstraintPolyModel pp.numProofs)
-    (yOf : cutX.State → Fp) (vanishingOf : cutX.State → Polynomial Fp)
+    (yOf : cutX.State → Fp) (vanishingOf : cutX.State → CPoly)
     (hmodelY : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
       topLevelRunModel actionCircuit pp family static inputs hvk hI hchar basis O h =
         modelY ((cutY.pre basis).run O))
@@ -354,7 +354,7 @@ theorem actionXYFailureEvent_prob_le {T : Type*} [DecidableEq T]
     (cutX : SequentialCut family.toComputedAlgebraicFSFamily 4)
     (modelY : cutY.State → ConstraintPolyModel pp.numProofs)
     (modelX : cutX.State → ConstraintPolyModel pp.numProofs)
-    (yOf : cutX.State → Fp) (vanishingOf : cutX.State → Polynomial Fp)
+    (yOf : cutX.State → Fp) (vanishingOf : cutX.State → CPoly)
     (hmodelY : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
       topLevelRunModel actionCircuit pp family static inputs hvk hI hchar basis O h =
         modelY ((cutY.pre basis).run O))
@@ -406,7 +406,7 @@ Schwartz–Zippel exclusion, priced by `uniformChallenge_szBadSet` at its fold d
 /-- The per-state `θ` measure: the row-by-arity budget over the field size. -/
 theorem actionThetaBadSet_measure_le
     (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
-    (poly : CommitmentId → Polynomial Fp) :
+    (poly : CommitmentId → CPoly) :
     (PMF.uniformOfFintype Fp).toOuterMeasure
       ↑(TopLevelLookup.thetaBadSet actionCircuit pp
         (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) poly) ≤
@@ -419,7 +419,7 @@ theorem actionThetaBadSet_measure_le
 /-- The per-state `β` measure: permutation cells plus lookup pair counts. -/
 theorem actionBetaBadSets_measure_le
     (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
-    (theta : Fp) (poly : CommitmentId → Polynomial Fp) :
+    (theta : Fp) (poly : CommitmentId → CPoly) :
     (PMF.uniformOfFintype Fp).toOuterMeasure
       (↑(allResolverPermutationBetaBadSet (vkAt pp basis) poly (actionCircuit.usableRowsAt actionCircuit.domainExponent)) ∪
         ↑(allResolverLookupBetaBadSet pp.numProofs (vkAt pp basis)
@@ -446,7 +446,7 @@ theorem actionBetaBadSets_measure_le
 /-- The per-state `γ` measure: doubled permutation cells plus lookup pair counts. -/
 theorem actionGammaBadSets_measure_le
     (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
-    (theta beta : Fp) (poly : CommitmentId → Polynomial Fp) :
+    (theta beta : Fp) (poly : CommitmentId → CPoly) :
     (PMF.uniformOfFintype Fp).toOuterMeasure
       (↑(allResolverPermutationGammaBadSet (vkAt pp basis)
           (semanticChRecord theta beta) poly (actionCircuit.usableRowsAt actionCircuit.domainExponent)) ∪
@@ -472,7 +472,7 @@ theorem actionGammaBadSets_measure_le
 /-- The per-state `y` measure: `n` times the constraint count over the field size. -/
 theorem actionYBadSet_measure_le
     (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
-    (constraints : List (Polynomial Fp)) (hn : (vkAt pp basis).n ≠ 0) :
+    (constraints : List (CPoly)) (hn : (vkAt pp basis).n ≠ 0) :
     (PMF.uniformOfFintype Fp).toOuterMeasure
       (⋃ j, ↑(szBadSet (foldSplitWitness constraints (vkAt pp basis).n j))) ≤
       (((vkAt pp basis).n * constraints.length : ℕ) : ℝ≥0∞) /
@@ -494,16 +494,16 @@ counting lemmas; it is no longer an input to the public capstone.
 
 /-- Data emitted before `θ`: the represented query-column polynomials. -/
 structure ActionThetaSnapshot where
-  polynomial : CommitmentId → Polynomial Fp
+  polynomial : CommitmentId → CPoly
 
 /-- Data emitted before `β`: the relevant represented polynomials and the earlier `θ` answer. -/
 structure ActionBetaSnapshot where
-  polynomial : CommitmentId → Polynomial Fp
+  polynomial : CommitmentId → CPoly
   theta : Fp
 
 /-- Data emitted before `γ`: the relevant represented polynomials and earlier challenge answers. -/
 structure ActionGammaSnapshot where
-  polynomial : CommitmentId → Polynomial Fp
+  polynomial : CommitmentId → CPoly
   theta : Fp
   beta : Fp
 
@@ -515,7 +515,7 @@ structure ActionYSnapshot (np : ℕ) where
 structure ActionXSnapshot (np : ℕ) where
   model : ConstraintPolyModel np
   y : Fp
-  vanishing : Polynomial Fp
+  vanishing : CPoly
 
 /-- One phased sequential Action execution.  Each phase is an actual `OracleComp` stopped before
 its squeeze and returns precisely the snapshot later used by the exclusion-set proof.  The
@@ -571,7 +571,7 @@ structure ActionSequentialCuts (Dx L : ℕ) where
   /-- The cut at the `θ` squeeze. -/
   cut0 : SequentialCut family.toComputedAlgebraicFSFamily 0
   /-- The query columns, read off the pre-`θ` state. -/
-  view0 : cut0.State → CommitmentId → Polynomial Fp
+  view0 : cut0.State → CommitmentId → CPoly
   /-- The `θ` view agrees with the decoded run polynomial on the query columns. -/
   hview0 : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
     ∀ id, id.isColumnInput →
@@ -580,7 +580,7 @@ structure ActionSequentialCuts (Dx L : ℕ) where
   /-- The cut at the `β` squeeze. -/
   cut1 : SequentialCut family.toComputedAlgebraicFSFamily 1
   /-- The permutation and lookup inputs, read off the pre-`β` state. -/
-  view1 : cut1.State → CommitmentId → Polynomial Fp
+  view1 : cut1.State → CommitmentId → CPoly
   /-- The `θ` answer carried by the pre-`β` state. -/
   theta1 : cut1.State → Fp
   /-- The `β` view agrees with the decoded run polynomial on both input classes. -/
@@ -594,7 +594,7 @@ structure ActionSequentialCuts (Dx L : ℕ) where
   /-- The cut at the `γ` squeeze. -/
   cut2 : SequentialCut family.toComputedAlgebraicFSFamily 2
   /-- The permutation and lookup inputs, read off the pre-`γ` state. -/
-  view2 : cut2.State → CommitmentId → Polynomial Fp
+  view2 : cut2.State → CommitmentId → CPoly
   /-- The `θ` answer carried by the pre-`γ` state. -/
   theta2 : cut2.State → Fp
   /-- The `β` answer carried by the pre-`γ` state. -/
@@ -627,7 +627,7 @@ structure ActionSequentialCuts (Dx L : ℕ) where
   /-- The `y` answer carried by the pre-`x` state. -/
   yOf : cut4.State → Fp
   /-- The vanishing commitment's polynomial, read off the pre-`x` state. -/
-  vanishingOf : cut4.State → Polynomial Fp
+  vanishingOf : cut4.State → CPoly
   /-- The `x` model view agrees with the decoded run model. -/
   hmodelX : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
     topLevelRunModel actionCircuit pp family static inputs hvk hI hchar basis O h =
@@ -688,7 +688,7 @@ theorem ActionSequentialCuts.theta_prob_le {T : Type*} [DecidableEq T]
     {Dx L : ℕ} (cuts : ActionSequentialCuts pp family static inputs hvk hI hchar Dx L)
     {Ntheta : ℕ}
     (hbudget : ∀ (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
-      (poly : CommitmentId → Polynomial Fp),
+      (poly : CommitmentId → CPoly),
       TopLevelLookup.thetaBudget actionCircuit pp
         (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) poly ≤ Ntheta) :
     (independentProductPMF (orchardGeneratorROSetup query)
@@ -711,7 +711,7 @@ theorem ActionSequentialCuts.beta_prob_le {T : Type*} [DecidableEq T]
     {Dx L : ℕ} (cuts : ActionSequentialCuts pp family static inputs hvk hI hchar Dx L)
     {Nbeta : ℕ}
     (hcap : ∀ (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
-      (poly : CommitmentId → Polynomial Fp),
+      (poly : CommitmentId → CPoly),
       (∑ p : Fin pp.numProofs,
         (Fintype.card (ResolverPermutationCell (vkAt pp basis) poly p (actionCircuit.usableRowsAt actionCircuit.domainExponent)) + 1) *
           Fintype.card (ResolverPermutationCell (vkAt pp basis) poly p (actionCircuit.usableRowsAt actionCircuit.domainExponent))) +
@@ -740,7 +740,7 @@ theorem ActionSequentialCuts.gamma_prob_le {T : Type*} [DecidableEq T]
     {Dx L : ℕ} (cuts : ActionSequentialCuts pp family static inputs hvk hI hchar Dx L)
     {Ngamma : ℕ}
     (hcap : ∀ (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
-      (poly : CommitmentId → Polynomial Fp),
+      (poly : CommitmentId → CPoly),
       (∑ p : Fin pp.numProofs,
         2 * Fintype.card (ResolverPermutationCell (vkAt pp basis) poly p (actionCircuit.usableRowsAt actionCircuit.domainExponent))) +
       pp.numProofs * actionCircuit.lookupCount *

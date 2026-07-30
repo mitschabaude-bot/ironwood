@@ -10,19 +10,19 @@ before `ξ` and `z`, so a raw-value error survives only on two linear root sets 
 
 namespace Zcash.Snark
 
-open Polynomial
+open CompPoly.CPolynomial
 open scoped ENNReal
 
 /-- The exceptional `ξ` polynomial.  Its value is the coefficient of `z` after clearing the IPA
 value shift denominator. -/
-noncomputable def ipaShiftXiPolynomial (delta sEval : Fp) : Polynomial Fp :=
-  Polynomial.C delta + Polynomial.C sEval * Polynomial.X
+def ipaShiftXiPolynomial (delta sEval : Fp) : CPoly :=
+  C delta + C sEval * X
 
 /-- For a fixed good `ξ`, the shifted IPA equality makes `z` a root of this linear polynomial. -/
-noncomputable def ipaShiftZPolynomial
-    (delta pU sU sEval xi : Fp) : Polynomial Fp :=
-  Polynomial.C (-(pU + xi * sU)) +
-    Polynomial.C (delta + xi * sEval) * Polynomial.X
+def ipaShiftZPolynomial
+    (delta pU sU sEval xi : Fp) : CPoly :=
+  C (-(pU + xi * sU)) +
+    C (delta + xi * sEval) * X
 
 @[simp] theorem ipaShiftXiPolynomial_eval (delta sEval xi : Fp) :
     (ipaShiftXiPolynomial delta sEval).eval xi = delta + xi * sEval := by
@@ -37,6 +37,7 @@ noncomputable def ipaShiftZPolynomial
 
 theorem ipaShiftXiPolynomial_ne_zero {delta sEval : Fp} (hdelta : delta ≠ 0) :
     ipaShiftXiPolynomial delta sEval ≠ 0 := by
+  rw [Ne, ← toPoly_eq_zero_iff]
   intro hzero
   have hcoeff := congrArg (Polynomial.coeff · 0) hzero
   simp [ipaShiftXiPolynomial] at hcoeff
@@ -45,6 +46,7 @@ theorem ipaShiftXiPolynomial_ne_zero {delta sEval : Fp} (hdelta : delta ≠ 0) :
 theorem ipaShiftZPolynomial_ne_zero {delta pU sU sEval xi : Fp}
     (hslope : delta + xi * sEval ≠ 0) :
     ipaShiftZPolynomial delta pU sU sEval xi ≠ 0 := by
+  rw [Ne, ← toPoly_eq_zero_iff]
   intro hzero
   have hcoeff := congrArg (Polynomial.coeff · 1) hzero
   simp [ipaShiftZPolynomial] at hcoeff
@@ -79,25 +81,25 @@ theorem rawValue_of_shiftedValue_of_good
         = z * (z⁻¹ * (pU + xi * sU)) - (pU + xi * sU) := by
             rw [hshifted]
             ring
-    _ = 0 := by rw [← mul_assoc, mul_inv_cancel₀ hz, one_mul, sub_self]
+    _ = 0 := by rw [← _root_.mul_assoc, mul_inv_cancel₀ hz, _root_.one_mul, sub_self]
 
 theorem ipaShiftXiPolynomial_natDegree_le (delta sEval : Fp) :
     (ipaShiftXiPolynomial delta sEval).natDegree ≤ 1 := by
-  change (Polynomial.C delta + Polynomial.C sEval * Polynomial.X).natDegree ≤ 1
-  refine (Polynomial.natDegree_add_le _ _).trans (max_le ?_ ?_)
-  · exact (Polynomial.natDegree_C delta).le.trans (by omega)
-  · exact Polynomial.natDegree_mul_le.trans
-      (Nat.add_le_add (Polynomial.natDegree_C sEval).le Polynomial.natDegree_X_le)
+  change (C delta + C sEval * X).natDegree ≤ 1
+  refine (natDegree_add_le _ _).trans (max_le ?_ ?_)
+  · exact (natDegree_C delta).le.trans (by omega)
+  · exact natDegree_mul_le.trans
+      (Nat.add_le_add (natDegree_C sEval).le natDegree_X_le)
 
 theorem ipaShiftZPolynomial_natDegree_le (delta pU sU sEval xi : Fp) :
     (ipaShiftZPolynomial delta pU sU sEval xi).natDegree ≤ 1 := by
-  change (Polynomial.C (-(pU + xi * sU)) +
-    Polynomial.C (delta + xi * sEval) * Polynomial.X).natDegree ≤ 1
-  refine (Polynomial.natDegree_add_le _ _).trans (max_le ?_ ?_)
-  · exact (Polynomial.natDegree_C (-(pU + xi * sU))).le.trans (by omega)
-  · exact Polynomial.natDegree_mul_le.trans
-      (Nat.add_le_add (Polynomial.natDegree_C (delta + xi * sEval)).le
-        Polynomial.natDegree_X_le)
+  change (C (-(pU + xi * sU)) +
+    C (delta + xi * sEval) * X).natDegree ≤ 1
+  refine (natDegree_add_le _ _).trans (max_le ?_ ?_)
+  · exact (natDegree_C (-(pU + xi * sU))).le.trans (by omega)
+  · exact natDegree_mul_le.trans
+      (Nat.add_le_add (natDegree_C (delta + xi * sEval)).le
+        natDegree_X_le)
 
 /-- Each of the two sequential exceptional sets costs at most one field element. -/
 theorem ipaShiftXi_badSet_measure_le (delta sEval : Fp) :

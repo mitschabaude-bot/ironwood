@@ -1,4 +1,4 @@
-import Zcash.Snark.Soundness.Forking.Adversary.OracleComp
+import Zcash.Snark.Soundness.FiatShamir.Adversary.OracleComp
 
 /-!
 # A pinned, table-reading squeeze
@@ -14,7 +14,7 @@ variable {T F P : Type*} [Fintype F] [Nonempty F]
 
 open Classical in
 /-- The one-level escape with a table-reading bad set. -/
-noncomputable def xEscTable [DecidableEq T] (A : OracleComp T F P) (xpt : P -> T)
+def xEscTable [DecidableEq T] (A : OracleComp T F P) (xpt : P -> T)
     (bad : P -> (T -> F) -> Set F) : T -> (T -> F) -> Set F :=
   fun t O => {v : F | t = xpt (A.run (Function.update O t v)) ∧
     v ∈ bad (A.run (Function.update O t v)) (Function.update O t v)}

@@ -14,7 +14,7 @@ finite bad sets.
 namespace Zcash.Snark
 
 open Classical
-open Halo2 Polynomial Keygen
+open Halo2 CompPoly CompPoly.CPolynomial Keygen
 open Zcash.Circuits
 open Zcash.Circuits.Action
 open scoped ENNReal
@@ -328,7 +328,7 @@ def adaptiveActionQuerySource
 def adaptiveActionPointPolynomial
     {basis : AugmentedIndex (2 ^ shape.k) → VestaG}
     (source : List (AlgebraicPoint (F := Fp) basis)) :
-    VestaG → Polynomial Fp :=
+    VestaG → CPoly :=
   onlinePointPolynomial source
 
 /-- Commitment slots actually consumed by the constraint model.  Returning zero outside this
@@ -693,14 +693,14 @@ def adaptiveActionCommitmentPolynomialOf
     (ps : ProofString shape Fp VestaG)
     (source : List (AlgebraicPoint (F := Fp) basis))
     (ch : Challenges shape.k Fp) :
-    CommitmentId → Polynomial Fp :=
+    CommitmentId → CPoly :=
   let pointPoly := adaptiveActionPointPolynomial source
   fun id =>
     if adaptiveActionCommitmentActive vk id then
         match assembledCommitment vk ic ps ch id with
         | .point P => pointPoly P
-        | .msm _ => ComputablePolynomial.zero
-    else ComputablePolynomial.zero
+        | .msm _ => 0
+    else 0
 
 /-- Action specialization of the executable commitment resolver. -/
 noncomputable def adaptiveActionCommitmentPolynomial
@@ -710,7 +710,7 @@ noncomputable def adaptiveActionCommitmentPolynomial
     (ps : ProofString (pp.mergeDerived actionCircuit) Fp VestaG)
     (source : List (AlgebraicPoint (F := Fp) basis))
     (ch : Challenges (pp.mergeDerived actionCircuit).k Fp) :
-    CommitmentId → Polynomial Fp :=
+    CommitmentId → CPoly :=
   adaptiveActionCommitmentPolynomialOf (ActionTerminal.vkAt pp basis)
     (actionCircuit.instanceCommitment pp
       (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) inputs)
@@ -734,7 +734,7 @@ theorem adaptiveActionCommitmentPolynomialOf_action
       adaptiveActionCommitmentPolynomial pp basis inputs ps source ch := by
   subst vk
   subst ic
-  rfl
+  simp only [adaptiveActionCommitmentPolynomialOf, adaptiveActionCommitmentPolynomial]
 
 /-- Every nonterminal commitment resolver is independent of the challenge record; only the
 separately handled reassembled quotient slot can depend on `x`. -/
@@ -749,9 +749,9 @@ theorem adaptiveActionCommitmentPolynomial_challenge_congr
     adaptiveActionCommitmentPolynomial pp basis inputs ps source ch₁ id =
       adaptiveActionCommitmentPolynomial pp basis inputs ps source ch₂ id := by
   cases id <;>
-    simp_all [adaptiveActionCommitmentPolynomial, adaptiveActionCommitmentPolynomialOf,
+    simp_all only [adaptiveActionCommitmentPolynomial, adaptiveActionCommitmentPolynomialOf,
       adaptiveActionCommitmentActive,
-      adaptiveActionPointPolynomial, assembledCommitment]
+      adaptiveActionPointPolynomial, assembledCommitment, ne_eq, not_true_eq_false]
 
 /-- The constraint model determined before `y`/`x` by the commitments already in the transcript. -/
 def adaptiveActionCommittedModelOf
@@ -791,17 +791,13 @@ def adaptiveActionPreXDifferenceOf
     (ps : ProofString shape Fp VestaG)
     (source : List (AlgebraicPoint (F := Fp) basis))
     (ch : Challenges shape.k Fp)
-    (hblinding : vk.blindingFactors < vk.n) : Polynomial Fp :=
+    (hblinding : vk.blindingFactors < vk.n) : CPoly :=
   let model := adaptiveActionCommittedModelOf vk ic ps source ch hblinding
-  ComputablePolynomial.sub
-    (combineConstraintsData model.fixedCols model.adviceCols model.instanceCols model.gates
+  combineConstraints model.fixedCols model.adviceCols model.instanceCols model.gates
       model.sets model.chunks model.lookups model.beta model.gamma model.delta model.theta ch.y
-      model.chunkLen model.l0 model.lLast model.lBlind)
-    (ComputablePolynomial.mul
-      (committedPreXQuotient vk (fun i => onlinePointPolynomial source (ps.hPieces i)))
-      (ComputablePolynomial.sub
-        (ComputablePolynomial.pow ComputablePolynomial.X vk.n)
-        (ComputablePolynomial.const 1)))
+      model.chunkLen model.l0 model.lLast model.lBlind
+    - committedPreXQuotient vk (fun i => onlinePointPolynomial source (ps.hPieces i))
+        * (X ^ vk.n - 1)
 
 /-- Action specialization of the executable fixed pre-`x` difference. -/
 noncomputable def adaptiveActionPreXDifference
@@ -810,7 +806,7 @@ noncomputable def adaptiveActionPreXDifference
     (inputs : Fin (pp.mergeDerived actionCircuit).numProofs → PublicInputs Fp)
     (ps : ProofString (pp.mergeDerived actionCircuit) Fp VestaG)
     (source : List (AlgebraicPoint (F := Fp) basis))
-    (ch : Challenges (pp.mergeDerived actionCircuit).k Fp) : Polynomial Fp :=
+    (ch : Challenges (pp.mergeDerived actionCircuit).k Fp) : CPoly :=
   adaptiveActionPreXDifferenceOf (ActionTerminal.vkAt pp basis)
     (actionCircuit.instanceCommitment pp
       (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) inputs)
@@ -853,12 +849,7 @@ theorem adaptiveActionPreXDifferenceOf_eq
           model.sets model.chunks model.lookups model.beta model.gamma model.delta model.theta
           ch.y model.chunkLen model.l0 model.lLast model.lBlind -
         committedPreXQuotient vk (fun i => onlinePointPolynomial source (ps.hPieces i)) *
-          (Polynomial.X ^ vk.n - 1) := by
-  dsimp only [adaptiveActionPreXDifferenceOf]
-  rw [combineConstraintsData_eq]
-  simp only [ComputablePolynomial.sub_eq, ComputablePolynomial.mul_eq,
-    ComputablePolynomial.pow_eq, ComputablePolynomial.X_eq, ComputablePolynomial.const_eq,
-    Polynomial.C_1]
+          (X ^ vk.n - 1) := rfl
 
 /-- The stage-`x` difference is exactly the constraint difference of the stage-local canonical
 model with the genuinely pre-`x` quotient polynomial. -/
@@ -876,7 +867,7 @@ theorem adaptiveActionPreXDifference_eq
           model.sets model.chunks model.lookups model.beta model.gamma model.delta model.theta
           ch.y model.chunkLen model.l0 model.lLast model.lBlind -
         committedPreXQuotient vk (fun i => onlinePointPolynomial source (ps.hPieces i)) *
-          (Polynomial.X ^ vk.n - 1) := by
+          (X ^ vk.n - 1) := by
   exact adaptiveActionPreXDifferenceOf_eq (ActionTerminal.vkAt pp basis)
     (actionCircuit.instanceCommitment pp
       (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) inputs)
@@ -921,7 +912,7 @@ so pointwise agreement on every other identity determines the whole model. -/
 theorem VerifyingKey.constraintModel_congr_nonterminal
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly₁ poly₂ : CommitmentId → Polynomial Fp)
+    (poly₁ poly₂ : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n)
     (hpoly : ∀ id, id ≠ .vanishingH → id ≠ .randomPoly →
       poly₁ id = poly₂ id) :
@@ -1382,7 +1373,7 @@ theorem adaptiveActionSurfaceAt_congr
       rw [adaptiveActionPreXDifference_eq, adaptiveActionPreXDifference_eq]
       rw [hmodel, hh]
     have hs := congrArg
-      (fun polynomial : Polynomial Fp => (↑(szBadSet polynomial) : Set Fp)) hdifference
+      (fun polynomial : CPoly => (↑(szBadSet polynomial) : Set Fp)) hdifference
     simpa [adaptiveActionSurfaceAt, nu, ch] using hs
 
 /-! ## Pointwise prices of the five Action surfaces -/
@@ -1878,7 +1869,7 @@ def adaptiveActionRepresentationRelationFinder
         (List.ofFn fun n => family.adaptiveActionSourceMismatchAt? basis data n) ++
         [family.adaptiveActionQuotientRelationFinder basis O])
 
-/-- The one-pass Action provenance finder is extensionally the former repeated-scan expression. -/
+/-- The one-pass Action provenance finder is extensionally equal to the uncached repeated scan. -/
 theorem adaptiveActionRepresentationRelationFinder_eq_uncached
     (family : ComputedAdaptiveOnlineAGMFSFamily shape)
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
@@ -2009,8 +2000,7 @@ theorem acceptedPolynomial_eq_zero_of_no_query
       pnu.1.proof.1 (chRecord (wrappedPreIpaReads pnu) rounds), q.commId ≠ id) :
     CanonicalMemberConstraintRelation.acceptedPolynomial
         (memberDecode := fun i hi => (decode.reRound rounds).toMemberDecode hchar i hi)
-        haccepts id =
-      ComputablePolynomial.zero := by
+        haccepts id = 0 := by
   have hroute : CanonicalMemberConstraintRelation.acceptedRoute haccepts id = none := by
     unfold CanonicalMemberConstraintRelation.acceptedRoute assembledQueryMemberRoute
     dsimp only
@@ -2479,7 +2469,7 @@ theorem adaptiveAcceptedVanishing_eq_fullQuotient
     _ = (committedPreXQuotient (family.vk basis)
         (fun i => onlinePointPolynomial source
           (pnu.1.algebraicProof.hPieces i).point)).eval ch.x := by
-      apply congrArg (fun polynomial : Polynomial Fp => polynomial.eval ch.x)
+      apply congrArg (fun polynomial : CPoly => polynomial.eval ch.x)
       exact (committedPreXQuotient_eq (family.vk basis)
         (fun i => onlinePointPolynomial source
           (pnu.1.algebraicProof.hPieces i).point)).symm
@@ -2974,7 +2964,7 @@ theorem adaptiveActionAcceptedDifference_eval_eq_preX
         actionModel.gates actionModel.sets actionModel.chunks actionModel.lookups
         actionModel.beta actionModel.gamma actionModel.delta actionModel.theta ch.y
         actionModel.chunkLen actionModel.l0 actionModel.lLast actionModel.lBlind -
-      actionPoly .vanishingH * (Polynomial.X ^ (ActionTerminal.vkAt pp basis).n - 1)).eval ch.x =
+      actionPoly .vanishingH * (X ^ (ActionTerminal.vkAt pp basis).n - 1)).eval ch.x =
     (adaptiveActionPreXDifference pp basis inputs data.algebraicProof.erase source ch).eval
       ch.x := by
   simp only
@@ -3032,7 +3022,7 @@ theorem adaptiveActionAcceptedDifference_eval_eq_preX
     have htransport := acceptedPolynomial_transport (hI basis) (hvk basis)
       (rawDecode.reRound (runRounds family.toFamily basis O)) hcharRaw hacceptsFull
     have htransportEval := congrArg
-      (fun polynomial : CommitmentId → Polynomial Fp =>
+      (fun polynomial : CommitmentId → CPoly =>
         (polynomial .vanishingH).eval ch.x) htransport
     have hcombined := htransportEval.symm.trans (hvanishingRaw.trans hrawTarget)
     simpa only [actionPoly, decode, hacceptsAction, pnu, ch,
@@ -3085,11 +3075,11 @@ theorem adaptiveActionAcceptedDifference_eval_eq_preX
       actionModel.instanceCols actionModel.gates actionModel.sets actionModel.chunks
       actionModel.lookups actionModel.beta actionModel.gamma actionModel.delta actionModel.theta
       ch.y actionModel.chunkLen actionModel.l0 actionModel.lLast actionModel.lBlind -
-    actionPoly .vanishingH * (Polynomial.X ^ (ActionTerminal.vkAt pp basis).n - 1)).eval
+    actionPoly .vanishingH * (X ^ (ActionTerminal.vkAt pp basis).n - 1)).eval
       ch.x =
     (adaptiveActionPreXDifference pp basis inputs data.algebraicProof.erase source ch).eval ch.x
   rw [hmodel]
-  simp only [Polynomial.eval_sub, Polynomial.eval_mul]
+  simp only [CPolynomial.eval_sub, CPolynomial.eval_mul]
   rw [hvanishing]
   rw [hpiecePoly]
   rw [adaptiveActionPreXDifference_eq]

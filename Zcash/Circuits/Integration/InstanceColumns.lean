@@ -13,7 +13,7 @@ the two augmented openings compute a nontrivial relation.
 
 namespace Zcash.Snark
 
-open Polynomial
+open CompPoly.CPolynomial
 
 set_option maxHeartbeats 20000
 
@@ -80,7 +80,7 @@ variable
         (instanceCommitment := instanceCommitment)
         urs hk vk ps ch batchOpenings i hi}
     {hblinding : vk.blindingFactors < vk.n}
-    {y : Fp} {hpoly : Polynomial Fp} {deg : ℕ}
+    {y : Fp} {hpoly : CPoly} {deg : ℕ}
 
 /--
 A canonically routed instance-column opening is the polynomial interpolating the

@@ -7,11 +7,10 @@ The fingerprint MSM's coefficients are assembled from the proof's evaluation sca
 verifier's challenges; this module records the challenges: `θ, β, γ, y, x` (the main verifier),
 `x₁…x₄` (the multiopen), and `ξ, z` plus the `k` round challenges `uⱼ` (the IPA opening).
 
-We do not model the transcript. How the challenges are derived — Fiat–Shamir over a Blake2b hash
-of the proof so far — is hand-waved (project scope; the deployed non-interactive derivation is
-related to the interactive verifier separately). All the fingerprint needs is that the challenges
-are the verifier's randomness: free `F_p` variables the soundness argument (Schwartz–Zippel,
-special soundness) quantifies over.
+This structure only records the sampled values. `Verifier.FiatShamir` separately models the exact
+deployed transcript schedule, while `Soundness.FiatShamir` models its random-oracle execution and
+query accounting. The soundness development uses these values in its Schwartz–Zippel and
+represented-execution arguments.
 -/
 
 namespace Zcash.Snark

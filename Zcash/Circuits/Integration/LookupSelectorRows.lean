@@ -16,7 +16,7 @@ resolver environment, preserving the caller's existing commitment-relation branc
 
 namespace Zcash.Snark
 
-open Halo2 Polynomial
+open Halo2 CompPoly.CPolynomial
 
 set_option maxHeartbeats 20000
 
@@ -386,7 +386,7 @@ omit [AddCommGroup G] [Module Fp G] [DecidableEq G] [Inhabited G] in
 private theorem resolverFixedRead_of_rowPolynomial
     {shape : Shape} (urs : URS G)
     (vk : VerifyingKey shape Fp G)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (rows : ℕ → List Fp)
     (hrows : Function.Injective
       fun i : Fin (2 ^ urs.k) => vk.omega ^ (i : ℕ))
@@ -409,7 +409,7 @@ expression-level selector boundary consumed by lookup projection.
 def EnabledLookup.inputSelectorValuesRealized_or_bad
     {top : TopLevelCircuit Fp Config PublicInput}
     {pp : Keygen.ProofParams} {urs : URS G}
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (rows : ℕ → List Fp)
     (hrows : Function.Injective
       fun i : Fin (2 ^ urs.k) =>
@@ -490,7 +490,7 @@ def EnabledLookup.inputSelectorValuesRealized_or_bad
                   (lookup.row : ℤ) + 0) =
               (rows compressed.packedCol).getD
                 (top.placement lookup.region + lookup.row) 0 := by
-          simpa only [Int.natCast_add, add_zero] using hfixed
+          simpa only [Int.natCast_add, _root_.add_zero] using hfixed
         simpa only [Query.eval, hfixed'] using hstatic
 
 end Zcash.Snark

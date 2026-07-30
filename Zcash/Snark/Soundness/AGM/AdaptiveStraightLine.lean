@@ -116,7 +116,7 @@ def adaptivePreIpaRepresentationRelationFinder
        family.adaptivePreIpaRepresentationRelationAtFromAnnotations? basis annotations data 10
           (by omega)]
 
-/-- The one-pass executable pre-IPA finder is extensionally the former repeated-scan expression. -/
+/-- The one-pass executable pre-IPA finder is extensionally equal to the uncached repeated scan. -/
 theorem adaptivePreIpaRepresentationRelationFinder_eq_uncached
     (family : ComputedAdaptiveOnlineAGMFSFamily shape)
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
@@ -235,7 +235,7 @@ def adaptiveIpaRepresentationRelationFinder
     firstAdaptiveRelation? (List.ofFn fun j =>
       family.adaptiveIpaRepresentationRelationAtFromAnnotations? basis annotations data j)
 
-/-- The one-pass IPA provenance finder is extensionally the former repeated-scan expression. -/
+/-- The one-pass IPA provenance finder is extensionally equal to the uncached repeated scan. -/
 theorem adaptiveIpaRepresentationRelationFinder_eq_uncached
     (family : ComputedAdaptiveOnlineAGMFSFamily shape)
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)

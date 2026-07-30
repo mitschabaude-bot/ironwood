@@ -14,7 +14,7 @@ representations identically on every evaluation-domain row.
 
 namespace Zcash.Snark
 
-open Halo2 Polynomial
+open Halo2 CompPoly.CPolynomial
 
 set_option maxHeartbeats 20000
 
@@ -37,7 +37,7 @@ the same natural-numbered row as its decoded Clean column.
 theorem permutationColumnPolynomial_eval_environment
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (proofIndex : Fin shape.numProofs)
     (usableRows row : ℕ) (reference : ColumnRef)
     (hcoherent : PermutationColumnRef.Coherent vk reference) :
@@ -69,7 +69,7 @@ concrete column decoded from that chunk's query reference.
 theorem chunkRowValue_eq_resolverEnvironment
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (proofIndex : Fin shape.numProofs)
     (usableRows chunk row column : ℕ)
     (hcolumn :
@@ -292,13 +292,13 @@ theorem rotateOmega_domainPoint
     rotateOmega omega (omega ^ row) rotation =
       omega ^ ((row : ℤ) + rotation) := by
   rw [zpow_add₀ homega]
-  simp [rotateOmega, mul_comm]
+  simp [rotateOmega, _root_.mul_comm]
 
 /-- A fixed query feed reads the same row as the canonical resolver environment. -/
 theorem fixedQueryFeedOfResolver_eval_environment
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs) (usableRows : ℕ)
     (selectors : ℕ → Fp)
     {query column : ℕ} {rotation : ℤ}
@@ -322,7 +322,7 @@ theorem fixedQueryFeedOfResolver_eval_environment
 theorem adviceQueryFeedOfResolver_eval_environment
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs) (usableRows : ℕ)
     (selectors : ℕ → Fp)
     {query column : ℕ} {rotation : ℤ}
@@ -346,7 +346,7 @@ theorem adviceQueryFeedOfResolver_eval_environment
 theorem instanceQueryFeedOfResolver_eval_environment
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs) (usableRows : ℕ)
     (selectors : ℕ → Fp)
     {query column : ℕ} {rotation : ℤ}
@@ -373,7 +373,7 @@ the state layouts are the VK layouts and the shape counts those layouts exactly.
 theorem resolverQueryFeeds_interpret
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs) (usableRows : ℕ)
     (selectors : ℕ → Fp) (row : ℕ)
     (homega : vk.omega ≠ 0)

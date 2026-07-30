@@ -1,10 +1,11 @@
-import Zcash.Snark.Soundness.Forking.Rewind
+import Zcash.Snark.Soundness.FiatShamir.Execution
+import Zcash.Snark.Soundness.UniformMeasure
 
 /-!
 # The oracle-querying Fiat–Shamir adversary
 
 Model a `Q`-query adversary as an adaptive query tree with eager whole-table semantics. Query
-histories support replay and reprogramming; blind escape sets give the adaptive query loss.
+logs support resource accounting; blind escape sets give the adaptive query loss.
 -/
 
 namespace Zcash.Snark
@@ -51,7 +52,7 @@ theorem run_update_of_not_mem_queries [DecidableEq T]
       exact ih (O q) hfresh.2
 
 /-- The machine makes at most `Q` queries on every path (VCVio's structural `IsQueryBound`). The
-forking reduction charges its query loss against this `Q`. -/
+Fiat–Shamir reductions charge their query loss against this `Q`. -/
 inductive QueryBound : OracleComp T F α → ℕ → Prop
   | pure (a : α) (Q : ℕ) : QueryBound (.pure a) Q
   | query {t : T} {k : F → OracleComp T F α} {Q : ℕ}
@@ -73,76 +74,6 @@ theorem queries_length_le {A : OracleComp T F α} {Q : ℕ} (h : QueryBound A Q)
   | pure => exact Nat.zero_le _
   | query h ih => simpa [queries] using Nat.succ_le_succ (ih _)
 
-/-- The ordered query–answer history of a run. -/
-def history : OracleComp T F α → (T → F) → List (T × F)
-  | .pure _, _ => []
-  | .query t k, O => (t, O t) :: (k (O t)).history O
-
-@[simp] theorem history_pure (a : α) (O : T → F) :
-    (pure a : OracleComp T F α).history O = [] := rfl
-
-@[simp] theorem history_query (t : T) (k : F → OracleComp T F α) (O : T → F) :
-    (query t k).history O = (t, O t) :: (k (O t)).history O := rfl
-
-/-- The query log is the history's points. -/
-theorem queries_eq_map_fst_history (A : OracleComp T F α) (O : T → F) :
-    A.queries O = (A.history O).map Prod.fst := by
-  induction A with
-  | pure a => rfl
-  | query t k ih => simp [queries, ih (O t)]
-
-/-- Every recorded answer is the table's. -/
-theorem history_mem_answer (A : OracleComp T F α) (O : T → F) :
-    ∀ p ∈ A.history O, O p.1 = p.2 := by
-  induction A with
-  | pure a => intro p hp; simp at hp
-  | query t k ih =>
-      intro p hp
-      rcases List.mem_cons.mp hp with hp | hp
-      · subst hp; rfl
-      · exact ih (O t) p hp
-
-/-- A table agreeing with the first `i` recorded answers reproduces those steps. -/
-theorem history_take_replay (A : OracleComp T F α) (O O' : T → F) (i : ℕ)
-    (h : ∀ p ∈ (A.history O).take i, O' p.1 = p.2) :
-    (A.history O').take i = (A.history O).take i := by
-  induction A generalizing i with
-  | pure a => rfl
-  | query t k ih =>
-      cases i with
-      | zero => rfl
-      | succ j =>
-          have ht : O' t = O t := h (t, O t) (by simp)
-          simp only [history_query, List.take_succ_cons, ht]
-          congr 1
-          exact ih (O t) j fun p hp => h p (by simp [hp])
-
-/-- Two runs share their first `i` steps exactly when the second table agrees with those recorded
-answers. -/
-theorem history_take_eq_iff (A : OracleComp T F α) (O O' : T → F) (i : ℕ) :
-    (A.history O').take i = (A.history O).take i
-      ↔ ∀ p ∈ (A.history O).take i, O' p.1 = p.2 := by
-  constructor
-  · intro heq p hp
-    rw [← heq] at hp
-    exact history_mem_answer A O' p (List.mem_of_mem_take hp)
-  · exact history_take_replay A O O' i
-
-/-- Shared history determines the next query point: two runs agreeing on their first `i` steps ask
-the same `i`-th question (the answers may then diverge — the fork). -/
-theorem history_getElem_fst_congr (A : OracleComp T F α) (O O' : T → F) (i : ℕ)
-    (h : (A.history O').take i = (A.history O).take i) :
-    ((A.history O')[i]?).map Prod.fst = ((A.history O)[i]?).map Prod.fst := by
-  induction A generalizing i with
-  | pure a => rfl
-  | query t k ih =>
-      cases i with
-      | zero => rfl
-      | succ j =>
-          simp only [history_query, List.take_succ_cons, List.cons.injEq] at h
-          have ht : O' t = O t := congrArg Prod.snd h.1
-          simp only [history_query, List.getElem?_cons_succ, ht]
-          exact ih (O t) j (ht ▸ h.2)
 
 /-- Some query answer lies in a table-dependent escape set that is blind at that query point. -/
 def escapesDuringC (esc : T → (T → F) → Set F) : OracleComp T F α → (T → F) → Prop
@@ -362,97 +293,6 @@ theorem queryBound_restrictSum {J : Type*} {A : OracleComp (T ⊕ J) F α} {Q : 
       | inl t => exact .query fun u => ih u
       | inr x => exact (ih (j x)).mono (Nat.le_succ Q)
 
-/-- A cache-avoiding run queries distinct points, none already cached. -/
-theorem AvoidsCache.run_queries_nodup [DecidableEq T] :
-    {c : List (T × F)} → {A : OracleComp T F α} → AvoidsCache c A → (O : T → F) →
-    (A.queries O).Nodup ∧ ∀ p ∈ c, p.1 ∉ A.queries O
-  | _, _, .pure c a, O => ⟨by simp [queries], by intro p _; simp [queries]⟩
-  | c, _, .query (t := t) (k := k) ht h, O => by
-      obtain ⟨hnd, hdis⟩ := (h (O t)).run_queries_nodup O
-      have htnotin : t ∉ (k (O t)).queries O := hdis ⟨t, O t⟩ (List.mem_cons_self ..)
-      refine ⟨?_, ?_⟩
-      · rw [queries]
-        exact List.nodup_cons.mpr ⟨htnotin, hnd⟩
-      · intro p hp
-        rw [queries, List.mem_cons]
-        push Not
-        refine ⟨fun hpt => ?_, ?_⟩
-        · exact absurd (hpt ▸ List.mem_map_of_mem (f := Prod.fst) hp) ht
-        · exact hdis p (List.mem_cons_of_mem _ hp)
-
-/-- Reprogramming a cache-avoiding run at query `i` preserves its earlier history and supplies the
-new answer at `i`. -/
-theorem reprogram_replay_fork [DecidableEq T] {A : OracleComp T F α}
-    (hac : A.AvoidsCache []) (O : T → F) {i : ℕ} (hi : i < (A.history O).length) (u : F) :
-    ((A.history (Function.update O ((A.history O)[i].1) u)).take i = (A.history O).take i)
-      ∧ (A.history (Function.update O ((A.history O)[i].1) u))[i]?
-          = some ((A.history O)[i].1, u) := by
-  set t := (A.history O)[i].1 with ht
-  set O' := Function.update O t u with hO'
-  have hnd : ((A.history O).map Prod.fst).Nodup := by
-    have h := (hac.run_queries_nodup O).1
-    rwa [queries_eq_map_fst_history] at h
-  have hagree : ∀ p ∈ (A.history O).take i, O' p.1 = p.2 := by
-    intro p hp
-    obtain ⟨j, hj, hpj⟩ := List.getElem_of_mem hp
-    rw [List.length_take] at hj
-    have hji : j < i := lt_of_lt_of_le hj (min_le_left _ _)
-    have hjlen : j < (A.history O).length := lt_of_lt_of_le hji hi.le
-    have hpoint : p.1 = (A.history O)[j].1 := by
-      rw [← hpj, List.getElem_take]
-    have hne : p.1 ≠ t := by
-      rw [hpoint, ht]
-      intro heq
-      have hmap : ((A.history O).map Prod.fst)[j]'(by rw [List.length_map]; exact hjlen)
-          = ((A.history O).map Prod.fst)[i]'(by rw [List.length_map]; exact hi) := by
-        rw [List.getElem_map, List.getElem_map]; exact heq
-      exact absurd (hnd.getElem_inj_iff.mp hmap) (by omega)
-    have hval : p.2 = O p.1 := (A.history_mem_answer O p (List.mem_of_mem_take hp)).symm
-    rw [hO', Function.update_apply, if_neg hne, hval]
-  have htake : (A.history O').take i = (A.history O).take i := A.history_take_replay O O' i hagree
-  refine ⟨htake, ?_⟩
-  have hpt : ((A.history O')[i]?).map Prod.fst = ((A.history O)[i]?).map Prod.fst :=
-    A.history_getElem_fst_congr O O' i htake
-  have hrhs : ((A.history O)[i]?).map Prod.fst = some t := by
-    rw [List.getElem?_eq_getElem hi]; rfl
-  rw [hrhs] at hpt
-  obtain ⟨q, hq⟩ : ∃ q, (A.history O')[i]? = some q := by
-    cases hc : (A.history O')[i]? with
-    | none => rw [hc] at hpt; simp at hpt
-    | some q => exact ⟨q, rfl⟩
-  rw [hq] at hpt ⊢
-  rw [Option.map_some] at hpt
-  have hq1 : q.1 = t := Option.some.inj hpt
-  have hqmem : q ∈ A.history O' := List.mem_of_getElem? hq
-  have hans : O' q.1 = q.2 := A.history_mem_answer O' q hqmem
-  rw [hq1, hO', Function.update_self] at hans
-  rw [Option.some.injEq, Prod.ext_iff]
-  exact ⟨hq1, hans.symm⟩
-
-
-/-- The first query index of the output's fork point. -/
-def forkIdx [DecidableEq T] (A : OracleComp T F α) (fp : α → T) (O : T → F) : ℕ :=
-  (A.queries O).idxOf (fp (A.run O))
-
-theorem forkIdx_lt [DecidableEq T] {A : OracleComp T F α} {Q : ℕ} (hQ : A.QueryBound Q)
-    (fp : α → T) {O : T → F} (hmem : fp (A.run O) ∈ A.queries O) :
-    forkIdx A fp O < Q :=
-  lt_of_lt_of_le (List.idxOf_lt_length_iff.mpr hmem) (A.queries_length_le hQ O)
-
-/-- Partition winning tables by their fork index among the first `Q` queries. -/
-theorem card_win_eq_sum_forkIdx [Fintype T] [DecidableEq T] [Fintype F] [DecidableEq F]
-    {A : OracleComp T F α} {Q : ℕ} (hQ : A.QueryBound Q) (fp : α → T)
-    (win : (T → F) → Prop) [DecidablePred win]
-    (hquery : ∀ O, win O → fp (A.run O) ∈ A.queries O) :
-    (Finset.univ.filter win).card
-      = ∑ i ∈ Finset.range Q,
-          (Finset.univ.filter (fun O => win O ∧ forkIdx A fp O = i)).card := by
-  rw [Finset.card_eq_sum_card_fiberwise
-    (f := fun O => forkIdx A fp O) (t := Finset.range Q) ?_]
-  · refine Finset.sum_congr rfl fun i _ => ?_
-    rw [Finset.filter_filter]
-  · intro O hO
-    exact Finset.mem_range.mpr (forkIdx_lt hQ fp (hquery O (Finset.mem_filter.mp hO).2))
 
 end OracleComp
 

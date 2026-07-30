@@ -1,6 +1,5 @@
 import Zcash.Snark.Soundness.AGM.Peel
 import Zcash.Snark.Soundness.Multiopen.Compat
-import Zcash.Common.ComputablePolynomial
 
 /-!
 # The pre-`x` quotient reconstruction
@@ -23,66 +22,53 @@ namespace Zcash.Snark
 
 open Zcash.Arithmetic (Msm Msm.zero Msm.eval_appendTerm)
 
-open Polynomial
+open CompPoly.CPolynomial
 
 variable {d : ℕ}
 
 /-- The reassembled quotient *polynomial* at scalar `xn`: `Σᵢ C(xnⁱ)·hᵢ(X)`. This is the polynomial
 whose commitment is halo2's reassembled `h` (`Σᵢ hᵢ·(xⁿ)ⁱ`), read as a polynomial in `X` with
 `xⁿ`-scaled pieces — the `x`-dependent form `hpolyP` decodes. -/
-noncomputable def reassembledQuotient (xn : Fp) (hp : Fin d → Polynomial Fp) : Polynomial Fp :=
-  ∑ i : Fin d, Polynomial.C (xn ^ (i : ℕ)) * hp i
+def reassembledQuotient (xn : Fp) (hp : Fin d → CPoly) : CPoly :=
+  ∑ i : Fin d, C (xn ^ (i : ℕ)) * hp i
 
 /-- The pre-`x` quotient polynomial `Σᵢ X^(n·i)·hᵢ(X)` — the reassembly with the scalar `xⁿ` lifted
 to the monomial `X^(n·i)`. Pre-`x`: it mentions only the piece polynomials and `n`. -/
-noncomputable def preXQuotient (n : ℕ) (hp : Fin d → Polynomial Fp) : Polynomial Fp :=
-  ∑ i : Fin d, Polynomial.X ^ (n * (i : ℕ)) * hp i
-
-/-- Executable coefficient-data implementation of `preXQuotient`. -/
-def preXQuotientData (n : ℕ) (hp : Fin d → Polynomial Fp) : Polynomial Fp :=
-  ComputablePolynomial.sumList (List.ofFn fun i =>
-    ComputablePolynomial.mul
-      (ComputablePolynomial.pow ComputablePolynomial.X (n * (i : ℕ)))
-      (hp i))
-
-theorem preXQuotientData_eq (n : ℕ) (hp : Fin d → Polynomial Fp) :
-    preXQuotientData n hp = preXQuotient n hp := by
-  rw [preXQuotientData, ComputablePolynomial.sumList_eq, preXQuotient]
-  simp only [ComputablePolynomial.mul_eq, ComputablePolynomial.pow_eq,
-    ComputablePolynomial.X_eq, List.sum_ofFn]
+def preXQuotient (n : ℕ) (hp : Fin d → CPoly) : CPoly :=
+  ∑ i : Fin d, X ^ (n * (i : ℕ)) * hp i
 
 /-- **The reassembly and the pre-`x` quotient agree in value at `x`.** Each term matches under
 `(xⁿ)ⁱ = x^(n·i)`, so the `x`-dependent reassembled `hpolyP` never needs to enter the pinned bad
 set — its evaluation at `x` is the pre-`x` quotient's. -/
-theorem reassembledQuotient_eval_eq_preXQuotient_eval (n : ℕ) (hp : Fin d → Polynomial Fp) (x : Fp) :
+theorem reassembledQuotient_eval_eq_preXQuotient_eval (n : ℕ) (hp : Fin d → CPoly) (x : Fp) :
     (reassembledQuotient (x ^ n) hp).eval x = (preXQuotient n hp).eval x := by
-  rw [reassembledQuotient, preXQuotient, Polynomial.eval_finsetSum, Polynomial.eval_finsetSum]
+  rw [reassembledQuotient, preXQuotient, eval_finsetSum, eval_finsetSum]
   refine Finset.sum_congr rfl (fun i _ => ?_)
-  rw [Polynomial.eval_mul, Polynomial.eval_mul, Polynomial.eval_C, Polynomial.eval_pow,
-    Polynomial.eval_X, ← pow_mul]
+  rw [eval_mul, eval_mul, eval_C, eval_pow,
+    eval_X, ← pow_mul]
 
 /-- **The verifier's quotient check equals the pre-`x` check at `x`.** Replacing the reassembled
 `hpolyP` (evaluated at `x`) by the pre-`x` quotient leaves the difference polynomial's value at `x`
 unchanged: `(combine − hpolyP·(Xⁿ−1)).eval x = (combine − Hpoly·(Xⁿ−1)).eval x`. So `x` is bad for
 the `x`-dependent check iff it is bad for the pinned pre-`x` polynomial. -/
-theorem quotientCheck_eval_eq_preX (combine : Polynomial Fp) (n : ℕ) (hp : Fin d → Polynomial Fp)
+theorem quotientCheck_eval_eq_preX (combine : CPoly) (n : ℕ) (hp : Fin d → CPoly)
     (x : Fp) :
-    (combine - reassembledQuotient (x ^ n) hp * (Polynomial.X ^ n - 1)).eval x
-      = (combine - preXQuotient n hp * (Polynomial.X ^ n - 1)).eval x := by
-  rw [Polynomial.eval_sub, Polynomial.eval_sub, Polynomial.eval_mul, Polynomial.eval_mul,
+    (combine - reassembledQuotient (x ^ n) hp * (X ^ n - 1)).eval x
+      = (combine - preXQuotient n hp * (X ^ n - 1)).eval x := by
+  rw [eval_sub, eval_sub, eval_mul, eval_mul,
     reassembledQuotient_eval_eq_preXQuotient_eval]
 
 /-- **Bad-set transport to the pre-`x` polynomial.** If `x` is bad for the `x`-dependent quotient
 check (`combine − hpolyP·(Xⁿ−1)`), then the pre-`x` difference vanishes at `x`; unless that pre-`x`
 polynomial is identically zero (the constraint holds as polynomials), `x` lands in its pinned bad
 set. `hpolyP = reassembledQuotient (xⁿ) hp` is the decoded reassembly. -/
-theorem mem_szBadSet_reassembled_imp (combine : Polynomial Fp) (n : ℕ) (hp : Fin d → Polynomial Fp)
+theorem mem_szBadSet_reassembled_imp (combine : CPoly) (n : ℕ) (hp : Fin d → CPoly)
     {x : Fp}
-    (hx : x ∈ szBadSet (combine - reassembledQuotient (x ^ n) hp * (Polynomial.X ^ n - 1))) :
-    x ∈ szBadSet (combine - preXQuotient n hp * (Polynomial.X ^ n - 1))
-    ∨ combine - preXQuotient n hp * (Polynomial.X ^ n - 1) = 0 := by
+    (hx : x ∈ szBadSet (combine - reassembledQuotient (x ^ n) hp * (X ^ n - 1))) :
+    x ∈ szBadSet (combine - preXQuotient n hp * (X ^ n - 1))
+    ∨ combine - preXQuotient n hp * (X ^ n - 1) = 0 := by
   rw [mem_szBadSet] at hx
-  by_cases hQ : combine - preXQuotient n hp * (Polynomial.X ^ n - 1) = 0
+  by_cases hQ : combine - preXQuotient n hp * (X ^ n - 1) = 0
   · exact Or.inr hQ
   · refine Or.inl (mem_szBadSet.mpr ⟨hQ, ?_⟩)
     rw [← quotientCheck_eval_eq_preX]
@@ -98,14 +84,14 @@ polynomials, exactly the `x`-dependent form whose evaluation the identity above 
 /-- `coeffsToPoly` is additive. -/
 private theorem coeffsToPoly_add {m : ℕ} (a a' : Fin m → Fp) :
     coeffsToPoly (a + a') = coeffsToPoly a + coeffsToPoly a' := by
-  rw [coeffsToPoly_eq_sum, coeffsToPoly_eq_sum, coeffsToPoly_eq_sum]
-  simp only [Pi.add_apply, Polynomial.C_add, add_mul, Finset.sum_add_distrib]
+  rw [coeffsToPoly, coeffsToPoly, coeffsToPoly]
+  simp only [Pi.add_apply, C_add, _root_.add_mul, Finset.sum_add_distrib]
 
 /-- `coeffsToPoly` sends a scalar multiple to the constant-scaled polynomial. -/
 private theorem coeffsToPoly_smul {m : ℕ} (c : Fp) (a : Fin m → Fp) :
-    coeffsToPoly (c • a) = Polynomial.C c * coeffsToPoly a := by
-  rw [coeffsToPoly_eq_sum, coeffsToPoly_eq_sum]
-  simp only [Pi.smul_apply, smul_eq_mul, Polynomial.C_mul, Finset.mul_sum]
+    coeffsToPoly (c • a) = C c * coeffsToPoly a := by
+  rw [coeffsToPoly, coeffsToPoly]
+  simp only [Pi.smul_apply, smul_eq_mul, C_mul, Finset.mul_sum]
   exact Finset.sum_congr rfl (fun j _ => by ring)
 
 /-- `coeffsToPoly` sends an `(xⁿ)ⁱ`-scaled coefficient sum to the reassembled quotient of the
@@ -115,7 +101,7 @@ theorem coeffsToPoly_scaledSum {k : ℕ} (xn : Fp) (hp : Fin d → Fin (2 ^ k) �
       = reassembledQuotient xn (fun i => coeffsToPoly (hp i)) := by
   rw [reassembledQuotient]
   induction (Finset.univ : Finset (Fin d)) using Finset.induction with
-  | empty => simp [coeffsToPoly_eq_sum]
+  | empty => simp [coeffsToPoly]
   | @insert a s h ih =>
       rw [Finset.sum_insert h, Finset.sum_insert h, coeffsToPoly_add, coeffsToPoly_smul, ih]
 
@@ -146,7 +132,7 @@ def decodedQuotientEqReassembledOrRelationWitness (urs : URS G) (xn : Fp)
     rw [commit_scaledSum, Finset.sum_smul, Finset.sum_smul, ← Finset.sum_add_distrib,
       ← Finset.sum_add_distrib]
     refine Finset.sum_congr rfl (fun i _ => ?_)
-    rw [mul_smul, mul_smul, ← hpiece i, smul_add, smul_add]
+    rw [SemigroupAction.mul_smul, SemigroupAction.mul_smul, ← hpiece i, _root_.smul_add, _root_.smul_add]
   let sumCoeffs := ∑ i : Fin d, xn ^ (i : ℕ) • hp i
   let sumU := ∑ i : Fin d, xn ^ (i : ℕ) * hpu i
   let sumW := ∑ i : Fin d, xn ^ (i : ℕ) * hpw i
@@ -182,9 +168,9 @@ theorem vanishingHCommitment_eval (urs : URS G) (xn : Fp) :
       rw [vanishingHCommitment_foldr, List.foldr_cons, Msm.eval_appendTerm, Msm.eval_scale,
         ← vanishingHCommitment_foldr urs xn l, vanishingHCommitment_eval urs xn l,
         List.length_cons, Finset.sum_range_succ', Finset.smul_sum]
-      simp only [List.getD_cons_succ, List.getD_cons_zero, pow_zero, one_smul, pow_succ, smul_smul]
+      simp only [List.getD_cons_succ, List.getD_cons_zero, pow_zero, _root_.one_smul, pow_succ, _root_.smul_smul]
       rw [show (∑ j ∈ Finset.range l.length, (xn * xn ^ j) • l.getD j 0)
             = ∑ j ∈ Finset.range l.length, (xn ^ j * xn) • l.getD j 0 from
-          Finset.sum_congr rfl (fun j _ => by rw [mul_comm]), add_comm]
+          Finset.sum_congr rfl (fun j _ => by rw [_root_.mul_comm]), _root_.add_comm]
 
 end Zcash.Snark

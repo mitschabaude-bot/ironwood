@@ -1,4 +1,4 @@
-import Zcash.Snark.Soundness.Forking.Adversary.Algebraic
+import Zcash.Snark.Soundness.FiatShamir.Adversary.Algebraic
 
 /-!
 # Multiopen assembly provenance

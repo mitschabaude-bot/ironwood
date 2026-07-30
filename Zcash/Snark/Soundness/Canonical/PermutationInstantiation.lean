@@ -20,7 +20,7 @@ namespace Zcash.Snark
 
 open Zcash.Arithmetic (Msm)
 
-open Polynomial
+open CompPoly.CPolynomial
 
 set_option maxHeartbeats 20000
 
@@ -64,9 +64,8 @@ def PermutationChunkRoutingCoherent {shape : Shape} {F G : Type*}
 /-- Resolve a permutation column reference to its polynomial.  `finFn` mirrors the verifier's
 total claimed-evaluation feeds: an out-of-range evaluation reference reads zero. -/
 def permutationColumnPolynomialOfResolver {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (cr : ColumnRef) : Polynomial Fp :=
-  letI : Zero (Polynomial Fp) := ⟨ComputablePolynomial.zero⟩
+    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
+    (p : Fin shape.numProofs) (cr : ColumnRef) : CPoly :=
   cr.resolve
     (finFn fun i : Fin shape.numInstanceQueries =>
       poly (permutationColumnCommitmentId vk p (.instance i)))
@@ -78,53 +77,49 @@ def permutationColumnPolynomialOfResolver {shape : Shape} {G : Type*}
 /-- The polynomial-valued evaluation record for one permutation running product.  Its optional
 last-row opening follows the shape-level Halo2 read schedule. -/
 def permutationSetOfResolver {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → Polynomial Fp)
+    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs) (s : Fin shape.numPermutationSets) :
-    PermSetEval (Polynomial Fp) :=
+    PermSetEval (CPoly) :=
   { eval := poly (.permProduct p s)
-    nextEval := ComputablePolynomial.comp (poly (.permProduct p s))
-      (ComputablePolynomial.mul (ComputablePolynomial.const vk.omega)
-        ComputablePolynomial.X)
+    nextEval := comp (poly (.permProduct p s)) (C vk.omega * X)
     lastEval :=
       if s.val + 1 = shape.numPermutationSets then none
-      else some (ComputablePolynomial.comp (poly (.permProduct p s))
-        (ComputablePolynomial.mul
-          (ComputablePolynomial.const (vk.omega ^ (-((vk.blindingFactors : ℤ) + 1))))
-          ComputablePolynomial.X)) }
+      else some (comp (poly (.permProduct p s))
+        (C (vk.omega ^ (-((vk.blindingFactors : ℤ) + 1))) * X)) }
 
 /-- One sub-proof's permutation running products, in verifier order. -/
 def permutationSetsOfResolver {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) : List (PermSetEval (Polynomial Fp)) :=
+    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
+    (p : Fin shape.numProofs) : List (PermSetEval (CPoly)) :=
   List.ofFn fun s => permutationSetOfResolver vk poly p s
 
 /-- One sub-proof's permutation chunks, with the value and common-permutation columns selected by
 their stable commitment identities. -/
 def permutationChunksOfResolver {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → Polynomial Fp)
+    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs) :
-    List (PermSetEval (Polynomial Fp) × List (Polynomial Fp × Polynomial Fp)) :=
+    List (PermSetEval (CPoly) × List (CPoly × CPoly)) :=
   ((permutationSetsOfResolver vk poly p).zip vk.permutationChunks).map fun sc =>
     (sc.1, sc.2.map fun cr =>
       (permutationColumnPolynomialOfResolver vk poly p cr.1, poly (.permCommon cr.2)))
 
 /-- The value/σ polynomial pairs of chunk `c`, totalized by the empty chunk out of range. -/
 def permutationChunkPairsOfResolver {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (c : ℕ) : List (Polynomial Fp × Polynomial Fp) :=
+    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
+    (p : Fin shape.numProofs) (c : ℕ) : List (CPoly × CPoly) :=
   (vk.permutationChunks.getD c []).map fun cr =>
     (permutationColumnPolynomialOfResolver vk poly p cr.1, poly (.permCommon cr.2))
 
 @[simp] theorem permutationSetsOfResolver_length
     {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → Polynomial Fp)
+    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs) :
     (permutationSetsOfResolver vk poly p).length = shape.numPermutationSets := by
   simp [permutationSetsOfResolver]
 
 theorem permutationChunksOfResolver_length
     {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → Polynomial Fp)
+    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs) :
     (permutationChunksOfResolver vk poly p).length =
       min shape.numPermutationSets vk.permutationChunks.length := by
@@ -133,7 +128,7 @@ theorem permutationChunksOfResolver_length
 /-- In-range chunk lookup exposes the corresponding running-product set and routed pair list. -/
 theorem permutationChunksOfResolver_getElem
     {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → Polynomial Fp)
+    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs) {c : ℕ}
     (hcs : c < shape.numPermutationSets) (hcv : c < vk.permutationChunks.length) :
     (permutationChunksOfResolver vk poly p)[c]'(by
@@ -311,7 +306,7 @@ theorem eval_permutationSetsOfResolver
     (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → ℕ → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (hwf : permutationLastEvalsWellFormed ps = true)
     (p : Fin shape.numProofs)
     (hopen : ∀ q ∈ assembleQueries vk instanceCommitment ps ch,
@@ -339,23 +334,16 @@ theorem eval_permutationSetsOfResolver
   apply PermSetEval.ext
   · change (poly (.permProduct p s)).eval ch.x = (ps.permutationSetEvals p s).eval
     simpa using heval
-  · change (ComputablePolynomial.comp (poly (.permProduct p s))
-        (ComputablePolynomial.mul (ComputablePolynomial.const vk.omega)
-          ComputablePolynomial.X)).eval ch.x =
+  · change (comp (poly (.permProduct p s)) (C vk.omega * X)).eval ch.x =
       (ps.permutationSetEvals p s).nextEval
-    rw [ComputablePolynomial.comp_eq, ComputablePolynomial.mul_eq,
-      ComputablePolynomial.const_eq, ComputablePolynomial.X_eq]
-    rw [eval_comp_rotate, mul_comm]
+    rw [eval_comp_rotate, _root_.mul_comm]
     simpa only [rotateOmega, zpow_one] using hnext
   · have hschedule := permutationLastEval_isSome ps hwf p s
     change
       (if s.val + 1 = shape.numPermutationSets then none
-        else some (ComputablePolynomial.comp (poly (.permProduct p s))
-          (ComputablePolynomial.mul
-            (ComputablePolynomial.const
-              (vk.omega ^ (-((vk.blindingFactors : ℤ) + 1))))
-            ComputablePolynomial.X))).map
-            (fun q => q.eval ch.x)
+        else some (comp (poly (.permProduct p s))
+          (C (vk.omega ^ (-((vk.blindingFactors : ℤ) + 1))) * X))).map
+            (fun q : CPoly => q.eval ch.x)
         = (ps.permutationSetEvals p s).lastEval
     by_cases hfinal : s.val + 1 = shape.numPermutationSets
     · have hnot : ¬s.val + 1 < shape.numPermutationSets := by omega
@@ -381,9 +369,7 @@ theorem eval_permutationSetsOfResolver
           (permutation_last_query_mem vk ps ch p s hlt hlast))
       rw [if_neg hfinal, hlast]
       simp only [Option.map_some, Option.some.injEq]
-      rw [ComputablePolynomial.comp_eq, ComputablePolynomial.mul_eq,
-        ComputablePolynomial.const_eq, ComputablePolynomial.X_eq]
-      rw [eval_comp_rotate, mul_comm]
+      rw [eval_comp_rotate, _root_.mul_comm]
       simpa only [rotateOmega] using hopenLast
 
 /-- A coherent permutation value reference is opened at `x`, and therefore the selected resolver
@@ -393,7 +379,7 @@ theorem eval_permutationColumnPolynomialOfResolver
     (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → ℕ → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp) (p : Fin shape.numProofs)
+    (poly : CommitmentId → CPoly) (p : Fin shape.numProofs)
     (cr : ColumnRef) (hcr : PermutationColumnRef.Coherent vk cr)
     (hopen : ∀ q ∈ assembleQueries vk instanceCommitment ps ch,
       (poly q.commId).eval q.point = q.eval) :
@@ -424,7 +410,7 @@ theorem eval_permutationColumnPolynomialOfResolver
       have ho := hopen q hq
       dsimp only [q] at ho
       rw [hrot] at ho
-      simp only [rotateOmega, zpow_zero, mul_one] at ho
+      simp only [rotateOmega, zpow_zero, _root_.mul_one] at ho
       simpa [permutationColumnPolynomialOfResolver, permutationColumnCommitmentId,
         ColumnRef.resolve, finFn, hi] using ho
   | fixed i =>
@@ -446,7 +432,7 @@ theorem eval_permutationColumnPolynomialOfResolver
       have ho := hopen q hq
       dsimp only [q] at ho
       rw [hrot] at ho
-      simp only [rotateOmega, zpow_zero, mul_one] at ho
+      simp only [rotateOmega, zpow_zero, _root_.mul_one] at ho
       simpa [permutationColumnPolynomialOfResolver, permutationColumnCommitmentId,
         ColumnRef.resolve, finFn, hi] using ho
   | «instance» i =>
@@ -471,7 +457,7 @@ theorem eval_permutationColumnPolynomialOfResolver
       have ho := hopen q hq
       dsimp only [q] at ho
       rw [hrot] at ho
-      simp only [rotateOmega, zpow_zero, mul_one] at ho
+      simp only [rotateOmega, zpow_zero, _root_.mul_one] at ho
       simpa [permutationColumnPolynomialOfResolver, permutationColumnCommitmentId,
         ColumnRef.resolve, finFn, hi] using ho
 
@@ -481,7 +467,7 @@ theorem eval_permutationCommonPolynomialOfResolver
     (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → ℕ → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp) {i : ℕ}
+    (poly : CommitmentId → CPoly) {i : ℕ}
     (hi : i < shape.numPermutationColumns)
     (hopen : ∀ q ∈ assembleQueries vk instanceCommitment ps ch,
       (poly q.commId).eval q.point = q.eval) :
@@ -520,7 +506,7 @@ theorem eval_permutationChunkPairsOfResolver
     (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → ℕ → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp) (p : Fin shape.numProofs)
+    (poly : CommitmentId → CPoly) (p : Fin shape.numProofs)
     (chunk : List (ColumnRef × ℕ)) (hchunk : chunk ∈ vk.permutationChunks)
     (hcoherent : PermutationChunkRoutingCoherent vk)
     (hopen : ∀ q ∈ assembleQueries vk instanceCommitment ps ch,
@@ -550,7 +536,7 @@ theorem eval_permutationChunksOfResolver
     (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → ℕ → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (hwf : permutationLastEvalsWellFormed ps = true)
     (hcoherent : PermutationChunkRoutingCoherent vk)
     (p : Fin shape.numProofs)
@@ -588,18 +574,18 @@ theorem eval_permutationChunksOfResolver
 structure ResolverPermutationConstraints
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
-    (l0 lLast lBlind : Polynomial Fp)
+    (poly : CommitmentId → CPoly)
+    (l0 lLast lBlind : CPoly)
     (p : Fin shape.numProofs) (n m : ℕ) : Prop where
-  step : ∀ c < shape.numPermutationSets, (X ^ n - 1 : Polynomial Fp) ∣
+  step : ∀ c < shape.numPermutationSets, (X ^ n - 1 : CPoly) ∣
     permChunkExpression (C ch.beta) (C ch.gamma) X (C vk.delta) vk.chunkLen c
       (permSetPolys vk.omega (poly (.permProduct p c)) none)
       (permutationChunkPairsOfResolver vk poly p c) lLast lBlind
-  chain : ∀ c, c + 1 < shape.numPermutationSets → (X ^ n - 1 : Polynomial Fp) ∣
+  chain : ∀ c, c + 1 < shape.numPermutationSets → (X ^ n - 1 : CPoly) ∣
     (poly (.permProduct p (c + 1)) -
       (poly (.permProduct p c)).comp (C (vk.omega ^ m) * X)) * l0
-  start : (X ^ n - 1 : Polynomial Fp) ∣ l0 * (1 - poly (.permProduct p 0))
-  finish : (X ^ n - 1 : Polynomial Fp) ∣
+  start : (X ^ n - 1 : CPoly) ∣ l0 * (1 - poly (.permProduct p 0))
+  finish : (X ^ n - 1 : CPoly) ∣
     ((poly (.permProduct p (shape.numPermutationSets - 1))) ^ 2 -
       poly (.permProduct p (shape.numPermutationSets - 1))) * lLast
 
@@ -609,8 +595,8 @@ permutation sets have the same count, and the last-row rotation is `ω^m`. -/
 theorem ConstraintSatisfaction.resolverPermutationConstraints
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
-    (l0 lLast lBlind : Polynomial Fp)
+    (poly : CommitmentId → CPoly)
+    (l0 lLast lBlind : CPoly)
     (p : Fin shape.numProofs) {n m : ℕ}
     (h : ConstraintSatisfaction
       (constraintModelOfResolver vk ch poly
@@ -664,8 +650,6 @@ theorem ConstraintSatisfaction.resolverPermutationConstraints
     simpa [constraintModelOfResolver,
       ConstraintPolyModel.permutationConstraints, sets, chunks, current, previous,
       permutationSetOfResolver, hrotation,
-      ComputablePolynomial.comp_eq, ComputablePolynomial.mul_eq,
-      ComputablePolynomial.const_eq, ComputablePolynomial.X_eq,
       show c + 1 ≠ shape.numPermutationSets by omega] using hdvd
   · let first := permutationSetOfResolver vk poly p ⟨0, hnonempty⟩
     have hfirst : sets.head? = some first := by

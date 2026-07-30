@@ -28,15 +28,14 @@ proves the operational prover, certificate, and reductions used here.
 
 ## Computational boundary
 
-`Soundness.AGM.Prover` adds representations to prover and certificate data.
-`Soundness.AGM.Peel` and `.Capstone` compute an IPA opening or relation.
-`Soundness.AGM.Probability` prices the reduction's single failure hyperplane at `1/|F|`, and
-`.ProbabilityVesta` applies it to Vesta.
+`FiatShamir.Adversary.Provenance` and the online AGM modules attach representations to the prover's
+emitted points. `StraightLineIpa` and `Composition.StraightLineDeployed` consume one represented
+execution and return either decoded opening data or an explicit relation. `ProbabilityCoins` and
+the finite-security profiles price the reduction's single programmed-slot miss at `1/|F|` and
+account separately for random-oracle queries, group work, and direct-coordinate work.
 
-The explicit-certificate path is computable. The deployed combined capstone converts its proved
-polynomial expected-call bound to a fixed call budget with an explicit truncation tail. Its
-remaining boundary is AGM, fixed-call plain-DL hardness, ideal random oracles, and an external
-PPT-adversary restriction for non-oracle work.
+The relation-to-DLOG path is computable. Its remaining boundary is the online AGM restriction,
+finite-security plain-DL hardness, ideal random oracles, and external implementation work bounds.
 -/
 
 namespace Zcash.Snark

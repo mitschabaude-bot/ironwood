@@ -4,8 +4,8 @@ import Zcash.Snark.Soundness.Multiopen.Deployed
 /-!
 # Acceptance at the deployed verifier decision
 
-These definitions isolate the deployed-decision event from the historical accepting-multiopen
-rewind construction.  They are the acceptance surface used by the rewind-free algebraic bound.
+These definitions provide the deployed-decision acceptance surface used by the straight-line
+algebraic bound.
 -/
 
 namespace Zcash.Snark

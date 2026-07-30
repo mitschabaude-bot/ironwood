@@ -6,8 +6,8 @@ import Zcash.Snark.Soundness.Composition.DeployedConstraintContainment
 /-!
 # Straight-line AGM composition through deployed multiopen decoding
 
-This module combines the one-run IPA extractor with the deployed batch/root decoder.  Since
-ironwood#133 retired the rewinding route, this is the deployed AGM composition.
+This module combines the one-run IPA extractor with the deployed batch/root decoder to form the
+deployed AGM composition.
 -/
 
 namespace Zcash.Snark

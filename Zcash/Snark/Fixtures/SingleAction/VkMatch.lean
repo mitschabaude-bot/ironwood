@@ -183,8 +183,7 @@ theorem numInstanceColumns_eq :
 
 /-! ## The VK's domain and permutation scalars, derived
 
-The captured `vk`'s scalar fields — previously transcribed constants — are all
-computable from the circuit: `omega`/`n` from the derived domain exponent
+The captured `vk`'s scalar fields are computable from the circuit: `omega`/`n` from the derived domain exponent
 (`TopLevelCircuit.domainExponent`), `blindingFactors` from the configure-recorded
 advice queries, `delta` a pasta constant, `chunkLen` from the ported `cs.degree()`,
 and `permutationChunks` the recorded permutation columns chunked by it. -/

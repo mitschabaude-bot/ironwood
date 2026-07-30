@@ -118,58 +118,33 @@ theorem ipaRelation_unblind (urs : URS G) (P : G) (b : Fin (2 ^ urs.k) → F) (v
   have h' := ipaRelation_unblind_value urs P b v ξ s a h
   rwa [hs, mul_zero, sub_zero] at h'
 
-/-! ## The IPA round fold and its 2-special-soundness extractor
+/-! ## The IPA round fold
 
 One round of the inner-product argument halves the witness. The prover sends the cross-commitments
 `(Lⱼ, Rⱼ)`, the verifier sends a challenge `uⱼ`, and the length-`2m` vector folds to length `m`. The
-core of special soundness is that the same halves, folded at two distinct challenges, are uniquely
-recoverable — so an accepting prover is committed to a fixed witness, which the extractor recovers. -/
+current straight-line AGM path uses this fold to relate one represented accepting execution to its
+carried witness coordinates. -/
 
 /-- One IPA round folds a vector into its lower half plus `u` times its upper half (`compute_s`'s
 `(1, uⱼ)` structure): `foldVec lo hi u = lo + u • hi`. The round commitments `(Lⱼ, Rⱼ)` pin `lo`, `hi`. -/
 def foldVec {m : ℕ} (lo hi : Fin m → F) (u : F) : Fin m → F := lo + u • hi
 
-/-- The IPA round extractor: from the folded vector at two distinct challenges, recover the halves —
-`hi = (f₁ − f₂)/(u₁ − u₂)` and `lo = f₁ − u₁ • hi`. -/
-def roundExtract {m : ℕ} (f₁ f₂ : Fin m → F) (u₁ u₂ : F) : (Fin m → F) × (Fin m → F) :=
-  (f₁ - u₁ • ((u₁ - u₂)⁻¹ • (f₁ - f₂)), (u₁ - u₂)⁻¹ • (f₁ - f₂))
-
-/-- Two distinct challenge folds uniquely recover the original vector halves. -/
-theorem roundExtract_correct {m : ℕ} (lo hi : Fin m → F) (u₁ u₂ : F) (h : u₁ ≠ u₂) :
-    roundExtract (foldVec lo hi u₁) (foldVec lo hi u₂) u₁ u₂ = (lo, hi) := by
-  have hsub : u₁ - u₂ ≠ 0 := sub_ne_zero.mpr h
-  have hi_eq : (u₁ - u₂)⁻¹ • (foldVec lo hi u₁ - foldVec lo hi u₂) = hi := by
-    have hd : foldVec lo hi u₁ - foldVec lo hi u₂ = (u₁ - u₂) • hi := by
-      simp only [foldVec, sub_smul]; abel
-    rw [hd, smul_smul, inv_mul_cancel₀ hsub, one_smul]
-  simp only [roundExtract, Prod.mk.injEq]
-  refine ⟨?_, hi_eq⟩
-  rw [hi_eq]
-  simp only [foldVec]
-  abel
-
 /-! ## Inner-product left-additivity
 
 The scalar side of the IPA. The fact needed downstream is that the inner product is additive in its left
-argument (`innerProduct_add_left`) — the algebra the round extractor's witness fold rests on. -/
+argument (`innerProduct_add_left`) — the algebra the represented witness fold rests on. -/
 
 /-- The inner product is additive in its left argument. -/
 theorem innerProduct_add_left {n : ℕ} (a a' b : Fin n → F) :
     innerProduct (a + a') b = innerProduct a b + innerProduct a' b := by
   simp only [innerProduct, Pi.add_apply, add_mul, Finset.sum_add_distrib]
 
-/-! ## Commitment binding and knowledge soundness of the opening
+/-! ## Commitment binding and relation extraction
 
-The last ingredient is binding: distinct coefficient vectors have distinct commitments (the URS
-generators are `F`-linearly independent). On the Vesta curve this is the discrete-log-relation
-(DLR) hardness assumption — kept as an explicit hypothesis (project scope), not proved here,
-mirroring how `Zcash/Security/BindingSignature/Balance.lean` records its cryptographic assumptions.
-
-Given binding, the witness the special-soundness extractor produces (`roundExtract_correct` per
-round, composed over the `k` rounds) is the unique opening, so an accepting proof demonstrates
-knowledge of exactly one polynomial. The complementary constraint layer — that the opened
-polynomials satisfy the circuit's identities — is the Schwartz–Zippel bound (`quotientCheck_sound`
-in `Soundness/Constraints.lean`): a violated identity passes the random-point check only with
-probability `≤ d/p`. -/
+On the deployed Vesta curve, distinct coefficient vectors can represent the same commitment. The
+current AGM path therefore does not assume literal linear independence: a representation mismatch
+computes an explicit discrete-log relation, which the probability layer reduces to DLOG hardness.
+The complementary constraint layer uses Schwartz–Zippel bounds to price violated polynomial
+identities that pass the verifier's random-point checks. -/
 
 end Zcash.Snark

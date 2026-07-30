@@ -16,7 +16,7 @@ concepts.
 
 namespace Zcash.Snark
 
-open Polynomial
+open CompPoly.CPolynomial
 
 set_option maxHeartbeats 20000
 
@@ -407,7 +407,7 @@ def acceptedModel_circuitSat_or_relation
     (haccepts :
       DeployedAccepts urs hk vk instanceCommitment ps ch)
     (hblinding : vk.blindingFactors < vk.n)
-    (hpoly : Polynomial Fp)
+    (hpoly : CPoly)
     (i m : ℕ)
     (hm :
       m < (deployedSetQueries
@@ -415,7 +415,7 @@ def acceptedModel_circuitSat_or_relation
     (columnPolynomial :
       Fin (deployedSetQueries
         vk instanceCommitment ps ch i).length →
-        Polynomial Fp)
+        CPoly)
     (hbindAll : ∀
       (pointIndex : Fin
         ((constructIntermediateSets
@@ -572,7 +572,7 @@ theorem acceptedModel_circuitSat_of_openings
     (haccepts :
       DeployedAccepts urs hk vk instanceCommitment ps ch)
     (hblinding : vk.blindingFactors < vk.n)
-    (hpoly : Polynomial Fp)
+    (hpoly : CPoly)
     (hquot :
       hpoly =
         CanonicalMemberConstraintRelation.acceptedPolynomial
@@ -751,7 +751,7 @@ def acceptedModel_circuitSat_or_relation_of_decodedMemberPolynomial_eq
     (haccepts :
       DeployedAccepts urs hk vk instanceCommitment ps ch)
     (hblinding : vk.blindingFactors < vk.n)
-    (hpoly : Polynomial Fp)
+    (hpoly : CPoly)
     (hquot :
       hpoly =
         CanonicalMemberConstraintRelation.acceptedPolynomial

@@ -1,6 +1,4 @@
 import Zcash.Snark.Soundness.AGM.AlgebraicUnbatch
-import Zcash.Snark.Soundness.AGM.ShiftRecovery
-import Zcash.Snark.Soundness.Multiopen.Deployed
 
 /-!
 # AGM unbatching for the deployed `x₄` multiopen collapse
@@ -76,61 +74,5 @@ theorem deployedX4AlgebraicValues_of_good [DecidableEq G] [Inhabited G] {shape :
   rw [heta] at hbatch
   exact hvalue.trans hbatch
   exact hgood
-
-/-- Compose the recursive IPA's shifted opening with AGM commitment unbatching.  A witness
-mismatch exposes an augmented-basis relation; otherwise the two linear good-challenge conditions
-recover the raw deployed value. -/
-noncomputable def deployedX4AlgebraicBatchAndValueOrRelation
-    [DecidableEq G] [Inhabited G] {shape : Shape}
-    (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
-    (instanceCommitment : Fin shape.numProofs -> Nat -> G)
-    (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
-    (cols : AlgebraicColumnRepresentations urs
-      (x4BatchCommitments urs hk vk instanceCommitment ps ch))
-    (aggregate : Fin (2 ^ urs.k) → Fp) (aggregateU aggregateW : Fp)
-    (haggregate : commit urs aggregate + aggregateU • urs.u + aggregateW • urs.w =
-      deployedCommitment urs hk vk instanceCommitment ps ch)
-    (openingWitness s : Fin (2 ^ urs.k) → Fp) (sU : Fp)
-    (b : Fin (2 ^ urs.k) → Fp)
-    (hopeningCommit : commit urs openingWitness = commit urs aggregate)
-    (hz : ch.z ≠ 0)
-    (hshifted : commitGen b openingWitness =
-      multiopenValue vk instanceCommitment ps ch + ch.z⁻¹ * (aggregateU + ch.xi * sU) -
-        ch.xi * commitGen b s)
-    (hgoodXi : ch.xi ∉ szBadSet
-      (ipaShiftXiPolynomial
-        (commitGen b aggregate - multiopenValue vk instanceCommitment ps ch)
-        (commitGen b s)))
-    (hgoodZ : ch.z ∉ szBadSet
-      (ipaShiftZPolynomial
-        (commitGen b aggregate - multiopenValue vk instanceCommitment ps ch)
-        aggregateU sU (commitGen b s) ch.xi)) :
-    (Σ' _batch : AlgebraicPowerBatch urs
-        (x4BatchCommitments urs hk vk instanceCommitment ps ch)
-        aggregate aggregateU aggregateW ch.x4,
-      commitGen b aggregate = multiopenValue vk instanceCommitment ps ch) ⊕'
-      AugmentedRelationWitness (F := Fp) urs.g urs.u urs.w := by
-  match deployedX4AlgebraicBatchOrRelation urs hk vk instanceCommitment ps ch cols
-      aggregate aggregateU aggregateW haggregate with
-  | PSum.inr hrel => exact PSum.inr hrel
-  | PSum.inl batch =>
-      have hcollision :
-          commitGen urs.g openingWitness + (0 : Fp) • urs.u + (0 : Fp) • urs.w =
-            commitGen urs.g aggregate + (0 : Fp) • urs.u + (0 : Fp) • urs.w := by
-        simpa [← commit_eq_commitGen] using hopeningCommit
-      match separateOrRelationWitness urs.g urs.u urs.w openingWitness aggregate
-          0 0 0 0 hcollision with
-      | PSum.inr hrel => exact PSum.inr hrel
-      | PSum.inl heq =>
-          have hshifted' : commitGen b aggregate =
-              multiopenValue vk instanceCommitment ps ch +
-                ch.z⁻¹ * (aggregateU + ch.xi * sU) -
-                ch.xi * commitGen b s := by
-            rw [← heq.1]
-            exact hshifted
-          have hvalue := rawValue_of_shiftedValue_of_good
-            (commitGen b aggregate) (multiopenValue vk instanceCommitment ps ch) aggregateU sU
-            (commitGen b s) ch.xi ch.z hz hshifted' hgoodXi hgoodZ
-          exact PSum.inl ⟨batch, hvalue⟩
 
 end Zcash.Snark

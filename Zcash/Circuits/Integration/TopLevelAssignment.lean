@@ -21,7 +21,7 @@ input to this type.
 
 namespace Zcash.Snark
 
-open Halo2 Polynomial
+open Halo2 CompPoly.CPolynomial
 
 set_option maxHeartbeats 20000
 
@@ -37,7 +37,7 @@ structure TopLevelAssignment
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
     (numProofs : ℕ) (proofIndex : Fin numProofs) where
-  polynomial : CommitmentId → Polynomial Fp
+  polynomial : CommitmentId → CPoly
 
 namespace TopLevelAssignment
 

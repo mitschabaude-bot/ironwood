@@ -46,8 +46,8 @@ def deployedDirectDecodeOps
 
 /-- **The direct-coordinate decode has a field-independent polynomial total cost.**  Every column
 traverses at most `queryBudget shape` members, and there are at most `numPointSets + 1` columns —
-both bounds are consequences of the deployed query assembly alone, with no fork spread, no
-adversary-dependent quantity, and no `|F|` term. -/
+both bounds are consequences of the deployed query assembly alone, with no spread premise,
+adversary-dependent quantity, or `|F|` term. -/
 theorem deployedDirectDecodeOps_le
     (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → ℕ → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp) (sourceLen : ℕ) :

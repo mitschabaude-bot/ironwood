@@ -9,7 +9,7 @@ Each root surface is rebuilt from the ordinary prefix and its first-query AGM co
 
 namespace Zcash.Snark
 
-open Classical Polynomial
+open Classical CompPoly.CPolynomial
 open scoped ENNReal
 
 set_option maxRecDepth 10000
@@ -154,7 +154,7 @@ noncomputable def adaptiveX1RootPolynomial
     (hi : i < deployedX4PairCount vk instanceCommitment ps
       (chRecord nu (fun _ => 0)))
     (idx : Fin ((deployedSetsForEval vk instanceCommitment ps
-      (chRecord nu (fun _ => 0))).getD i ([], [], 0)).1.length) : Polynomial Fp :=
+      (chRecord nu (fun _ => 0))).getD i ([], [], 0)).1.length) : CPoly :=
   memberBindingErrorPolynomial
     (fun m : Fin (deployedSetQueries vk instanceCommitment ps
       (chRecord nu (fun _ => 0)) i).length =>
@@ -273,7 +273,7 @@ noncomputable def adaptiveSetColumn
     (hcovered : AdaptiveMembersCovered vk instanceCommitment ps source)
     (nu : Fin 11 → Fp)
     (j : Fin (deployedX4PairCount vk instanceCommitment ps
-      (chRecord nu (fun _ => 0)))) : Polynomial Fp :=
+      (chRecord nu (fun _ => 0)))) : CPoly :=
   let i := deployedX4PairCount vk instanceCommitment ps
       (chRecord nu (fun _ => 0)) - 1 - (j : Nat)
   let members := adaptiveMemberRepresentations vk instanceCommitment ps source hcovered nu i

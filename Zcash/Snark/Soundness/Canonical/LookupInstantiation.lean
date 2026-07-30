@@ -17,7 +17,7 @@ circuit fixture or concrete verification key occurs here.
 
 namespace Zcash.Snark
 
-open Polynomial
+open CompPoly.CPolynomial
 
 /--
 The polynomial feed for one verifier query family.
@@ -29,35 +29,32 @@ feeds, indices outside the shape-level query count read zero.
 -/
 def resolverQueryFeed
     {n : ℕ} (omega : Fp) (layout : List (ℕ × ℤ))
-    (column : ℕ → Polynomial Fp) : ℕ → Polynomial Fp :=
+    (column : ℕ → CPoly) : ℕ → CPoly :=
   fun query =>
     if _hquery : query < n then
       let entry := layout.getD query (0, 0)
-      ComputablePolynomial.comp (column entry.1)
-        (ComputablePolynomial.mul (ComputablePolynomial.const (omega ^ entry.2))
-          ComputablePolynomial.X)
-    else ComputablePolynomial.zero
+      comp (column entry.1) (C (omega ^ entry.2) * X)
+    else 0
 
 /-- An in-range query feed evaluates its resolved column at the rotated point. -/
 theorem resolverQueryFeed_eval
     {n : ℕ} (omega : Fp) (layout : List (ℕ × ℤ))
-    (column : ℕ → Polynomial Fp)
+    (column : ℕ → CPoly)
     {query : ℕ} (hquery : query < n) (x : Fp) :
     (resolverQueryFeed (n := n) omega layout column query).eval x =
       (column (layout.getD query (0, 0)).1).eval
         (rotateOmega omega x (layout.getD query (0, 0)).2) := by
-  simp only [resolverQueryFeed, dif_pos hquery, ComputablePolynomial.comp_eq,
-    ComputablePolynomial.mul_eq, ComputablePolynomial.const_eq, ComputablePolynomial.X_eq,
+  simp only [resolverQueryFeed, dif_pos hquery,
     eval_comp, eval_mul, eval_C, eval_X, rotateOmega]
-  rw [mul_comm]
+  rw [_root_.mul_comm]
 
 /-- Outside the shape-level query count the feed is the zero polynomial. -/
 theorem resolverQueryFeed_eval_of_ge
     {n : ℕ} (omega : Fp) (layout : List (ℕ × ℤ))
-    (column : ℕ → Polynomial Fp)
+    (column : ℕ → CPoly)
     {query : ℕ} (hquery : n ≤ query) (x : Fp) :
     (resolverQueryFeed (n := n) omega layout column query).eval x = 0 := by
-  simp [resolverQueryFeed, Nat.not_lt.mpr hquery, ComputablePolynomial.zero_eq]
+  simp [resolverQueryFeed, Nat.not_lt.mpr hquery]
 
 /--
 Uniform openings of a complete `columnQueries` block reconstruct its entire
@@ -73,7 +70,7 @@ theorem resolverQueryFeed_eval_of_columnQueries
     (commitment : ℕ → G) (mkId : ℕ → CommitmentId)
     (layout : List (ℕ × ℤ)) (evals : Fin n → Fp)
     (hlayout : layout.length = n)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (hopen : ∀ q ∈
       columnQueries (k := k) omega x commitment mkId layout
         (List.ofFn evals),
@@ -108,7 +105,7 @@ theorem resolverQueryFeed_eval_of_columnQueries
 def fixedQueryFeedOfResolver
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
-    (poly : CommitmentId → Polynomial Fp) : ℕ → Polynomial Fp :=
+    (poly : CommitmentId → CPoly) : ℕ → CPoly :=
   resolverQueryFeed (n := shape.numFixedQueries)
     vk.omega vk.fixedQueryLayout fun column => poly (.fixedCol column)
 
@@ -116,8 +113,8 @@ def fixedQueryFeedOfResolver
 def adviceQueryFeedOfResolver
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
-    (poly : CommitmentId → Polynomial Fp)
-    (p : ℕ) : ℕ → Polynomial Fp :=
+    (poly : CommitmentId → CPoly)
+    (p : ℕ) : ℕ → CPoly :=
   resolverQueryFeed (n := shape.numAdviceQueries)
     vk.omega vk.adviceQueryLayout fun column => poly (.adviceCol p column)
 
@@ -125,8 +122,8 @@ def adviceQueryFeedOfResolver
 def instanceQueryFeedOfResolver
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
-    (poly : CommitmentId → Polynomial Fp)
-    (p : ℕ) : ℕ → Polynomial Fp :=
+    (poly : CommitmentId → CPoly)
+    (p : ℕ) : ℕ → CPoly :=
   resolverQueryFeed (n := shape.numInstanceQueries)
     vk.omega vk.instanceQueryLayout fun column => poly (.instanceCol p column)
 
@@ -175,9 +172,9 @@ theorem mem_assembleQueries_of_mem_subProofLookupQueries
 /-- Polynomial lookup entries built from an arbitrary commitment-ID resolver.  Coherence of the
 rotations is definitional through `lookupEvalPolys`. -/
 def lookupEntriesOfResolver {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → Polynomial Fp)
+    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
     (p : ℕ) :
-    List (LookupEval (Polynomial Fp) × List (Expr Fp) × List (Expr Fp)) :=
+    List (LookupEval (CPoly) × List (Expr Fp) × List (Expr Fp)) :=
   List.ofFn fun l =>
     (lookupEvalPolys vk.omega
       (poly (.lookupProduct p l))
@@ -189,62 +186,48 @@ def lookupEntriesOfResolver {shape : Shape} {G : Type*}
 /-- The selected lookup's compressed input polynomial under the resolver-backed column feeds. -/
 def lookupInputPolyOfResolver {shape : Shape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp)
-    (p : ℕ) (l : Fin shape.numLookups) : Polynomial Fp :=
-  letI : CommRing (Polynomial Fp) := ComputablePolynomial.commRing
+    (poly : CommitmentId → CPoly)
+    (p : ℕ) (l : Fin shape.numLookups) : CPoly :=
   compressExprs
     (fixedQueryFeedOfResolver vk poly)
     (adviceQueryFeedOfResolver vk poly p)
     (instanceQueryFeedOfResolver vk poly p)
-    (ComputablePolynomial.const ch.theta)
-    ((vk.lookupInputExprs l).map (Expr.map ComputablePolynomial.const))
+    (C ch.theta)
+    ((vk.lookupInputExprs l).map (Expr.map C))
 
 theorem lookupInputPolyOfResolver_eq {shape : Shape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) :
     lookupInputPolyOfResolver vk ch poly p l =
       compressExprs
         (fixedQueryFeedOfResolver vk poly)
         (adviceQueryFeedOfResolver vk poly p)
         (instanceQueryFeedOfResolver vk poly p)
-        (C ch.theta) ((vk.lookupInputExprs l).map (Expr.map C)) := by
-  have hconst : (ComputablePolynomial.const : Fp → Polynomial Fp) = C := by
-    funext c
-    exact ComputablePolynomial.const_eq c
-  unfold lookupInputPolyOfResolver
-  rw [← ComputablePolynomial.commRing_eq (R := Fp)]
-  rw [hconst]
+        (C ch.theta) ((vk.lookupInputExprs l).map (Expr.map C)) := rfl
 
 /-- The selected lookup's compressed table polynomial under the same resolver-backed feeds. -/
 def lookupTablePolyOfResolver {shape : Shape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp)
-    (p : ℕ) (l : Fin shape.numLookups) : Polynomial Fp :=
-  letI : CommRing (Polynomial Fp) := ComputablePolynomial.commRing
+    (poly : CommitmentId → CPoly)
+    (p : ℕ) (l : Fin shape.numLookups) : CPoly :=
   compressExprs
     (fixedQueryFeedOfResolver vk poly)
     (adviceQueryFeedOfResolver vk poly p)
     (instanceQueryFeedOfResolver vk poly p)
-    (ComputablePolynomial.const ch.theta)
-    ((vk.lookupTableExprs l).map (Expr.map ComputablePolynomial.const))
+    (C ch.theta)
+    ((vk.lookupTableExprs l).map (Expr.map C))
 
 theorem lookupTablePolyOfResolver_eq {shape : Shape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) :
     lookupTablePolyOfResolver vk ch poly p l =
       compressExprs
         (fixedQueryFeedOfResolver vk poly)
         (adviceQueryFeedOfResolver vk poly p)
         (instanceQueryFeedOfResolver vk poly p)
-        (C ch.theta) ((vk.lookupTableExprs l).map (Expr.map C)) := by
-  have hconst : (ComputablePolynomial.const : Fp → Polynomial Fp) = C := by
-    funext c
-    exact ComputablePolynomial.const_eq c
-  unfold lookupTablePolyOfResolver
-  rw [← ComputablePolynomial.commRing_eq (R := Fp)]
-  rw [hconst]
+        (C ch.theta) ((vk.lookupTableExprs l).map (Expr.map C)) := rfl
 
 /-- A full constraint model whose column polynomials and lookup arguments are resolved by stable
 commitment identities.  The permutation sets/chunks remain parameters until their analogous
@@ -252,11 +235,11 @@ canonical routing layer is installed. -/
 def constraintModelOfResolver
     {shape : Shape} {numProofs k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp)
-    (sets : Fin numProofs → List (PermSetEval (Polynomial Fp)))
+    (poly : CommitmentId → CPoly)
+    (sets : Fin numProofs → List (PermSetEval CPoly))
     (chunks : Fin numProofs →
-      List (PermSetEval (Polynomial Fp) × List (Polynomial Fp × Polynomial Fp)))
-    (l0 lLast lBlind : Polynomial Fp) :
+      List (PermSetEval CPoly × List (CPoly × CPoly)))
+    (l0 lLast lBlind : CPoly) :
     ConstraintPolyModel numProofs where
   fixedCols := fixedQueryFeedOfResolver vk poly
   adviceCols := fun proofIndex =>
@@ -279,17 +262,17 @@ def constraintModelOfResolver
 
 @[simp] theorem constraintModelOfResolver_lookups {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
-    (sets : Fin shape.numProofs → List (PermSetEval (Polynomial Fp)))
+    (poly : CommitmentId → CPoly)
+    (sets : Fin shape.numProofs → List (PermSetEval (CPoly)))
     (chunks : Fin shape.numProofs →
-      List (PermSetEval (Polynomial Fp) × List (Polynomial Fp × Polynomial Fp)))
-    (l0 lLast lBlind : Polynomial Fp) (p : Fin shape.numProofs) :
+      List (PermSetEval (CPoly) × List (CPoly × CPoly)))
+    (l0 lLast lBlind : CPoly) (p : Fin shape.numProofs) :
     (constraintModelOfResolver vk ch poly sets chunks l0 lLast lBlind).lookups p
       = lookupEntriesOfResolver vk poly p := rfl
 
 /-- The selected coherent lookup entry occurs in the resolver-built lookup list. -/
 theorem lookupEntry_mem_lookupEntriesOfResolver {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → Polynomial Fp)
+    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) :
     (lookupEvalPolys vk.omega
         (poly (.lookupProduct p l))
@@ -305,11 +288,11 @@ membership fact passed to `ConstraintSatisfaction.lookupStart`, `lookupEnd`,
 theorem lookupEntry_mem_constraintModelOfResolver
     {shape : Shape} {numProofs k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp)
-    (sets : Fin numProofs → List (PermSetEval (Polynomial Fp)))
+    (poly : CommitmentId → CPoly)
+    (sets : Fin numProofs → List (PermSetEval CPoly))
     (chunks : Fin numProofs →
-      List (PermSetEval (Polynomial Fp) × List (Polynomial Fp × Polynomial Fp)))
-    (l0 lLast lBlind : Polynomial Fp)
+      List (PermSetEval CPoly × List (CPoly × CPoly)))
+    (l0 lLast lBlind : CPoly)
     (p : Fin numProofs) (l : Fin shape.numLookups) :
     (lookupEvalPolys vk.omega
         (poly (.lookupProduct p l))
@@ -367,7 +350,7 @@ two queries sharing the product ID (respectively permuted-input ID) automaticall
 polynomial. -/
 theorem eval_lookupEntriesOfResolver {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ps : ProofString shape Fp G)
-    (ch : Challenges shape.k Fp) (poly : CommitmentId → Polynomial Fp)
+    (ch : Challenges shape.k Fp) (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs)
     (hopen : ∀ q ∈ subProofLookupQueries vk ps ch p,
       (poly q.commId).eval q.point = q.eval) :
@@ -413,7 +396,7 @@ theorem eval_lookupEntriesOfResolver {shape : Shape} {G : Type*}
   have hproductNext' :
       ((poly (.lookupProduct p l)).comp (C vk.omega * X)).eval ch.x
         = (ps.lookupEvals p l).productNextEval := by
-    rw [eval_comp_rotate, mul_comm vk.omega ch.x]
+    rw [eval_comp_rotate, _root_.mul_comm vk.omega ch.x]
     simpa only [rotateOmega, zpow_one] using hproductNext
   have hinput' :
       (poly (.lookupPermInput p l)).eval ch.x
@@ -422,7 +405,7 @@ theorem eval_lookupEntriesOfResolver {shape : Shape} {G : Type*}
   have hinputInv' :
       ((poly (.lookupPermInput p l)).comp (C vk.omega⁻¹ * X)).eval ch.x
         = (ps.lookupEvals p l).permutedInputInvEval := by
-    rw [eval_comp_rotate, mul_comm vk.omega⁻¹ ch.x]
+    rw [eval_comp_rotate, _root_.mul_comm vk.omega⁻¹ ch.x]
     simpa only [rotateOmega, zpow_neg_one] using hinputInv
   have htable' :
       (poly (.lookupPermTable p l)).eval ch.x
@@ -430,9 +413,7 @@ theorem eval_lookupEntriesOfResolver {shape : Shape} {G : Type*}
     simpa using htable
   apply Prod.ext
   · simp only [Function.comp_apply, LookupEval.map, lookupEvalPolys]
-    simp only [ComputablePolynomial.comp_eq, ComputablePolynomial.mul_eq,
-      ComputablePolynomial.const_eq, ComputablePolynomial.X_eq,
-      hproduct', hproductNext', hinput', hinputInv', htable']
+    simp only [hproduct', hproductNext', hinput', hinputInv', htable']
   · rfl
 
 /-- The same routing theorem with its opening premise supplied on the verifier's complete assembled
@@ -442,7 +423,7 @@ theorem eval_lookupEntriesOfResolver_of_assembleQueries
     (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → ℕ → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp) (p : Fin shape.numProofs)
+    (poly : CommitmentId → CPoly) (p : Fin shape.numProofs)
     (hopen : ∀ q ∈ assembleQueries vk instanceCommitment ps ch,
       (poly q.commId).eval q.point = q.eval) :
     (lookupEntriesOfResolver vk poly p).map
@@ -457,11 +438,11 @@ theorem eval_lookupEntriesOfResolver_of_assembleQueries
 query-opening fact per sub-proof. -/
 theorem eval_constraintModelOfResolver_lookups {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ps : ProofString shape Fp G)
-    (ch : Challenges shape.k Fp) (poly : CommitmentId → Polynomial Fp)
-    (sets : Fin shape.numProofs → List (PermSetEval (Polynomial Fp)))
+    (ch : Challenges shape.k Fp) (poly : CommitmentId → CPoly)
+    (sets : Fin shape.numProofs → List (PermSetEval (CPoly)))
     (chunks : Fin shape.numProofs →
-      List (PermSetEval (Polynomial Fp) × List (Polynomial Fp × Polynomial Fp)))
-    (l0 lLast lBlind : Polynomial Fp)
+      List (PermSetEval (CPoly) × List (CPoly × CPoly)))
+    (l0 lLast lBlind : CPoly)
     (hopen : ∀ p q, q ∈ subProofLookupQueries vk ps ch p →
       (poly q.commId).eval q.point = q.eval) :
     ∀ p, ((constraintModelOfResolver vk ch poly sets chunks l0 lLast lBlind).lookups p).map
@@ -476,11 +457,11 @@ theorem eval_constraintModelOfResolver_lookups_of_assembleQueries
     (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → ℕ → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
-    (sets : Fin shape.numProofs → List (PermSetEval (Polynomial Fp)))
+    (poly : CommitmentId → CPoly)
+    (sets : Fin shape.numProofs → List (PermSetEval (CPoly)))
     (chunks : Fin shape.numProofs →
-      List (PermSetEval (Polynomial Fp) × List (Polynomial Fp × Polynomial Fp)))
-    (l0 lLast lBlind : Polynomial Fp)
+      List (PermSetEval (CPoly) × List (CPoly × CPoly)))
+    (l0 lLast lBlind : CPoly)
     (hopen : ∀ q ∈ assembleQueries vk instanceCommitment ps ch,
       (poly q.commId).eval q.point = q.eval) :
     ∀ p, ((constraintModelOfResolver vk ch poly sets chunks l0 lLast lBlind).lookups p).map
@@ -494,11 +475,11 @@ coherent divisibility facts consumed by `deployed_lookup_subset`. -/
 theorem ConstraintSatisfaction.lookupConstraintsDvdOfResolver
     {shape : Shape} {numProofs k : ℕ} {G : Type*} {n : ℕ}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp)
-    (sets : Fin numProofs → List (PermSetEval (Polynomial Fp)))
+    (poly : CommitmentId → CPoly)
+    (sets : Fin numProofs → List (PermSetEval CPoly))
     (chunks : Fin numProofs →
-      List (PermSetEval (Polynomial Fp) × List (Polynomial Fp × Polynomial Fp)))
-    (l0 lLast lBlind : Polynomial Fp)
+      List (PermSetEval CPoly × List (CPoly × CPoly)))
+    (l0 lLast lBlind : CPoly)
     (h : ConstraintSatisfaction
       (constraintModelOfResolver vk ch poly sets chunks l0 lLast lBlind) n)
     (p : Fin numProofs) (l : Fin shape.numLookups) :
@@ -510,7 +491,7 @@ theorem ConstraintSatisfaction.lookupConstraintsDvdOfResolver
       (lookupTablePolyOfResolver vk ch poly p l)
       l0 lLast lBlind := by
   let lk :
-      LookupEval (Polynomial Fp) × List (Expr Fp) × List (Expr Fp) :=
+      LookupEval (CPoly) × List (Expr Fp) × List (Expr Fp) :=
     (lookupEvalPolys vk.omega
         (poly (.lookupProduct p l))
         (poly (.lookupPermInput p l))
@@ -525,13 +506,9 @@ theorem ConstraintSatisfaction.lookupConstraintsDvdOfResolver
   · simpa [lk, constraintModelOfResolver, lookupEvalPolys] using h.lookupStart p hlk
   · simpa [lk, constraintModelOfResolver, lookupEvalPolys] using h.lookupEnd p hlk
   · simpa only [lk, constraintModelOfResolver, lookupEvalPolys,
-      ComputablePolynomial.comp_eq, ComputablePolynomial.mul_eq,
-      ComputablePolynomial.const_eq, ComputablePolynomial.X_eq,
       lookupInputPolyOfResolver_eq, lookupTablePolyOfResolver_eq] using
       h.lookupProductStep p hlk
   · simpa [lk, constraintModelOfResolver, lookupEvalPolys] using h.lookupRunStart p hlk
-  · simpa only [lk, constraintModelOfResolver, lookupEvalPolys,
-      ComputablePolynomial.comp_eq, ComputablePolynomial.mul_eq,
-      ComputablePolynomial.const_eq, ComputablePolynomial.X_eq] using h.lookupRunStep p hlk
+  · simpa only [lk, constraintModelOfResolver, lookupEvalPolys] using h.lookupRunStep p hlk
 
 end Zcash.Snark

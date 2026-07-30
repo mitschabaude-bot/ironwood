@@ -1,8 +1,8 @@
 import Zcash.Snark.Soundness.Vesta
 import Zcash.Snark.Soundness.AGM.ProbabilityVesta
 import Zcash.Snark.Soundness.AGM.ProbabilityCoins
-import Zcash.Snark.Soundness.Forking.Adversary.PreIpa
-import Zcash.Snark.Soundness.Forking.Adversary.DomainReduction
+import Zcash.Snark.Soundness.FiatShamir.Adversary.PreIpa
+import Zcash.Snark.Soundness.FiatShamir.Adversary.DomainReduction
 
 /-!
 # Fiat–Shamir to AGM handoff
@@ -311,7 +311,7 @@ def fullAlgebraicBindingAttack {shape : Shape}
         (ν 10)⁻¹ * (p.multiU ν + ν 9 * p.sU) -
         ν 9 * innerProduct p.s (evalVector shape.k (ν 7))
 
-/-- The binding attack with the `z ≠ 0` guard required by the fork kernel. -/
+/-- The binding attack with the `z ≠ 0` guard used by the straight-line classifier. -/
 def fullAlgebraicBindingAttackZ {shape : Shape}
     (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
     (vk : VerifyingKey shape Fp VestaG) (instanceCommitment : Fin shape.numProofs → ℕ → VestaG) (p : AlgebraicWfProof basis vk instanceCommitment)
@@ -365,10 +365,7 @@ namespace ComputedAlgebraicFSFamily
 
 variable {shape : Shape}
 
-/-- The random-oracle table one run reads.
-
-Collapsing the sampling tape out of this left a bare alias for the table type. It is kept as the
-name every consumer spells, so inlining it is a separate mechanical pass. -/
+/-- The random-oracle table read by one adversary execution. -/
 abbrev Coins (family : ComputedAlgebraicFSFamily shape) :=
   BTranscript Fp VestaG (preIpaLen shape family.init.length 10 + 3 * shape.k) → Fp
 
@@ -379,10 +376,8 @@ end ComputedAlgebraicFSFamily
 Bounded-query adversaries over transcript lists reduce to their finite reachable-support split.
 Blake2b remains idealized; `truncateTranscript` is only the deployed bounded-transcript retraction. -/
 
-/-- Transfer a uniform bounded-transcript binding bound to the reachable-support split.
-
-No in-tree consumer since the recursive extractor was retired; kept deliberately as the named
-reduction from the unbounded oracle domain to its finite reachable-support split. -/
+/-- Transfer a uniform bounded-transcript binding bound to the reachable-support split. This is the
+named reduction from the unbounded oracle domain to its finite reachable-support split. -/
 theorem bindingWin_unbounded_measure_le {shape : Shape}
     {basis : AugmentedIndex (2 ^ shape.k) → VestaG} {vk : VerifyingKey shape Fp VestaG} {instanceCommitment : Fin shape.numProofs → ℕ → VestaG}
     (init : List (TranscriptElt Fp VestaG))
@@ -418,11 +413,8 @@ theorem bindingWin_unbounded_measure_le {shape : Shape}
 
 /-! ## Uniform-URS basis transfer -/
 
-/-- Transfer any finite-coin event across a uniform-URS basis identification.
-
-The programmed-basis endpoint that consumed this was retired with the recursive extractor, so the
-trust-boundary pin is now its only reference. Kept deliberately: the statement is route-independent
-and is what a future programmed-basis argument reuses. -/
+/-- Transfer any finite-coin event across a uniform-URS basis identification. The statement is
+route-independent and reusable by programmed-basis arguments. -/
 theorem uniformURS_basis_transfer {k : ℕ} {C : Type*} [Fintype C] [Nonempty C]
     {Ω : Type*} (setup : PMF Ω) (B : VestaG)
     (basisOf : Ω → AugmentedIndex (2 ^ k) → VestaG)

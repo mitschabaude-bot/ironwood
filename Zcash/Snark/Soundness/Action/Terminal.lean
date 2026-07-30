@@ -18,7 +18,7 @@ language. Clean operation records occur only here, where they are consumed.
 
 namespace Zcash.Snark
 
-open Halo2 Polynomial Keygen
+open Halo2 CompPoly.CPolynomial Keygen
 open Zcash.Circuits
 open Zcash.Circuits.Action
 
@@ -75,7 +75,7 @@ def action_bundleStatement_or_relation_of_decodedMemberPolynomial_eq
       DeployedAccepts urs hk
         (actionCircuit.toVerifierKey pp urs)
         (actionCircuit.instanceCommitment pp urs inputs) ps ch)
-    (hpoly : Polynomial Fp)
+    (hpoly : CPoly)
     (hquot :
       hpoly =
         CanonicalMemberConstraintRelation.acceptedPolynomial

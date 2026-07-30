@@ -1,4 +1,4 @@
-import Zcash.Snark.Soundness.Forking.Adversary.OracleComp
+import Zcash.Snark.Soundness.FiatShamir.Adversary.OracleComp
 
 /-!
 # Minimal adaptive Fiat–Shamir interface

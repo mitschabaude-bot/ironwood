@@ -33,10 +33,10 @@ open CompElliptic.Curves.Pasta
 /-- The interpolated Kronecker column IS the closed form: both have degree below the
 node count and agree on every node. -/
 theorem rowPolynomial_single_eq_closed (k : ℕ) (hk : k ≤ 32) (i : Fin (2 ^ k)) :
-    rowPolynomial (omegaOf k) (Pi.single i (1 : Fp)) = lagrangeBasisClosed k i := by
+    (rowPolynomial (omegaOf k) (Pi.single i (1 : Fp))).toPoly = lagrangeBasisClosed k i := by
   classical
   symm
-  rw [rowPolynomial_eq_lagrange]
+  rw [toPoly_rowPolynomial]
   apply Lagrange.eq_interpolate_of_eval_eq _ (omegaOf_powers_injective k hk).injOn
   · rw [Finset.card_univ, Fintype.card_fin]
     exact lt_of_le_of_lt Polynomial.degree_le_natDegree
@@ -50,7 +50,8 @@ theorem polynomialCoefficients_single_closed (k : ℕ) (hk : k ≤ 32)
     (i t : Fin (2 ^ k)) :
     polynomialCoefficients (2 ^ k) (rowPolynomial (omegaOf k) (Pi.single i (1 : Fp))) t =
       (2 ^ k : Fp)⁻¹ * (omegaOf k)⁻¹ ^ ((i : ℕ) * (t : ℕ)) := by
-  rw [polynomialCoefficients, rowPolynomial_single_eq_closed k hk i]
+  rw [polynomialCoefficients, CompPoly.CPolynomial.coeff_toPoly,
+    rowPolynomial_single_eq_closed k hk i]
   exact lagrangeBasisClosed_coeff k i t
 
 theorem permPolysOf_length (k : ℕ) (cs : Halo2.ConstraintSystem Fp)

@@ -1,7 +1,7 @@
 import Zcash.Security.KeyBinding.Basic
 import Zcash.Security.Common.Birthday
 import Zcash.Snark.Soundness.UniformMeasure
-import Zcash.Snark.Soundness.Forking.Adversary.OracleComp
+import Zcash.Snark.Soundness.FiatShamir.Adversary.OracleComp
 
 /-!
 # Key binding in the whole-table random-oracle model

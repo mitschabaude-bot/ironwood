@@ -1,6 +1,5 @@
 import Zcash.Snark.Soundness.Vesta
 import Zcash.Snark.Soundness.AGM.Probability
-import Zcash.Snark.Soundness.AGM.Peel
 
 /-!
 # Vesta AGM probability bounds
@@ -14,7 +13,7 @@ The reduction samples a basis as uniform scalar multiples of `B`.
 `orchard_uniformURSIdentification_of_generatorRO` proves this inside a uniform generator random-
 oracle model. Treating halo2's hash-to-curve as that oracle remains an assumption.
 
-`Soundness.Forking.Adversary.Algebraic` builds the basis-indexed adversary family from the deployed
+`Soundness.FiatShamir.Adversary.Algebraic` builds the basis-indexed adversary family from the deployed
 bounded-query Fiat–Shamir adversary and names the events this file prices.
 -/
 

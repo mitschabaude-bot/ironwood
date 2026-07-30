@@ -23,7 +23,7 @@ desired statement or an opaque encoding implication.
 
 namespace Zcash.Snark
 
-open Halo2 Polynomial
+open Halo2 CompPoly.CPolynomial
 
 universe u v w
 
@@ -32,7 +32,7 @@ def TopLevelTerminalOutcome
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : Keygen.ProofParams)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (Bad : Type) : Type :=
   TopLevelBundleStatement top pp poly ⊕' Bad
 
@@ -42,7 +42,7 @@ def TopLevelWitnessTerminalOutcome
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : Keygen.ProofParams)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (Bad : Type) : Type :=
   TopLevelBundleWitness top pp poly ⊕' Bad
 
@@ -59,7 +59,7 @@ def topLevelBundleStatement_or_bad_of_components
     {top : TopLevelCircuit Fp Config PublicInput}
     {pp : Keygen.ProofParams} {urs : URS G}
     {k : ℕ} {ch : Challenges k Fp}
-    {poly : CommitmentId → Polynomial Fp}
+    {poly : CommitmentId → CPoly}
     {cell : Type} [DecidableEq cell] [Fintype cell]
     {Bad : Type}
     (satisfaction :
@@ -101,7 +101,7 @@ def topLevelBundleWitness_or_bad_of_components
     {top : TopLevelCircuit Fp Config PublicInput}
     {pp : Keygen.ProofParams} {urs : URS G}
     {k : ℕ} {ch : Challenges k Fp}
-    {poly : CommitmentId → Polynomial Fp}
+    {poly : CommitmentId → CPoly}
     {cell : Type} [DecidableEq cell] [Fintype cell]
     {Bad : Type}
     (satisfaction :
@@ -137,7 +137,7 @@ def topLevelBundleStatement_or_bad_of_constraintSatisfaction
     {top : TopLevelCircuit Fp Config PublicInput}
     {pp : Keygen.ProofParams} {urs : URS G}
     {k : ℕ} {ch : Challenges k Fp}
-    {poly : CommitmentId → Polynomial Fp}
+    {poly : CommitmentId → CPoly}
     {cell : Type} [DecidableEq cell] [Fintype cell]
     {Bad : Type}
     (satisfaction :
@@ -184,7 +184,7 @@ def topLevelBundleWitness_or_bad_of_constraintSatisfaction
     {top : TopLevelCircuit Fp Config PublicInput}
     {pp : Keygen.ProofParams} {urs : URS G}
     {k : ℕ} {ch : Challenges k Fp}
-    {poly : CommitmentId → Polynomial Fp}
+    {poly : CommitmentId → CPoly}
     {cell : Type} [DecidableEq cell] [Fintype cell]
     {Bad : Type}
     (satisfaction :
@@ -266,7 +266,7 @@ together with the circuit's named correctness package, retains private witnesses
 at the public inputs supplied to the verifier.
 -/
 def topLevelWitnesses_or_relation_of_circuitSat
-    (hpoly : Polynomial Fp)
+    (hpoly : CPoly)
     (hsatisfied :
       (CanonicalMemberConstraintRelation.acceptedModel
         (memberDecode := memberDecode)
@@ -325,7 +325,7 @@ assert_no_sorry topLevelWitnesses_or_relation_of_circuitSat
 
 /-- Forget the retained private witnesses to obtain the statement-only terminal. -/
 def topLevelStatements_or_relation_of_circuitSat
-    (hpoly : Polynomial Fp)
+    (hpoly : CPoly)
     (hsatisfied :
       (CanonicalMemberConstraintRelation.acceptedModel
         (memberDecode := memberDecode)
@@ -399,7 +399,7 @@ def topLevelStatements_or_relation_of_decodedMemberPolynomial_eq
       DeployedAccepts urs hk
         (top.toVerifierKey pp urs)
         (top.instanceCommitment pp urs inputs) ps ch)
-    (hpoly : Polynomial Fp)
+    (hpoly : CPoly)
     (hquot :
       hpoly =
         CanonicalMemberConstraintRelation.acceptedPolynomial

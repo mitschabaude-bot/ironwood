@@ -19,7 +19,9 @@ the restriction equation, and the common-column identification explicitly.
 
 namespace Zcash.Snark
 
-open Polynomial
+open Zcash.Arithmetic (deltaFp omegaOf omegaOf_isPrimitiveRoot powFast_eq_pow scalarFieldOrder)
+
+open CompPoly.CPolynomial
 open Halo2
 open Zcash.Arithmetic
   (deltaFp deltaFp_ne_zero deltaFpOrder deltaFp_isPrimitiveRoot
@@ -68,9 +70,9 @@ theorem chunkLength_le (pp : Keygen.ProofParams) (urs : URS G) :
 /-- Resolver pairing preserves each concrete VK chunk's width. -/
 theorem resolverPairsLength_le
     (pp : Keygen.ProofParams) (urs : URS G)
-    (poly : CommitmentId → Polynomial Fp)
-    (p : Fin (actionShape pp).numProofs) :
-    ∀ i, i < (actionShape pp).numPermutationSets →
+    (poly : CommitmentId → CPoly)
+    (p : Fin pp.numProofs) :
+    ∀ i, i < actionCircuit.permutationSetCount →
       (ResolverPermutationPairs (actionVk pp urs) poly p i).length ≤
         (actionVk pp urs).chunkLen := by
   intro i hi
@@ -81,9 +83,9 @@ set_option maxRecDepth 100000 in
 /-- A resolver-backed chunk has exactly the compiler-derived suffix width. -/
 theorem resolverPairsLength_eq_min
     (pp : Keygen.ProofParams) (urs : URS G)
-    (poly : CommitmentId → Polynomial Fp)
-    (p : Fin (actionShape pp).numProofs)
-    (chunk : Fin (actionShape pp).numPermutationSets) :
+    (poly : CommitmentId → CPoly)
+    (p : Fin pp.numProofs)
+    (chunk : Fin actionCircuit.permutationSetCount) :
     (ResolverPermutationPairs (actionVk pp urs) poly p chunk).length =
       min (actionVk pp urs).chunkLen
         (actionCircuit.permutationColumnCount -
@@ -93,8 +95,7 @@ theorem resolverPairsLength_eq_min
   have hi :
       (chunk : ℕ) < actionCircuit.verifierCS.permutationChunks.length := by
     rw [verifierCS_permutationChunks_length]
-    simpa only [actionShape,
-      Keygen.ProofParams.mergeDerived_numPermutationSets] using chunk.isLt
+    exact chunk.isLt
   change
     (actionCircuit.verifierCS.permutationChunks.getD chunk []).length =
       min actionCircuit.chunkLen
@@ -220,7 +221,7 @@ theorem deltaFp_domainCosets
   have hpow := congrArg (fun x : Fp => x ^ pastaOddFactor) h
   change (deltaFp ^ (j : ℕ)) ^ pastaOddFactor =
     (omegaOf k ^ t * deltaFp ^ (j' : ℕ)) ^ pastaOddFactor at hpow
-  rw [hj, mul_pow, hj', mul_one] at hpow
+  rw [hj, mul_pow, hj', _root_.mul_one] at hpow
   have htMul : omegaOf k ^ (t * pastaOddFactor) = 1 := by
     rw [pow_mul]
     exact hpow.symm
@@ -232,7 +233,7 @@ theorem deltaFp_domainCosets
     (pastaOddFactor_coprime_domain k).dvd_of_dvd_mul_right hdvdMul
   have ht : omegaOf k ^ t = 1 :=
     (hprimitive.pow_eq_one_iff_dvd _).mpr hdvd
-  rw [ht, one_mul] at h
+  rw [ht, _root_.one_mul] at h
   exact deltaFp_powers_injective n hn h
 
 /-! ## Derived evaluation-domain facts -/
@@ -266,8 +267,9 @@ the verifier's `omega^(-(blindingFactors + 1))` rotation. -/
 theorem domain
     (pp : Keygen.ProofParams) (urs : URS G)
     (ch : Challenges actionCircuit.domainExponent Fp)
-    (poly : CommitmentId → Polynomial Fp) :
-    let model := actionCircuit.constraintModel pp urs ch poly
+    (poly : CommitmentId → CPoly) :
+    let model :=
+      actionCircuit.constraintModel pp urs ch poly
     ResolverPermutationDomain (actionVk pp urs)
       model.l0 model.lLast model.lBlind
       (actionVk pp urs).n
@@ -297,7 +299,7 @@ theorem lastRowRotation (pp : Keygen.ProofParams) (urs : URS G) :
       xi := 0
       z := 0
       ipaRound := fun _ => 0 }
-  let poly : CommitmentId → Polynomial Fp := fun _ => 0
+  let poly : CommitmentId → CPoly := fun _ => 0
   exact (domain pp urs ch poly).lastRotation
 
 set_option maxRecDepth 100000 in
@@ -306,8 +308,8 @@ evaluation domain. This is the `hnames` premise retained by
 `ResolverPermutationCycle.ofKeygenColumns`. -/
 theorem namesInjective
     (pp : Keygen.ProofParams) (urs : URS G)
-    (poly : CommitmentId → Polynomial Fp)
-    (p : Fin (actionShape pp).numProofs)
+    (poly : CommitmentId → CPoly)
+    (p : Fin pp.numProofs)
     {activeRows : ℕ} (hactive : activeRows ≤ (actionVk pp urs).n) :
     Function.Injective fun c :
         ResolverPermutationCell (actionVk pp urs) poly p activeRows =>
@@ -508,8 +510,8 @@ theorem namesInjective
 replayed full permutation. -/
 def cycleOfKeygenColumnsAt
     (pp : Keygen.ProofParams) (urs : URS G)
-    (poly : CommitmentId → Polynomial Fp)
-    (p : Fin (actionShape pp).numProofs)
+    (poly : CommitmentId → CPoly)
+    (p : Fin pp.numProofs)
     {m : ℕ}
     (hactive : m ≤ (actionVk pp urs).n)
     (fullSigma : Equiv.Perm
@@ -541,8 +543,8 @@ def cycleOfKeygenColumnsAt
 /-- Assemble the semantic cycle at the verifier-derived active-row boundary. -/
 def cycleOfKeygenColumns
     (pp : Keygen.ProofParams) (urs : URS G)
-    (poly : CommitmentId → Polynomial Fp)
-    (p : Fin (actionShape pp).numProofs)
+    (poly : CommitmentId → CPoly)
+    (p : Fin pp.numProofs)
     (fullSigma : Equiv.Perm
       (ResolverPermutationCell (actionVk pp urs) poly p
         (actionVk pp urs).n))

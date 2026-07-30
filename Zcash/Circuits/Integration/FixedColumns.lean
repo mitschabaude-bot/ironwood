@@ -24,7 +24,7 @@ the circuit-owned instance.
 namespace Zcash.Snark
 
 open Zcash.Arithmetic (derivedUrsGLagrange)
-open Halo2 Polynomial
+open Halo2 CompPoly.CPolynomial
 open CompElliptic.Curves.Pasta
 
 variable {G : Type} [AddCommGroup G] [Module Fp G]
@@ -551,7 +551,7 @@ theorem topLevelFixedEntryRead_of_column
     [ProvableType PublicInput]
     {top : TopLevelCircuit Fp Config PublicInput}
     {pp : Keygen.ProofParams} {urs : URS G}
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (rows : ℕ → List Fp)
     (hrows : Function.Injective
       fun i : Fin (2 ^ urs.k) =>
@@ -592,7 +592,7 @@ def topLevelFixedEntryRead_or_bad
     [ProvableType PublicInput]
     {top : TopLevelCircuit Fp Config PublicInput}
     {pp : Keygen.ProofParams} {urs : URS G}
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (rows : ℕ → List Fp)
     (hrows : Function.Injective
       fun i : Fin (2 ^ urs.k) =>
@@ -634,7 +634,7 @@ def topLevelFixedConstraints_or_bad
     [ProvableType PublicInput]
     {top : TopLevelCircuit Fp Config PublicInput}
     {pp : Keygen.ProofParams} {urs : URS G}
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (rows : ℕ → List Fp)
     (hrows : Function.Injective
       fun i : Fin (2 ^ urs.k) =>
@@ -728,7 +728,7 @@ variable
         (instanceCommitment := instanceCommitment)
         urs hk vk ps ch batchOpenings i hi}
     {hblinding : vk.blindingFactors < vk.n}
-    {y : Fp} {hpoly : Polynomial Fp} {deg : ℕ}
+    {y : Fp} {hpoly : CPoly} {deg : ℕ}
 
 /-- Commitment identities absent from the assembled verifier queries resolve to
 the zero polynomial. -/
@@ -755,7 +755,6 @@ theorem polynomial_eq_zero_of_not_assembled
       simpa using List.find?_some hfind
   unfold decodedPolynomialResolver
   rw [hnone]
-  exact ComputablePolynomial.zero_eq
 
 /--
 A canonically routed fixed-column opening is the polynomial interpolating its
@@ -908,9 +907,7 @@ def fixedColumns_eq_rowPolynomials_or_relation
         rw [rowsLength]
         exact Nat.le_of_not_gt hcolumn
       rw [hrowsDefault]
-      simp [instanceRowPolynomial, zeroPaddedRows, rowPolynomial,
-        ComputablePolynomial.sumList_eq, ComputablePolynomial.mul_eq,
-        ComputablePolynomial.const_eq]
+      simp [instanceRowPolynomial, zeroPaddedRows, rowPolynomial]
 
 /--
 Circuit-derived fixed rows discharge both consumers of fixed-column semantics:
@@ -947,7 +944,7 @@ def topLevelFixedConstraints_or_relation
         (instanceCommitment := instanceCommitment)
         urs hk vk ps ch batchOpenings i hi}
     {hblinding : vk.blindingFactors < vk.n}
-    {y : Fp} {hpoly : Polynomial Fp}
+    {y : Fp} {hpoly : CPoly}
     (relation :
       CanonicalMemberConstraintRelation
         urs hk vk instanceCommitment ps ch pU pW a
@@ -1027,7 +1024,7 @@ def topLevelFixedEntryRead_or_relation
         (instanceCommitment := instanceCommitment)
         urs hk vk ps ch batchOpenings i hi}
     {hblinding : vk.blindingFactors < vk.n}
-    {y : Fp} {hpoly : Polynomial Fp}
+    {y : Fp} {hpoly : CPoly}
     (relation :
       CanonicalMemberConstraintRelation
         urs hk vk instanceCommitment ps ch pU pW a

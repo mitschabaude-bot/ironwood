@@ -12,7 +12,7 @@ statement and no opaque encoding implication.
 
 namespace Zcash.Snark
 
-open Halo2 Polynomial
+open Halo2 CompPoly.CPolynomial
 
 /--
 The statement owned by a top-level circuit, simultaneously for every polynomial
@@ -23,7 +23,7 @@ def TopLevelBundleStatement
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : Keygen.ProofParams)
-    (poly : CommitmentId → Polynomial Fp) : Prop :=
+    (poly : CommitmentId → CPoly) : Prop :=
   ∀ proofIndex : Fin pp.numProofs,
     let environment := ({
         polynomial := poly
@@ -37,7 +37,7 @@ def TopLevelBundleWitness
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : Keygen.ProofParams)
-    (poly : CommitmentId → Polynomial Fp) : Type :=
+    (poly : CommitmentId → CPoly) : Type :=
   ∀ proofIndex : Fin pp.numProofs,
     let environment := ({
         polynomial := poly
@@ -66,7 +66,7 @@ theorem of_publicInputEncoding
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : Keygen.ProofParams)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (inputs : Fin pp.numProofs → PublicInput Fp)
     (hencoding : ∀ proofIndex,
       let assignment : TopLevelAssignment top
@@ -96,7 +96,7 @@ def of_publicInputEncoding
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : Keygen.ProofParams)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (inputs : Fin pp.numProofs → PublicInput Fp)
     (hencoding : ∀ proofIndex,
       let assignment : TopLevelAssignment top
@@ -121,7 +121,7 @@ theorem statement
     [ProvableType PublicInput]
     {top : TopLevelCircuit Fp Config PublicInput}
     {pp : Keygen.ProofParams}
-    {poly : CommitmentId → Polynomial Fp}
+    {poly : CommitmentId → CPoly}
     (witness : TopLevelBundleWitness top pp poly) :
     TopLevelBundleStatement top pp poly :=
   fun proofIndex => (witness proofIndex).statement
@@ -133,7 +133,7 @@ abbrev TopLevelFixedEncoding
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : Keygen.ProofParams)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs) : Prop :=
   let assignment :
       TopLevelAssignment top pp.numProofs proofIndex :=
@@ -146,7 +146,7 @@ abbrev TopLevelFixed
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : Keygen.ProofParams) (urs : URS G)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs) : Prop :=
   (SelectorActivationsRealized
       top.selectorMap top.selectorActivations
@@ -165,7 +165,7 @@ abbrev TopLevelCopies
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : Keygen.ProofParams) (urs : URS G)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (cell : Type) [DecidableEq cell] [Fintype cell]
     (Bad : Type)
     (proofIndex : Fin pp.numProofs) : Type :=
@@ -183,7 +183,7 @@ abbrev TopLevelLookups
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : Keygen.ProofParams) (urs : URS G)
     (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs) : Prop :=
   TopLevelLookup.WitnessConditions
     top pp urs ch poly proofIndex
@@ -202,7 +202,7 @@ def bridgeWitness_of_components
     {top : TopLevelCircuit Fp Config PublicInput}
     {pp : Keygen.ProofParams} {urs : URS G}
     {k : ℕ} {ch : Challenges k Fp}
-    {poly : CommitmentId → Polynomial Fp}
+    {poly : CommitmentId → CPoly}
     {cell : Type} [DecidableEq cell] [Fintype cell]
     {Bad : Type}
     (proofIndex : Fin pp.numProofs)
@@ -305,9 +305,8 @@ joined without turning this record into an opaque statement-level hypothesis, an
 is carried as data: a field that cannot be discharged returns the break rather
 than asserting one exists.
 
-The copy field previously squashed its witness under `Nonempty`.  With `Bad` a
-type the witness is already data, so it is carried directly and the terminal no
-longer has to recover it by choice.
+The copy field carries its witness directly because `Bad` is a type, keeping the
+terminal independent of choice.
 -/
 structure TopLevelCircuitCorrectness
     {G : Type} [AddCommGroup G] [Inhabited G]
@@ -316,7 +315,7 @@ structure TopLevelCircuitCorrectness
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : Keygen.ProofParams) (urs : URS G)
     {k : ℕ} (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (cell : Type) [DecidableEq cell] [Fintype cell]
     (Bad : Type) : Type where
   gates : TopLevelGateCoherence top

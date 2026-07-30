@@ -46,8 +46,7 @@ constructor. Total in the other direction only up to the extra `selector` node, 
 maps to junk (`.constant 0`): post-compression gate/lookup expressions are selector-free
 (`compress_selectors` substitutes every simple selector by a fixed-column polynomial), so
 the `.selector` arm is never reached on the expressions a derived verifying key carries.
-Used to spell a derived VK's gate/lookup fields directly in `Expr` space; the exact
-round-trip is `RichExpression.toExpr_ofExpr`. -/
+The exact round-trip is `RichExpression.toExpr_ofExpr`. -/
 def RichExpression.toExpr {F : Type} [Zero F] : RichExpression F → Zcash.Snark.Expr F
   | .constant c => .constant c
   | .fixed i => .fixed i

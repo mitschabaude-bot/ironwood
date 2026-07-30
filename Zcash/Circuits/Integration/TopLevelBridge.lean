@@ -13,7 +13,7 @@ finished here before the resulting bridge is handed to the semantic endpoint.
 
 namespace Zcash.Snark
 
-open Halo2 Polynomial
+open Halo2 CompPoly.CPolynomial
 
 set_option maxHeartbeats 20000
 
@@ -45,7 +45,7 @@ def ofTopLevelCanonical
     {k : ℕ}
     (gateCoherence : TopLevelGateCoherence top)
     (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
     (satisfaction :
       ConstraintSatisfaction

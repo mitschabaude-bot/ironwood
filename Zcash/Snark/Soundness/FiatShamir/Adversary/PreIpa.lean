@@ -1,5 +1,5 @@
-import Zcash.Snark.Soundness.Forking.Adversary.Adaptive
-import Zcash.Snark.Soundness.Forking.Ordering
+import Zcash.Snark.Soundness.FiatShamir.Adversary.Adaptive
+import Zcash.Snark.Soundness.FiatShamir.Ordering
 
 /-!
 # Pre-IPA squeeze points

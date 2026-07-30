@@ -25,41 +25,38 @@ Everything here is about the deployed `permChunkExpression`, not a restatement o
 
 namespace Zcash.Snark
 
-open Polynomial Finset
+open CompPoly.CPolynomial Finset
 
 /-- A constraint that vanishes on the whole domain vanishes at each row. -/
-theorem eval_eq_zero_of_dvd_vanishing {n : ℕ} {c : Polynomial Fp}
-    (h : (X ^ n - 1 : Polynomial Fp) ∣ c) {r : Fp} (hr : r ^ n = 1) : c.eval r = 0 := by
+theorem eval_eq_zero_of_dvd_vanishing {n : ℕ} {c : CPoly}
+    (h : (X ^ n - 1 : CPoly) ∣ c) {r : Fp} (hr : r ^ n = 1) : c.eval r = 0 := by
   obtain ⟨d, rfl⟩ := h
   simp [hr]
 
 /-- The running product as a permutation set: `eval` is this row, `nextEval` is the next row (the
 polynomial composed with the rotation `ω·X`), and `lastEval` is supplied by the caller. -/
-def permSetPolys (omega : Fp) (z : Polynomial Fp)
-    (last : Option (Polynomial Fp)) : PermSetEval (Polynomial Fp) :=
+def permSetPolys (omega : Fp) (z : CPoly)
+    (last : Option (CPoly)) : PermSetEval (CPoly) :=
   { eval := z
-    nextEval := ComputablePolynomial.comp z
-      (ComputablePolynomial.mul (ComputablePolynomial.const omega) ComputablePolynomial.X)
+    nextEval := comp z (C omega * X)
     lastEval := last }
 
-@[simp] theorem permSetPolys_eval (omega : Fp) (z : Polynomial Fp) (last) :
+@[simp] theorem permSetPolys_eval (omega : Fp) (z : CPoly) (last) :
     (permSetPolys omega z last).eval = z := rfl
 
 /-- The next-row component really is the next row: at `ωⁱ` it reads `z(ω^{i+1})`. -/
-theorem eval_permSetPolys_nextEval (omega : Fp) (z : Polynomial Fp) (last) (i : ℕ) :
+theorem eval_permSetPolys_nextEval (omega : Fp) (z : CPoly) (last) (i : ℕ) :
     ((permSetPolys omega z last).nextEval).eval (omega ^ i) = z.eval (omega ^ (i + 1)) := by
-  rw [permSetPolys, ComputablePolynomial.comp_eq, ComputablePolynomial.mul_eq,
-    ComputablePolynomial.const_eq, ComputablePolynomial.X_eq,
-    eval_comp_rotate, pow_succ, mul_comm]
+  rw [permSetPolys, eval_comp_rotate, pow_succ, _root_.mul_comm]
 
 /-- **The step rule is the recurrence.** At a row the verifier has switched on, the deployed
 `permChunkExpression` vanishing says exactly that the running product advances by the ratio of the
 `σ`-named factors to the identity-named ones. The identity name of column `j` in chunk `c` at row
 `ωⁱ` is `ωⁱ·δ^{c·chunkLen + j}`. -/
 theorem perm_row_recurrence (omega beta gamma delta : Fp) (chunkLen chunkIndex : ℕ)
-    (z : Polynomial Fp) (last : Option (Polynomial Fp))
-    (pairs : List (Polynomial Fp × Polynomial Fp)) (lLastP lBlindP : Polynomial Fp) {n : ℕ}
-    (hdvd : (X ^ n - 1 : Polynomial Fp) ∣ permChunkExpression (C beta) (C gamma) X (C delta)
+    (z : CPoly) (last : Option (CPoly))
+    (pairs : List (CPoly × CPoly)) (lLastP lBlindP : CPoly) {n : ℕ}
+    (hdvd : (X ^ n - 1 : CPoly) ∣ permChunkExpression (C beta) (C gamma) X (C delta)
       chunkLen chunkIndex (permSetPolys omega z last) pairs lLastP lBlindP)
     {i : ℕ} (hpow : (omega ^ i) ^ n = 1)
     (hactive : 1 - (lLastP.eval (omega ^ i) + lBlindP.eval (omega ^ i)) ≠ 0) :
@@ -80,8 +77,8 @@ theorem perm_row_recurrence (omega beta gamma delta : Fp) (chunkLen chunkIndex :
   · exact absurd hact hactive
 
 /-- The first-row rule `ℓ₀·(1 − z) = 0` pins the running product to `1` where `ℓ₀` is nonzero. -/
-theorem running_product_start {l0P zP : Polynomial Fp} {n : ℕ}
-    (hdvd : (X ^ n - 1 : Polynomial Fp) ∣ l0P * (1 - zP)) {r : Fp} (hr : r ^ n = 1)
+theorem running_product_start {l0P zP : CPoly} {n : ℕ}
+    (hdvd : (X ^ n - 1 : CPoly) ∣ l0P * (1 - zP)) {r : Fp} (hr : r ^ n = 1)
     (hl0 : l0P.eval r ≠ 0) : zP.eval r = 1 := by
   have hzero := eval_eq_zero_of_dvd_vanishing hdvd hr
   rw [eval_mul, eval_sub, eval_one] at hzero
@@ -91,8 +88,8 @@ theorem running_product_start {l0P zP : Polynomial Fp} {n : ℕ}
 
 /-- The last-row rule `(z² − z)·ℓ_last = 0` leaves the running product at `0` or `1` where
 `ℓ_last` is nonzero. -/
-theorem running_product_end {lLastP zP : Polynomial Fp} {n : ℕ}
-    (hdvd : (X ^ n - 1 : Polynomial Fp) ∣ (zP ^ 2 - zP) * lLastP) {r : Fp} (hr : r ^ n = 1)
+theorem running_product_end {lLastP zP : CPoly} {n : ℕ}
+    (hdvd : (X ^ n - 1 : CPoly) ∣ (zP ^ 2 - zP) * lLastP) {r : Fp} (hr : r ^ n = 1)
     (hlast : lLastP.eval r ≠ 0) : zP.eval r = 0 ∨ zP.eval r = 1 := by
   have hzero := eval_eq_zero_of_dvd_vanishing hdvd hr
   rw [eval_mul, eval_sub, eval_pow] at hzero
@@ -105,8 +102,8 @@ theorem running_product_end {lLastP zP : Polynomial Fp} {n : ℕ}
 
 /-- The inter-set rule `(zNext - zLast)·ℓ₀ = 0` joins two permutation running products at the
 first row. -/
-theorem running_product_chain {l0P zNextP zLastP : Polynomial Fp} {n : ℕ}
-    (hdvd : (X ^ n - 1 : Polynomial Fp) ∣ (zNextP - zLastP) * l0P)
+theorem running_product_chain {l0P zNextP zLastP : CPoly} {n : ℕ}
+    (hdvd : (X ^ n - 1 : CPoly) ∣ (zNextP - zLastP) * l0P)
     {r : Fp} (hr : r ^ n = 1) (hl0 : l0P.eval r ≠ 0) :
     zNextP.eval r = zLastP.eval r := by
   have hzero := eval_eq_zero_of_dvd_vanishing hdvd hr
@@ -136,8 +133,8 @@ theorem name_injective_of_coset {omega : Fp} {u : ℕ} {ι : Type}
   have hshift : colName j = omega ^ (u - (i : ℕ) + (i' : ℕ)) * colName j' := by
     have hmul := congrArg (fun v => omega ^ (u - (i : ℕ)) * v) h
     simp only at hmul
-    rw [← mul_assoc, ← pow_add, Nat.sub_add_cancel (le_of_lt i.isLt), homega, one_mul] at hmul
-    rw [hmul, ← mul_assoc, ← pow_add]
+    rw [← _root_.mul_assoc, ← pow_add, Nat.sub_add_cancel (le_of_lt i.isLt), homega, _root_.one_mul] at hmul
+    rw [hmul, ← _root_.mul_assoc, ← pow_add]
   have hj : j = j' := hcoset _ _ _ hshift
   have hi : (i : ℕ) = (i' : ℕ) := by
     refine horder _ _ i.isLt i'.isLt ?_
@@ -152,14 +149,14 @@ committed column value at a cell, the permutation column's value there (the `σ`
 identity name `ωⁱ·δ^{offset + j}` halo2 assigns the cell. -/
 
 /-- The committed column's value at row `ωⁱ`, column `j`. -/
-def rowValue (omega : Fp) (pairs : List (Polynomial Fp × Polynomial Fp)) :
+def rowValue (omega : Fp) (pairs : List (CPoly × CPoly)) :
     ℕ → ℕ → Fp := fun i j =>
-  (pairs.getD j (ComputablePolynomial.zero, ComputablePolynomial.zero)).1.eval (omega ^ i)
+  (pairs.getD j (0, 0)).1.eval (omega ^ i)
 
 /-- The permutation column's value at row `ωⁱ`, column `j` — the name `σ` sends the cell to. -/
-def rowSigmaName (omega : Fp) (pairs : List (Polynomial Fp × Polynomial Fp)) :
+def rowSigmaName (omega : Fp) (pairs : List (CPoly × CPoly)) :
     ℕ → ℕ → Fp := fun i j =>
-  (pairs.getD j (ComputablePolynomial.zero, ComputablePolynomial.zero)).2.eval (omega ^ i)
+  (pairs.getD j (0, 0)).2.eval (omega ^ i)
 
 /-- The identity name halo2 assigns to row `ωⁱ`, column `j` of a chunk starting at `off`. -/
 def rowName (omega delta : Fp) (off : ℕ) : ℕ → ℕ → Fp :=
@@ -167,12 +164,12 @@ def rowName (omega delta : Fp) (off : ℕ) : ℕ → ℕ → Fp :=
 
 /-- The committed values across a family of variable-width chunks. -/
 def chunkRowValue (omega : Fp)
-    (pairs : ℕ → List (Polynomial Fp × Polynomial Fp)) : ℕ → ℕ → ℕ → Fp :=
+    (pairs : ℕ → List (CPoly × CPoly)) : ℕ → ℕ → ℕ → Fp :=
   fun c => rowValue omega (pairs c)
 
 /-- The permutation-column names across a family of variable-width chunks. -/
 def chunkRowSigmaName (omega : Fp)
-    (pairs : ℕ → List (Polynomial Fp × Polynomial Fp)) : ℕ → ℕ → ℕ → Fp :=
+    (pairs : ℕ → List (CPoly × CPoly)) : ℕ → ℕ → ℕ → Fp :=
   fun c => rowSigmaName omega (pairs c)
 
 /-- The identity name of a chunked cell, including the chunk's column offset. -/
@@ -188,13 +185,13 @@ equal values. The surviving branch is a vanishing factor — the running product
 name collided with a value. -/
 theorem deployed_perm_copy_constraints
     (omega beta gamma delta : Fp) (chunkLen chunkIndex : ℕ)
-    (z : Polynomial Fp) (last : Option (Polynomial Fp))
-    (pairs : List (Polynomial Fp × Polynomial Fp)) (l0P lLastP lBlindP : Polynomial Fp)
+    (z : CPoly) (last : Option (CPoly))
+    (pairs : List (CPoly × CPoly)) (l0P lLastP lBlindP : CPoly)
     {n u : ℕ} (σ : Equiv.Perm (Fin u × Fin pairs.length))
-    (hstep : (X ^ n - 1 : Polynomial Fp) ∣ permChunkExpression (C beta) (C gamma) X (C delta)
+    (hstep : (X ^ n - 1 : CPoly) ∣ permChunkExpression (C beta) (C gamma) X (C delta)
       chunkLen chunkIndex (permSetPolys omega z last) pairs lLastP lBlindP)
-    (hstart : (X ^ n - 1 : Polynomial Fp) ∣ l0P * (1 - z))
-    (hend : (X ^ n - 1 : Polynomial Fp) ∣ (z ^ 2 - z) * lLastP)
+    (hstart : (X ^ n - 1 : CPoly) ∣ l0P * (1 - z))
+    (hend : (X ^ n - 1 : CPoly) ∣ (z ^ 2 - z) * lLastP)
     (hrow : ∀ i : ℕ, (omega ^ i) ^ n = 1)
     (hactive : ∀ i < u, 1 - (lLastP.eval (omega ^ i) + lBlindP.eval (omega ^ i)) ≠ 0)
     (hl0 : l0P.eval (omega ^ 0) ≠ 0) (hlast : lLastP.eval (omega ^ u) ≠ 0)
@@ -208,10 +205,7 @@ theorem deployed_perm_copy_constraints
         (rowSigmaName omega pairs)).map (fun p => p.1 + p.2 * beta))
       ((cellPairs u pairs.length (rowValue omega pairs)
         (rowName omega delta (chunkIndex * chunkLen))).map (fun p => p.1 + p.2 * beta))))
-    (hgoodβ : ∀ j, beta ∉ szBadSet ((pairProdDiff
-      (cellPairs u pairs.length (rowValue omega pairs) (rowSigmaName omega pairs))
-      (cellPairs u pairs.length (rowValue omega pairs)
-        (rowName omega delta (chunkIndex * chunkLen)))).coeff j))
+    (hgoodβ : ∀ j, beta ∉ szBadSet (pairProdDiffCoeff (cellPairs u pairs.length (rowValue omega pairs) (rowSigmaName omega pairs)) (cellPairs u pairs.length (rowValue omega pairs) (rowName omega delta (chunkIndex * chunkLen))) j))
     {c d : Fin u × Fin pairs.length} (hcd : σ.SameCycle c d) :
     rowValue omega pairs (c.1 : ℕ) (c.2 : ℕ) = rowValue omega pairs (d.1 : ℕ) (d.2 : ℕ)
       ∨ ∃ p ∈ range u ×ˢ range pairs.length,
@@ -221,7 +215,7 @@ theorem deployed_perm_copy_constraints
     (rowValue omega pairs) (rowName omega delta (chunkIndex * chunkLen))
     (rowSigmaName omega pairs) beta gamma σ hσ hnm ?_ ?_ ?_ hgoodγ hgoodβ hcd
   · intro i hi
-    simpa [rowValue, rowSigmaName, rowName, pow_add, mul_assoc, mul_comm, mul_left_comm] using
+    simpa [rowValue, rowSigmaName, rowName, pow_add, _root_.mul_assoc, _root_.mul_comm, mul_left_comm] using
       perm_row_recurrence omega beta gamma delta chunkLen chunkIndex z last pairs lLastP lBlindP
         hstep (hrow i) (hactive i hi)
   · simpa using running_product_start hstart (hrow 0) hl0
@@ -234,17 +228,17 @@ start/end constraints pin the combined product. The conclusion uses one global `
 may cross chunk boundaries and the final chunk may be shorter than `chunkLen`. -/
 theorem deployed_perm_copy_constraints_all_chunks
     (omega beta gamma delta : Fp) (chunkLen : ℕ)
-    (z : ℕ → Polynomial Fp)
-    (pairs : ℕ → List (Polynomial Fp × Polynomial Fp))
-    (l0P lLastP lBlindP : Polynomial Fp) {nc n m : ℕ} (hnc : 0 < nc)
+    (z : ℕ → CPoly)
+    (pairs : ℕ → List (CPoly × CPoly))
+    (l0P lLastP lBlindP : CPoly) {nc n m : ℕ} (hnc : 0 < nc)
     (σ : Equiv.Perm (ChunkCell nc m (fun c => (pairs c).length)))
-    (hstep : ∀ c < nc, (X ^ n - 1 : Polynomial Fp) ∣
+    (hstep : ∀ c < nc, (X ^ n - 1 : CPoly) ∣
       permChunkExpression (C beta) (C gamma) X (C delta) chunkLen c
         (permSetPolys omega (z c) none) (pairs c) lLastP lBlindP)
-    (hchain : ∀ c, c + 1 < nc → (X ^ n - 1 : Polynomial Fp) ∣
+    (hchain : ∀ c, c + 1 < nc → (X ^ n - 1 : CPoly) ∣
       (z (c + 1) - (z c).comp (C (omega ^ m) * X)) * l0P)
-    (hstart : (X ^ n - 1 : Polynomial Fp) ∣ l0P * (1 - z 0))
-    (hend : (X ^ n - 1 : Polynomial Fp) ∣
+    (hstart : (X ^ n - 1 : CPoly) ∣ l0P * (1 - z 0))
+    (hend : (X ^ n - 1 : CPoly) ∣
       ((z (nc - 1)) ^ 2 - z (nc - 1)) * lLastP)
     (hrow : ∀ i : ℕ, (omega ^ i) ^ n = 1)
     (hactive : ∀ i < m, 1 - (lLastP.eval (omega ^ i) + lBlindP.eval (omega ^ i)) ≠ 0)
@@ -261,11 +255,7 @@ theorem deployed_perm_copy_constraints_all_chunks
       ((chunkedCellPairs nc m (fun c => (pairs c).length)
         (chunkRowValue omega pairs) (chunkRowName omega delta chunkLen)).map
           (fun p => p.1 + p.2 * beta))))
-    (hgoodβ : ∀ j, beta ∉ szBadSet ((pairProdDiff
-      (chunkedCellPairs nc m (fun c => (pairs c).length)
-        (chunkRowValue omega pairs) (chunkRowSigmaName omega pairs))
-      (chunkedCellPairs nc m (fun c => (pairs c).length)
-        (chunkRowValue omega pairs) (chunkRowName omega delta chunkLen))).coeff j))
+    (hgoodβ : ∀ j, beta ∉ szBadSet (pairProdDiffCoeff (chunkedCellPairs nc m (fun c => (pairs c).length) (chunkRowValue omega pairs) (chunkRowSigmaName omega pairs)) (chunkedCellPairs nc m (fun c => (pairs c).length) (chunkRowValue omega pairs) (chunkRowName omega delta chunkLen)) j))
     {c d : ChunkCell nc m (fun c => (pairs c).length)} (hcd : σ.SameCycle c d) :
     chunkRowValue omega pairs c.1 c.2.1 c.2.2
         = chunkRowValue omega pairs d.1 d.2.1 d.2.2
@@ -281,7 +271,7 @@ theorem deployed_perm_copy_constraints_all_chunks
     beta gamma σ hσ hnm
   · intro c hc i hi
     simpa [Z, hc, chunkRowValue, chunkRowName, chunkRowSigmaName, rowValue, rowSigmaName, rowName,
-      pow_add, mul_assoc, mul_comm, mul_left_comm] using
+      pow_add, _root_.mul_assoc, _root_.mul_comm, mul_left_comm] using
       perm_row_recurrence omega beta gamma delta chunkLen c (z c) none (pairs c)
         lLastP lBlindP (hstep c hc) (hrow i) (hactive i hi)
   · intro c hc
@@ -306,38 +296,38 @@ the soundness argument needs: each chunk's set *is* a committed running product 
 rotation that reads the next row. -/
 
 /-- The permutation sets at the polynomial level: chunk `c` carries its running product `z c`. -/
-def deployedPermSets (omega : Fp) (nc : ℕ) (z : ℕ → Polynomial Fp)
-    (lastP : ℕ → Option (Polynomial Fp)) : List (PermSetEval (Polynomial Fp)) :=
+def deployedPermSets (omega : Fp) (nc : ℕ) (z : ℕ → CPoly)
+    (lastP : ℕ → Option (CPoly)) : List (PermSetEval (CPoly)) :=
   (List.range nc).map (fun c => permSetPolys omega (z c) (lastP c))
 
 /-- The permutation chunks at the polynomial level: each set with its chunk's columns. -/
-def deployedPermChunks (omega : Fp) (nc : ℕ) (z : ℕ → Polynomial Fp)
-    (lastP : ℕ → Option (Polynomial Fp)) (cols : ℕ → List (Polynomial Fp × Polynomial Fp)) :
-    List (PermSetEval (Polynomial Fp) × List (Polynomial Fp × Polynomial Fp)) :=
+def deployedPermChunks (omega : Fp) (nc : ℕ) (z : ℕ → CPoly)
+    (lastP : ℕ → Option (CPoly)) (cols : ℕ → List (CPoly × CPoly)) :
+    List (PermSetEval (CPoly) × List (CPoly × CPoly)) :=
   (List.range nc).map (fun c => (permSetPolys omega (z c) (lastP c), cols c))
 
-@[simp] theorem length_deployedPermChunks (omega : Fp) (nc : ℕ) (z : ℕ → Polynomial Fp)
-    (lastP : ℕ → Option (Polynomial Fp)) (cols : ℕ → List (Polynomial Fp × Polynomial Fp)) :
+@[simp] theorem length_deployedPermChunks (omega : Fp) (nc : ℕ) (z : ℕ → CPoly)
+    (lastP : ℕ → Option (CPoly)) (cols : ℕ → List (CPoly × CPoly)) :
     (deployedPermChunks omega nc z lastP cols).length = nc := by
   simp [deployedPermChunks]
 
-@[simp] theorem getElem_deployedPermChunks (omega : Fp) (nc : ℕ) (z : ℕ → Polynomial Fp)
-    (lastP : ℕ → Option (Polynomial Fp)) (cols : ℕ → List (Polynomial Fp × Polynomial Fp))
+@[simp] theorem getElem_deployedPermChunks (omega : Fp) (nc : ℕ) (z : ℕ → CPoly)
+    (lastP : ℕ → Option (CPoly)) (cols : ℕ → List (CPoly × CPoly))
     {c : ℕ} (hc : c < (deployedPermChunks omega nc z lastP cols).length) :
     (deployedPermChunks omega nc z lastP cols)[c]
       = (permSetPolys omega (z c) (lastP c), cols c) := by
   simp only [deployedPermChunks, List.getElem_map, List.getElem_range]
 
-theorem head?_deployedPermSets (omega : Fp) {nc : ℕ} (hnc : 0 < nc) (z : ℕ → Polynomial Fp)
-    (lastP : ℕ → Option (Polynomial Fp)) :
+theorem head?_deployedPermSets (omega : Fp) {nc : ℕ} (hnc : 0 < nc) (z : ℕ → CPoly)
+    (lastP : ℕ → Option (CPoly)) :
     (deployedPermSets omega nc z lastP).head? = some (permSetPolys omega (z 0) (lastP 0)) := by
   rw [deployedPermSets, List.head?_map]
   rcases nc with _ | nc
   · exact absurd hnc (lt_irrefl 0)
   · simp [List.range_succ_eq_map]
 
-theorem getLast?_deployedPermSets (omega : Fp) {nc : ℕ} (hnc : 0 < nc) (z : ℕ → Polynomial Fp)
-    (lastP : ℕ → Option (Polynomial Fp)) :
+theorem getLast?_deployedPermSets (omega : Fp) {nc : ℕ} (hnc : 0 < nc) (z : ℕ → CPoly)
+    (lastP : ℕ → Option (CPoly)) :
     (deployedPermSets omega nc z lastP).getLast?
       = some (permSetPolys omega (z (nc - 1)) (lastP (nc - 1))) := by
   rw [deployedPermSets, List.getLast?_map]
@@ -345,13 +335,13 @@ theorem getLast?_deployedPermSets (omega : Fp) {nc : ℕ} (hnc : 0 < nc) (z : �
   · exact absurd hnc (lt_irrefl 0)
   · simp [List.range_succ]
 
-@[simp] theorem length_deployedPermSets (omega : Fp) (nc : ℕ) (z : ℕ → Polynomial Fp)
-    (lastP : ℕ → Option (Polynomial Fp)) :
+@[simp] theorem length_deployedPermSets (omega : Fp) (nc : ℕ) (z : ℕ → CPoly)
+    (lastP : ℕ → Option (CPoly)) :
     (deployedPermSets omega nc z lastP).length = nc := by
   simp [deployedPermSets]
 
-@[simp] theorem getElem_deployedPermSets (omega : Fp) (nc : ℕ) (z : ℕ → Polynomial Fp)
-    (lastP : ℕ → Option (Polynomial Fp)) {c : ℕ}
+@[simp] theorem getElem_deployedPermSets (omega : Fp) (nc : ℕ) (z : ℕ → CPoly)
+    (lastP : ℕ → Option (CPoly)) {c : ℕ}
     (hc : c < (deployedPermSets omega nc z lastP).length) :
     (deployedPermSets omega nc z lastP)[c] = permSetPolys omega (z c) (lastP c) := by
   simp only [deployedPermSets, List.getElem_map, List.getElem_range]
@@ -365,12 +355,12 @@ vanishing is read off the identity. Stated for a single permutation chunk; sever
 `deployed_copy_constraints_of_identity_chunks` below. -/
 theorem deployed_copy_constraints_of_identity
     (omega beta gamma delta theta y : Fp) (chunkLen : ℕ)
-    (z : ℕ → Polynomial Fp) (lastP : ℕ → Option (Polynomial Fp))
-    (cols : ℕ → List (Polynomial Fp × Polynomial Fp))
-    {np : ℕ} (fixedCols : ℕ → Polynomial Fp)
-    (adviceCols instanceCols : Fin np → ℕ → Polynomial Fp) (gates : List (Expr Fp))
-    (lookups : Fin np → List (LookupEval (Polynomial Fp) × List (Expr Fp) × List (Expr Fp)))
-    (l0P lLastP lBlindP hpoly : Polynomial Fp) {n u : ℕ} (hn : n ≠ 0) (p : Fin np)
+    (z : ℕ → CPoly) (lastP : ℕ → Option (CPoly))
+    (cols : ℕ → List (CPoly × CPoly))
+    {np : ℕ} (fixedCols : ℕ → CPoly)
+    (adviceCols instanceCols : Fin np → ℕ → CPoly) (gates : List (Expr Fp))
+    (lookups : Fin np → List (LookupEval (CPoly) × List (Expr Fp) × List (Expr Fp)))
+    (l0P lLastP lBlindP hpoly : CPoly) {n u : ℕ} (hn : n ≠ 0) (p : Fin np)
     (σ : Equiv.Perm (Fin u × Fin (cols 0).length))
     (hidentity : combineConstraints fixedCols adviceCols instanceCols gates
         (fun _ => deployedPermSets omega 1 z lastP)
@@ -393,10 +383,7 @@ theorem deployed_copy_constraints_of_identity
         (rowSigmaName omega (cols 0))).map (fun q => q.1 + q.2 * beta))
       ((cellPairs u (cols 0).length (rowValue omega (cols 0))
         (rowName omega delta 0)).map (fun q => q.1 + q.2 * beta))))
-    (hgoodβ : ∀ j, beta ∉ szBadSet ((pairProdDiff
-      (cellPairs u (cols 0).length (rowValue omega (cols 0)) (rowSigmaName omega (cols 0)))
-      (cellPairs u (cols 0).length (rowValue omega (cols 0))
-        (rowName omega delta 0))).coeff j))
+    (hgoodβ : ∀ j, beta ∉ szBadSet (pairProdDiffCoeff (cellPairs u (cols 0).length (rowValue omega (cols 0)) (rowSigmaName omega (cols 0))) (cellPairs u (cols 0).length (rowValue omega (cols 0)) (rowName omega delta 0)) j))
     {c d : Fin u × Fin (cols 0).length} (hcd : σ.SameCycle c d) :
     rowValue omega (cols 0) (c.1 : ℕ) (c.2 : ℕ)
         = rowValue omega (cols 0) (d.1 : ℕ) (d.2 : ℕ)
@@ -444,12 +431,12 @@ with the permutation taken to be the one built from the circuit's copy constrain
 conclusion names the equalities the circuit declared rather than the cycles of some permutation. -/
 theorem deployed_declared_equalities_of_identity
     (omega beta gamma delta theta y : Fp) (chunkLen : ℕ)
-    (z : ℕ → Polynomial Fp) (lastP : ℕ → Option (Polynomial Fp))
-    (cols : ℕ → List (Polynomial Fp × Polynomial Fp))
-    {np : ℕ} (fixedCols : ℕ → Polynomial Fp)
-    (adviceCols instanceCols : Fin np → ℕ → Polynomial Fp) (gates : List (Expr Fp))
-    (lookups : Fin np → List (LookupEval (Polynomial Fp) × List (Expr Fp) × List (Expr Fp)))
-    (l0P lLastP lBlindP hpoly : Polynomial Fp) {n u : ℕ} (hn : n ≠ 0) (p : Fin np)
+    (z : ℕ → CPoly) (lastP : ℕ → Option (CPoly))
+    (cols : ℕ → List (CPoly × CPoly))
+    {np : ℕ} (fixedCols : ℕ → CPoly)
+    (adviceCols instanceCols : Fin np → ℕ → CPoly) (gates : List (Expr Fp))
+    (lookups : Fin np → List (LookupEval (CPoly) × List (Expr Fp) × List (Expr Fp)))
+    (l0P lLastP lBlindP hpoly : CPoly) {n u : ℕ} (hn : n ≠ 0) (p : Fin np)
     (cs : List ((Fin u × Fin (cols 0).length) × (Fin u × Fin (cols 0).length)))
     (hidentity : combineConstraints fixedCols adviceCols instanceCols gates
         (fun _ => deployedPermSets omega 1 z lastP)
@@ -473,10 +460,7 @@ theorem deployed_declared_equalities_of_identity
         (rowSigmaName omega (cols 0))).map (fun q => q.1 + q.2 * beta))
       ((cellPairs u (cols 0).length (rowValue omega (cols 0))
         (rowName omega delta 0)).map (fun q => q.1 + q.2 * beta))))
-    (hgoodβ : ∀ j, beta ∉ szBadSet ((pairProdDiff
-      (cellPairs u (cols 0).length (rowValue omega (cols 0)) (rowSigmaName omega (cols 0)))
-      (cellPairs u (cols 0).length (rowValue omega (cols 0))
-        (rowName omega delta 0))).coeff j))
+    (hgoodβ : ∀ j, beta ∉ szBadSet (pairProdDiffCoeff (cellPairs u (cols 0).length (rowValue omega (cols 0)) (rowSigmaName omega (cols 0))) (cellPairs u (cols 0).length (rowValue omega (cols 0)) (rowName omega delta 0)) j))
     {x w : Fin u × Fin (cols 0).length}
     (hxw : Relation.EqvGen (fun a b => (a, b) ∈ cs) x w) :
     rowValue omega (cols 0) (x.1 : ℕ) (x.2 : ℕ)
@@ -544,8 +528,7 @@ theorem perm_copy_constraints_of_chunk_products {nc m : ℕ} {k : Fin nc → ℕ
     (hgoodγ : gamma ∉ szBadSet (linProdDiff
       ((chunkCellPairs nc m k value sigmaName).map (fun q => q.1 + q.2 * beta))
       ((chunkCellPairs nc m k value nm).map (fun q => q.1 + q.2 * beta))))
-    (hgoodβ : ∀ j, beta ∉ szBadSet ((pairProdDiff (chunkCellPairs nc m k value sigmaName)
-      (chunkCellPairs nc m k value nm)).coeff j))
+    (hgoodβ : ∀ j, beta ∉ szBadSet (pairProdDiffCoeff (chunkCellPairs nc m k value sigmaName) (chunkCellPairs nc m k value nm) j))
     {x w : (c : Fin nc) × Fin m × Fin (k c)} (hxw : σ.SameCycle x w) :
     value (x.1 : ℕ) (x.2.1 : ℕ) (x.2.2 : ℕ) = value (w.1 : ℕ) (w.2.1 : ℕ) (w.2.2 : ℕ)
       ∨ ∃ cell : (c : Fin nc) × Fin m × Fin (k c),
@@ -649,11 +632,11 @@ def chunkName (omega delta : Fp) (chunkLen : ℕ) : ℕ → ℕ → ℕ → Fp :
   fun c i j => omega ^ i * delta ^ (c * chunkLen + j)
 
 /-- The committed column value of chunk `c` at a cell. -/
-def chunkValue (omega : Fp) (cols : ℕ → List (Polynomial Fp × Polynomial Fp)) :
+def chunkValue (omega : Fp) (cols : ℕ → List (CPoly × CPoly)) :
     ℕ → ℕ → ℕ → Fp := fun c => rowValue omega (cols c)
 
 /-- The permutation column value of chunk `c` at a cell — the name `σ` sends the cell to. -/
-def chunkSigma (omega : Fp) (cols : ℕ → List (Polynomial Fp × Polynomial Fp)) :
+def chunkSigma (omega : Fp) (cols : ℕ → List (CPoly × CPoly)) :
     ℕ → ℕ → ℕ → Fp := fun c => rowSigmaName omega (cols c)
 
 /-- **Name distinctness across chunks.** With every chunk width below `chunkLen`, the global column
@@ -680,8 +663,8 @@ theorem chunkName_injective_of_coset {omega delta : Fp} {nc m chunkLen : ℕ} {k
       = omega ^ (m - (i : ℕ) + (i' : ℕ)) * delta ^ ((c' : ℕ) * chunkLen + (j' : ℕ)) := by
     have hmul := congrArg (fun v => omega ^ (m - (i : ℕ)) * v) h
     simp only at hmul
-    rw [← mul_assoc, ← pow_add, Nat.sub_add_cancel (le_of_lt i.isLt), homega, one_mul] at hmul
-    rw [hmul, ← mul_assoc, ← pow_add]
+    rw [← _root_.mul_assoc, ← pow_add, Nat.sub_add_cancel (le_of_lt i.isLt), homega, _root_.one_mul] at hmul
+    rw [hmul, ← _root_.mul_assoc, ← pow_add]
   have hcol : (c : ℕ) * chunkLen + (j : ℕ) = (c' : ℕ) * chunkLen + (j' : ℕ) :=
     hcoset _ _ (hlt ⟨c, i, j⟩) (hlt ⟨c', i', j'⟩) _ hshift
   -- base-chunkLen: the chunk and the in-chunk column separate
@@ -716,15 +699,15 @@ every one of them located inside the deployed constraint list and read off the i
 chunk's boundary is derived from the located end rule rather than assumed. -/
 theorem deployed_copy_constraints_of_identity_chunks
     (omega beta gamma delta theta y : Fp) (chunkLen : ℕ) {nc m : ℕ} (hnc : 0 < nc)
-    (z : ℕ → Polynomial Fp) (lastP : ℕ → Option (Polynomial Fp))
-    (cols : ℕ → List (Polynomial Fp × Polynomial Fp))
-    {np : ℕ} (fixedCols : ℕ → Polynomial Fp)
-    (adviceCols instanceCols : Fin np → ℕ → Polynomial Fp) (gates : List (Expr Fp))
-    (sets : Fin np → List (PermSetEval (Polynomial Fp)))
+    (z : ℕ → CPoly) (lastP : ℕ → Option (CPoly))
+    (cols : ℕ → List (CPoly × CPoly))
+    {np : ℕ} (fixedCols : ℕ → CPoly)
+    (adviceCols instanceCols : Fin np → ℕ → CPoly) (gates : List (Expr Fp))
+    (sets : Fin np → List (PermSetEval (CPoly)))
     (chunks : Fin np →
-      List (PermSetEval (Polynomial Fp) × List (Polynomial Fp × Polynomial Fp)))
-    (lookups : Fin np → List (LookupEval (Polynomial Fp) × List (Expr Fp) × List (Expr Fp)))
-    (l0P lLastP lBlindP hpoly : Polynomial Fp) {n : ℕ} (hn : n ≠ 0) (p : Fin np)
+      List (PermSetEval (CPoly) × List (CPoly × CPoly)))
+    (lookups : Fin np → List (LookupEval (CPoly) × List (Expr Fp) × List (Expr Fp)))
+    (l0P lLastP lBlindP hpoly : CPoly) {n : ℕ} (hn : n ≠ 0) (p : Fin np)
     (hsets : sets p = deployedPermSets omega nc z lastP)
     (hchunks : chunks p = deployedPermChunks omega nc z lastP cols)
     (σ : Equiv.Perm ((c : Fin nc) × Fin m × Fin (cols (c : ℕ)).length))
@@ -748,11 +731,7 @@ theorem deployed_copy_constraints_of_identity_chunks
         (chunkSigma omega cols)).map (fun q => q.1 + q.2 * beta))
       ((chunkCellPairs nc m (fun c => (cols (c : ℕ)).length) (chunkValue omega cols)
         (chunkName omega delta chunkLen)).map (fun q => q.1 + q.2 * beta))))
-    (hgoodβ : ∀ j, beta ∉ szBadSet ((pairProdDiff
-      (chunkCellPairs nc m (fun c => (cols (c : ℕ)).length) (chunkValue omega cols)
-        (chunkSigma omega cols))
-      (chunkCellPairs nc m (fun c => (cols (c : ℕ)).length) (chunkValue omega cols)
-        (chunkName omega delta chunkLen))).coeff j))
+    (hgoodβ : ∀ j, beta ∉ szBadSet (pairProdDiffCoeff (chunkCellPairs nc m (fun c => (cols (c : ℕ)).length) (chunkValue omega cols) (chunkSigma omega cols)) (chunkCellPairs nc m (fun c => (cols (c : ℕ)).length) (chunkValue omega cols) (chunkName omega delta chunkLen)) j))
     {x w : (c : Fin nc) × Fin m × Fin (cols (c : ℕ)).length} (hxw : σ.SameCycle x w) :
     chunkValue omega cols (x.1 : ℕ) (x.2.1 : ℕ) (x.2.2 : ℕ)
         = chunkValue omega cols (w.1 : ℕ) (w.2.1 : ℕ) (w.2.2 : ℕ)
@@ -761,10 +740,10 @@ theorem deployed_copy_constraints_of_identity_chunks
             + beta * chunkName omega delta chunkLen (cell.1 : ℕ) (cell.2.1 : ℕ) (cell.2.2 : ℕ)
             + gamma = 0 := by
   have hall := constraints_dvd_of_good_y _ hpoly hn hidentity hgoodY
-  have hmem : ∀ v : Polynomial Fp,
+  have hmem : ∀ v : CPoly,
       v ∈ permutationExpressions (deployedPermSets omega nc z lastP)
         (deployedPermChunks omega nc z lastP cols) (C beta) (C gamma) X (C delta) chunkLen
-        l0P lLastP lBlindP → (X ^ n - 1 : Polynomial Fp) ∣ v := by
+        l0P lLastP lBlindP → (X ^ n - 1 : CPoly) ∣ v := by
     intro v hv
     refine hall v (mem_constraintPolys_of_mem_permutationExpressions fixedCols adviceCols
       instanceCols gates sets chunks lookups beta gamma delta theta chunkLen l0P lLastP lBlindP
@@ -814,15 +793,15 @@ permutation taken to be the one keygen builds from the circuit's copy constraint
 the equalities the circuit declared. -/
 theorem deployed_declared_equalities_of_identity_chunks
     (omega beta gamma delta theta y : Fp) (chunkLen : ℕ) {nc m : ℕ} (hnc : 0 < nc)
-    (z : ℕ → Polynomial Fp) (lastP : ℕ → Option (Polynomial Fp))
-    (cols : ℕ → List (Polynomial Fp × Polynomial Fp))
-    {np : ℕ} (fixedCols : ℕ → Polynomial Fp)
-    (adviceCols instanceCols : Fin np → ℕ → Polynomial Fp) (gates : List (Expr Fp))
-    (sets : Fin np → List (PermSetEval (Polynomial Fp)))
+    (z : ℕ → CPoly) (lastP : ℕ → Option (CPoly))
+    (cols : ℕ → List (CPoly × CPoly))
+    {np : ℕ} (fixedCols : ℕ → CPoly)
+    (adviceCols instanceCols : Fin np → ℕ → CPoly) (gates : List (Expr Fp))
+    (sets : Fin np → List (PermSetEval (CPoly)))
     (chunks : Fin np →
-      List (PermSetEval (Polynomial Fp) × List (Polynomial Fp × Polynomial Fp)))
-    (lookups : Fin np → List (LookupEval (Polynomial Fp) × List (Expr Fp) × List (Expr Fp)))
-    (l0P lLastP lBlindP hpoly : Polynomial Fp) {n : ℕ} (hn : n ≠ 0) (p : Fin np)
+      List (PermSetEval (CPoly) × List (CPoly × CPoly)))
+    (lookups : Fin np → List (LookupEval (CPoly) × List (Expr Fp) × List (Expr Fp)))
+    (l0P lLastP lBlindP hpoly : CPoly) {n : ℕ} (hn : n ≠ 0) (p : Fin np)
     (hsets : sets p = deployedPermSets omega nc z lastP)
     (hchunks : chunks p = deployedPermChunks omega nc z lastP cols)
     (cs : List (((c : Fin nc) × Fin m × Fin (cols (c : ℕ)).length)
@@ -848,11 +827,7 @@ theorem deployed_declared_equalities_of_identity_chunks
         (chunkSigma omega cols)).map (fun q => q.1 + q.2 * beta))
       ((chunkCellPairs nc m (fun c => (cols (c : ℕ)).length) (chunkValue omega cols)
         (chunkName omega delta chunkLen)).map (fun q => q.1 + q.2 * beta))))
-    (hgoodβ : ∀ j, beta ∉ szBadSet ((pairProdDiff
-      (chunkCellPairs nc m (fun c => (cols (c : ℕ)).length) (chunkValue omega cols)
-        (chunkSigma omega cols))
-      (chunkCellPairs nc m (fun c => (cols (c : ℕ)).length) (chunkValue omega cols)
-        (chunkName omega delta chunkLen))).coeff j))
+    (hgoodβ : ∀ j, beta ∉ szBadSet (pairProdDiffCoeff (chunkCellPairs nc m (fun c => (cols (c : ℕ)).length) (chunkValue omega cols) (chunkSigma omega cols)) (chunkCellPairs nc m (fun c => (cols (c : ℕ)).length) (chunkValue omega cols) (chunkName omega delta chunkLen)) j))
     {x w : (c : Fin nc) × Fin m × Fin (cols (c : ℕ)).length}
     (hxw : Relation.EqvGen (fun a b => (a, b) ∈ cs) x w) :
     chunkValue omega cols (x.1 : ℕ) (x.2.1 : ℕ) (x.2.2 : ℕ)

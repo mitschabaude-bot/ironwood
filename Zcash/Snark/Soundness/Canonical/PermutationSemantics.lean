@@ -20,7 +20,7 @@ source cell.
 
 namespace Zcash.Snark
 
-open Polynomial
+open CompPoly CompPoly.CPolynomial
 open scoped ENNReal
 
 set_option maxHeartbeats 20000
@@ -286,12 +286,12 @@ def chunkPermutationOfFlat
 At row `i`, its interpolation value is the identity name of the cell to which keygen's global
 permutation sends `(chunk, i, column)`. This is the mathematical form of Halo2's σ-column
 construction; commitment encoding and comparison with a concrete VK are deliberately downstream. -/
-noncomputable def keygenSigmaColumn
+def keygenSigmaColumn
     {nc m : ℕ} {width : ℕ → ℕ}
     (omega delta : Fp) (chunkLen : ℕ)
     (sigma : Equiv.Perm (ChunkCell nc m width))
-    (chunk : Fin nc) (column : Fin (width chunk)) : Polynomial Fp :=
-  Lagrange.interpolate Finset.univ
+    (chunk : Fin nc) (column : Fin (width chunk)) : CPoly :=
+  CPolynomial.CLagrange.interpolate Finset.univ
     (fun i : Fin m => omega ^ (i : ℕ))
     (fun i : Fin m =>
       chunkRowName omega delta chunkLen
@@ -312,7 +312,9 @@ theorem keygenSigmaColumn_eval
         (sigma ⟨chunk, i, column⟩).1
         (sigma ⟨chunk, i, column⟩).2.1
         (sigma ⟨chunk, i, column⟩).2.2 :=
-  Lagrange.eval_interpolate_at_node _ hrows.injOn (Finset.mem_univ i)
+  by
+  rw [eval_toPoly, keygenSigmaColumn, CPolynomial.CLagrange.cinterpolate_eq_interpolate]
+  exact Lagrange.eval_interpolate_at_node _ hrows.injOn (Finset.mem_univ i)
 
 /-- Generated σ columns have degree strictly below the full evaluation-domain size. -/
 theorem keygenSigmaColumn_natDegree_lt
@@ -322,8 +324,10 @@ theorem keygenSigmaColumn_natDegree_lt
     (hrows : Function.Injective fun i : Fin m => omega ^ (i : ℕ))
     (hm : 0 < m) (chunk : Fin nc) (column : Fin (width chunk)) :
     (keygenSigmaColumn omega delta chunkLen sigma chunk column).natDegree < m := by
+  rw [natDegree_toPoly]
   have hd :
-      (keygenSigmaColumn omega delta chunkLen sigma chunk column).degree < (m : ℕ) := by
+      (keygenSigmaColumn omega delta chunkLen sigma chunk column).toPoly.degree
+        < (m : ℕ) := by
     have h := Lagrange.degree_interpolate_lt
       (s := (Finset.univ : Finset (Fin m)))
       (v := fun i : Fin m => omega ^ (i : ℕ))
@@ -333,8 +337,9 @@ theorem keygenSigmaColumn_natDegree_lt
           (sigma ⟨chunk, i, column⟩).2.1
           (sigma ⟨chunk, i, column⟩).2.2)
       hrows.injOn
-    simpa [keygenSigmaColumn, Finset.card_univ, Fintype.card_fin] using h
-  by_cases hzero : keygenSigmaColumn omega delta chunkLen sigma chunk column = 0
+    simpa [keygenSigmaColumn, CPolynomial.CLagrange.cinterpolate_eq_interpolate,
+      Finset.card_univ, Fintype.card_fin] using h
+  by_cases hzero : (keygenSigmaColumn omega delta chunkLen sigma chunk column).toPoly = 0
   · rw [hzero, Polynomial.natDegree_zero]
     exact hm
   · exact (Polynomial.natDegree_lt_iff_degree_lt hzero).mpr hd
@@ -342,14 +347,14 @@ theorem keygenSigmaColumn_natDegree_lt
 /-- The polynomial pairs, indexed by permutation chunk, selected from one resolver-backed proof. -/
 abbrev ResolverPermutationPairs
     {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) : ℕ → List (Polynomial Fp × Polynomial Fp) :=
+    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
+    (p : Fin shape.numProofs) : ℕ → List (CPoly × CPoly) :=
   permutationChunkPairsOfResolver vk poly p
 
 /-- Cells covered by one resolver-backed permutation argument. -/
 abbrev ResolverPermutationCell
     {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → Polynomial Fp)
+    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs) (m : ℕ) :=
   ChunkCell shape.numPermutationSets m
     (fun c => (ResolverPermutationPairs vk poly p c).length)
@@ -359,7 +364,7 @@ extracted.  These are independent of the proof's committed witness columns. -/
 structure ResolverPermutationDomain
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
-    (l0 lLast lBlind : Polynomial Fp) (n m : ℕ) : Prop where
+    (l0 lLast lBlind : CPoly) (n m : ℕ) : Prop where
   chunkCount : vk.permutationChunks.length = shape.numPermutationSets
   lastRotation :
     vk.omega ^ m = vk.omega ^ (-((vk.blindingFactors : ℤ) + 1))
@@ -405,7 +410,7 @@ keygen permutation. `namesInjective` is the usual root-of-unity/coset property o
 `ωⁱ · δʲ` cell names. -/
 structure ResolverPermutationCycle
     {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → Polynomial Fp)
+    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs) (m : ℕ) where
   sigma : Equiv.Perm (ResolverPermutationCell vk poly p m)
   mapsNames : ∀ c : ResolverPermutationCell vk poly p m,
@@ -425,7 +430,7 @@ The main equality left to a concrete VK is `hcolumns`: each resolver-selected co
 the corresponding degree-`< domainSize` generated σ column. -/
 def ResolverPermutationCycle.ofKeygenColumns
     {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → Polynomial Fp)
+    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs) {domainSize activeRows : ℕ}
     (hactive : activeRows ≤ domainSize)
     (fullSigma : Equiv.Perm (ResolverPermutationCell vk poly p domainSize))
@@ -490,8 +495,8 @@ def ResolverPermutationCycle.ofKeygenColumns
 def resolverPermutationGammaDifference
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
-    (p : Fin shape.numProofs) (m : ℕ) : Polynomial Fp :=
+    (poly : CommitmentId → CPoly)
+    (p : Fin shape.numProofs) (m : ℕ) : CPoly :=
   linProdDiff
     ((chunkedCellPairs shape.numPermutationSets m
       (fun c => (ResolverPermutationPairs vk poly p c).length)
@@ -508,7 +513,7 @@ def resolverPermutationGammaDifference
 def resolverPermutationFactorOffset
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs) (m : ℕ)
     (cell : ResolverPermutationCell vk poly p m) : Fp :=
   chunkRowValue vk.omega (ResolverPermutationPairs vk poly p)
@@ -520,7 +525,7 @@ def resolverPermutationFactorOffset
 def resolverPermutationZeroFactorBadSet
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs) (m : ℕ) : Finset Fp :=
   additiveZeroBadSet (resolverPermutationFactorOffset vk ch poly p m)
 
@@ -528,7 +533,7 @@ def resolverPermutationZeroFactorBadSet
 theorem mem_resolverPermutationZeroFactorBadSet_iff
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs) (m : ℕ) :
     ch.gamma ∈ resolverPermutationZeroFactorBadSet vk ch poly p m ↔
       ∃ cell : ResolverPermutationCell vk poly p m,
@@ -544,7 +549,7 @@ theorem mem_resolverPermutationZeroFactorBadSet_iff
 theorem uniformChallenge_resolverPermutationZeroFactorBadSet
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs) (m : ℕ) :
     uniformChallenge.toOuterMeasure
         (resolverPermutationZeroFactorBadSet vk ch poly p m)
@@ -555,10 +560,10 @@ theorem uniformChallenge_resolverPermutationZeroFactorBadSet
 
 /-- The complete `γ` exclusion: roots needed for multiset recovery together with the individual
 source-cell factors that must stay nonzero while propagating equality around a cycle. -/
-noncomputable def resolverPermutationGammaBadSet
+def resolverPermutationGammaBadSet
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs) (m : ℕ) : Finset Fp :=
   szBadSet (resolverPermutationGammaDifference vk ch poly p m) ∪
     resolverPermutationZeroFactorBadSet vk ch poly p m
@@ -567,7 +572,7 @@ noncomputable def resolverPermutationGammaBadSet
 theorem uniformChallenge_resolverPermutationGammaBadSet
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs) (m : ℕ) :
     uniformChallenge.toOuterMeasure
         (resolverPermutationGammaBadSet vk ch poly p m)
@@ -584,14 +589,14 @@ theorem uniformChallenge_resolverPermutationGammaBadSet
 
 /-- The challenge exclusions used both to recover the multiset of `(value, name)` pairs and to
 propagate equality around its cycles.  They are kept separate from VK semantics because the
-forking/bad-set accounting, rather than key generation, supplies them. -/
+random-oracle bad-set accounting, rather than key generation, supplies them. -/
 structure ResolverPermutationGoodChallenges
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
+    (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs) (m : ℕ) : Prop where
   gamma : ch.gamma ∉ resolverPermutationGammaBadSet vk ch poly p m
-  beta : ∀ j, ch.beta ∉ szBadSet ((pairProdDiff
+  beta : ∀ j, ch.beta ∉ szBadSet (pairProdDiffCoeff
     (chunkedCellPairs shape.numPermutationSets m
       (fun c => (ResolverPermutationPairs vk poly p c).length)
       (chunkRowValue vk.omega (ResolverPermutationPairs vk poly p))
@@ -599,11 +604,11 @@ structure ResolverPermutationGoodChallenges
     (chunkedCellPairs shape.numPermutationSets m
       (fun c => (ResolverPermutationPairs vk poly p c).length)
       (chunkRowValue vk.omega (ResolverPermutationPairs vk poly p))
-      (chunkRowName vk.omega vk.delta vk.chunkLen))).coeff j)
+      (chunkRowName vk.omega vk.delta vk.chunkLen)) j)
 
 /-- Resolver-backed full constraint satisfaction enforces equality on every replayed keygen
-permutation cycle.  The formerly explicit zero-factor branch is excluded by the separately priced
-active-cell component of `ResolverPermutationGoodChallenges.gamma`.
+permutation cycle. The zero-factor branch is excluded by the separately priced active-cell
+component of `ResolverPermutationGoodChallenges.gamma`.
 
 The proof does no new algebra: it joins the polynomial half from
 `ConstraintSatisfaction.resolverPermutationConstraints` to the domain, keygen-semantic, and
@@ -611,8 +616,8 @@ good-challenge halves at `deployed_perm_copy_constraints_all_chunks`. -/
 theorem ConstraintSatisfaction.resolverPermutationCopyConstraints
     {shape : Shape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp)
-    (l0 lLast lBlind : Polynomial Fp)
+    (poly : CommitmentId → CPoly)
+    (l0 lLast lBlind : CPoly)
     (p : Fin shape.numProofs) {n m : ℕ}
     (h : ConstraintSatisfaction
       (constraintModelOfResolver vk ch poly

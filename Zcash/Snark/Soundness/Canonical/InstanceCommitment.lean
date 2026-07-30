@@ -15,23 +15,27 @@ public row vector; the Action circuit only decides which rows form its external 
 
 namespace Zcash.Snark
 
-open Polynomial
+open Polynomial CompPoly
 
 set_option maxHeartbeats 20000
 
 variable {G : Type*} [AddCommGroup G] [Module Fp G]
 
 /-- The first `n` monomial coefficients of a polynomial. -/
-def polynomialCoefficients (n : ℕ) (p : Polynomial Fp) : Fin n → Fp :=
+def polynomialCoefficients (n : ℕ) (p : CPoly) : Fin n → Fp :=
   fun i => p.coeff (i : ℕ)
 
 /-- A polynomial of degree below `n` is reconstructed by its length-`n` coefficient vector. -/
-theorem coeffsToPoly_polynomialCoefficients {n : ℕ} {p : Polynomial Fp}
+theorem coeffsToPoly_polynomialCoefficients {n : ℕ} {p : CPoly}
     (hdegree : p.natDegree < n) :
     coeffsToPoly (polynomialCoefficients n p) = p := by
-  rw [coeffsToPoly_eq_sum]
-  simpa only [polynomialCoefficients, ← Fin.sum_univ_eq_sum_range] using
-    (p.as_sum_range_C_mul_X_pow' hdegree).symm
+  apply CPolynomial.toPoly_injective
+  rw [coeffsToPoly, CPolynomial.toPoly_sum]
+  simp only [CPolynomial.toPoly_mul, CPolynomial.C_toPoly, CPolynomial.toPoly_pow,
+    CPolynomial.X_toPoly, polynomialCoefficients, CPolynomial.coeff_toPoly]
+  simpa only [← Fin.sum_univ_eq_sum_range] using
+    (p.toPoly.as_sum_range_C_mul_X_pow'
+      (by rwa [← CPolynomial.natDegree_toPoly])).symm
 
 /-- Every row vector is the sum of its scaled coordinate vectors after interpolation. -/
 theorem rowPolynomial_eq_sum_single {n : ℕ}
@@ -40,8 +44,9 @@ theorem rowPolynomial_eq_sum_single {n : ℕ}
       ∑ i : Fin n, values i • rowPolynomial omega (Pi.single i 1) := by
   let interpolation :=
     Lagrange.interpolate Finset.univ (fun i : Fin n => omega ^ (i : ℕ))
-  rw [rowPolynomial_eq_lagrange]
-  simp_rw [rowPolynomial_eq_lagrange]
+  apply CPolynomial.toPoly_injective
+  rw [toPoly_rowPolynomial, CPolynomial.toPoly_sum]
+  simp_rw [CPolynomial.toPoly_smul, toPoly_rowPolynomial]
   change interpolation values =
     ∑ i : Fin n, values i • interpolation (Pi.single i 1)
   calc
@@ -72,7 +77,10 @@ theorem polynomialCoefficients_rowPolynomial_eq_sum_single {n : ℕ}
         polynomialCoefficients n (rowPolynomial omega (Pi.single i 1)) := by
   rw [rowPolynomial_eq_sum_single]
   funext j
-  simp [polynomialCoefficients]
+  simp only [polynomialCoefficients, Finset.sum_apply, Pi.smul_apply, smul_eq_mul]
+  rw [CPolynomial.coeff_toPoly, CPolynomial.toPoly_sum]
+  simp only [CPolynomial.toPoly_smul, Polynomial.finsetSum_coeff, Polynomial.coeff_smul,
+    smul_eq_mul, CPolynomial.coeff_toPoly]
 
 /-- The monomial coefficient vector of the zero-padded public-instance row polynomial. -/
 def instanceCoefficients (n : ℕ)

@@ -1,5 +1,6 @@
 import Mathlib.Tactic
 import Zcash.Snark.Soundness.Main
+import Zcash.Snark.Soundness.Multiopen.Deployed
 import CompElliptic.Curves.Pasta
 import CompElliptic.Curves.PastaOrder
 

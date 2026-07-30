@@ -13,7 +13,7 @@ namespace Zcash.Snark
 
 open Zcash.Arithmetic (Msm Msm.zero)
 
-open Classical Polynomial
+open Classical CompPoly.CPolynomial
 
 variable {G : Type*} [AddCommGroup G] [Module Fp G]
 
@@ -99,10 +99,10 @@ theorem deployed_member_commitment_eq_assembled [DecidableEq G] [Inhabited G]
 theorem permChunks_bind_of_feeds {shape : Shape} {G' : Type*}
     (vk : VerifyingKey shape Fp G') (ps : ProofString shape Fp G')
     (ch : Challenges shape.k Fp) (q : Fin shape.numProofs)
-    (setCarriers : List (PermSetEval (Polynomial Fp)))
+    (setCarriers : List (PermSetEval (CPoly)))
     (hsets : setCarriers.map (PermSetEval.map (fun r => r.eval ch.x)) =
       subProofPermSets ps q)
-    (fixedF adviceF instanceF commonF : Nat → Polynomial Fp)
+    (fixedF adviceF instanceF commonF : Nat → CPoly)
     (hfixedF : ∀ n, (fixedF n).eval ch.x = finFn ps.fixedEvals n)
     (hadviceF : ∀ n, (adviceF n).eval ch.x = finFn (ps.adviceEvals q) n)
     (hinstanceF : ∀ n, (instanceF n).eval ch.x = finFn (ps.instanceEvals q) n)
@@ -130,30 +130,8 @@ theorem permChunks_bind_of_feeds {shape : Shape} {G' : Type*}
   · exact hinstanceF i
 
 /-- The public Lagrange-basis polynomial. -/
-def lagrangeBasisPoly (omega : Fp) (n : Nat) (i : Int) : Polynomial Fp :=
-  ComputablePolynomial.mul
-    (ComputablePolynomial.const (omega ^ i / (n : Fp)))
-    (ComputablePolynomial.sumList ((List.range n).map fun k =>
-      ComputablePolynomial.mul
-        (ComputablePolynomial.const ((omega ^ i) ^ (n - 1 - k)))
-        (ComputablePolynomial.pow ComputablePolynomial.X k)))
-
-private theorem sum_listRange_eq_finsetRange (f : Nat → Polynomial Fp) (n : Nat) :
-    ((List.range n).map f).sum = ∑ k ∈ Finset.range n, f k := by
-  induction n with
-  | zero => simp
-  | succ n ih => simp [List.range_succ, Finset.sum_range_succ, ih]
-
-theorem lagrangeBasisPoly_eq (omega : Fp) (n : Nat) (i : Int) :
-    lagrangeBasisPoly omega n i =
-      Polynomial.C (omega ^ i / (n : Fp)) *
-        ∑ k ∈ Finset.range n,
-          Polynomial.C ((omega ^ i) ^ (n - 1 - k)) * Polynomial.X ^ k := by
-  rw [lagrangeBasisPoly, ComputablePolynomial.mul_eq, ComputablePolynomial.const_eq,
-    ComputablePolynomial.sumList_eq]
-  simp only [ComputablePolynomial.mul_eq, ComputablePolynomial.const_eq,
-    ComputablePolynomial.pow_eq, ComputablePolynomial.X_eq,
-    sum_listRange_eq_finsetRange]
+def lagrangeBasisPoly (omega : Fp) (n : Nat) (i : Int) : CPoly :=
+  C (omega ^ i / (n : Fp)) * ∑ k ∈ Finset.range n, C ((omega ^ i) ^ (n - 1 - k)) * X ^ k
 
 /-- Closed-form evaluation of the basis polynomial away from the domain. -/
 theorem lagrangeBasisPoly_eval (omega : Fp) (n : Nat) (i : Int) (x : Fp)
@@ -167,7 +145,7 @@ theorem lagrangeBasisPoly_eval (omega : Fp) (n : Nat) (i : Int) (x : Fp)
     · rw [zero_pow hpos.ne'] at homega
       exact one_ne_zero homega.symm
   have han : (omega ^ i) ^ n = 1 := by
-    rw [← zpow_natCast (omega ^ i) n, ← zpow_mul, mul_comm i (n : Int), zpow_mul,
+    rw [← zpow_natCast (omega ^ i) n, ← zpow_mul, _root_.mul_comm i (n : Int), zpow_mul,
       zpow_natCast, homega, one_zpow]
   have hxa : x ≠ omega ^ i := by
     intro hxe
@@ -183,14 +161,14 @@ theorem lagrangeBasisPoly_eval (omega : Fp) (n : Nat) (i : Int) (x : Fp)
           (∑ k ∈ Finset.range n, x ^ k * (omega ^ i) ^ (n - 1 - k)) *
             (x - omega ^ i) := by
               congr 1
-              exact Finset.sum_congr rfl fun k _ => mul_comm _ _
+              exact Finset.sum_congr rfl fun k _ => _root_.mul_comm _ _
       _ = x ^ n - (omega ^ i) ^ n := h
       _ = x ^ n - 1 := by rw [han]
   have heval : (lagrangeBasisPoly omega n i).eval x =
       (omega ^ i / (n : Fp)) *
         ∑ k ∈ Finset.range n, (omega ^ i) ^ (n - 1 - k) * x ^ k := by
-    rw [lagrangeBasisPoly_eq]
-    simp [Polynomial.eval_finsetSum]
+    rw [lagrangeBasisPoly]
+    simp [eval_finsetSum]
   have hsub : x - omega ^ i ≠ 0 := sub_ne_zero.mpr hxa
   have hsum : (∑ k ∈ Finset.range n, (omega ^ i) ^ (n - 1 - k) * x ^ k) =
       (x ^ n - 1) / (x - omega ^ i) := by
@@ -200,7 +178,7 @@ theorem lagrangeBasisPoly_eval (omega : Fp) (n : Nat) (i : Int) (x : Fp)
   field_simp
 
 /-- Evaluation commutes with the verifier's additive fold. -/
-theorem eval_foldl_add (x : Fp) (acc : Polynomial Fp) (ps : List (Polynomial Fp)) :
+theorem eval_foldl_add (x : Fp) (acc : CPoly) (ps : List (CPoly)) :
     (ps.foldl (· + ·) acc).eval x =
       (ps.map (fun p => p.eval x)).foldl (· + ·) (acc.eval x) := by
   induction ps generalizing acc with
@@ -223,7 +201,7 @@ theorem lagrange_bind_derived (omega : Fp) (n blinding : Nat) (x : Fp)
   show _ = ((List.range blinding).map
       (fun j => lagrangeBasisValue omega n (x ^ n) x (-((j : Int) + 1)))).foldl
         (· + ·) 0
-  rw [eval_foldl_add, Polynomial.eval_zero, List.map_map]
+  rw [eval_foldl_add, eval_zero, List.map_map]
   congr 1
   refine List.map_congr_left fun j _ => ?_
   exact lagrangeBasisPoly_eval omega n _ x homega hn hx

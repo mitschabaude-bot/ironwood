@@ -9,8 +9,8 @@ import Zcash.Snark.Verifier.FiatShamir
         let t := t ++ [.point Lⱼ, .point Rⱼ, .challenge]
         (t, us ++ [squeeze t])) (t₀, [])
 
-This module proves that the deployed schedule has the prefix ordering the reprogramming proofs
-assume.
+This module proves the deployed schedule's prefix ordering, used by the represented-execution and
+pinned-squeeze bounds.
 
 * `roundTranscript` is the prefix used to squeeze one round challenge.
 * `roundTranscript_succ` and `roundTranscript_prefix_mono` show how those prefixes grow.
@@ -282,14 +282,12 @@ theorem deriveChallenges_ipaRound_eq_roundChallenge {shape : Shape} [Zero F] (fs
 
 /-! ## Sealing the multiopen squeeze points
 
-The multiopen rewinding (`Soundness.Multiopen.Decode`) forks on the batching challenge `x₄`; the
-analogue of the round-by-round treatment above needs the same two ingredients at the multiopen
-squeeze points: the commit-before-challenge ordering (`q′` is absorbed before `x₃` is squeezed, the
-`u` family before `x₄`), and named squeeze prefixes so the oracle can be reprogrammed there
-(`Soundness.Forking.reprogramX4`). Mirroring `preIpaTranscript`, `preX3Transcript`/`preX4Transcript`
+The deployed verifier's multiopen squeeze points require explicit commit-before-challenge ordering:
+`q′` is absorbed before `x₃` is squeezed and the `u` family before `x₄`. Mirroring
+`preIpaTranscript`, `preX3Transcript`/`preX4Transcript`
 are fully inlined (not a chain of `++`), so `deriveChallenges_x3_eq`/`_x4_eq` hold by `rfl` and a
-single `simp only [preX4Transcript, …]` unfolds the squeeze input in one step — the shape the
-reprogramming length proofs use. A refactor of the absorb order breaks the seals. -/
+single `simp only [preX4Transcript, …]` unfolds the squeeze input in one step. A refactor of the
+absorb order breaks the seals. -/
 
 /-- The transcript `deriveChallenges` has absorbed when `x₃` is squeezed: everything through the
 `x₂` marker, then the multiopen `q′` commitment and the `x₃` challenge marker. -/
@@ -368,14 +366,10 @@ theorem preIpaTranscript_length_eq_preX4 {shape : Shape} (init : List (Transcrip
 
 /-! ## Sealing the compression squeeze points `x₁`/`x₂`
 
-The within-set (`x₁`) rewinding forks one squeeze earlier than the `x₄` collapse: redraw `x₁` and the
-rewound prover re-sends the *post-`x₁`* proof fields (`q′`, `u`, the IPA opening), so `x₃`/`x₄`
-re-randomize through their squeeze inputs while everything absorbed before `x₁` — the column
-commitments and every claimed evaluation — is shared across runs. The seals here supply that ordering:
+The compression squeezes occur before the multiopen collapse. The seals here supply that ordering:
 `preX1Transcript`/`preX2Transcript` name the squeeze inputs (inlined for `rfl` seals, like
 `preX3Transcript`), the membership lemmas pin the claimed evaluations before `x₁`, and the length chain
-places the compression squeezes strictly inside the multiopen ones. `Soundness.Forking.reprogramX1` is
-the reprogramming at this prefix. -/
+places the compression squeezes strictly inside the multiopen ones. -/
 
 /-- The transcript `deriveChallenges` has absorbed when `x₁` is squeezed: everything through the `x`
 marker, then all claimed evaluations and the `x₁` challenge marker. -/
@@ -426,8 +420,8 @@ theorem deriveChallenges_x2_eq {shape : Shape} [Zero F] (fs : FiatShamir F G)
     (init : List (TranscriptElt F G)) (ps : ProofString shape F G) :
     (deriveChallenges fs init ps).x2 = fs.squeeze (preX2Transcript init ps) := rfl
 
-/-- Commit-before-challenge at `x₁`: every claimed advice evaluation is inside the `x₁` squeeze input,
-fixed before the compression challenge — so it is shared across `x₁` rewinds. -/
+/-- Commit-before-challenge at `x₁`: every claimed advice evaluation is inside the `x₁` squeeze input
+and therefore fixed before the compression challenge. -/
 theorem adviceEvals_mem_preX1Transcript {shape : Shape} (init : List (TranscriptElt F G))
     (ps : ProofString shape F G) (p : Fin shape.numProofs) (i : Fin shape.numAdviceQueries) :
     TranscriptElt.scalar (ps.adviceEvals p i) ∈ preX1Transcript init ps := by
@@ -468,17 +462,15 @@ theorem fixedEvals_mem_preX1Transcript {shape : Shape} (init : List (TranscriptE
     (List.mem_append_left _ (List.mem_append_left _ (List.mem_append_left _
       (List.mem_append_left _ (List.mem_append_right _ hmem))))))
 
-/-- The `x₂` prefix is the `x₁` prefix plus its marker: nothing is absorbed between the compression
-squeezes, so an `x₁` reprogram leaves the `x₂` input at a different length (and every later squeeze
-longer still). -/
+/-- The `x₂` prefix is the `x₁` prefix plus its marker: nothing is absorbed between the two
+compression squeezes, and every later squeeze has a strictly longer input. -/
 theorem preX2Transcript_length_eq {shape : Shape} (init : List (TranscriptElt F G))
     (ps : ProofString shape F G) :
     (preX2Transcript init ps).length = (preX1Transcript init ps).length + 1 := by
   simp only [preX2Transcript, preX1Transcript, List.length_append, List.length_cons,
     List.length_nil]
 
-/-- The `x₃` prefix is the `x₂` prefix extended by the `q′` commitment and the `x₃` marker — the
-rewound prover's fresh `q′` is exactly what re-randomizes `x₃` across `x₁` rewinds. -/
+/-- The `x₃` prefix is the `x₂` prefix extended by the `q′` commitment and the `x₃` marker. -/
 theorem preX3Transcript_length_eq {shape : Shape} (init : List (TranscriptElt F G))
     (ps : ProofString shape F G) :
     (preX3Transcript init ps).length = (preX2Transcript init ps).length + 2 := by
@@ -487,13 +479,9 @@ theorem preX3Transcript_length_eq {shape : Shape} (init : List (TranscriptElt F 
 
 /-! ## Sealing the gate-check squeeze point `x`
 
-The good-challenge derivation (`Soundness.GoodChallenge`, the `_xgood` capstone rungs) spends an
-accept measure over the vanishing-check challenge `x`. Tying that measure's runs to the deployed
-schedule needs the same two ingredients as the round/multiopen/compression squeezes: the
-commit-before-challenge ordering (the column commitments and the quotient `h` pieces are absorbed
-before `x` is squeezed — exactly what pins the Schwartz–Zippel difference polynomial before the
-challenge samples), and a named squeeze prefix so the oracle can be reprogrammed there
-(`Soundness.Forking.reprogramX`). As with the other seals, `preXTranscript` is fully inlined so
+The gate-check squeeze has the same commit-before-challenge ordering: the column commitments and
+quotient `h` pieces are absorbed before `x`, pinning the Schwartz–Zippel difference polynomial
+before the challenge samples. As with the other seals, `preXTranscript` is fully inlined so
 `deriveChallenges_x_eq` holds by `rfl`, and a refactor of the absorb order breaks it. -/
 
 /-- The transcript `deriveChallenges` has absorbed when `x` is squeezed: everything through the `y`
@@ -535,9 +523,8 @@ theorem adviceCommitments_mem_preXTranscript {shape : Shape} (init : List (Trans
   simp only [preXTranscript, List.mem_append]
   tauto
 
-/-- The `x₁` prefix strictly extends the `x` prefix (by the claimed evaluations and the `x₁`
-marker): the gate-check squeeze sits strictly inside every later squeeze input, so an `x` reprogram
-leaves them untouched. -/
+/-- The `x₁` prefix strictly extends the `x` prefix by the claimed evaluations and the `x₁` marker,
+so the gate-check squeeze occurs strictly before every later squeeze. -/
 theorem preXTranscript_length_lt_preX1Transcript {shape : Shape} (init : List (TranscriptElt F G))
     (ps : ProofString shape F G) :
     (preXTranscript init ps).length < (preX1Transcript init ps).length := by

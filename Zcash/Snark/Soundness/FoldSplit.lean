@@ -25,49 +25,40 @@ That step is not free. The fold is a polynomial in `y` whose coefficients are th
 
 namespace Zcash.Snark
 
-open Polynomial Finset
+open CompPoly CompPoly.CPolynomial Finset
 
 /-- The `acc·y + v` fold read as a polynomial in `y`: `[c₀, …, c_{m-1}]` becomes
 `c₀·y^{m-1} + ⋯ + c_{m-1}`. -/
-def foldPoly (l : List Fp) : Polynomial Fp :=
-  l.foldl (fun acc v =>
-    ComputablePolynomial.add
-      (ComputablePolynomial.mul acc ComputablePolynomial.X)
-      (ComputablePolynomial.const v)) ComputablePolynomial.zero
+def foldPoly (l : List Fp) : CPoly :=
+  l.foldl (fun acc v => acc * X + C v) 0
 
-theorem foldPoly_eq_foldl (l : List Fp) :
-    foldPoly l = l.foldl (fun acc v => acc * X + C v) 0 := by
-  suffices h : ∀ (t : List Fp) (acc : Polynomial Fp),
-      t.foldl (fun acc v =>
-        ComputablePolynomial.add
-          (ComputablePolynomial.mul acc ComputablePolynomial.X)
-          (ComputablePolynomial.const v)) acc =
-        t.foldl (fun acc v => acc * X + C v) acc by
-    rw [foldPoly, h, ComputablePolynomial.zero_eq]
+@[simp] theorem foldPoly_nil : foldPoly [] = 0 := rfl
+
+/-- The fold grows from the right: appending `v` multiplies by `y` and adds. -/
+theorem foldPoly_concat (l : List Fp) (v : Fp) :
+    foldPoly (l ++ [v]) = foldPoly l * X + C v := by
+  rw [foldPoly, foldPoly, List.foldl_append]
+  rfl
+
+theorem toPoly_foldPoly (l : List Fp) :
+    (foldPoly l).toPoly
+      = l.foldl (fun acc v => acc * Polynomial.X + Polynomial.C v) 0 := by
+  suffices h : ∀ (t : List Fp) (acc : CPoly),
+      (t.foldl (fun acc v => acc * X + C v) acc).toPoly
+        = t.foldl (fun acc v => acc * Polynomial.X + Polynomial.C v) acc.toPoly by
+    simpa using h l 0
   intro t
   induction t with
   | nil => intro acc; rfl
   | cons v t ih =>
       intro acc
-      rw [List.foldl_cons, List.foldl_cons, ih,
-        ComputablePolynomial.add_eq, ComputablePolynomial.mul_eq,
-        ComputablePolynomial.X_eq, ComputablePolynomial.const_eq]
-
-@[simp] theorem foldPoly_nil : foldPoly [] = 0 := by
-  rw [foldPoly_eq_foldl]
-  rfl
-
-/-- The fold grows from the right: appending `v` multiplies by `y` and adds. -/
-theorem foldPoly_concat (l : List Fp) (v : Fp) :
-    foldPoly (l ++ [v]) = foldPoly l * X + C v := by
-  rw [foldPoly_eq_foldl, foldPoly_eq_foldl, List.foldl_append]
-  rfl
+      have hacc : (acc * X + C v).toPoly = acc.toPoly * Polynomial.X + Polynomial.C v := by simp
+      rw [List.foldl_cons, List.foldl_cons, ih, hacc]
 
 /-- Evaluating the fold polynomial at `y` is the verifier's fold. -/
 theorem eval_foldPoly (l : List Fp) (y : Fp) :
     (foldPoly l).eval y = l.foldl (fun acc v => acc * y + v) 0 := by
-  rw [foldPoly_eq_foldl]
-  suffices h : ∀ (t : List Fp) (acc : Polynomial Fp),
+  suffices h : ∀ (t : List Fp) (acc : CPoly),
       (t.foldl (fun acc v => acc * X + C v) acc).eval y
         = t.foldl (fun acc v => acc * y + v) (acc.eval y) by
     simpa using h l 0
@@ -76,10 +67,8 @@ theorem eval_foldPoly (l : List Fp) (y : Fp) :
   | nil => intro acc; simp
   | cons a s ih =>
       intro acc
-      simp only [List.foldl_cons]
-      have h := ih (acc * X + C a)
-      simp only [eval_add, eval_mul, eval_C, eval_X] at h
-      exact h
+      have hacc : (acc * X + C a).eval y = acc.eval y * y + a := by simp
+      rw [List.foldl_cons, List.foldl_cons, ih, hacc]
 
 /-- The fold polynomial has degree below the list length, so it is determined by fewer than
 `length` challenges. -/
@@ -89,9 +78,9 @@ theorem natDegree_foldPoly_lt {l : List Fp} (hl : l ≠ []) : (foldPoly l).natDe
   | append_singleton t v ih =>
       rw [foldPoly_concat, List.length_append, List.length_singleton]
       rcases eq_or_ne t [] with rfl | ht
-      · simp [foldPoly_eq_foldl]
+      · simp
       · refine Nat.lt_succ_of_le ((natDegree_add_le _ _).trans (max_le ?_ ?_))
-        · exact (natDegree_mul_le).trans (by simpa using Nat.succ_le_of_lt (ih ht))
+        · exact natDegree_mul_le.trans (by simpa using Nat.succ_le_of_lt (ih ht))
         · exact (natDegree_C v).le.trans (Nat.zero_le _)
 
 /-- The fold polynomial is zero exactly when every entry is. One `y` cannot distinguish these, which
@@ -103,12 +92,16 @@ theorem foldPoly_eq_zero_iff (l : List Fp) : foldPoly l = 0 ↔ ∀ v ∈ l, v =
       rw [foldPoly_concat]
       constructor
       · intro h
+        have hpoly : (foldPoly t).toPoly * Polynomial.X + Polynomial.C v = 0 := by
+          have := congrArg CPolynomial.toPoly h
+          simpa using this
         have hv : v = 0 := by
-          have := congrArg (Polynomial.coeff · 0) h
-          simpa [coeff_add, coeff_C, mul_coeff_zero] using this
+          have := congrArg (Polynomial.coeff · 0) hpoly
+          simpa [Polynomial.coeff_add, Polynomial.coeff_C, Polynomial.mul_coeff_zero] using this
         have ht : foldPoly t = 0 := by
-          rw [hv, map_zero, add_zero] at h
-          exact (mul_eq_zero.mp h).resolve_right X_ne_zero
+          rw [hv, map_zero, _root_.add_zero] at hpoly
+          rw [← toPoly_eq_zero_iff]
+          exact (mul_eq_zero.mp hpoly).resolve_right Polynomial.X_ne_zero
         intro u hu
         rcases List.mem_append.mp hu with hu | hu
         · exact (ih.mp ht) u hu
@@ -118,7 +111,6 @@ theorem foldPoly_eq_zero_iff (l : List Fp) : foldPoly l = 0 ↔ ∀ v ∈ l, v =
         have ht : foldPoly t = 0 := ih.mpr fun u hu => h u (by simp [hu])
         simp [hv, ht]
 
-
 /-! ## Reducing modulo the vanishing polynomial
 
 A constraint holds on the whole evaluation domain exactly when `Xⁿ − 1` divides it, which for a
@@ -127,96 +119,100 @@ the combined check says the remainders themselves fold to zero — and each `X`-
 statement is one polynomial equation in `y`. -/
 
 /-- `Xⁿ − 1` is monic for `n ≠ 0`, so remainders against it are well behaved. -/
-theorem monic_X_pow_sub_one {n : ℕ} (hn : n ≠ 0) : (X ^ n - 1 : Polynomial Fp).Monic := by
-  simpa using monic_X_pow_sub_C (1 : Fp) hn
+theorem monic_X_pow_sub_one {n : ℕ} (hn : n ≠ 0) : ((X : CPoly) ^ n - 1).monic := by
+  rw [monic_toPoly_iff]
+  simp only [toPoly_sub, toPoly_pow, X_toPoly, toPoly_one]
+  simpa using Polynomial.monic_X_pow_sub_C (1 : Fp) hn
+
+/-- The remainder of a constraint against the vanishing polynomial. -/
+abbrev vanishingRemainder (c : CPoly) (n : ℕ) : CPoly :=
+  CPolynomial.modByMonic c ((X : CPoly) ^ n - 1)
 
 /-- A constraint vanishes on the domain exactly when its remainder is zero. -/
-theorem dvd_iff_modByMonic_eq_zero {n : ℕ} (hn : n ≠ 0) (c : Polynomial Fp) :
-    (X ^ n - 1 : Polynomial Fp) ∣ c ↔ c %ₘ (X ^ n - 1) = 0 :=
+theorem dvd_iff_vanishingRemainder_eq_zero {n : ℕ} (hn : n ≠ 0) (c : CPoly) :
+    ((X : CPoly) ^ n - 1) ∣ c ↔ vanishingRemainder c n = 0 :=
   (modByMonic_eq_zero_iff_dvd (monic_X_pow_sub_one hn)).symm
 
 /-- The `y` fold commutes with reduction: folding and then reducing is reducing and then folding. -/
-theorem foldl_modByMonic (cs : List (Polynomial Fp)) (y : Fp) {r : Polynomial Fp} :
-    (cs.foldl (fun acc q => acc * C y + q) 0) %ₘ r
-      = (cs.map (fun c => c %ₘ r)).foldl (fun acc q => acc * C y + q) 0 := by
-  suffices h : ∀ (t : List (Polynomial Fp)) (acc : Polynomial Fp),
-      (t.foldl (fun acc q => acc * C y + q) acc) %ₘ r
-        = (t.map (fun c => c %ₘ r)).foldl (fun acc q => acc * C y + q) (acc %ₘ r) by
-    simpa [zero_modByMonic] using h cs 0
+theorem foldl_modByMonic (cs : List CPoly) (y : Fp) {r : CPoly} (hr : r.monic) :
+    CPolynomial.modByMonic (cs.foldl (fun acc q => acc * C y + q) 0) r
+      = (cs.map (fun c => CPolynomial.modByMonic c r)).foldl (fun acc q => acc * C y + q) 0 := by
+  suffices h : ∀ (t : List CPoly) (acc : CPoly),
+      CPolynomial.modByMonic (t.foldl (fun acc q => acc * C y + q) acc) r
+        = (t.map (fun c => CPolynomial.modByMonic c r)).foldl (fun acc q => acc * C y + q)
+            (CPolynomial.modByMonic acc r) by
+    simpa [zero_modByMonic hr] using h cs 0
   intro t
   induction t with
   | nil => intro acc; simp
   | cons a u ih =>
       intro acc
-      have hstep : (acc * C y + a) %ₘ r = (acc %ₘ r) * C y + a %ₘ r := by
-        rw [add_modByMonic, mul_comm acc (C y), ← smul_eq_C_mul, smul_modByMonic,
-          smul_eq_C_mul, mul_comm]
+      have hstep : CPolynomial.modByMonic (acc * C y + a) r
+          = CPolynomial.modByMonic acc r * C y + CPolynomial.modByMonic a r := by
+        rw [add_modByMonic _ _ hr, _root_.mul_comm acc (C y), C_mul_modByMonic _ _ hr,
+          _root_.mul_comm]
       simpa [hstep] using ih (acc * C y + a)
 
 /-- The `j`-th coefficient of the reduced constraints, folded as a polynomial in `y`. The combined
 check forces `y` to be one of its roots, so a nonzero witness is what makes splitting cost
 something. -/
-def foldSplitWitness (cs : List (Polynomial Fp)) (n j : ℕ) : Polynomial Fp :=
-  foldPoly (cs.map (fun c =>
-    (ComputablePolynomial.modByMonic c
-      (ComputablePolynomial.sub
-        (ComputablePolynomial.pow ComputablePolynomial.X n)
-        (ComputablePolynomial.const 1))).coeff j))
-
-theorem foldSplitWitness_eq (cs : List (Polynomial Fp)) (n j : ℕ) :
-    foldSplitWitness cs n j =
-      foldPoly (cs.map (fun c => (c %ₘ (X ^ n - 1)).coeff j)) := by
-  simp [foldSplitWitness, ComputablePolynomial.modByMonic_eq, ComputablePolynomial.sub_eq,
-    ComputablePolynomial.pow_eq, ComputablePolynomial.X_eq, ComputablePolynomial.const_eq]
+def foldSplitWitness (cs : List CPoly) (n j : ℕ) : CPoly :=
+  foldPoly (cs.map (fun c => (vanishingRemainder c n).coeff j))
 
 /-- The witness has degree below the list length, so it excludes at most `length − 1` challenges. -/
-theorem natDegree_foldSplitWitness_lt {cs : List (Polynomial Fp)} (hcs : cs ≠ []) (n j : ℕ) :
+theorem natDegree_foldSplitWitness_lt {cs : List CPoly} (hcs : cs ≠ []) (n j : ℕ) :
     (foldSplitWitness cs n j).natDegree < cs.length := by
-  rw [foldSplitWitness_eq]
-  have hne : cs.map (fun c => (c %ₘ (X ^ n - 1)).coeff j) ≠ [] := by
+  rw [foldSplitWitness]
+  have hne : cs.map (fun c => (vanishingRemainder c n).coeff j) ≠ [] := by
     simpa using hcs
   simpa using natDegree_foldPoly_lt hne
 
 /-- The price of splitting: each coefficient's witness excludes at most `length − 1` challenges. -/
-theorem szBadSet_foldSplitWitness_card_le {cs : List (Polynomial Fp)} (hcs : cs ≠ []) (n j : ℕ) :
+theorem szBadSet_foldSplitWitness_card_le {cs : List CPoly} (hcs : cs ≠ []) (n j : ℕ) :
     (szBadSet (foldSplitWitness cs n j)).card < cs.length :=
   lt_of_le_of_lt (szBadSet_card_le _) (natDegree_foldSplitWitness_lt hcs n j)
 
 /-- A constraint that does not vanish on the domain makes some coefficient's witness nonzero. -/
-theorem exists_foldSplitWitness_ne_zero {cs : List (Polynomial Fp)} {n : ℕ} (hn : n ≠ 0)
-    {c : Polynomial Fp} (hmem : c ∈ cs) (hdvd : ¬ (X ^ n - 1 : Polynomial Fp) ∣ c) :
+theorem exists_foldSplitWitness_ne_zero {cs : List CPoly} {n : ℕ} (hn : n ≠ 0)
+    {c : CPoly} (hmem : c ∈ cs) (hdvd : ¬ ((X : CPoly) ^ n - 1) ∣ c) :
     ∃ j, foldSplitWitness cs n j ≠ 0 := by
-  have hres : c %ₘ (X ^ n - 1) ≠ 0 := fun h => hdvd ((dvd_iff_modByMonic_eq_zero hn c).mpr h)
-  obtain ⟨j, hj⟩ : ∃ j, (c %ₘ (X ^ n - 1)).coeff j ≠ 0 := by
+  have hres : vanishingRemainder c n ≠ 0 :=
+    fun h => hdvd ((dvd_iff_vanishingRemainder_eq_zero hn c).mpr h)
+  obtain ⟨j, hj⟩ : ∃ j, (vanishingRemainder c n).coeff j ≠ 0 := by
     by_contra hall
-    exact hres (Polynomial.ext fun j => by simpa using not_exists.mp hall j)
+    exact hres (eq_zero_iff_coeff_zero.mpr fun j => by simpa using not_exists.mp hall j)
   refine ⟨j, fun h => hj ?_⟩
-  rw [foldSplitWitness_eq] at h
+  rw [foldSplitWitness] at h
   exact (foldPoly_eq_zero_iff _).mp h _ (List.mem_map_of_mem hmem)
 
 /-- The combined check forces `y` to root every coefficient's witness. -/
-theorem eval_foldSplitWitness_eq_zero {cs : List (Polynomial Fp)} {hq : Polynomial Fp} {n : ℕ}
+theorem eval_foldSplitWitness_eq_zero {cs : List CPoly} {hq : CPoly} {n : ℕ}
     (hn : n ≠ 0) {y : Fp}
-    (hfold : cs.foldl (fun acc q => acc * C y + q) 0 = hq * (X ^ n - 1)) (j : ℕ) :
+    (hfold : cs.foldl (fun acc q => acc * C y + q) 0 = hq * ((X : CPoly) ^ n - 1)) (j : ℕ) :
     (foldSplitWitness cs n j).eval y = 0 := by
-  have hmonic := monic_X_pow_sub_one hn
-  have hzero : (cs.map (fun c => c %ₘ (X ^ n - 1))).foldl (fun acc q => acc * C y + q) 0 = 0 := by
-    rw [← foldl_modByMonic cs y, hfold]
-    exact (modByMonic_eq_zero_iff_dvd hmonic).mpr ⟨hq, mul_comm _ _⟩
+  have hmonic : ((X : CPoly) ^ n - 1).monic := monic_X_pow_sub_one hn
+  have hzero : (cs.map (fun c => vanishingRemainder c n)).foldl
+      (fun acc q => acc * C y + q) 0 = 0 := by
+    rw [← foldl_modByMonic cs y hmonic, hfold]
+    exact (modByMonic_eq_zero_iff_dvd hmonic).mpr ⟨hq, _root_.mul_comm _ _⟩
   have hcoeff : (List.foldl (fun acc q => acc * C y + q) 0
-      (cs.map (fun c => c %ₘ (X ^ n - 1)))).coeff j = 0 := by
+      (cs.map (fun c => vanishingRemainder c n))).coeff j = 0 := by
     rw [hzero, coeff_zero]
-  rw [foldSplitWitness_eq, eval_foldPoly]
-  have key : ∀ (t : List (Polynomial Fp)) (acc : Polynomial Fp),
-      ((t.map (fun c => c %ₘ (X ^ n - 1))).foldl (fun acc q => acc * C y + q) acc).coeff j
-        = (t.map (fun c => (c %ₘ (X ^ n - 1)).coeff j)).foldl (fun acc v => acc * y + v)
+  rw [foldSplitWitness, eval_foldPoly]
+  have key : ∀ (t : List CPoly) (acc : CPoly),
+      ((t.map (fun c => vanishingRemainder c n)).foldl (fun acc q => acc * C y + q) acc).coeff j
+        = (t.map (fun c => (vanishingRemainder c n).coeff j)).foldl (fun acc v => acc * y + v)
             (acc.coeff j) := by
     intro t
     induction t with
     | nil => intro acc; simp
     | cons a u ih =>
         intro acc
-        simpa [coeff_add, coeff_C_mul, mul_comm] using ih (acc * C y + a %ₘ (X ^ n - 1))
+        have hacc : (acc * C y + vanishingRemainder a n).coeff j
+            = acc.coeff j * y + (vanishingRemainder a n).coeff j := by
+          rw [coeff_add, _root_.mul_comm acc (C y), coeff_C_mul, _root_.mul_comm]
+        simp only [List.map_cons, List.foldl_cons]
+        rw [ih (acc * C y + vanishingRemainder a n), hacc]
   have hkey := key cs 0
   simp only [coeff_zero] at hkey
   rw [← hkey, hcoeff]
@@ -226,16 +222,15 @@ the single folded identity into one identity per constraint: every constraint va
 evaluation domain. This is the `y`-side analogue of `hgood`, priced by
 `szBadSet_foldSplitWitness_card_le`, and it is what lets the permutation and lookup arguments talk
 about individual rows. -/
-theorem constraints_dvd_of_good_y (cs : List (Polynomial Fp)) (hq : Polynomial Fp) {n : ℕ}
+theorem constraints_dvd_of_good_y (cs : List CPoly) (hq : CPoly) {n : ℕ}
     (hn : n ≠ 0) {y : Fp}
-    (hfold : cs.foldl (fun acc q => acc * C y + q) 0 = hq * (X ^ n - 1))
+    (hfold : cs.foldl (fun acc q => acc * C y + q) 0 = hq * ((X : CPoly) ^ n - 1))
     (hgoodY : ∀ j, y ∉ szBadSet (foldSplitWitness cs n j)) :
-    ∀ c ∈ cs, (X ^ n - 1 : Polynomial Fp) ∣ c := by
+    ∀ c ∈ cs, ((X : CPoly) ^ n - 1) ∣ c := by
   intro c hmem
   by_contra hdvd
   obtain ⟨j, hj⟩ := exists_foldSplitWitness_ne_zero hn hmem hdvd
   exact (not_mem_szBadSet.mp (hgoodY j)) hj (eval_foldSplitWitness_eq_zero hn hfold j)
-
 
 /-! ## Tuples under the fold
 
@@ -259,13 +254,15 @@ theorem foldPoly_sub {l₁ l₂ : List Fp} (hlen : l₁.length = l₂.length) :
           simpa [List.concat_eq_append] using hlen
         rw [List.concat_eq_append, List.zipWith_append (h := hlen'), foldPoly_concat,
           foldPoly_concat, List.zipWith_cons_cons, List.zipWith_nil_right, foldPoly_concat,
-          ← ih hlen', map_sub]
+          ← ih hlen']
+        apply toPoly_injective
+        simp only [toPoly_sub, toPoly_add, toPoly_mul, C_toPoly, X_toPoly, map_sub]
         ring
 
 /-- **Decompression.** Equal folds at a `θ` outside the difference's roots force equal tuples. -/
 theorem tuple_eq_of_foldPoly_eval_eq {u w : List Fp} (hlen : u.length = w.length) {θ : Fp}
     (hgood : θ ∉ szBadSet (foldPoly u - foldPoly w))
-    (heq : (foldPoly u).eval θ = (foldPoly w).eval θ) : u = w := by
+    (heq : eval θ (foldPoly u) = eval θ (foldPoly w)) : u = w := by
   by_contra hne
   have hD : foldPoly u - foldPoly w ≠ 0 := by
     rw [foldPoly_sub hlen]

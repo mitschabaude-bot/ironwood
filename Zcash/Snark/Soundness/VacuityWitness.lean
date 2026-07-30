@@ -30,10 +30,8 @@ tiers of census pin say sharply different things:
 
 So this is the anti-vacuity instrument for the endpoint census: it identifies precisely which pin
 carries the extraction claim, and it is the reason the `⊕'`-with-data shape is not by itself
-sufficient. Endpoints whose route is essentially classical — the `x₁` forking floor
-(`openedMemberDecode_of_x1Prob`) turns an accept-measure bound into rewound transcripts via
-`Classical.choose`, and everything downstream of it inherits that — cannot be strengthened by
-restating them; they are strengthened by being superseded by a rewind-free computable route.
+sufficient. The member-decode route starts from explicit AGM coordinates and keeps every relation
+branch as computed data.
 -/
 
 namespace Zcash.Snark

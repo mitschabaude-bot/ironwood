@@ -1922,7 +1922,7 @@ does not need to know how commitments or a concrete verifying key are assembled.
 theorem selectorActivationsRealized_of_fixedRowPolynomials
     {n : ℕ} (omega : Fp)
     (fixedRows : ℕ → List Fp)
-    (adviceCols instanceCols : ℕ → Polynomial Fp)
+    (adviceCols instanceCols : ℕ → CPoly)
     (usableRows : ℕ)
     (map : SelCompressMap) (activationRows : List (ℕ × ℕ))
     (hrows :

@@ -14,7 +14,7 @@ namespace Zcash.Snark
 
 namespace ActionTerminal
 
-open Halo2 Polynomial Keygen
+open Halo2 CompPoly.CPolynomial Keygen
 open Zcash.Circuits
 open Zcash.Circuits.Action
 open Zcash.Arithmetic (scalarFieldOrder)
@@ -42,7 +42,7 @@ end ActionBundleWitness
 indices `j ≥ n` are zero by degree, so this finite traversal returns the full specification-level
 avoidance certificate without computing any root set. -/
 def foldSplitAvoidance?
-    (cs : List (Polynomial Fp)) (n : Nat) (hn : n ≠ 0) (y : Fp) :
+    (cs : List (CPoly)) (n : Nat) (hn : n ≠ 0) (y : Fp) :
     Option (PLift (∀ j, y ∉ szBadSet (foldSplitWitness cs n j))) :=
   match finForallOption (fun j : Fin n =>
       szBadSetAvoidance? (foldSplitWitness cs n j.1) y) with
@@ -50,10 +50,10 @@ def foldSplitAvoidance?
   | some hgood => some ⟨fun j =>
       if hj : j < n then (hgood ⟨j, hj⟩).down
       else not_mem_szBadSet.mpr fun hne =>
-        False.elim (hne (foldSplitWitness_eq_zero_of_le hn (Nat.le_of_not_gt hj)))⟩
+        False.elim (hne (foldSplitWitness_zero_of_le hn (Nat.le_of_not_gt hj)))⟩
 
 theorem foldSplitAvoidance?_isSome_of
-    (cs : List (Polynomial Fp)) (n : Nat) (hn : n ≠ 0) (y : Fp)
+    (cs : List (CPoly)) (n : Nat) (hn : n ≠ 0) (y : Fp)
     (hgood : ∀ j, y ∉ szBadSet (foldSplitWitness cs n j)) :
     (foldSplitAvoidance? cs n hn y).isSome := by
   have hfinite : ∀ j : Fin n,
@@ -111,7 +111,7 @@ def action_bundleStatement_or_relation_of_decode_circuitSat
     (haccepts : DeployedAccepts urs hk
       (actionCircuit.toVerifierKey pp urs)
       (actionCircuit.instanceCommitment pp urs inputs) ps ch)
-    (hpoly : Polynomial Fp)
+    (hpoly : CPoly)
     (hsatisfied :
       (CanonicalMemberConstraintRelation.acceptedModel
         (memberDecode := fun i hi => decode.toMemberDecode hchar i hi)
@@ -165,7 +165,7 @@ def action_bundleWitness_or_relation_of_decode_circuitSat
     (haccepts : DeployedAccepts urs hk
       (actionCircuit.toVerifierKey pp urs)
       (actionCircuit.instanceCommitment pp urs inputs) ps ch)
-    (hpoly : Polynomial Fp)
+    (hpoly : CPoly)
     (hsatisfied :
       (CanonicalMemberConstraintRelation.acceptedModel
         (memberDecode := fun i hi => decode.toMemberDecode hchar i hi)
@@ -365,15 +365,11 @@ def actionTerminalWitnessOrRelationFinder
         let polynomial := CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode := fun i hi => decode.toMemberDecode (hchar basis O) i hi) haccepts
         match hxgood : szBadSetAvoidance?
-            (ComputablePolynomial.sub
-              (combineConstraintsData model.fixedCols model.adviceCols model.instanceCols model.gates
+            (combineConstraints model.fixedCols model.adviceCols model.instanceCols model.gates
                 model.sets model.chunks model.lookups model.beta model.gamma model.delta model.theta
-                ch.y model.chunkLen model.l0 model.lLast model.lBlind)
-              (ComputablePolynomial.mul (polynomial CommitmentId.vanishingH)
-                (ComputablePolynomial.sub
-                  (ComputablePolynomial.pow ComputablePolynomial.X
-                    actionCircuit.n)
-                  (ComputablePolynomial.const 1)))) ch.x with
+                ch.y model.chunkLen model.l0 model.lLast model.lBlind
+              - polynomial CommitmentId.vanishingH
+                  * (X ^ actionCircuit.n - 1)) ch.x with
         | some hxgoodProof =>
           let hn : actionCircuit.n ≠ 0 := actionCircuit.n_ne_zero
           match hgoodY : foldSplitAvoidance? model.constraints
@@ -402,11 +398,7 @@ def actionTerminalWitnessOrRelationFinder
                     (ActionPermutationDomain.routingCoherent_of_derived pp urs)
                     (ActionPermutationDomain.rowsInjective pp urs)
                     (ActionPermutationDomain.root pp urs) hnFp
-                    (by
-                      simpa only [ComputablePolynomial.sub_eq, ComputablePolynomial.mul_eq,
-                        ComputablePolynomial.pow_eq, ComputablePolynomial.X_eq,
-                        ComputablePolynomial.const_eq, Polynomial.C_1,
-                        combineConstraintsData_eq] using hxgoodProof.down) with
+                    (by exact hxgoodProof.down) with
                 | PSum.inr relation =>
                     some (Sum.inr (augmentedBasis_ursOfAugmentedBasis
                       (pp.mergeDerived actionCircuit).k basis ▸

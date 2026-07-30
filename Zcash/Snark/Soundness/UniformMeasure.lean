@@ -3,17 +3,15 @@ import Mathlib.Algebra.Order.Chebyshev
 import Mathlib.Probability.Distributions.Uniform
 
 /-!
-# Uniform-measure and accepting-count lemmas
+# Uniform-measure lemmas
 
-Distribution facts about `PMF.uniformOfFintype` and the counting floors built on them, kept
-independent of any extraction strategy: pushforwards along equivalences and injections, product
-and fibre bounds, point and blind-set measures, and the "measure beats count" lemmas
-(`exists_injective_accepting_of_measure` and friends) that turn an accept measure into an
-injective family of accepting points.
+Distribution facts about `PMF.uniformOfFintype`, kept independent of any extraction strategy:
+pushforwards along equivalences and injections, product and fibre bounds, and point and blind-set
+measures.
 
-These were factored out of `Soundness.Forking.Probability` so the straight-line consumers
-(`Soundness.GoodChallenge`, `Soundness.Multiopen.*`, `Security.KeyBinding.Probability`,
-`Soundness.AGM.*`) do not depend on the forking development.
+These are factored into a standalone module so the straight-line consumers
+(`Soundness.GoodChallenge`, `Soundness.Multiopen.*`, `Security.KeyBinding.Probability`, and
+`Soundness.AGM.*`) depend only on the distribution facts they use.
 -/
 
 namespace Zcash.Snark
@@ -325,132 +323,5 @@ theorem uniformOfFintype_point_mem_blind_le {T F : Type*} [Fintype T] [Decidable
         exact sum_point_mem_measure_le S hS
     _ = ε := ENNReal.mul_div_cancel_right (Nat.cast_ne_zero.mpr Fintype.card_ne_zero)
         (ENNReal.natCast_ne_top _)
-
-/-- Uniform measure of a set inside three points is at most `3 / |α|`. -/
-theorem uniformOfFintype_toOuterMeasure_triple_le {α : Type*} [Fintype α] [Nonempty α]
-    {s : Set α} {x a b : α} (hs : s ⊆ {x, a, b}) :
-    (PMF.uniformOfFintype α).toOuterMeasure s ≤ 3 / Fintype.card α := by
-  refine le_trans (MeasureTheory.measure_mono hs) ?_
-  rw [uniformOfFintype_toOuterMeasure_set]
-  gcongr
-  have h1 : ({x, a, b} : Set α).ncard ≤ 3 := by
-    refine le_trans (Set.ncard_insert_le _ _) ?_
-    have h2 : ({a, b} : Set α).ncard ≤ 2 :=
-      le_trans (Set.ncard_insert_le _ _) (by simp [Set.ncard_singleton])
-    omega
-  rw [Nat.card_coe_set_eq]
-  exact_mod_cast h1
-
-open scoped ENNReal in
-/-- **The single-squeeze forking count.** If one accepting challenge is in hand and the accept event's
-uniform measure beats `n / |α|`, then `n + 1` pairwise-distinct accepting challenges exist, with the given
-one in slot `0`. Beating `n/|α|` forces `n` rewound accepting values beside the current one — the
-counting core of the multiopen `x₄` rewinding
-(`Soundness.Multiopen.Deployed`). -/
-theorem exists_injective_accepting_of_measure {α : Type*} [Fintype α] [DecidableEq α] [Nonempty α] {n : ℕ}
-    {acc : α → Prop} [DecidablePred acc] {x₀ : α} (hx₀ : acc x₀)
-    (hprob : (n : ℝ≥0∞) / Fintype.card α
-      < (PMF.uniformOfFintype α).toOuterMeasure (Finset.univ.filter acc)) :
-    ∃ ξ : Fin (n + 1) → α, Function.Injective ξ ∧ ξ 0 = x₀ ∧ ∀ r, acc (ξ r) := by
-  have hcard : n < (Finset.univ.filter acc).card := by
-    by_contra hle
-    push Not at hle
-    have hmono : (PMF.uniformOfFintype α).toOuterMeasure (Finset.univ.filter acc)
-        ≤ (n : ℝ≥0∞) / Fintype.card α := by
-      rw [uniformOfFintype_toOuterMeasure_finset]
-      exact ENNReal.div_le_div_right (by exact_mod_cast hle) _
-    exact absurd hprob (not_lt.mpr hmono)
-  have hx₀mem : x₀ ∈ Finset.univ.filter acc := Finset.mem_filter.mpr ⟨Finset.mem_univ _, hx₀⟩
-  have herase : n ≤ ((Finset.univ.filter acc).erase x₀).card := by
-    rw [Finset.card_erase_of_mem hx₀mem]
-    omega
-  obtain ⟨S, hS, hScard⟩ := Finset.exists_subset_card_eq herase
-  let f : Fin n → α := fun i => (S.equivFin.symm (Fin.cast hScard.symm i) : α)
-  have hfinj : Function.Injective f := fun i j hij => by
-    have h1 := S.equivFin.symm.injective (Subtype.val_injective hij)
-    exact Fin.val_injective (by simpa using congrArg Fin.val h1)
-  have hfS : ∀ i, f i ∈ S := fun i => (S.equivFin.symm (Fin.cast hScard.symm i)).2
-  refine ⟨Fin.cons x₀ f, ?_, rfl, ?_⟩
-  · refine (Fin.cons_injective_iff).mpr ⟨?_, hfinj⟩
-    rintro ⟨i, hfi⟩
-    exact Finset.ne_of_mem_erase (hS (hfS i)) hfi
-  · intro r
-    cases r using Fin.cases with
-    | zero => simpa using hx₀
-    | succ i =>
-        have hmem := hS (hfS i)
-        have := Finset.mem_of_mem_erase hmem
-        simpa using (Finset.mem_filter.mp this).2
-
-open scoped ENNReal in
-/-- **The single-squeeze forking count, off a bad set.** The avoidance-strengthened
-`exists_injective_accepting_of_measure`: paying `bad.card / |α|` on top of the `n / |α|` sampling
-floor buys `n + 1` pairwise-distinct accepting values that additionally miss `bad` altogether.
-Counting, not a union bound: beating `(n + bad.card) / |α|` forces `n + bad.card < #{acc}`, so
-`#({acc} \ bad) > n` whatever `bad` is.
-
-This is what turns a sample-avoidance hypothesis into a budget line. The multiopen grid needs its
-interpolation challenges off the opened set points (else the cleared-denominator core divides by a
-vanishing `∏(χ − p)`), and an accepting run does *not* supply that: at a colliding challenge the
-verifier's `(x₃ − p)⁻¹` is `0⁻¹ = 0`, so the check degenerates rather than failing. Charging
-`|allPts| / |α|` for the collisions and sampling off `allPts` discharges the hypothesis outright.
-
-No anchor is needed — unlike `exists_injective_accepting_of_measure`, which threads a given
-accepting value into slot `0`, the floor alone is what produces the family here. -/
-theorem exists_injective_accepting_avoiding_of_measure {α : Type*} [Fintype α] [DecidableEq α]
-    [Nonempty α] {n : ℕ} {acc : α → Prop} [DecidablePred acc] (bad : Finset α)
-    (hprob : ((n + bad.card : ℕ) : ℝ≥0∞) / Fintype.card α
-      < (PMF.uniformOfFintype α).toOuterMeasure (Finset.univ.filter acc)) :
-    ∃ ξ : Fin (n + 1) → α, Function.Injective ξ ∧ ∀ r, acc (ξ r) ∧ ξ r ∉ bad := by
-  have hcard : n + bad.card < (Finset.univ.filter acc).card := by
-    by_contra hle
-    push Not at hle
-    have hmono : (PMF.uniformOfFintype α).toOuterMeasure (Finset.univ.filter acc)
-        ≤ ((n + bad.card : ℕ) : ℝ≥0∞) / Fintype.card α := by
-      rw [uniformOfFintype_toOuterMeasure_finset]
-      exact ENNReal.div_le_div_right (by exact_mod_cast hle) _
-    exact absurd hprob (not_lt.mpr hmono)
-  have hsd : n + 1 ≤ ((Finset.univ.filter acc) \ bad).card := by
-    have := Finset.le_card_sdiff bad (Finset.univ.filter acc)
-    omega
-  obtain ⟨S, hS, hScard⟩ := Finset.exists_subset_card_eq hsd
-  refine ⟨fun i => (S.equivFin.symm (Fin.cast hScard.symm i) : α), ?_, ?_⟩
-  · intro i j hij
-    have h1 := S.equivFin.symm.injective (Subtype.val_injective hij)
-    exact Fin.val_injective (by simpa using congrArg Fin.val h1)
-  · intro r
-    have hmem := hS (S.equivFin.symm (Fin.cast hScard.symm r)).2
-    rw [Finset.mem_sdiff] at hmem
-    exact ⟨(Finset.mem_filter.mp hmem.1).2, hmem.2⟩
-
-open scoped ENNReal in
-/-- **The single-squeeze forking *failure* bound** — the failure-side complement of
-`exists_injective_accepting_of_measure`. Over one fresh uniform challenge `χ`, the event "`acc χ` holds
-yet the accept measure sits at or below the threshold `t`" has measure `≤ t`: the threshold condition is
-`χ`-independent, so the event is either all of `{χ | acc χ}` (when the measure `≤ t`, whence its measure
-`≤ t`) or empty. This is the counting core turning each multiopen squeeze's `hprob` floor into a bounded
-failure probability. -/
-theorem uniformOfFintype_accept_below_threshold_le {α : Type*} [Fintype α] [Nonempty α]
-    [DecidableEq α] (acc : α → Prop) [DecidablePred acc] (t : ℝ≥0∞) :
-    (PMF.uniformOfFintype α).toOuterMeasure
-        {χ : α | acc χ ∧ (PMF.uniformOfFintype α).toOuterMeasure (Finset.univ.filter acc) ≤ t}
-      ≤ t := by
-  by_cases h : (PMF.uniformOfFintype α).toOuterMeasure (Finset.univ.filter acc) ≤ t
-  · have hset : {χ : α | acc χ ∧
-        (PMF.uniformOfFintype α).toOuterMeasure (Finset.univ.filter acc) ≤ t}
-        = {χ : α | acc χ} := by
-      ext χ
-      simp only [Set.mem_setOf_eq, and_iff_left_iff_imp]
-      intro _; exact h
-    have hcoe : {χ : α | acc χ} = (↑(Finset.univ.filter acc) : Set α) := by
-      ext χ; simp [Finset.coe_filter]
-    rw [hset, hcoe]
-    exact h
-  · have hset : {χ : α | acc χ ∧
-        (PMF.uniformOfFintype α).toOuterMeasure (Finset.univ.filter acc) ≤ t} = ∅ := by
-      ext χ
-      simp only [Set.mem_setOf_eq, Set.mem_empty_iff_false, iff_false, not_and]
-      intro _; exact h
-    rw [hset]; simp
 
 end Zcash.Snark

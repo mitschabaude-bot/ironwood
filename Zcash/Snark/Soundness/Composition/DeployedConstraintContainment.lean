@@ -40,7 +40,7 @@ degenerate. -/
 def deployedConstraintDifferencePreX
     (family : ComputedDeployedRootFSFamily shape)
     (basis : AugmentedIndex (2 ^ shape.k) -> VestaG) (coins : family.toFamily.Coins) :
-    Polynomial Fp :=
+    CPoly :=
   let pnu := deployedRootRunOutput family basis coins
   committedPreXConstraintDifference
     (deployedConstraintPointPolynomial family basis pnu)
@@ -251,8 +251,8 @@ Inhabited twice.  `Composition.StraightLineWitness` does it at the degenerate wi
 metadata, layouts and domain — so the six staged root events run against captured query layouts
 and the staged IPA trace carries eleven live rounds rather than quantifying over `Fin 0`.
 
-The total event of issue #127 removed this interface's old decode guard, so the zero prover
-also inhabits it at the full captured shape (`Fixtures.MultiAction.CapturedZeroFamily`): with
+The zero prover inhabits this interface at the full captured shape
+(`Fixtures.MultiAction.CapturedZeroFamily`): with
 sub-proofs the pre-`x` difference is a nonzero polynomial, and the stage prices its root set
 from the four folding squeezes alone.
 -/
@@ -297,7 +297,7 @@ structure DeployedConstraintXSqueezeSchedule (family : ComputedDeployedRootFSFam
   pinned : DeployedConstraintXPinning family
 
 /-- The single pinned event for the constraint evaluation challenge. -/
-noncomputable def deployedConstraintXPinnedEvent
+def deployedConstraintXPinnedEvent
     (family : ComputedDeployedRootFSFamily shape) {epsilonX : ENNReal}
     (schedule : DeployedConstraintXSqueezeSchedule family epsilonX)
     (basis : AugmentedIndex (2 ^ shape.k) -> VestaG) :

@@ -1,4 +1,4 @@
-import Zcash.Snark.Soundness.Forking.PinnedSqueeze
+import Zcash.Snark.Soundness.FiatShamir.PinnedSqueeze
 
 /-!
 # Additive pricing for pinned root events

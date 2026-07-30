@@ -13,7 +13,7 @@ the constructor of `TopLevelCircuitCorrectness`.
 
 namespace Zcash.Snark
 
-open Halo2 Polynomial Keygen
+open Halo2 CompPoly.CPolynomial Keygen
 open Zcash.Arithmetic (scalarFieldOrder)
 
 variable {G : Type} [AddCommGroup G] [Module Fp G]
@@ -23,7 +23,7 @@ local instance topLevelStraightLineInhabitedVesta : Inhabited VestaG := ⟨0⟩
 
 /-- Check every potentially nonzero fold-split witness by direct evaluation. -/
 def foldSplitAvoidance?
-    (cs : List (Polynomial Fp)) (n : Nat) (hn : n ≠ 0) (y : Fp) :
+    (cs : List CPoly) (n : Nat) (hn : n ≠ 0) (y : Fp) :
     Option (PLift (∀ j, y ∉ szBadSet (foldSplitWitness cs n j))) :=
   match finForallOption (fun j : Fin n =>
       szBadSetAvoidance? (foldSplitWitness cs n j.1) y) with
@@ -31,10 +31,10 @@ def foldSplitAvoidance?
   | some hgood => some ⟨fun j =>
       if hj : j < n then (hgood ⟨j, hj⟩).down
       else not_mem_szBadSet.mpr fun hne =>
-        False.elim (hne (foldSplitWitness_eq_zero_of_le hn (Nat.le_of_not_gt hj)))⟩
+        False.elim (hne (foldSplitWitness_zero_of_le hn (Nat.le_of_not_gt hj)))⟩
 
 theorem foldSplitAvoidance?_isSome_of
-    (cs : List (Polynomial Fp)) (n : Nat) (hn : n ≠ 0) (y : Fp)
+    (cs : List CPoly) (n : Nat) (hn : n ≠ 0) (y : Fp)
     (hgood : ∀ j, y ∉ szBadSet (foldSplitWitness cs n j)) :
     (foldSplitAvoidance? cs n hn y).isSome := by
   have hfinite : ∀ j : Fin n,

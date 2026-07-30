@@ -4,9 +4,9 @@ import Zcash.Snark.Soundness.AGM.DeployedRootDecode
 /-!
 # A decode presented through the opened-batch interface
 
-`DeployedAlgebraicDecode` is what the rewind-free route produces: AGM coordinate columns for the
-`x₄` batch and each routed `x₁` batch, together with the value equations they open to.  The
-Action-side terminal instead consumes the historical opened-batch interface — an
+`DeployedAlgebraicDecode` supplies AGM coordinate columns for the `x₄` batch and each routed `x₁`
+batch, together with the value equations they open to. The Action-side terminal consumes the
+opened-batch interface — an
 `OpenedBatchOpenings` and a per-set `OpenedMemberDecode`.
 
 The two are the same data.  `AGM.SyntheticOpened` already rebuilds the opened-batch object from

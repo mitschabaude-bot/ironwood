@@ -15,7 +15,7 @@ depth times `B`.
 
 namespace Zcash.Snark
 
-open Polynomial
+open CompPoly.CPolynomial
 
 /-- Syntactic degree of a gate expression, counting column leaves per multiplicative branch:
 leaves are `1`, products add, sums take the max. Evaluated at column polynomials of degree `≤ B`,
@@ -33,10 +33,10 @@ def Expr.degreeBound {F : Type*} : Expr F → ℕ
 /-- A gate expression with scalar constants, evaluated at column polynomials of degree `≤ B`, has
 degree at most `degreeBound · B`: constants contribute nothing, leaves one column each, products
 add. -/
-theorem natDegree_eval_map_C_le {B : ℕ} {fx av inst : ℕ → Polynomial Fp}
+theorem natDegree_eval_map_C_le {B : ℕ} {fx av inst : ℕ → CPoly}
     (hfx : ∀ i, (fx i).natDegree ≤ B) (hav : ∀ i, (av i).natDegree ≤ B)
     (hinst : ∀ i, (inst i).natDegree ≤ B) (e : Expr Fp) :
-    ((e.map Polynomial.C).eval fx av inst).natDegree ≤ e.degreeBound * B := by
+    ((e.map C).eval fx av inst).natDegree ≤ e.degreeBound * B := by
   induction e with
   | constant c => simp [Expr.map, Expr.eval, Expr.degreeBound]
   | fixed i => simpa [Expr.map, Expr.eval, Expr.degreeBound] using hfx i
@@ -49,7 +49,7 @@ theorem natDegree_eval_map_C_le {B : ℕ} {fx av inst : ℕ → Polynomial Fp}
       · exact le_trans ihb (Nat.mul_le_mul_right B (le_max_right _ _))
   | product a b iha ihb =>
       refine le_trans (natDegree_mul_le) ?_
-      rw [Expr.degreeBound, add_mul]
+      rw [Expr.degreeBound, _root_.add_mul]
       exact Nat.add_le_add iha ihb
   | scaled a c ih =>
       refine le_trans (natDegree_mul_le) ?_
@@ -57,16 +57,16 @@ theorem natDegree_eval_map_C_le {B : ℕ} {fx av inst : ℕ → Polynomial Fp}
 
 /-- The `θ`-compression of a list of gate expressions keeps the members' degree bound: the fold
 `acc·θ + e` never multiplies two columns. -/
-theorem natDegree_compressExprs_le {B D : ℕ} {fx av inst : ℕ → Polynomial Fp}
+theorem natDegree_compressExprs_le {B D : ℕ} {fx av inst : ℕ → CPoly}
     (hfx : ∀ i, (fx i).natDegree ≤ B) (hav : ∀ i, (av i).natDegree ≤ B)
     (hinst : ∀ i, (inst i).natDegree ≤ B) (theta : Fp) (exprs : List (Expr Fp))
     (hD : ∀ e ∈ exprs, e.degreeBound * B ≤ D) :
-    (compressExprs fx av inst (Polynomial.C theta) (exprs.map (Expr.map Polynomial.C))).natDegree
+    (compressExprs fx av inst (C theta) (exprs.map (Expr.map C))).natDegree
       ≤ D := by
   rw [compressExprs]
-  suffices h : ∀ acc : Polynomial Fp, acc.natDegree ≤ D →
-      ((exprs.map (Expr.map Polynomial.C)).foldl
-        (fun acc e => acc * Polynomial.C theta + e.eval fx av inst) acc).natDegree ≤ D by
+  suffices h : ∀ acc : CPoly, acc.natDegree ≤ D →
+      ((exprs.map (Expr.map C)).foldl
+        (fun acc e => acc * C theta + e.eval fx av inst) acc).natDegree ≤ D by
     exact h 0 (by simp)
   induction exprs with
   | nil => intro acc hacc; simpa using hacc
@@ -84,16 +84,16 @@ column plus the carrier, and the switch-off multiplies one more selector — `(W
 width `≤ W`. -/
 theorem natDegree_permChunk_le {B W : ℕ} (hB : 1 ≤ B)
     (beta gamma delta : Fp) (chunkLen chunkIndex : ℕ)
-    (set : PermSetEval (Polynomial Fp)) (pairs : List (Polynomial Fp × Polynomial Fp))
-    (lLast lBlind : Polynomial Fp)
+    (set : PermSetEval (CPoly)) (pairs : List (CPoly × CPoly))
+    (lLast lBlind : CPoly)
     (hev : set.eval.natDegree ≤ B) (hnext : set.nextEval.natDegree ≤ B)
     (hpairs : ∀ p ∈ pairs, p.1.natDegree ≤ B ∧ p.2.natDegree ≤ B)
     (hlen : pairs.length ≤ W)
     (hll : lLast.natDegree ≤ B) (hlb : lBlind.natDegree ≤ B) :
-    (permChunkExpression (Polynomial.C beta) (Polynomial.C gamma) Polynomial.X
-      (Polynomial.C delta) chunkLen chunkIndex set pairs lLast lBlind).natDegree
+    (permChunkExpression (C beta) (C gamma) X
+      (C delta) chunkLen chunkIndex set pairs lLast lBlind).natDegree
       ≤ (W + 2) * B := by
-  have hprod : ∀ f : ℕ → Polynomial Fp, (∀ j ∈ Finset.range pairs.length, (f j).natDegree ≤ B) →
+  have hprod : ∀ f : ℕ → CPoly, (∀ j ∈ Finset.range pairs.length, (f j).natDegree ≤ B) →
       (∏ j ∈ Finset.range pairs.length, f j).natDegree ≤ W * B := by
     intro f hf
     refine le_trans (natDegree_prod_le _ _) (le_trans (Finset.sum_le_card_nsmul _ _ B hf) ?_)
@@ -104,7 +104,7 @@ theorem natDegree_permChunk_le {B W : ℕ} (hB : 1 ≤ B)
     exact List.getElem_mem _
   rw [permChunkExpression_eq]
   refine le_trans natDegree_mul_le ?_
-  have hsel : ((1 : Polynomial Fp) - (lLast + lBlind)).natDegree ≤ B :=
+  have hsel : ((1 : CPoly) - (lLast + lBlind)).natDegree ≤ B :=
     le_trans (natDegree_sub_le _ _)
       (max_le (by simp) (le_trans (natDegree_add_le _ _) (max_le hll hlb)))
   refine le_trans (Nat.add_le_add ?_ hsel)
@@ -119,10 +119,10 @@ theorem natDegree_permChunk_le {B W : ℕ} (hB : 1 ≤ B)
       (by simpa using (hpairs _ (hmem j hj)).2)
   · refine le_trans natDegree_mul_le (Nat.add_le_add hev (hprod _ ?_))
     intro j hj
-    have heq : (Polynomial.C beta * Polynomial.X * Polynomial.C delta ^ (chunkIndex * chunkLen)
-        * Polynomial.C delta ^ j : Polynomial Fp)
-        = Polynomial.C (beta * delta ^ (chunkIndex * chunkLen) * delta ^ j) * Polynomial.X := by
-      simp only [Polynomial.C_mul, Polynomial.C_pow]
+    have heq : (C beta * X * C delta ^ (chunkIndex * chunkLen)
+        * C delta ^ j : CPoly)
+        = C (beta * delta ^ (chunkIndex * chunkLen) * delta ^ j) * X := by
+      simp only [C_mul, C_pow]
       ring
     refine le_trans (natDegree_add_le _ _) (max_le (le_trans (natDegree_add_le _ _)
       (max_le ((hpairs _ (hmem j hj)).1) ?_)) (by simp))
@@ -132,16 +132,16 @@ theorem natDegree_permChunk_le {B W : ℕ} (hB : 1 ≤ B)
 /-- Every permutation constraint value has degree at most `D`, for `D` dominating `3·B` (the
 boundary and chaining rules) and `(W + 2)·B` (the chunk steps). -/
 theorem natDegree_permutationExpressions_le {B W D : ℕ} (hB : 1 ≤ B)
-    (sets : List (PermSetEval (Polynomial Fp)))
-    (chunks : List (PermSetEval (Polynomial Fp) × List (Polynomial Fp × Polynomial Fp)))
-    (beta gamma delta : Fp) (chunkLen : ℕ) (l0 lLast lBlind : Polynomial Fp)
+    (sets : List (PermSetEval (CPoly)))
+    (chunks : List (PermSetEval (CPoly) × List (CPoly × CPoly)))
+    (beta gamma delta : Fp) (chunkLen : ℕ) (l0 lLast lBlind : CPoly)
     (hsets : ∀ s ∈ sets, s.eval.natDegree ≤ B ∧ (s.lastEval.getD 0).natDegree ≤ B)
     (hchunks : ∀ c ∈ chunks, (c.1.eval.natDegree ≤ B ∧ c.1.nextEval.natDegree ≤ B)
       ∧ c.2.length ≤ W ∧ ∀ p ∈ c.2, p.1.natDegree ≤ B ∧ p.2.natDegree ≤ B)
     (hl0 : l0.natDegree ≤ B) (hll : lLast.natDegree ≤ B) (hlb : lBlind.natDegree ≤ B)
     (h3 : 3 * B ≤ D) (hWD : (W + 2) * B ≤ D) :
-    ∀ q ∈ permutationExpressions sets chunks (Polynomial.C beta) (Polynomial.C gamma)
-      Polynomial.X (Polynomial.C delta) chunkLen l0 lLast lBlind, q.natDegree ≤ D := by
+    ∀ q ∈ permutationExpressions sets chunks (C beta) (C gamma)
+      X (C delta) chunkLen l0 lLast lBlind, q.natDegree ≤ D := by
   intro q hq
   rw [permutationExpressions] at hq
   rcases List.mem_append.mp hq with hq' | hq'
@@ -185,11 +185,11 @@ theorem natDegree_permutationExpressions_le {B W D : ℕ} (hB : 1 ≤ B)
 product-and-shuffle rules) and `2·B + 2·Dc` (the compressed step rule), where `Dc` bounds the
 compressed input/table expressions. -/
 theorem natDegree_lookupExpressions_le {B Dc D : ℕ}
-    {fx av inst : ℕ → Polynomial Fp}
+    {fx av inst : ℕ → CPoly}
     (hfx : ∀ i, (fx i).natDegree ≤ B) (hav : ∀ i, (av i).natDegree ≤ B)
     (hinst : ∀ i, (inst i).natDegree ≤ B)
-    (le : LookupEval (Polynomial Fp)) (inputExprs tableExprs : List (Expr Fp))
-    (theta beta gamma : Fp) (l0 lLast lBlind : Polynomial Fp)
+    (le : LookupEval (CPoly)) (inputExprs tableExprs : List (Expr Fp))
+    (theta beta gamma : Fp) (l0 lLast lBlind : CPoly)
     (hle : le.productEval.natDegree ≤ B ∧ le.productNextEval.natDegree ≤ B
       ∧ le.permutedInputEval.natDegree ≤ B ∧ le.permutedInputInvEval.natDegree ≤ B
       ∧ le.permutedTableEval.natDegree ≤ B)
@@ -197,11 +197,11 @@ theorem natDegree_lookupExpressions_le {B Dc D : ℕ}
     (htab : ∀ e ∈ tableExprs, e.degreeBound * B ≤ Dc)
     (hl0 : l0.natDegree ≤ B) (hll : lLast.natDegree ≤ B) (hlb : lBlind.natDegree ≤ B)
     (h4 : 4 * B ≤ D) (hcomp : 2 * B + 2 * Dc ≤ D) :
-    ∀ q ∈ lookupExpressions le (inputExprs.map (Expr.map Polynomial.C))
-      (tableExprs.map (Expr.map Polynomial.C)) fx av inst (Polynomial.C theta)
-      (Polynomial.C beta) (Polynomial.C gamma) l0 lLast lBlind, q.natDegree ≤ D := by
+    ∀ q ∈ lookupExpressions le (inputExprs.map (Expr.map C))
+      (tableExprs.map (Expr.map C)) fx av inst (C theta)
+      (C beta) (C gamma) l0 lLast lBlind, q.natDegree ≤ D := by
   obtain ⟨hp, hpn, hpi, hpiv, hpt⟩ := hle
-  have hactive : ((1 : Polynomial Fp) - (lLast + lBlind)).natDegree ≤ B :=
+  have hactive : ((1 : CPoly) - (lLast + lBlind)).natDegree ≤ B :=
     le_trans (natDegree_sub_le _ _)
       (max_le (by simp) (le_trans (natDegree_add_le _ _) (max_le hll hlb)))
   intro q hq
@@ -216,16 +216,16 @@ theorem natDegree_lookupExpressions_le {B Dc D : ℕ}
         (le_trans natDegree_pow_le (Nat.mul_le_mul_left 2 hp)) (le_trans hp (by omega)))
     exact le_trans natDegree_mul_le (le_trans (Nat.add_le_add hll h2B) (by omega))
   · -- the step rule
-    have hleft : (le.productNextEval * (le.permutedInputEval + Polynomial.C beta)
-        * (le.permutedTableEval + Polynomial.C gamma)).natDegree ≤ 3 * B := by
+    have hleft : (le.productNextEval * (le.permutedInputEval + C beta)
+        * (le.permutedTableEval + C gamma)).natDegree ≤ 3 * B := by
       refine le_trans natDegree_mul_le (le_trans (Nat.add_le_add (le_trans natDegree_mul_le
         (Nat.add_le_add hpn (le_trans (natDegree_add_le _ _) (max_le hpi (by simp)))))
         (le_trans (natDegree_add_le _ _) (max_le hpt (by simp)))) (by omega))
     have hright : (le.productEval
-        * (compressExprs fx av inst (Polynomial.C theta)
-            (inputExprs.map (Expr.map Polynomial.C)) + Polynomial.C beta)
-        * (compressExprs fx av inst (Polynomial.C theta)
-            (tableExprs.map (Expr.map Polynomial.C)) + Polynomial.C gamma)).natDegree
+        * (compressExprs fx av inst (C theta)
+            (inputExprs.map (Expr.map C)) + C beta)
+        * (compressExprs fx av inst (C theta)
+            (tableExprs.map (Expr.map C)) + C gamma)).natDegree
         ≤ B + 2 * Dc := by
       refine le_trans natDegree_mul_le (le_trans (Nat.add_le_add (le_trans natDegree_mul_le
         (Nat.add_le_add hp (le_trans (natDegree_add_le _ _) (max_le
@@ -247,12 +247,12 @@ theorem natDegree_lookupExpressions_le {B Dc D : ℕ}
 must dominate each family: the gates' `degreeBound · B`, the permutation rules' `3·B` and
 `(W + 2)·B`, and the lookup rules' `4·B` and `2·B + 2·Dc`. -/
 theorem natDegree_constraintPolys_le {np : ℕ} {B W Dc D : ℕ} (hB : 1 ≤ B)
-    (fixedCols : ℕ → Polynomial Fp) (adviceCols instanceCols : Fin np → ℕ → Polynomial Fp)
+    (fixedCols : ℕ → CPoly) (adviceCols instanceCols : Fin np → ℕ → CPoly)
     (gates : List (Expr Fp))
-    (sets : Fin np → List (PermSetEval (Polynomial Fp)))
-    (chunks : Fin np → List (PermSetEval (Polynomial Fp) × List (Polynomial Fp × Polynomial Fp)))
-    (lookups : Fin np → List (LookupEval (Polynomial Fp) × List (Expr Fp) × List (Expr Fp)))
-    (beta gamma delta theta : Fp) (chunkLen : ℕ) (l0 lLast lBlind : Polynomial Fp)
+    (sets : Fin np → List (PermSetEval (CPoly)))
+    (chunks : Fin np → List (PermSetEval (CPoly) × List (CPoly × CPoly)))
+    (lookups : Fin np → List (LookupEval (CPoly) × List (Expr Fp) × List (Expr Fp)))
+    (beta gamma delta theta : Fp) (chunkLen : ℕ) (l0 lLast lBlind : CPoly)
     (hfx : ∀ i, (fixedCols i).natDegree ≤ B)
     (hav : ∀ p i, (adviceCols p i).natDegree ≤ B)
     (hinst : ∀ p i, (instanceCols p i).natDegree ≤ B)
@@ -292,11 +292,11 @@ theorem natDegree_constraintPolys_le {np : ℕ} {B W Dc D : ℕ} (hB : 1 ≤ B)
       (hlooks p lk hlk).2.2 hl0 hll hlb h4 hcomp _ hql'
 
 /-- The `acc·y + v` fold preserves the members' degree cap: `y` is a scalar. -/
-theorem natDegree_foldByY_le {D : ℕ} (y : Fp) (ps : List (Polynomial Fp))
+theorem natDegree_foldByY_le {D : ℕ} (y : Fp) (ps : List (CPoly))
     (hps : ∀ q ∈ ps, q.natDegree ≤ D) :
-    (ps.foldl (fun acc p => acc * Polynomial.C y + p) 0).natDegree ≤ D := by
-  suffices h : ∀ acc : Polynomial Fp, acc.natDegree ≤ D →
-      (ps.foldl (fun acc p => acc * Polynomial.C y + p) acc).natDegree ≤ D by
+    (ps.foldl (fun acc p => acc * C y + p) 0).natDegree ≤ D := by
+  suffices h : ∀ acc : CPoly, acc.natDegree ≤ D →
+      (ps.foldl (fun acc p => acc * C y + p) acc).natDegree ≤ D by
     exact h 0 (by simp)
   induction ps with
   | nil => intro acc hacc; simpa using hacc
@@ -311,12 +311,12 @@ theorem natDegree_foldByY_le {D : ℕ} (y : Fp) (ps : List (Polynomial Fp))
 selector of degree `≤ B` and the cap `D` dominating each constraint family, the full `y`-fold has
 degree at most `D`. -/
 theorem natDegree_combineConstraints_le {np : ℕ} {B W Dc D : ℕ} (hB : 1 ≤ B)
-    (fixedCols : ℕ → Polynomial Fp) (adviceCols instanceCols : Fin np → ℕ → Polynomial Fp)
+    (fixedCols : ℕ → CPoly) (adviceCols instanceCols : Fin np → ℕ → CPoly)
     (gates : List (Expr Fp))
-    (sets : Fin np → List (PermSetEval (Polynomial Fp)))
-    (chunks : Fin np → List (PermSetEval (Polynomial Fp) × List (Polynomial Fp × Polynomial Fp)))
-    (lookups : Fin np → List (LookupEval (Polynomial Fp) × List (Expr Fp) × List (Expr Fp)))
-    (beta gamma delta theta y : Fp) (chunkLen : ℕ) (l0 lLast lBlind : Polynomial Fp)
+    (sets : Fin np → List (PermSetEval (CPoly)))
+    (chunks : Fin np → List (PermSetEval (CPoly) × List (CPoly × CPoly)))
+    (lookups : Fin np → List (LookupEval (CPoly) × List (Expr Fp) × List (Expr Fp)))
+    (beta gamma delta theta y : Fp) (chunkLen : ℕ) (l0 lLast lBlind : CPoly)
     (hfx : ∀ i, (fixedCols i).natDegree ≤ B)
     (hav : ∀ p i, (adviceCols p i).natDegree ≤ B)
     (hinst : ∀ p i, (instanceCols p i).natDegree ≤ B)

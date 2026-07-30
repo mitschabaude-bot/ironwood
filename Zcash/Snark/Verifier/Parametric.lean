@@ -6,6 +6,12 @@ import Zcash.Snark.Verifier.FiatShamir
 These theorems show that verifier assembly and the Fiat–Shamir schedule traverse every sub-proof for
 arbitrary `shape.numProofs`. Every consensus-valid Orchard action count is one instance.
 
+The generic definitions are total at `numProofs = 0` and `shape.k = 0`. Zero proofs represents the
+transaction-level absence of an Orchard bundle, not a call to Halo2 with an empty bundle; an actual
+verifier invocation has `0 < shape.numProofs`. Halo2's IPA implementation also requires `0 < k`.
+The deployed Action instance lies inside both boundaries (`k = 11`), so Rust behavioral
+correspondence is claimed only on that deployed domain.
+
 Fixtures compare trusted typed Rust captures, not transcript bytes. Most results here are
 definitional pins; the remaining lemmas prevent block loss and cross-proof multiopen grouping.
 -/
@@ -19,7 +25,8 @@ def orchardConsensusMaxProofs : ℕ := 2^16 - 1
 
 /-- The consensus-scoped upper bound on `shape.numProofs`.
 
-Zero is not excluded because a transaction with no actions never invokes the Orchard verifier. -/
+Zero is included to represent a transaction with no Orchard bundle. It is not an empty-bundle
+verifier invocation: the serialized bundle is absent and the Orchard verifier is never called. -/
 def Shape.hasConsensusNumProofs (shape : Shape) : Prop :=
   shape.numProofs ≤ orchardConsensusMaxProofs
 

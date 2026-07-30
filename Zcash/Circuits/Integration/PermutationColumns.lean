@@ -29,7 +29,7 @@ namespace Zcash.Snark
 
 open Zcash.Arithmetic (derivedUrsGLagrange derivedUrsGLagrange_length omegaOf)
 
-open Halo2 Polynomial
+open Halo2 CompPoly CompPoly.CPolynomial
 
 set_option maxHeartbeats 20000
 
@@ -181,8 +181,9 @@ theorem instanceRowPolynomial_eq_keygenSigmaColumn
         (sigma ⟨chunk, i, column⟩).2.2) :
     instanceRowPolynomial n omega rows =
       keygenSigmaColumn omega delta chunkLen sigma chunk column := by
+  apply CPolynomial.toPoly_injective
   unfold instanceRowPolynomial zeroPaddedRows keygenSigmaColumn
-  rw [rowPolynomial_eq_lagrange]
+  rw [toPoly_rowPolynomial, CPolynomial.CLagrange.cinterpolate_eq_interpolate]
   exact congrArg _ (funext fun i => hval i)
 
 namespace CanonicalMemberConstraintRelation
@@ -212,7 +213,7 @@ variable
         (instanceCommitment := instanceCommitment)
         urs hk vk ps ch batchOpenings i hi}
     {hblinding : vk.blindingFactors < vk.n}
-    {y : Fp} {hpoly : Polynomial Fp} {deg : ℕ}
+    {y : Fp} {hpoly : CPoly} {deg : ℕ}
 
 /--
 A canonically routed σ-column opening is the polynomial interpolating its keygen σ
@@ -341,7 +342,7 @@ omit [AddCommGroup G] [Module Fp G] [DecidableEq G] [Inhabited G] in
 common-polynomial index. -/
 theorem resolverPermutationPairs_getElem_snd
     {shape : Shape} (vk : VerifyingKey shape Fp G)
-    (poly : CommitmentId → Polynomial Fp) (p : Fin shape.numProofs)
+    (poly : CommitmentId → CPoly) (p : Fin shape.numProofs)
     (c j : ℕ) (hj : j < (vk.permutationChunks.getD c []).length) :
     (ResolverPermutationPairs vk poly p c)[j]'
         (by simpa [ResolverPermutationPairs, permutationChunkPairsOfResolver] using hj) =
@@ -377,7 +378,7 @@ variable
         (instanceCommitment := instanceCommitment)
         urs hk vk ps ch batchOpenings i hi}
     {hblinding : vk.blindingFactors < vk.n}
-    {y : Fp} {hpoly : Polynomial Fp} {deg : ℕ}
+    {y : Fp} {hpoly : CPoly} {deg : ℕ}
 
 /--
 `hcolumns` at one chunk entry, up to the retained relation branch: the σ side of the

@@ -1,6 +1,5 @@
 import Mathlib.Tactic
 import Zcash.Snark.Soundness.Main
-import Zcash.Snark.Soundness.UniformMeasure
 import Zcash.Snark.Soundness.Multiopen.Decode
 import Zcash.Snark.Soundness.Multiopen.Compat
 
@@ -11,8 +10,7 @@ The decoded-column layer (`Soundness.Multiopen.Decode`) consumes batched opening
 `P = Σⱼ ξʲ • Cⱼ` and `v = Σⱼ ξʲ • eⱼ` at distinct batching challenges `ξ` — and until now that form was a
 *model boundary*: the flat-batch family carried the power shape of the deployed statement as
 the assumptions `hP`/`hv`. This module discharges them against the deployed verifier. As a function of the
-`x₄` squeeze — over the runs `{ch with x4 := ξ}`, which `Soundness.Forking.reprogramX4` identifies with
-oracle reprogramming — the pinned `deployedCommitment`/`multiopenValue` *are* flat power batches
+`x₄` squeeze, the pinned `deployedCommitment`/`multiopenValue` *are* flat power batches
 (`deployedCommitment_x4_batch`/`multiopenValue_x4_batch`), and the coefficient families are read off the
 fingerprinted `constructIntermediateSets` grouping (`x4BatchCommitments`/`x4BatchEvals`):
 
@@ -28,23 +26,10 @@ batching as an independent flat power series; no separate "flat model = deployed
 the `x₄` level. The batch "columns" at this level are the multiopen aggregates (`qᵢ`, `q′`), not the
 circuit columns: unbatching *within* a point set is the `x₁` layer, one level down.
 
-The rewound-family instantiation that used to sit downstream of this — deriving an injective family
-of accepting runs over `{ch with x4 := ξᵣ}` from an accept-*measure* hypothesis, via the
-single-squeeze counting floor (`exists_injective_accepting_of_measure`,
-`Soundness.Forking.Probability`) — has been removed with the rest of the rewind-based route. The
-flat-batch facts below stand on their own.
-
-The `x₁` layer then closes the chain down to the *member* commitments — the actual queried column
-commitments (advice, instance, fixed, permutation/lookup products, vanishing). The rewound `x₁` runs
-share the pre-`x₁` prefix and re-send the post-`x₁` continuation (`spliceMultiopen`/`x1RunChallenges`;
-`reprogramX1` at the sealed `preX1Transcript`, `Soundness.Forking.Rewind`/`Forking.Ordering`); the query
-list and grouping are *definitionally* shared across runs (`x1Run_assembleQueries`); each run's
-aggregate is the run-`x₁`-power batch of the shared members (`x1Run_x4Qs_getD_eval`); and
-the extracted witness is the explicit two-level
-(`x₄`-then-`x₁`) power combination of member-column witnesses opening the member commitments, via the
-canonical decodes at both levels. Per-member claimed evaluations at the original rotated points and
-the gate/`x`→`x₃` transport remain the fingerprint-delegated half (`Soundness.Multiopen.Decode`, the
-deployed-status section).
+The AGM decode route closes the chain down to the actual member commitments with explicit
+`AlgebraicPowerBatch` data, then presents those coordinates through `OpenedBatchOpenings` and
+`OpenedMemberDecode`. This module supplies only the deterministic verifier algebra and grouping
+identities used by that route; it contains no accept-measure or rewind-run extraction API.
 -/
 
 namespace Zcash.Snark
@@ -81,8 +66,8 @@ theorem foldl_smul_add_powerForm {α : Type*} (ξ : F) (g : α → M) (d : α) (
       rw [Finset.sum_congr rfl fun j _ => hpow j]
       abel
 
-/-- Reassemble a top power plus a range power sum as one `Fin`-indexed power sum, the last index carrying
-the top term — the summation shape `BatchOpeningsForWitness` consumes. -/
+/-- Reassemble a top power plus a range power sum as one `Fin`-indexed power sum, the last index
+carrying the top term — the flat power-batch shape consumed by the opened AGM decoder. -/
 theorem powerSum_ite_last (ξ : F) (n : ℕ) (c : ℕ → M) (a₀ : M) :
     ξ ^ n • a₀ + ∑ j ∈ Finset.range n, ξ ^ j • c j
       = ∑ j : Fin (n + 1), ξ ^ (j : ℕ) • (if (j : ℕ) < n then c j else a₀) := by
@@ -220,8 +205,8 @@ theorem compressSet_fold_eval (urs : URS G) (x1 : F)
 /-- **The within-set aggregate is a flat power batch in `x₁`.** The compressed point-set commitment
 evaluates to the `x₁`-power combination of its member commitments' group values, in processing order —
 the `x₁` half of the two-level un-batching. At the `x₄` level the decoded columns are these aggregates
-(`x4BatchCommitments`), and rewinding the `x₁` squeeze un-batches them into the member commitments
-(the values are heterogeneous across `x₁` runs because `x₃` re-randomizes). -/
+(`x4BatchCommitments`); the represented `x₁` coordinates un-batch each aggregate into its member
+commitments. -/
 theorem compressSet_fst_eval (urs : URS G) (x1 : F)
     (sq : List (CommitmentRef urs.k F G × List F)) (np : ℕ) :
     (compressSet x1 sq np).1.eval urs
@@ -291,11 +276,10 @@ def x4BatchEvals [DecidableEq G] [Inhabited G] {shape : Shape} (vk : VerifyingKe
       ((deployedX4Pairs vk instanceCommitment ps ch).reverse.getD (j : ℕ) (Msm.zero shape.k Fp G, 0)).2
     else deployedBaseEval vk instanceCommitment ps ch
 
-/-- **The deployed commitment is a flat power batch in the `x₄` squeeze.** Over the rewound runs
-`{ch with x4 := ξ}` — everything upstream of the collapse (`assembleQueries`, the grouping, the `x₁`
-compression, the base evaluation) is untouched by the redraw — the pinned `deployedCommitment` is the
-`ξ`-power combination of the deployed aggregates. This discharges the flat-batch model boundary's
-`hP` for the deployed verifier, closing the flat-batch model boundary at the `x₄` level. -/
+/-- **The deployed commitment is a flat power batch in the `x₄` squeeze.** For every `ξ`, replacing
+only the `x₄` field in the challenge record leaves the upstream query assembly, grouping, `x₁`
+compression, and base evaluation fixed. The resulting `deployedCommitment` is therefore the
+`ξ`-power combination of the deployed aggregates. -/
 theorem deployedCommitment_x4_batch [DecidableEq G] [Inhabited G] {shape : Shape} (urs : URS G)
     (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → ℕ → G) (ps : ProofString shape Fp G)
     (ch : Challenges shape.k Fp) (ξ : Fp) :
@@ -380,470 +364,6 @@ theorem deployedX4Qs_getD_eval [DecidableEq G] [Inhabited G] {shape : Shape}
       List.getElem_map, List.getElem_map, deployedSetQueries,
       List.getD_eq_getElem _ _ hzip]
   rw [hq, compressSet_fst_eval]
-
-/-- The canonical within-set decode across `x₁` rewinds: the Vandermonde-inverse combination of the
-per-run aggregate witnesses — the same explicit combination `decodedColumnFamily_of_batch_openings`
-uses at the `x₄` level. -/
-noncomputable def x1DecodeCols {m n : ℕ} (z : Fin n → Fp) (a : Fin n → (Fin m → Fp)) :
-    Fin n → (Fin m → Fp) :=
-  fun j => ∑ r, (Matrix.vandermonde z)⁻¹ j r • a r
-
-
-/-- The canonical `x₁` decode reconstructs every run's aggregate witness as its `x₁`-power
-combination. -/
-theorem x1DecodeCols_reconstruct {m n : ℕ} (z : Fin n → Fp) (hz : Function.Injective z)
-    (a : Fin n → (Fin m → Fp)) (r : Fin n) :
-    a r = ∑ j : Fin n, z r ^ (j : ℕ) • x1DecodeCols z a j :=
-  (batch_open_reconstruct_with_coeffs z a _
-    (fun i j => by simpa using vandermonde_inv_right z hz i j) r).symm
-
-/-- The canonical `x₁` decode transports every run's value equation: the run's claimed set evaluation
-is the `x₁`-power combination of the decoded columns' values at that run's own evaluation vector
-(heterogeneous per run — `x₃` re-randomizes under `x₁` rewinds through the re-sent `q′`). -/
-theorem x1DecodeCols_value {m n : ℕ} (z : Fin n → Fp) (hz : Function.Injective z)
-    (a : Fin n → (Fin m → Fp)) (b : Fin n → (Fin m → Fp)) (u : Fin n → Fp)
-    (hau : ∀ r, commitGen (b r) (a r) = u r) (r : Fin n) :
-    ∑ j : Fin n, z r ^ (j : ℕ) • commitGen (b r) (x1DecodeCols z a j) = u r := by
-  have hlin : ∑ j : Fin n, z r ^ (j : ℕ) • commitGen (b r) (x1DecodeCols z a j)
-      = commitGen (b r) (∑ j : Fin n, z r ^ (j : ℕ) • x1DecodeCols z a j) := by
-    rw [commitGen_sum]
-    exact Finset.sum_congr rfl fun j _ => (commitGen_smul_left (b r) _ _).symm
-  rw [hlin, ← x1DecodeCols_reconstruct z hz a r]
-  exact hau r
-
-
-
-
-
-/-! ## The `x₁` rewound runs: shared pre-`x₁` prefix, re-sent continuation
-
-Rewinding the compression squeeze is one step deeper than the `x₄` collapse: the rewound prover
-re-sends everything absorbed *after* `x₁` — the quotient commitment `q′`, the claimed set evaluations
-`u`, and the IPA opening — so `x₃`…`z` and the round challenges re-randomize per run (their squeeze
-inputs absorb the fresh continuation), while `x₂` stays the honest one (nothing is absorbed between
-the compression squeezes, `preX2Transcript_length_eq`) and everything absorbed before `x₁` is shared:
-the column commitments, every claimed evaluation (`adviceEvals_mem_preX1Transcript` and companions,
-`Soundness.Forking.Ordering`), hence the whole query list and the fingerprinted grouping. The runs
-are `reprogramX1` reprogramming events (`Soundness.Forking.Rewind`) on the spliced strings. What varies per
-run is exactly the `x₁`-power weighting of the *same* member commitments — the shape
-`x1DecodeCols` un-batches. -/
-
-/-- The rewound prover's post-`x₁` continuation: the proof fields absorbed after `x₁` is squeezed,
-re-sent per `x₁` rewind. The `x₁` analogue of the IPA-level `spliceIpa` path data. -/
-structure MultiopenContinuation (shape : Shape) (G : Type*) where
-  multiopenQPrime : G
-  multiopenU : Fin shape.numPointSets → Fp
-  ipaS : G
-  ipaRounds : Fin shape.k → G × G
-  ipaC : Fp
-  ipaF : Fp
-
-/-- Splice a post-`x₁` continuation onto the shared pre-`x₁` proof prefix: every field absorbed before
-`x₁` is the base `ps`'s, the post-`x₁` fields are the continuation's. -/
-def spliceMultiopen {shape : Shape} (ps : ProofString shape Fp G)
-    (c : MultiopenContinuation shape G) : ProofString shape Fp G :=
-  { ps with
-    multiopenQPrime := c.multiopenQPrime
-    multiopenU := c.multiopenU
-    ipaS := c.ipaS
-    ipaRounds := c.ipaRounds
-    ipaC := c.ipaC
-    ipaF := c.ipaF }
-
-/-- The rewound run's challenge record: pre-`x₁` challenges the honest `ch`'s, the compression
-challenge replaced by `χ`, every post-`x₁` challenge the run's own. -/
-def x1RunChallenges {k : ℕ} (ch : Challenges k Fp) (χ x2 x3 x4 xi z : Fp)
-    (ipaRound : Fin k → Fp) : Challenges k Fp :=
-  { theta := ch.theta
-    beta := ch.beta
-    gamma := ch.gamma
-    y := ch.y
-    x := ch.x
-    x1 := χ
-    x2 := x2
-    x3 := x3
-    x4 := x4
-    xi := xi
-    z := z
-    ipaRound := ipaRound }
-
-/-- One `x₁`-rewound run: the re-sent continuation and the run's post-`x₁` challenges, all carried
-free (under reprogramming `x₂` is in fact the honest one — its squeeze input absorbs nothing new —
-so the freedom only widens the hypotheses). -/
-structure X1Run (shape : Shape) (G : Type*) where
-  cont : MultiopenContinuation shape G
-  x2 : Fp
-  x3 : Fp
-  x4 : Fp
-  xi : Fp
-  z : Fp
-  ipaRound : Fin shape.k → Fp
-
-/-- The run's proof string: the shared pre-`x₁` prefix with the run's continuation spliced on. -/
-def X1Run.spliced {shape : Shape} (r : X1Run shape G) (ps : ProofString shape Fp G) :
-    ProofString shape Fp G :=
-  spliceMultiopen ps r.cont
-
-/-- The run's challenge record at compression challenge `χ`. -/
-def X1Run.challenges {shape : Shape} (r : X1Run shape G) (ch : Challenges shape.k Fp) (χ : Fp) :
-    Challenges shape.k Fp :=
-  x1RunChallenges ch χ r.x2 r.x3 r.x4 r.xi r.z r.ipaRound
-
-/-- The honest run as an `X1Run`: its own continuation and challenges. Splicing it back is the
-identity (by structure eta), so the honest run sits inside every
-`x₁`-rewind family — the eta identities are what instantiations discharge `hcur`/`hwC` at the honest
-slot with. -/
-def honestX1Run {shape : Shape} (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp) :
-    X1Run shape G :=
-  ⟨⟨ps.multiopenQPrime, ps.multiopenU, ps.ipaS, ps.ipaRounds, ps.ipaC, ps.ipaF⟩,
-    ch.x2, ch.x3, ch.x4, ch.xi, ch.z, ch.ipaRound⟩
-
-
-
-/-! The pre-`x₁` projections of a rewound run are the honest ones — the per-field `rfl` facts the
-root query-list invariance is assembled from (keeping every definitional-equality check small). -/
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- Pre-`x₁` challenge projection shared across runs. -/
-theorem x1Run_challenges_x {shape : Shape} (r : X1Run shape G) (ch : Challenges shape.k Fp)
-    (χ : Fp) : (r.challenges ch χ).x = ch.x := rfl
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- Pre-`x₁` challenge projection shared across runs. -/
-theorem x1Run_challenges_y {shape : Shape} (r : X1Run shape G) (ch : Challenges shape.k Fp)
-    (χ : Fp) : (r.challenges ch χ).y = ch.y := rfl
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- Pre-`x₁` proof projection shared across runs. -/
-theorem x1Run_spliced_adviceCommitments {shape : Shape} (r : X1Run shape G)
-    (ps : ProofString shape Fp G) : (r.spliced ps).adviceCommitments = ps.adviceCommitments := rfl
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- Pre-`x₁` proof projection shared across runs. -/
-theorem x1Run_spliced_lookupPermutedInput {shape : Shape} (r : X1Run shape G)
-    (ps : ProofString shape Fp G) :
-    (r.spliced ps).lookupPermutedInput = ps.lookupPermutedInput := rfl
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- Pre-`x₁` proof projection shared across runs. -/
-theorem x1Run_spliced_lookupPermutedTable {shape : Shape} (r : X1Run shape G)
-    (ps : ProofString shape Fp G) :
-    (r.spliced ps).lookupPermutedTable = ps.lookupPermutedTable := rfl
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- Pre-`x₁` proof projection shared across runs. -/
-theorem x1Run_spliced_permutationProduct {shape : Shape} (r : X1Run shape G)
-    (ps : ProofString shape Fp G) :
-    (r.spliced ps).permutationProduct = ps.permutationProduct := rfl
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- Pre-`x₁` proof projection shared across runs. -/
-theorem x1Run_spliced_lookupProduct {shape : Shape} (r : X1Run shape G)
-    (ps : ProofString shape Fp G) : (r.spliced ps).lookupProduct = ps.lookupProduct := rfl
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- Pre-`x₁` proof projection shared across runs. -/
-theorem x1Run_spliced_vanishingRandom {shape : Shape} (r : X1Run shape G)
-    (ps : ProofString shape Fp G) : (r.spliced ps).vanishingRandom = ps.vanishingRandom := rfl
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- Pre-`x₁` proof projection shared across runs. -/
-theorem x1Run_spliced_hPieces {shape : Shape} (r : X1Run shape G)
-    (ps : ProofString shape Fp G) : (r.spliced ps).hPieces = ps.hPieces := rfl
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- Pre-`x₁` proof projection shared across runs. -/
-theorem x1Run_spliced_instanceEvals {shape : Shape} (r : X1Run shape G)
-    (ps : ProofString shape Fp G) : (r.spliced ps).instanceEvals = ps.instanceEvals := rfl
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- Pre-`x₁` proof projection shared across runs. -/
-theorem x1Run_spliced_adviceEvals {shape : Shape} (r : X1Run shape G)
-    (ps : ProofString shape Fp G) : (r.spliced ps).adviceEvals = ps.adviceEvals := rfl
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- Pre-`x₁` proof projection shared across runs. -/
-theorem x1Run_spliced_fixedEvals {shape : Shape} (r : X1Run shape G)
-    (ps : ProofString shape Fp G) : (r.spliced ps).fixedEvals = ps.fixedEvals := rfl
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- Pre-`x₁` proof projection shared across runs. -/
-theorem x1Run_spliced_vanishingRandomEval {shape : Shape} (r : X1Run shape G)
-    (ps : ProofString shape Fp G) :
-    (r.spliced ps).vanishingRandomEval = ps.vanishingRandomEval := rfl
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- Pre-`x₁` proof projection shared across runs. -/
-theorem x1Run_spliced_permutationCommonEvals {shape : Shape} (r : X1Run shape G)
-    (ps : ProofString shape Fp G) :
-    (r.spliced ps).permutationCommonEvals = ps.permutationCommonEvals := rfl
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- Pre-`x₁` proof projection shared across runs. -/
-theorem x1Run_spliced_permutationSetEvals {shape : Shape} (r : X1Run shape G)
-    (ps : ProofString shape Fp G) :
-    (r.spliced ps).permutationSetEvals = ps.permutationSetEvals := rfl
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- Pre-`x₁` proof projection shared across runs. -/
-theorem x1Run_spliced_lookupEvals {shape : Shape} (r : X1Run shape G)
-    (ps : ProofString shape Fp G) : (r.spliced ps).lookupEvals = ps.lookupEvals := rfl
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- The per-sub-proof constraint values are shared across `x₁` rewinds: they read only pre-`x₁`
-evaluations and challenges. -/
-theorem x1Run_subProofExpressions {shape : Shape} (vk : VerifyingKey shape Fp G)
-    (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp) (r : X1Run shape G) (χ : Fp)
-    (l0 lLast lBlind : Fp) (p : Fin shape.numProofs) :
-    subProofExpressions vk (r.spliced ps) (r.challenges ch χ) l0 lLast lBlind p
-      = subProofExpressions vk ps ch l0 lLast lBlind p := rfl
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- The full constraint-value list is shared across `x₁` rewinds. -/
-theorem x1Run_allExpressions {shape : Shape} (vk : VerifyingKey shape Fp G)
-    (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp) (r : X1Run shape G) (χ : Fp)
-    (l0 lLast lBlind : Fp) :
-    allExpressions vk (r.spliced ps) (r.challenges ch χ) l0 lLast lBlind
-      = allExpressions vk ps ch l0 lLast lBlind := by
-  simp only [allExpressions, x1Run_subProofExpressions]
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- **The query list is shared across `x₁` rewinds** — the root invariance. The assembly reads only
-pre-`x₁` data: the commitments and claimed evaluations absorbed before the compression squeeze (none
-of the spliced continuation's fields) and the pre-`x₁` challenges (none of the run record's redrawn
-fields). Assembled from the per-field projection facts so every definitional-equality check stays
-small. Everything grouping-derived is rewritten through this one equality. A refactor of the
-assembly's read set — a new challenge read or a post-`x₁` proof-field read — breaks this seal loudly,
-by design; extend the per-field projection facts alongside. -/
-theorem x1Run_assembleQueries [DecidableEq G] [Inhabited G] {shape : Shape}
-    (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → ℕ → G) (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
-    (r : X1Run shape G) (χ : Fp) :
-    assembleQueries vk instanceCommitment (r.spliced ps) (r.challenges ch χ) = assembleQueries vk instanceCommitment ps ch := by
-  simp only [assembleQueries, x1Run_allExpressions, x1Run_challenges_x, x1Run_challenges_y,
-    x1Run_spliced_hPieces, x1Run_spliced_instanceEvals, x1Run_spliced_adviceCommitments,
-    x1Run_spliced_adviceEvals, x1Run_spliced_permutationProduct,
-    x1Run_spliced_permutationSetEvals, x1Run_spliced_lookupProduct,
-    x1Run_spliced_lookupPermutedInput, x1Run_spliced_lookupPermutedTable,
-    x1Run_spliced_lookupEvals, x1Run_spliced_fixedEvals, x1Run_spliced_permutationCommonEvals,
-    x1Run_spliced_vanishingRandom, x1Run_spliced_vanishingRandomEval]
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- The grouping's routed queries are shared across `x₁` rewinds. -/
-theorem x1Run_setQueries [DecidableEq G] [Inhabited G] {shape : Shape}
-    (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → ℕ → G) (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
-    (r : X1Run shape G) (χ : Fp) (i : ℕ) :
-    deployedSetQueries vk instanceCommitment (r.spliced ps) (r.challenges ch χ) i
-      = deployedSetQueries vk instanceCommitment ps ch i := by
-  simp only [deployedSetQueries, x1Run_assembleQueries]
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- The number of point-set aggregates is shared across `x₁` rewinds. -/
-theorem x1Run_x4Qs_length [DecidableEq G] [Inhabited G] {shape : Shape}
-    (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → ℕ → G) (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
-    (r : X1Run shape G) (χ : Fp) :
-    (deployedX4Qs vk instanceCommitment (r.spliced ps) (r.challenges ch χ)).length
-      = (deployedX4Qs vk instanceCommitment ps ch).length := by
-  simp only [deployedX4Qs, x1Run_assembleQueries, List.length_map]
-
-omit [AddCommGroup G] [Module Fp G] in
-/-- The `x₄` pair count is shared across `x₁` rewinds: the grouping is the honest one and the `u`
-vector's length is shape-fixed. Interface fact for callers re-indexing a run's `x₄` batch against
-the honest one (`x4BatchCommitments_getD` at the run); no in-tree consumer yet. -/
-theorem x1Run_pairCount [DecidableEq G] [Inhabited G] {shape : Shape}
-    (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → ℕ → G) (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
-    (r : X1Run shape G) (χ : Fp) :
-    deployedX4PairCount vk instanceCommitment (r.spliced ps) (r.challenges ch χ) = deployedX4PairCount vk instanceCommitment ps ch := by
-  simp only [deployedX4PairCount, deployedX4Pairs, List.length_zip, List.length_ofFn,
-    x1Run_x4Qs_length]
-
-/-- **The run aggregate is the run-`x₁`-power batch of the honest members.** At a rewound run, point
-set `i`'s aggregate evaluates to the `χ`-power combination of the *shared* member commitments the
-honest grouping routes to that set — the `x₁` collapse re-weighted, nothing else moved. -/
-theorem x1Run_x4Qs_getD_eval [DecidableEq G] [Inhabited G] {shape : Shape}
-    (g : Fin (2 ^ shape.k) → G) (w u : G) (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → ℕ → G)
-    (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp) (r : X1Run shape G) (χ : Fp)
-    {i : ℕ} (hi : i < (deployedX4Qs vk instanceCommitment ps ch).length) :
-    ((deployedX4Qs vk instanceCommitment (r.spliced ps) (r.challenges ch χ)).getD i (Msm.zero shape.k Fp G)).eval
-        ⟨shape.k, g, w, u⟩
-      = ∑ j ∈ Finset.range (deployedSetQueries vk instanceCommitment ps ch i).length,
-          χ ^ j • ((deployedSetQueries vk instanceCommitment ps ch i).getD j (.point 0, [])).1.eval
-            ⟨shape.k, g, w, u⟩ := by
-  have hi' : i < (deployedX4Qs vk instanceCommitment (r.spliced ps) (r.challenges ch χ)).length := by
-    rw [x1Run_x4Qs_length]
-    exact hi
-  rw [deployedX4Qs_getD_eval g w u vk instanceCommitment (r.spliced ps) (r.challenges ch χ) hi',
-    x1Run_setQueries]
-  rfl
-
-/-! ## The `x₃` and `x₂` rewound runs: shared prefixes, re-sent continuations
-
-Rewinding the interpolation challenge `x₃` re-sends the fields absorbed after it — the claimed set
-evaluations `u` and the IPA opening — while the quotient commitment `q′` is absorbed *before* `x₃`
-(`qPrime_mem_preX3Transcript`) and stays shared, as do `x₁`/`x₂`, the query list, the grouping, and
-hence the point-set aggregates themselves: across `x₃` runs only the evaluation point and the
-claimed set evaluations move. Rewinding `x₂` additionally re-sends `q′`. The runs are the
-`reprogramX3`/`reprogramX2` reprogramming events (`Soundness.Forking.Rewind`). -/
-
-/-- The rewound prover's post-`x₃` continuation: the claimed set evaluations and the IPA opening
-(`q′` is pre-`x₃` and shared). -/
-structure X3Continuation (shape : Shape) (G : Type*) where
-  multiopenU : Fin shape.numPointSets → Fp
-  ipaS : G
-  ipaRounds : Fin shape.k → G × G
-  ipaC : Fp
-  ipaF : Fp
-
-/-- Splice a post-`x₃` continuation onto the shared pre-`x₃` proof prefix. -/
-def spliceX3 {shape : Shape} (ps : ProofString shape Fp G) (c : X3Continuation shape G) :
-    ProofString shape Fp G :=
-  { ps with
-    multiopenU := c.multiopenU
-    ipaS := c.ipaS
-    ipaRounds := c.ipaRounds
-    ipaC := c.ipaC
-    ipaF := c.ipaF }
-
-/-- One `x₃`-rewound run: the re-sent continuation and the run's post-`x₃` challenges. -/
-structure X3Run (shape : Shape) (G : Type*) where
-  cont : X3Continuation shape G
-  x4 : Fp
-  xi : Fp
-  z : Fp
-  ipaRound : Fin shape.k → Fp
-
-/-- The run's proof string: the shared pre-`x₃` prefix with the run's continuation spliced on. -/
-def X3Run.spliced {shape : Shape} (r : X3Run shape G) (ps : ProofString shape Fp G) :
-    ProofString shape Fp G :=
-  spliceX3 ps r.cont
-
-/-- The run's challenge record at interpolation challenge `χ`: pre-`x₃` challenges the honest
-ones, `x₃ := χ`, post-`x₃` challenges the run's own. -/
-def X3Run.challenges {shape : Shape} (r : X3Run shape G) (ch : Challenges shape.k Fp) (χ : Fp) :
-    Challenges shape.k Fp :=
-  { theta := ch.theta, beta := ch.beta, gamma := ch.gamma, y := ch.y, x := ch.x
-    x1 := ch.x1, x2 := ch.x2, x3 := χ, x4 := r.x4, xi := r.xi, z := r.z
-    ipaRound := r.ipaRound }
-
-
-
-
-
-
-
-
-
-/-- The rewound prover's post-`x₂` continuation: additionally re-sends `q′`. -/
-structure X2Continuation (shape : Shape) (G : Type*) where
-  multiopenQPrime : G
-  multiopenU : Fin shape.numPointSets → Fp
-  ipaS : G
-  ipaRounds : Fin shape.k → G × G
-  ipaC : Fp
-  ipaF : Fp
-
-/-- Splice a post-`x₂` continuation onto the shared pre-`x₂` proof prefix. -/
-def spliceX2 {shape : Shape} (ps : ProofString shape Fp G) (c : X2Continuation shape G) :
-    ProofString shape Fp G :=
-  { ps with
-    multiopenQPrime := c.multiopenQPrime
-    multiopenU := c.multiopenU
-    ipaS := c.ipaS
-    ipaRounds := c.ipaRounds
-    ipaC := c.ipaC
-    ipaF := c.ipaF }
-
-/-- One `x₂`-rewound run: the re-sent continuation and the run's post-`x₂` challenges. -/
-structure X2Run (shape : Shape) (G : Type*) where
-  cont : X2Continuation shape G
-  x3 : Fp
-  x4 : Fp
-  xi : Fp
-  z : Fp
-  ipaRound : Fin shape.k → Fp
-
-/-- The run's proof string: the shared pre-`x₂` prefix with the run's continuation spliced on. -/
-def X2Run.spliced {shape : Shape} (r : X2Run shape G) (ps : ProofString shape Fp G) :
-    ProofString shape Fp G :=
-  spliceX2 ps r.cont
-
-/-- The run's challenge record at set-separation challenge `χ`. -/
-def X2Run.challenges {shape : Shape} (r : X2Run shape G) (ch : Challenges shape.k Fp) (χ : Fp) :
-    Challenges shape.k Fp :=
-  { theta := ch.theta, beta := ch.beta, gamma := ch.gamma, y := ch.y, x := ch.x
-    x1 := ch.x1, x2 := χ, x3 := r.x3, x4 := r.x4, xi := r.xi, z := r.z
-    ipaRound := r.ipaRound }
-
-
-
-
-
-
-
-/-! ## The `x₄` rewound runs with a re-sent opening: the adaptive collapse
-
-Rewinding the batching challenge `x₄` re-sends the fields absorbed *after* it — the IPA opening
-(`ipaS`, `ipaRounds`, `ipaC`, `ipaF`) — while everything absorbed before `x₄` stays shared: the
-claimed set evaluations `u` (`multiopenU_mem_preX4Transcript`), the quotient `q′`, `x₁`/`x₂`/`x₃`,
-the query list, the grouping, and hence the point-set aggregates and the recomputed base evaluation.
-So the `x₄` batch columns (`x4BatchCommitments`/`x4BatchEvals`) — the aggregates the decode consumes —
-are *definitionally* the honest ones across `x₄` runs; only the IPA opening the fork's clean tree
-witnesses moves per run. The runs are the `reprogramX4` reprogramming events
-(`Soundness.Forking.Rewind`). This is the adaptive analogue of the `x₁` layer's `spliceMultiopen`:
-it lets each rewound `x₄` run present its own opening rather than reusing the honest `ps`, so the
-accept measure fed to the collapse no longer inherits a constant strategy. -/
-
-/-- The rewound prover's post-`x₄` continuation: the IPA opening absorbed after `x₄` is squeezed
-(`u` is pre-`x₄` and shared). -/
-structure X4Continuation (shape : Shape) (G : Type*) where
-  ipaS : G
-  ipaRounds : Fin shape.k → G × G
-  ipaC : Fp
-  ipaF : Fp
-
-/-- Splice a post-`x₄` continuation onto the shared pre-`x₄` proof prefix. -/
-def spliceX4 {shape : Shape} (ps : ProofString shape Fp G) (c : X4Continuation shape G) :
-    ProofString shape Fp G :=
-  { ps with
-    ipaS := c.ipaS
-    ipaRounds := c.ipaRounds
-    ipaC := c.ipaC
-    ipaF := c.ipaF }
-
-/-- One `x₄`-rewound run: the re-sent opening and the run's post-`x₄` challenges. -/
-structure X4Run (shape : Shape) (G : Type*) where
-  cont : X4Continuation shape G
-  xi : Fp
-  z : Fp
-  ipaRound : Fin shape.k → Fp
-
-/-- The run's proof string: the shared pre-`x₄` prefix with the run's continuation spliced on. -/
-def X4Run.spliced {shape : Shape} (r : X4Run shape G) (ps : ProofString shape Fp G) :
-    ProofString shape Fp G :=
-  spliceX4 ps r.cont
-
-/-- The run's challenge record at batching challenge `χ`: pre-`x₄` challenges the honest ones,
-`x₄ := χ`, post-`x₄` challenges the run's own. -/
-def X4Run.challenges {shape : Shape} (r : X4Run shape G) (ch : Challenges shape.k Fp) (χ : Fp) :
-    Challenges shape.k Fp :=
-  { theta := ch.theta, beta := ch.beta, gamma := ch.gamma, y := ch.y, x := ch.x
-    x1 := ch.x1, x2 := ch.x2, x3 := ch.x3, x4 := χ, xi := r.xi, z := r.z
-    ipaRound := r.ipaRound }
-
-/-- The honest run as an `X4Run`; splicing it back is the identity by structure eta. -/
-def honestX4Run {shape : Shape} (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp) :
-    X4Run shape G :=
-  ⟨⟨ps.ipaS, ps.ipaRounds, ps.ipaC, ps.ipaF⟩, ch.xi, ch.z, ch.ipaRound⟩
-
-
-
-
-
-
-
-
-
-
-
 
 /-! ## From the `x₄` batch positions back to the sets, and the member binding -/
 

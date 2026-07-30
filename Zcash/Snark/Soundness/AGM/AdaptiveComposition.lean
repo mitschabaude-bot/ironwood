@@ -9,7 +9,7 @@ are summed. Chronology comes from transcript prefixes and query annotations.
 
 namespace Zcash.Snark
 
-open Classical Polynomial
+open Classical CompPoly.CPolynomial
 open scoped ENNReal
 
 variable {shape : Shape}
@@ -161,7 +161,7 @@ theorem ComputedAdaptiveOnlineAGMFSFamily.adaptiveIpaFallbackBad_actual
       (algebraicFullPrefixes family.init p j) O = nu := by
     exact adaptiveIpaPreRecord_fullPrefixes family.init p j O
   rw [hnu]
-  apply congrArg (fun polynomial : Polynomial Fp => (szBadSet polynomial : Set Fp))
+  apply congrArg (fun polynomial : CPoly => (szBadSet polynomial : Set Fp))
   calc
     adaptiveIpaRootPolynomial (family.vk basis) (family.instanceCommitment basis)
         (adaptiveIpaCanonicalProof data.algebraicProof.erase)
@@ -250,7 +250,7 @@ theorem ComputedAdaptiveOnlineAGMFSFamily.adaptiveIpaBadWithoutRelation_all_meas
     _ = shape.k * ((family.Q + 1 : Nat) *
         (2 / (Fintype.card Fp : ENNReal))) := by simp
 
-/-- The adaptive index translation is inverse to the historical six-root ordering. -/
+/-- The adaptive index translation is inverse to the deployed six-root ordering. -/
 @[simp] theorem adaptiveRootEventIndex_deployedRootChallengeIndex (i : Fin 6) :
     adaptiveRootEventIndex (deployedRootChallengeIndex i) = i := by
   fin_cases i <;> rfl

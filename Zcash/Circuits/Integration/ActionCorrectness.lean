@@ -64,7 +64,7 @@ def ofAcceptedCircuitSat
       DeployedAccepts urs hk
         (actionCircuit.toVerifierKey pp urs)
         (actionCircuit.instanceCommitment pp urs inputs) ps ch)
-    (hpoly : Polynomial Fp)
+    (hpoly : CPoly)
     (hsatisfied :
       (CanonicalMemberConstraintRelation.acceptedModel
         (memberDecode := memberDecode)

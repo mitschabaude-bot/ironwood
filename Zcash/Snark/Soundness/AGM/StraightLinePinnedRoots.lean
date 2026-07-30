@@ -1,6 +1,6 @@
 import Zcash.Snark.Soundness.AGM.StraightLineIpa
 import Zcash.Snark.Soundness.Composition.DeployedRuntime
-import Zcash.Snark.Soundness.Forking.PinnedRoots
+import Zcash.Snark.Soundness.FiatShamir.PinnedRoots
 
 /-!
 # Pinned IPA-round roots for the straight-line AGM extractor
@@ -17,7 +17,7 @@ from the final proof value alone.
 
 namespace Zcash.Snark
 
-open Classical Polynomial
+open Classical CompPoly.CPolynomial
 open scoped ENNReal
 
 local instance vestaInhabitedStraightLinePinnedRoots : Inhabited VestaG := ⟨0⟩
@@ -64,7 +64,7 @@ structure StraightLineIpaOnlineTrace (family : ComputedAlgebraicFSFamily shape) 
     (basis : AugmentedIndex (2 ^ shape.k) -> VestaG) -> Fin shape.k ->
       OracleComp
         (BTranscript Fp VestaG
-          (preIpaLen shape family.init.length 10 + 3 * shape.k)) Fp (Polynomial Fp)
+          (preIpaLen shape family.init.length 10 + 3 * shape.k)) Fp (CPoly)
   agrees : forall (basis : AugmentedIndex (2 ^ shape.k) -> VestaG) (j : Fin shape.k)
       (O : BTranscript Fp VestaG
         (preIpaLen shape family.init.length 10 + 3 * shape.k) -> Fp),

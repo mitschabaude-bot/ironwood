@@ -1,16 +1,16 @@
 import Zcash.Snark.Soundness.Vesta
-import Zcash.Snark.Soundness.Forking.Adversary.Algebraic
-import Zcash.Snark.Soundness.AGM.Peel
-import Zcash.Snark.Soundness.Multiopen.Deployed
+import Zcash.Snark.Soundness.FiatShamir.Adversary.Algebraic
 
 /-!
 # Composing algebraic AGM extraction with the deployed decode
 
-`Soundness.Forking.Adversary.Algebraic` models the algebraic adversary family,
-while the deployed decoder works over a `(vk, ps, ch)` run. This module identifies
-the two on the computed path: `commit_aMulti_eq_multiopen` rewrites the adversary's
-aggregate witness as the deployed opened commitment
-`deployedCommitment − pU•u − pW•w`.
+`Soundness.FiatShamir.Adversary.Algebraic` models the algebraic adversary family; `Soundness.Vesta`
+proves the deployed decoded capstone. The two are architecturally
+disjoint — one runs over an adversary-produced `AlgebraicWfProof` at oracle-derived challenges
+`chRecord ν`, the other over a deployed `(vk, ps, ch)` run. This module builds the identification
+bridge the composition needs on the *computed path*: `commit_aMulti_eq_multiopen` rewrites the
+adversary's aggregate witness as the deployed opened commitment `deployedCommitment − pU•u − pW•w`
+the capstone consumes.
 
 ## The extracted `U`/`W` coordinates (`pU`, `pW`)
 
@@ -36,10 +36,10 @@ attribute [local irreducible] deployedSetQueries deployedSetCommIds deployedX4Pa
   x4BatchCommitments x4BatchEvals
 
 -- Match the instance set `AlgebraicWfProof.multiopen_repr` is stated against
--- (`Forking.Adversary.Algebraic` uses the same concrete `Inhabited VestaG`); a local `[Inhabited]`
+-- (`FiatShamir.Adversary.Algebraic` uses the same concrete `Inhabited VestaG`); a local `[Inhabited]`
 -- binder would be a *different* instance term, forcing the `multiopenCommitment` fold through `whnf`.
 -- Named (not anonymous) to avoid an auto-generated-name collision with the identical
--- `local instance` in `Forking.Adversary.Provenance` when both are imported into `TrustBoundary`.
+-- `local instance` in `FiatShamir.Adversary.Provenance` when both are imported into `TrustBoundary`.
 local instance vestaInhabitedCompositionBridge : Inhabited VestaG := ⟨0⟩
 
 variable {shape : Shape} {basis : AugmentedIndex (2 ^ shape.k) → VestaG}

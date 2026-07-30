@@ -19,16 +19,16 @@ those two views:
 * `eval_lookupEntriesOfDecodedResolver_or_relation` feeds that fact directly into the lookup
   instantiation layer.
 
-The adapter is generic in the verification key and proof string.  It does not select a concrete
-Ironwood verification key or duplicate the nested-fork probability argument that produces
-member-node binding.
+The adapter is generic in the verification key and proof string. It does not select a concrete
+Ironwood verification key or duplicate the straight-line AGM argument that produces member-node
+binding.
 -/
 
 namespace Zcash.Snark
 
 open Zcash.Arithmetic (Msm)
 
-open Polynomial
+open CompPoly.CPolynomial
 
 set_option maxHeartbeats 200000
 
@@ -65,7 +65,7 @@ def decodedMemberPolynomial [DecidableEq G] [Inhabited G]
       OpenedMemberDecode (instanceCommitment := instanceCommitment)
         urs hk vk ps ch pbatch i hi)
     (slot : DeployedMemberSlot (instanceCommitment := instanceCommitment) vk ps ch) :
-    Polynomial Fp :=
+    CPoly :=
   coeffsToPoly
     ((memberDecode slot.setIndex slot.setIndex_lt).cols slot.memberIndex)
 
@@ -85,13 +85,13 @@ def decodedPolynomialResolver [DecidableEq G] [Inhabited G]
         urs hk vk ps ch pbatch i hi)
     (route : CommitmentId →
       Option (DeployedMemberSlot (instanceCommitment := instanceCommitment) vk ps ch)) :
-    CommitmentId → Polynomial Fp :=
+    CommitmentId → CPoly :=
   fun id =>
     match route id with
     | some slot =>
         decodedMemberPolynomial (instanceCommitment := instanceCommitment)
           urs hk vk ps ch memberDecode slot
-    | none => ComputablePolynomial.zero
+    | none => 0
 
 /-- The claimed value stored by the deployed grouping for a member at a point of its point set. -/
 def deployedMemberClaim [DecidableEq G] [Inhabited G]

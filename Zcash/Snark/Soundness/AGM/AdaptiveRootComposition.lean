@@ -23,7 +23,7 @@ may inspect only entries below `n`; the current and later entries are dummy valu
 def adaptiveEarlierRecord (n : Fin 11) (earlier : Fin (n : Nat) → Fp) : Fin 11 → Fp :=
   fun i => if h : (i : Nat) < (n : Nat) then earlier ⟨i, h⟩ else 0
 
-/-- Translate the pre-IPA squeeze index to the historical six-root budget order
+/-- Translate the pre-IPA squeeze index to the deployed six-root budget order
 `(ξ,z,x₄,x₃,x₂,x₁)`. -/
 def adaptiveRootEventIndex (n : Fin 11) : Fin 6 :=
   if (n : Nat) = 5 then 5

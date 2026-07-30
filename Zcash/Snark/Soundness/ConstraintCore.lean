@@ -10,7 +10,7 @@ of any accepting-multiopen rewind.  This module isolates those facts for the alg
 
 namespace Zcash.Snark
 
-open Classical Polynomial
+open Classical CompPoly.CPolynomial
 
 variable {G : Type*} [AddCommGroup G] [Module Fp G]
 
@@ -97,22 +97,22 @@ theorem deployedAccepts_xn_ne_one [DecidableEq G] [Inhabited G] {shape : Shape}
 
 /-- Clear the verifier's computed quotient denominator. -/
 theorem hfold_of_expectedHEval_binding (constraints : List Fp) (y x : Fp)
-    (hpoly : Polynomial Fp) (deg : Nat) (exprs : List Fp)
+    (hpoly : CPoly) (deg : Nat) (exprs : List Fp)
     (hxn : x ^ deg ≠ 1)
     (hbind : hpoly.eval x = expectedHEval exprs y (x ^ deg))
     (hfp : constraints.foldl (fun acc v => acc * y + v) 0 =
       exprs.foldl (fun acc v => acc * y + v) 0) :
     constraints.foldl (fun acc v => acc * y + v) 0 =
       hpoly.eval x * (x ^ deg - 1) := by
-  rw [hfp, hbind, expectedHEval, mul_assoc,
-    inv_mul_cancel₀ (sub_ne_zero.mpr hxn), mul_one]
+  rw [hfp, hbind, expectedHEval, _root_.mul_assoc,
+    inv_mul_cancel₀ (sub_ne_zero.mpr hxn), _root_.mul_one]
 
 omit [Module Fp G] in
 /-- Read the quotient fold from the routed vanishing member. -/
 theorem hfold_of_vanishing_slot_binding [DecidableEq G] [Inhabited G] {shape : Shape}
     (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → Nat → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
-    (constraints : List Fp) (hpoly : Polynomial Fp) (i m : Nat)
+    (constraints : List Fp) (hpoly : CPoly) (i m : Nat)
     (hrouted : ∀ d0, ((deployedSetQueries vk instanceCommitment ps ch i).getD m d0).2 =
       [expectedHEval
         (allExpressions vk ps ch
@@ -137,10 +137,10 @@ theorem hfold_of_vanishing_slot_binding [DecidableEq G] [Inhabited G] {shape : S
   rfl
 
 /-- Outside the quotient-difference root set, the constraint implication holds. -/
-theorem hgood_of_good_challenge (numerator hq : Polynomial Fp) (n : Nat) {x : Fp}
-    (hx : x ∉ szBadSet (numerator - hq * (Polynomial.X ^ n - 1))) :
-    numerator ≠ hq * (Polynomial.X ^ n - 1) →
-      (numerator - hq * (Polynomial.X ^ n - 1)).eval x ≠ 0 :=
+theorem hgood_of_good_challenge (numerator hq : CPoly) (n : Nat) {x : Fp}
+    (hx : x ∉ szBadSet (numerator - hq * (X ^ n - 1))) :
+    numerator ≠ hq * (X ^ n - 1) →
+      (numerator - hq * (X ^ n - 1)).eval x ≠ 0 :=
   fun hne => (not_mem_szBadSet.mp hx) (sub_ne_zero.mpr hne)
 
 end Zcash.Snark

@@ -20,7 +20,7 @@ premises, not a repair to this fold.
 
 namespace Zcash.Snark
 
-open Polynomial
+open CompPoly.CPolynomial
 
 /-- **`hfold` from the budget's good branch.** `deployed_member_budget` ends in a disjunction:
 *either* the joint accept measure sits inside the four-threshold budget, *or* every decoded member
@@ -35,9 +35,9 @@ def hfold_of_member_budget {G : Type*} [AddCommGroup G] [Module Fp G] [Decidable
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → ℕ → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
     (constraints : List Fp)
-    (hpoly : Polynomial Fp) (i m : ℕ)
+    (hpoly : CPoly) (i m : ℕ)
     (hm : m < (deployedSetQueries vk instanceCommitment ps ch i).length)
-    (colPoly : Fin (deployedSetQueries vk instanceCommitment ps ch i).length → Polynomial Fp)
+    (colPoly : Fin (deployedSetQueries vk instanceCommitment ps ch i).length → CPoly)
     (hbindAll : ∀ (idx : Fin ((constructIntermediateSets
           (assembleQueries vk instanceCommitment ps ch)).points.getD i []).length)
         (m₀ : Fin (deployedSetQueries vk instanceCommitment ps ch i).length),
@@ -78,11 +78,11 @@ def hfold_of_member_budget {G : Type*} [AddCommGroup G] [Module Fp G] [Decidable
   rw [hquot, ← hx]
   exact hb
 
-open Polynomial in
+open CompPoly.CPolynomial in
 /-- **`hfold`, with the fingerprint discharged.** `hfold_of_member_budget` run on the full
 constraint list — gates, permutation argument and lookup argument together — instead of an abstract
 gate family. That list is the evaluation of the constraint *polynomials* at `ch.x`, so the
-fingerprint premise is no longer assumed: `eval_combineConstraints_deployed` proves it from the node
+fingerprint premise follows from `eval_combineConstraints_deployed` and the node
 binding alone.
 
 Named assumptions: `hfixed`/`hadvice`/`hinstance` — the fed columns take the claimed evaluations at
@@ -94,17 +94,17 @@ def hfold_of_constraint_polys {G : Type*} [AddCommGroup G] [Module Fp G] [Decida
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → ℕ → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
-    (fixedCols : ℕ → Polynomial Fp)
-    (adviceCols instanceCols : Fin shape.numProofs → ℕ → Polynomial Fp)
-    (sets : Fin shape.numProofs → List (PermSetEval (Polynomial Fp)))
+    (fixedCols : ℕ → CPoly)
+    (adviceCols instanceCols : Fin shape.numProofs → ℕ → CPoly)
+    (sets : Fin shape.numProofs → List (PermSetEval (CPoly)))
     (chunks : Fin shape.numProofs →
-      List (PermSetEval (Polynomial Fp) × List (Polynomial Fp × Polynomial Fp)))
+      List (PermSetEval (CPoly) × List (CPoly × CPoly)))
     (lookups : Fin shape.numProofs →
-      List (LookupEval (Polynomial Fp) × List (Expr Fp) × List (Expr Fp)))
-    (l0 lLast lBlind : Polynomial Fp)
-    (hpoly : Polynomial Fp) (i m : ℕ)
+      List (LookupEval (CPoly) × List (Expr Fp) × List (Expr Fp)))
+    (l0 lLast lBlind : CPoly)
+    (hpoly : CPoly) (i m : ℕ)
     (hm : m < (deployedSetQueries vk instanceCommitment ps ch i).length)
-    (colPoly : Fin (deployedSetQueries vk instanceCommitment ps ch i).length → Polynomial Fp)
+    (colPoly : Fin (deployedSetQueries vk instanceCommitment ps ch i).length → CPoly)
     (hbindAll : ∀ (idx : Fin ((constructIntermediateSets
           (assembleQueries vk instanceCommitment ps ch)).points.getD i []).length)
         (m₀ : Fin (deployedSetQueries vk instanceCommitment ps ch i).length),

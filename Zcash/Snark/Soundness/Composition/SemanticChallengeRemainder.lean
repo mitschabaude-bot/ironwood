@@ -47,7 +47,7 @@ variable {shape : Shape} {G : Type*}
 /-- The bundle-wide permutation `γ` exclusion costs the summed cell counts, doubled. -/
 theorem allResolverPermutationGammaBadSet_measure_le
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp) (m : ℕ) :
+    (poly : CommitmentId → CPoly) (m : ℕ) :
     uniformChallenge.toOuterMeasure (allResolverPermutationGammaBadSet vk ch poly m) ≤
       ((∑ p : Fin shape.numProofs,
         2 * Fintype.card (ResolverPermutationCell vk poly p m) : ℕ) : ℝ≥0∞) /
@@ -59,7 +59,7 @@ theorem allResolverPermutationGammaBadSet_measure_le
 /-- The bundle-wide permutation `β` exclusion costs the summed quadratic cell counts. -/
 theorem allResolverPermutationBetaBadSet_measure_le
     (vk : VerifyingKey shape Fp G)
-    (poly : CommitmentId → Polynomial Fp) (m : ℕ) :
+    (poly : CommitmentId → CPoly) (m : ℕ) :
     uniformChallenge.toOuterMeasure (allResolverPermutationBetaBadSet vk poly m) ≤
       ((∑ p : Fin shape.numProofs,
         (Fintype.card (ResolverPermutationCell vk poly p m) + 1) *
@@ -75,7 +75,7 @@ theorem allResolverPermutationBetaBadSet_measure_le
 theorem allResolverLookupGammaBadSet_measure_le
     {k : ℕ} (numProofs : ℕ)
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp) (u : ℕ) :
+    (poly : CommitmentId → CPoly) (u : ℕ) :
     uniformChallenge.toOuterMeasure
         (allResolverLookupGammaBadSet numProofs vk ch poly u) ≤
       ((numProofs * shape.numLookups * (2 * (u + 1)) : ℕ) : ℝ≥0∞) /
@@ -91,7 +91,7 @@ theorem allResolverLookupGammaBadSet_measure_le
 theorem allResolverLookupBetaBadSet_measure_le
     {k : ℕ} (numProofs : ℕ)
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
-    (poly : CommitmentId → Polynomial Fp) (u : ℕ) :
+    (poly : CommitmentId → CPoly) (u : ℕ) :
     uniformChallenge.toOuterMeasure
         (allResolverLookupBetaBadSet numProofs vk ch poly u) ≤
       ((numProofs * shape.numLookups * ((u + 2) * (u + 1) + (u + 1)) : ℕ) : ℝ≥0∞) /
@@ -112,7 +112,7 @@ theorem allResolverLookupBetaBadSet_measure_le
 environment family rather than a verifying key, so it is charged where that family is fixed. -/
 noncomputable def semanticChallengeRemainder
     (numProofs : ℕ) (vk : VerifyingKey shape Fp G)
-    (poly : CommitmentId → Polynomial Fp) (constraints : List (Polynomial Fp))
+    (poly : CommitmentId → CPoly) (constraints : List (CPoly))
     (m u : ℕ) : ℝ≥0∞ :=
   ((vk.n * constraints.length : ℕ) : ℝ≥0∞) / Fintype.card Fp +
     ((∑ p : Fin shape.numProofs,
@@ -130,7 +130,7 @@ other three are the bundle-wide unions above.  Stated as a sum because each chal
 separate squeeze. -/
 theorem semanticChallengeRemainder_covers
     (numProofs : ℕ) (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
-    (poly : CommitmentId → Polynomial Fp) (constraints : List (Polynomial Fp))
+    (poly : CommitmentId → CPoly) (constraints : List (CPoly))
     (m u : ℕ) (hn : vk.n ≠ 0) :
     uniformChallenge.toOuterMeasure
         {y : Fp | ∃ j, y ∈ szBadSet (foldSplitWitness constraints vk.n j)} +
@@ -270,14 +270,14 @@ the usable-row count alone.
 
 /-- The resolver's chunk pair count is the key's, not the run's. -/
 theorem resolverPermutationPairs_length {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → Polynomial Fp)
+    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
     (p : Fin shape.numProofs) (c : ℕ) :
     (ResolverPermutationPairs vk poly p c).length = (vk.permutationChunks.getD c []).length :=
   List.length_map _
 
 /-- Hence two runs give the same permutation cell count, so the epsilon is run-uniform. -/
 theorem resolverPermutationCell_card_congr {shape : Shape} {G : Type*}
-    (vk : VerifyingKey shape Fp G) (poly poly' : CommitmentId → Polynomial Fp)
+    (vk : VerifyingKey shape Fp G) (poly poly' : CommitmentId → CPoly)
     (p : Fin shape.numProofs) (m : ℕ) :
     Fintype.card (ResolverPermutationCell vk poly p m) =
       Fintype.card (ResolverPermutationCell vk poly' p m) := by

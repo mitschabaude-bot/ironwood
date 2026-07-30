@@ -3,9 +3,9 @@ import Zcash.Snark.Soundness.AGM.SyntheticOpened
 /-!
 # Deployed synthetic-opened adapter
 
-The Halo2 specialization of `AlgebraicPowerBatch.toSyntheticOpened`: the rewind-free `x4` and
-`x1` AGM batches presented through the historical member-constraint interface, every entry
-computed locally from representation coordinates.
+The Halo2 specialization of `AlgebraicPowerBatch.toSyntheticOpened`: the `x4` and `x1` AGM batches
+presented through the member-constraint interface, with every entry computed locally from
+representation coordinates.
 -/
 
 namespace Zcash.Snark
@@ -15,7 +15,7 @@ variable {G : Type*} [AddCommGroup G] [Module Fp G]
 attribute [local irreducible] deployedSetQueries deployedX4PairCount x4BatchCommitments
   x4BatchEvals deployedSetMemberCommitments
 
-/-- A deployed `x4` algebraic batch presented through the legacy opened-batch interface. -/
+/-- A deployed `x4` algebraic batch presented through the opened-batch interface. -/
 def deployedSyntheticOpenedX4 [DecidableEq G] [Inhabited G] {shape : Shape}
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → Nat → G)

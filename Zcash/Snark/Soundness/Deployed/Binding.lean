@@ -14,7 +14,7 @@ the breaks-as-computed-data convention (`Zcash.Security.RandomOracle`):
 
 * `NontrivialRelation.ofCombinationCollision` — a combined `(g, U, W)`-equation whose coordinates do
   not all agree *computes* a relation: the augmented analog of `relation_of_collision`, and the step
-  that ties the deployed peel (`Zcash.Snark.Soundness.Deployed.IpaPeel`) to binding.
+  used by the current AGM peel and canonical instance-commitment collision classifiers.
 
 For why the reduction produces the relation as data — an ∃-closed `Prop` would be vacuous at the
 concrete curve — see `The reduction form` in `Zcash.Snark.Soundness.Main`.

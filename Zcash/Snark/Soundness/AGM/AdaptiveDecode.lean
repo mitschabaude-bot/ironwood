@@ -10,7 +10,7 @@ constraint and Action decoders, without phase objects or existential relation wi
 
 namespace Zcash.Snark
 
-open Classical Polynomial
+open Classical CompPoly.CPolynomial
 
 local instance vestaInhabitedAdaptiveDecode : Inhabited VestaG := ⟨0⟩
 
@@ -1170,7 +1170,7 @@ private theorem nodeBindingErrorPolynomial_congr_fin
     {n m : Nat} (hnm : n = m)
     (allPts allPts' : Finset Fp) (hall : allPts = allPts')
     (pts : Fin n → Finset Fp) (pts' : Fin m → Finset Fp)
-    (col r : Fin n → Polynomial Fp) (col' r' : Fin m → Polynomial Fp)
+    (col r : Fin n → CPoly) (col' r' : Fin m → CPoly)
     (hpts : ∀ i : Fin n, pts i = pts' ⟨i, by omega⟩)
     (hcol : ∀ i : Fin n, col i = col' ⟨i, by omega⟩)
     (hr : ∀ i : Fin n, r i = r' ⟨i, by omega⟩)
@@ -1619,9 +1619,9 @@ private theorem clearedQuotientErrorPolynomial_congr_fin
     {n m : Nat} (hnm : n = m)
     (allPts allPts' : Finset Fp) (hall : allPts = allPts')
     (pts : Fin n → Finset Fp) (pts' : Fin m → Finset Fp)
-    (col r : Fin n → Polynomial Fp) (col' r' : Fin m → Polynomial Fp)
+    (col r : Fin n → CPoly) (col' r' : Fin m → CPoly)
     (a : Fin n → Fp) (a' : Fin m → Fp)
-    (qCol qCol' : Polynomial Fp)
+    (qCol qCol' : CPoly)
     (hpts : ∀ i : Fin n, pts i = pts' ⟨i, by omega⟩)
     (hcol : ∀ i : Fin n, col i = col' ⟨i, by omega⟩)
     (hr : ∀ i : Fin n, r i = r' ⟨i, by omega⟩)

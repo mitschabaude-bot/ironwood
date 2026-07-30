@@ -1,5 +1,5 @@
 import Zcash.Snark.Soundness.Composition.DeployedRuntime
-import Zcash.Snark.Soundness.Forking.PinnedSqueeze
+import Zcash.Snark.Soundness.FiatShamir.PinnedSqueeze
 
 /-!
 # The prefixed `x` squeeze

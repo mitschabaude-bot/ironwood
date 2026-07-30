@@ -1,5 +1,5 @@
 import Zcash.Meta.LibrarySuggestionsDeny
-import Zcash.Snark.Soundness.AGM.DeployedCoordinateDecode
+import Zcash.Snark.Soundness.AGM.OnlineMultiopen
 import Zcash.Snark.Soundness.AGM.DeployedX1
 
 /-!
@@ -8,7 +8,8 @@ import Zcash.Snark.Soundness.AGM.DeployedX1
 The within-set `x1` batch consists of actual query commitments.  Each such commitment must resolve
 to either a prover-emitted algebraic point fixed before `x1`, or a verifier-fixed represented
 point.  This file states that concrete coverage predicate and turns it into the exact
-`AlgebraicColumnRepresentations` consumed by `deployedX1AlgebraicBatchOrRelation`.
+`AlgebraicColumnRepresentations` consumed by
+`deployedX1AlgebraicBatchWithSourceOrRelation`.
 -/
 
 namespace Zcash.Snark
@@ -71,7 +72,7 @@ def onlinePointCoordinates (source : List (AlgebraicPoint (F := Fp) basis)) (P :
 
 /-- Polynomial carried by the deterministic online representation of a point. -/
 def onlinePointPolynomial
-    (source : List (AlgebraicPoint (F := Fp) basis)) (P : VestaG) : Polynomial Fp :=
+    (source : List (AlgebraicPoint (F := Fp) basis)) (P : VestaG) : CPoly :=
   coeffsToPoly (onlinePointCoordinates source P).1
 
 /-- Resolve a covered point by deterministic list lookup, or combine the representations carried
@@ -239,40 +240,6 @@ theorem deployedMemberRepresentationsOfCovered_components
   have hproof : hcovered nu i hi m = cCovered := Subsingleton.elim _ _
   cases hproof
   exact ⟨rfl, rfl, rfl⟩
-
-/-- The exact deployed within-set `x1` batch, obtained from online-covered member coordinates.
-Any mismatch with the already decoded `x4` aggregate is returned as an explicit augmented-basis
-relation. -/
-noncomputable def deployedX1BatchOfCoveredOrRelation
-    {vk : VerifyingKey shape Fp VestaG}
-    {instanceCommitment : Fin shape.numProofs → Nat → VestaG}
-    (p : AlgebraicWfProof basis vk instanceCommitment)
-    (fixed : List (AlgebraicPoint (F := Fp) basis))
-    (hcovered : DeployedMembersCovered vk instanceCommitment p.algebraicProof fixed)
-    (nu : Fin 11 -> Fp)
-    (x4Batch : AlgebraicPowerBatch (ursOfAugmentedBasis shape.k basis)
-      (x4BatchCommitments (ursOfAugmentedBasis shape.k basis) rfl vk instanceCommitment p.proof.1
-        (chRecord nu (fun _ => 0)))
-      (p.aMulti nu) (p.multiU nu) (p.multiBlind nu) (nu 8))
-    (i : Nat) (hi : i < deployedX4PairCount vk instanceCommitment p.proof.1
-      (chRecord nu (fun _ => 0))) :
-    AlgebraicPowerBatch (ursOfAugmentedBasis shape.k basis)
-        (deployedSetMemberCommitments (ursOfAugmentedBasis shape.k basis) rfl
-          vk instanceCommitment p.proof.1 (chRecord nu (fun _ => 0)) i)
-        (x4Batch.coeffs ⟨deployedX4PairCount vk instanceCommitment p.proof.1
-          (chRecord nu (fun _ => 0)) - 1 - i, by omega⟩)
-        (x4Batch.uComp ⟨deployedX4PairCount vk instanceCommitment p.proof.1
-          (chRecord nu (fun _ => 0)) - 1 - i, by omega⟩)
-        (x4Batch.wComp ⟨deployedX4PairCount vk instanceCommitment p.proof.1
-          (chRecord nu (fun _ => 0)) - 1 - i, by omega⟩)
-        (nu 5) ⊕'
-      AugmentedRelationWitness (F := Fp)
-        (ursOfAugmentedBasis shape.k basis).g
-        (ursOfAugmentedBasis shape.k basis).u
-        (ursOfAugmentedBasis shape.k basis).w :=
-  deployedX1AlgebraicBatchOrRelation (ursOfAugmentedBasis shape.k basis) rfl
-    vk instanceCommitment p.proof.1 (chRecord nu (fun _ => 0)) x4Batch i hi
-    (deployedMemberRepresentationsOfCovered p fixed hcovered nu i hi)
 
 /-- Provenance-preserving covered-member unbatch used by the deployed root capstone. -/
 def deployedX1BatchOfCoveredWithSourceOrRelation

@@ -8,7 +8,7 @@ import Zcash.Snark.Verifier.Assemble
 
 The deployed verifier derives each challenge by hashing the transcript absorbed so far. This module
 models halo2's Blake2b hash as the abstract `FiatShamir.squeeze`; it does not formalize Blake2b.
-Reprogramming and uniform-challenge results live in `Soundness.Forking.Oracle`.
+Reprogramming and uniform-challenge results live in `Soundness.FiatShamir.Oracle`.
 
 `deriveChallenges` records the absorb/squeeze order from halo2's PLONK, multiopen, and commitment
 verifiers. `nonInteractiveFingerprint` runs `assemble` at those derived challenges.
