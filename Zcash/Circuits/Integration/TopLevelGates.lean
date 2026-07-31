@@ -23,6 +23,21 @@ open Zcash.Arithmetic (omegaOf scalarFieldOrder)
 
 open Halo2 CompPoly.CPolynomial Keygen
 
+/-- A top-level circuit's intrinsic selector guarantees cover every selector atom
+in every configured gate. -/
+theorem _root_.Halo2.TopLevelCircuit.gateSelectorsAllocatedForCompression
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput) :
+    top.constraintSystem.GateSelectorsAllocated := by
+  rw [ConstraintSystem.GateSelectorsAllocated,
+    List.forall_iff_forall_mem]
+  intro gate hgate
+  exact Gate.SelectorsAllocated.of_owned
+    gate.wellFormed.selectorsOwned
+    (List.forall_iff_forall_mem.mp top.gateSelectorsAllocated
+      gate hgate)
+
 /--
 Static coherence for a top-level circuit's own derived verifying key.
 
@@ -36,8 +51,6 @@ structure TopLevelGateCoherence
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput) : Prop where
-  gateSelectorsAllocated :
-    top.constraintSystem.GateSelectorsAllocated
   domainExponent_lt : top.domainExponent < 33
   selectorDegree :
     csDegree top.constraintSystem < scalarFieldOrder
@@ -113,8 +126,7 @@ theorem selectorRootsWellFormed
     top.selectorActivations coherence.selectorDegree
 
 /-- Selector compression covers every configured gate expression. -/
-theorem gateSelectorsCovered
-    (coherence : TopLevelGateCoherence top) :
+theorem gateSelectorsCovered :
     ∀ expression ∈ flatGates top.constraintSystem,
       expression.selectorsCovered
         (fun selector =>
@@ -124,7 +136,7 @@ theorem gateSelectorsCovered
       top.constraintSystem
       top.n
       top.selectorActivations
-      coherence.gateSelectorsAllocated
+      top.gateSelectorsAllocatedForCompression
 
 /--
 Every enabled constraint in the top-level operation stream has the corresponding
@@ -168,7 +180,7 @@ opaque polynomialWitness
   have hselector :
       enabled.gate.selector.index <
         top.selectorCount :=
-    coherence.gateSelectorsAllocated.gate hgate
+    top.gateSelectorsAllocatedForCompression.gate hgate
   have hlookupSome :
       (top.selectorMap.lookup
         enabled.gate.selector.index).isSome = true := by
@@ -220,7 +232,7 @@ opaque polynomialWitness
     (by
       intro index hverifier hsource
       simpa only [top.toVerifierKey_gates, top.toVerifierKey_omega] using
-        top.verifierCS_gates_eval
+        Halo2.TopLevelCircuit.verifierCS_gates_eval (top := top)
           (fun query =>
             (fixedQueryFeedOfResolver
               (top.toVerifierKey urs) poly query).eval
@@ -241,7 +253,7 @@ opaque polynomialWitness
               (top.toVerifierKey urs) poly proofIndex usableRows)
             (fun _ => 0)
             (top.placement enabled.region + enabled.row))
-          coherence.gateSelectorsCovered hinterpret
+          (gateSelectorsCovered (top := top)) hinterpret
           index (by
             simpa only [top.toVerifierKey_gates] using hverifier)
           hsource)

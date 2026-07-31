@@ -67,18 +67,22 @@ theorem gate
   induction operations generalizing i with
   | nil => simp [operationEnabledGates] at henabled
   | cons operation rest ih =>
-      rw [OperationsKeygenCoherent, List.forall_cons] at hcoherent
-      rcases hcoherent with ⟨hoperation, hrest⟩
       cases operation with
       | region name body =>
-          simp only [Operation.KeygenCoherent] at hoperation
+          rcases (OperationsKeygenCoherent.region_cons
+            cs name body rest).mp hcoherent with
+            ⟨hoperation, hrest⟩
           simp only [operationEnabledGates, List.mem_append] at henabled
           rcases henabled with henabled | henabled
           · exact region_gate hoperation henabled
           · exact ih hrest henabled
       | constrainInstance cell column row =>
+          have hrest := (OperationsKeygenCoherent.constrainInstance_cons
+            cs cell column row rest).mp hcoherent
           exact ih hrest henabled
       | loadTable table values =>
+          have hrest := (OperationsKeygenCoherent.loadTable_cons
+            cs table values rest).mp hcoherent
           exact ih hrest henabled
 
 /-- A coherent region registers every extracted enabled lookup. -/
@@ -125,18 +129,22 @@ theorem lookup
   induction operations generalizing i with
   | nil => simp [operationEnabledLookups] at henabled
   | cons operation rest ih =>
-      rw [OperationsKeygenCoherent, List.forall_cons] at hcoherent
-      rcases hcoherent with ⟨hoperation, hrest⟩
       cases operation with
       | region name body =>
-          simp only [Operation.KeygenCoherent] at hoperation
+          rcases (OperationsKeygenCoherent.region_cons
+            cs name body rest).mp hcoherent with
+            ⟨hoperation, hrest⟩
           simp only [operationEnabledLookups, List.mem_append] at henabled
           rcases henabled with henabled | henabled
           · exact region_lookup hoperation henabled
           · exact ih hrest henabled
       | constrainInstance cell column row =>
+          have hrest := (OperationsKeygenCoherent.constrainInstance_cons
+            cs cell column row rest).mp hcoherent
           exact ih hrest henabled
       | loadTable table values =>
+          have hrest := (OperationsKeygenCoherent.loadTable_cons
+            cs table values rest).mp hcoherent
           exact ih hrest henabled
 
 end OperationsKeygenCoherent
