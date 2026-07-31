@@ -193,10 +193,9 @@ theorem actionCircuit_domainExponent : actionCircuit.domainExponent = capturedUR
 
 /-- The derived verifying key's domain generator is the captured URS's, so a key stated at that key's
 `omega` is a key at the captured domain. -/
-theorem toVerifierKey_omega_captured :
-    (actionCircuit.toVerifierKey actionProofParams capturedURS).omega = omegaOf capturedURS.k := by
-  rw [TopLevelCircuit.toVerifierKey_omega, TopLevelCircuit.omega,
-    actionCircuit_domainExponent]
+theorem actionCircuit_omega_captured :
+    actionCircuit.omega = omegaOf capturedURS.k := by
+  rw [TopLevelCircuit.omega, actionCircuit_domainExponent]
 
 /-- **The circuit-derived public-instance family is the fixture's.**
 `actionCircuit.instanceCommitment` computes commitments from the public inputs the way halo2's
@@ -217,7 +216,9 @@ theorem instanceCommitment_capturedActionInputs :
   rcases eq_or_ne column 0 with rfl | hcolumn
   · -- The single populated column: the circuit's serialization is the captured column itself.
     rw [Nat.add_zero, publicInputRows_capturedActionInputs proofIndex,
-      commitLagrange_eq_commitInstance toVerifierKey_omega_captured _ _
+      commitLagrange_eq_commitInstance
+        ((actionCircuit.toVerifierKey_omega actionProofParams capturedURS).trans
+          actionCircuit_omega_captured) _ _
         (by fin_cases proofIndex; native_decide)]
   · -- Every other column: the circuit serializes zeros, the capture stores nothing, both give `w`.
     rw [commitInstance_of_rows_zero _ (publicInputRows_ne_zero _ hcolumn),

@@ -77,6 +77,38 @@ theorem domainRowsInjective
   Zcash.Arithmetic.omegaOf_powers_injective
     top.domainExponent (by omega)
 
+/-- Reindex the circuit's injective domain rows along an identified exponent. -/
+theorem domainRowsInjective_of_domainExponent_eq
+    {k : ℕ}
+    (hbound : top.domainExponent < 33)
+    (hk : top.domainExponent = k) :
+    Function.Injective fun row : Fin (2 ^ k) =>
+      top.omega ^ (row : ℕ) := by
+  rw [← hk, ← top.n_eq_two_pow_domainExponent]
+  exact domainRowsInjective hbound
+
+/-- The verifier key derived from a top-level circuit uses the same injective
+evaluation-domain row names. -/
+theorem toVerifierKey_domainRowsInjective
+    {G : Type} [AddCommGroup G] [Inhabited G]
+    (pp : Keygen.ProofParams) (urs : URS G)
+    (hbound : top.domainExponent < 33) :
+    Function.Injective fun row : Fin (top.toVerifierKey pp urs).n =>
+      (top.toVerifierKey pp urs).omega ^ (row : ℕ) := by
+  simpa only [top.toVerifierKey_n, top.toVerifierKey_omega] using
+    domainRowsInjective (top := top) hbound
+
+/-- The verifier key derived from a top-level circuit uses the circuit's
+evaluation-domain root. -/
+theorem toVerifierKey_domainRoot
+    {G : Type} [AddCommGroup G] [Inhabited G]
+    (pp : Keygen.ProofParams) (urs : URS G)
+    (hbound : top.domainExponent < 33) :
+    (top.toVerifierKey pp urs).omega ^
+        (top.toVerifierKey pp urs).n = 1 := by
+  simpa only [top.toVerifierKey_n, top.toVerifierKey_omega] using
+    domainRoot (top := top) hbound
+
 /-- The circuit-derived domain size is nonzero in the verifier scalar field. -/
 theorem domainSizeCastNeZero
     (hbound : top.domainExponent < 33) :

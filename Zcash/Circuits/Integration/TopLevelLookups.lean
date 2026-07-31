@@ -1,6 +1,7 @@
 import Zcash.Circuits.Integration.LookupProjection
 import Zcash.Snark.Soundness.Canonical.ConstraintModel
 import Zcash.Snark.Soundness.ChallengePricing
+import Zcash.Circuits.Integration.TopLevelAssignment
 import Zcash.Circuits.Integration.TopLevelGates
 
 /-!
@@ -547,12 +548,6 @@ def deployedWitness
       ConstraintSatisfaction
         (top.constraintModel pp urs ch poly)
         top.n)
-    (hrows : Function.Injective
-      fun row : Fin top.n =>
-        top.omega ^ (row : ℕ))
-    (hroot :
-      top.omega ^
-        top.n = 1)
     (lookup : EnabledLookup Fp)
     (henabled :
       lookup ∈ operationEnabledLookups (top.operations) 0)
@@ -607,6 +602,15 @@ def deployedWitness
       polynomialEnvironment_usableRows]
     rw [hu, top.usableRowsAt_domainExponent]
     omega
+  have hrows : Function.Injective
+      fun row : Fin top.n =>
+        top.omega ^ (row : ℕ) :=
+    TopLevelAssignment.domainRowsInjective
+      gateCoherence.domainExponent_lt
+  have hroot :
+      top.omega ^ top.n = 1 :=
+    TopLevelAssignment.domainRoot
+      gateCoherence.domainExponent_lt
   have projected :=
     projectedPolynomialValues gateCoherence ch poly
       proofIndex lookup henabled selectors
@@ -956,12 +960,6 @@ def deployedWitnesses
       ConstraintSatisfaction
         (top.constraintModel pp urs ch poly)
         top.n)
-    (hrows : Function.Injective
-      fun row : Fin top.n =>
-        top.omega ^ (row : ℕ))
-    (hroot :
-      top.omega ^
-        top.n = 1)
     (conditions :
       WitnessConditions top pp urs ch poly proofIndex) :
     ∀ lookup ∈ operationEnabledLookups (top.operations) 0,
@@ -982,7 +980,7 @@ def deployedWitnesses
       (conditions.inputSelectorValues lookup henabled)
       (lookupTables_selectorFree lookup.argument)
   exact deployedWitness gateCoherence ch poly proofIndex
-    satisfaction hrows hroot lookup henabled
+    satisfaction lookup henabled
     selectorProjection
     (lookup.activationRow_lt_usableRows henabled)
     (conditions.resolverGood lookup henabled)
@@ -999,12 +997,6 @@ theorem constraints
       ConstraintSatisfaction
         (top.constraintModel pp urs ch poly)
         top.n)
-    (hrows : Function.Injective
-      fun row : Fin top.n =>
-        top.omega ^ (row : ℕ))
-    (hroot :
-      top.omega ^
-        top.n = 1)
     (conditions :
       WitnessConditions top pp urs ch poly proofIndex) :
     CircuitConstraintFamily.constraints .lookup top.placement
@@ -1014,7 +1006,7 @@ theorem constraints
       (top.operations) 0 := by
   apply lookup_constraints_of_deployed_witnesses
   exact deployedWitnesses gateCoherence ch poly proofIndex
-    satisfaction hrows hroot conditions
+    satisfaction conditions
 
 end TopLevelLookup
 

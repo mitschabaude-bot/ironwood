@@ -79,11 +79,11 @@ def actionTopLevelCircuitCorrectness
         instanceCommitment ps ch pU pW a batchOpenings memberDecode
         (actionCircuit.toVerifierKey_blindingFactors_lt_n pp urs)
         ch.y hpoly
-        (actionCircuit.toVerifierKey pp urs).n)
+        actionCircuit.n)
     (hgoodY : ∀ j,
       ch.y ∉ szBadSet
         (foldSplitWitness relation.model.constraints
-          (actionCircuit.toVerifierKey pp urs).n j))
+          actionCircuit.n j))
     (permutationExclusions :
       ResolverPermutationChallengeExclusions
         (actionCircuit.toVerifierKey pp urs)
@@ -100,15 +100,16 @@ def actionTopLevelCircuitCorrectness
       TopLevelFixedCoherence actionCircuit urs :=
     ActionFixedCoherence.ofDerived urs hk
   have hdomainSize :
-      (actionCircuit.toVerifierKey pp urs).n = 2 ^ urs.k := by
-    change
-      actionCircuit.n = 2 ^ urs.k
-    exact congrArg (2 ^ ·) hk
+      actionCircuit.n = 2 ^ urs.k := by
+    rw [actionCircuit.n_eq_two_pow_domainExponent]
+    exact congrArg (2 ^ ·)
+      ((pp.mergeDerived_k actionCircuit).symm.trans hk)
   have hfixedRows : Function.Injective
       fun i : Fin (2 ^ urs.k) =>
-        (actionCircuit.toVerifierKey pp urs).omega ^
+        actionCircuit.omega ^
           (i : ℕ) :=
-    actionRowsInjectiveAtUrs pp urs hk
+    TopLevelAssignment.domainRowsInjective_of_domainExponent_eq
+      ActionPermutationDomain.domainExponent_lt hk
   refine
     { gates := ActionGateCoherence.topLevel
       fixedEncoding := ?_
@@ -157,17 +158,17 @@ def actionTopLevelCircuitCorrectness
   · intro proofIndex
     · have hrows : Function.Injective
           fun i : Fin
-              (actionCircuit.toVerifierKey pp urs).n =>
-            (actionCircuit.toVerifierKey pp urs).omega ^
+              actionCircuit.n =>
+            actionCircuit.omega ^
               (i : ℕ) := by
         rw [hdomainSize]
         exact hfixedRows
       have hroot :
-          (actionCircuit.toVerifierKey pp urs).omega ^
-            (actionCircuit.toVerifierKey pp urs).n = 1 :=
-        ActionPermutationDomain.root pp urs
-      have hn : (actionCircuit.toVerifierKey pp urs).n ≠ 0 := by
-        rw [actionCircuit.toVerifierKey_n]
+          actionCircuit.omega ^
+            actionCircuit.n = 1 :=
+        TopLevelAssignment.domainRoot
+          ActionPermutationDomain.domainExponent_lt
+      have hn : actionCircuit.n ≠ 0 := by
         exact actionCircuit.n_ne_zero
       have hsatisfaction :=
         relation.constraintSatisfaction hn hgoodY
@@ -181,11 +182,8 @@ def actionTopLevelCircuitCorrectness
             lookupSelectorValues lookupExclusions
       · have hrow :
             actionCircuit.placement lookup.region + lookup.row <
-              (actionCircuit.toVerifierKey pp urs).n :=
+              actionCircuit.n :=
           by
-            change
-              actionCircuit.placement lookup.region + lookup.row <
-                actionCircuit.n
             exact
               (lookup.activationRow_lt_usableRows henabled).trans_le
                 (by

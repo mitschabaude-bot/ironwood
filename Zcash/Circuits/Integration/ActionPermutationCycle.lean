@@ -65,9 +65,9 @@ theorem actionPermutationRows_eq_chunkRowName
       ((Zcash.Snark.actionChunkFlatten pp urs poly proofIndex
         ⟨chunk, row, column⟩).2 : ℕ)).getD (row : ℕ) 0 =
       chunkRowName
-        (actionVk pp urs).omega
-        (actionVk pp urs).delta
-        (actionVk pp urs).chunkLen
+        actionCircuit.omega
+        Zcash.Arithmetic.deltaFp
+        actionCircuit.chunkLen
         ((Zcash.Snark.actionFullSigma pp urs poly proofIndex
           ⟨chunk, row, column⟩).1 : ℕ)
         ((Zcash.Snark.actionFullSigma pp urs poly proofIndex
@@ -79,7 +79,7 @@ theorem actionPermutationRows_eq_chunkRowName
     (actionCircuit.operations)
     Zcash.Snark.actionCopies
     actionCopyList_decoded
-    (actionVk pp urs).chunkLen
+    actionCircuit.chunkLen
     (Zcash.Snark.actionChunkFlatten pp urs poly proofIndex)
   · intro rc
     let hcl : 0 < (actionVk pp urs).chunkLen :=
@@ -125,7 +125,7 @@ theorem actionChunkCommonIndex
       (ResolverPermutationPairs
         (actionVk pp urs) poly proofIndex chunk).length)
     (row : Fin Zcash.Snark.actionDomainSize) :
-    (((actionVk pp urs).permutationChunks.getD chunk []).getD
+    ((actionCircuit.verifierCS.permutationChunks.getD chunk []).getD
         column ((.advice 0), 0)).2 =
       ((Zcash.Snark.actionChunkFlatten pp urs poly proofIndex
         ⟨chunk, row, column⟩).2 : ℕ) := by
@@ -166,14 +166,12 @@ theorem actionChunkCommonIndex
     Zcash.Snark.flatten_getD_at_chunk
       ((.advice 0), 0) vk.permutationChunks
       chunk column
-      (by
-        rw [chunkCount]
-        exact chunk.isLt)
+      hchunk
       hcolumn
   rw [hglobalIndex] at hlocal
   have hflatten :
       vk.permutationChunks.flatten =
-        (actionCircuit.permutationColumns.map
+      (actionCircuit.permutationColumns.map
           (Zcash.Snark.permutationQueryReference
             actionCircuit.adviceQueryLayout
             actionCircuit.fixedQueryLayout
@@ -318,6 +316,8 @@ def actionResolverPermutationCycle_or_relation
       chunk column ⟨0, Zcash.Snark.actionDomainSize_pos⟩
   have hcommon :
       entry.2 < (actionShape pp).numPermutationColumns := by
+    simp only [entry, vk, actionVk,
+      actionCircuit.toVerifierKey_permutationChunks]
     rw [hcommonIndex]
     have hlt :=
       ((Zcash.Snark.actionChunkFlatten

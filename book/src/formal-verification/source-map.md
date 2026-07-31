@@ -353,7 +353,7 @@ computed data.
   and `SpendAuthority` (an unsigned spend yields a signature forgery or a key-binding break), with
   `Merkle` proving fixed-depth Merkle trees position-binding up to an exhibited tree-hash collision
   and `Nullifier` reducing a nullifier collision to a discrete-log relation. `Pool` instantiates
-  the abstract primitives at the deployed pool, `Value` discharges the balance-value premiss
+  the abstract primitives at the deployed pool, `Value` discharges the transaction-balance premiss
   against the binding-signature layer, `KeyBindingArm` discharges the key-binding ε in the oracle
   model, `Capstone` lifts the deterministic layer to a distribution over valid annotated ledgers,
   and `Completeness` checks the other direction — that an honest wallet's spend actually verifies.

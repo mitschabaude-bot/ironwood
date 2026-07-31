@@ -168,15 +168,16 @@ recovers the compiler's original permutation-column order.
 -/
 theorem permutationColumnAddresses_eq
     (pp : Keygen.ProofParams) (urs : URS G) :
-    ((actionVk pp urs).permutationChunks.flatten.map
+    (actionCircuit.verifierCS.permutationChunks.flatten.map
         (fun reference =>
           permutationColumnAddress (actionVk pp urs) reference.1)) =
       (Keygen.permColsOf
         actionCircuit.constraintSystem).map
           Halo2.Layout.ColRef.toAny := by
-  exact topLevelPermutationColumnAddresses_eq
-    actionCircuit pp urs
-      (routingCoherent_of_derived pp urs)
+  simpa only [actionCircuit.toVerifierKey_permutationChunks] using
+    topLevelPermutationColumnAddresses_eq
+      actionCircuit pp urs
+        (routingCoherent_of_derived pp urs)
 
 /-! ## Pasta permutation-name cosets -/
 
@@ -253,11 +254,11 @@ theorem root (pp : Keygen.ProofParams) (urs : URS G) :
   exact TopLevelAssignment.domainRoot domainExponent_lt
 
 /-- The active permutation prefix ends at the last usable Action row. -/
-abbrev activeRows (pp : Keygen.ProofParams) (urs : URS G) : ℕ :=
-  (actionVk pp urs).n - (actionVk pp urs).blindingFactors - 1
+abbrev activeRows : ℕ :=
+  actionCircuit.n - actionCircuit.blindingFactors - 1
 
-theorem activeRows_le (pp : Keygen.ProofParams) (urs : URS G) :
-    activeRows pp urs ≤ (actionVk pp urs).n := by
+theorem activeRows_le :
+    activeRows ≤ actionCircuit.n := by
   unfold activeRows
   omega
 
@@ -272,8 +273,8 @@ theorem domain
       actionCircuit.constraintModel pp urs ch poly
     ResolverPermutationDomain (actionVk pp urs)
       model.l0 model.lLast model.lBlind
-      (actionVk pp urs).n
-      ((actionVk pp urs).n - (actionVk pp urs).blindingFactors - 1) := by
+      actionCircuit.n
+      activeRows := by
   exact ResolverPermutationDomain.ofCanonicalConstraintModel
     (actionVk pp urs) ch poly
       (actionCircuit.toVerifierKey_blindingFactors_lt_n pp urs)
@@ -310,11 +311,11 @@ theorem namesInjective
     (pp : Keygen.ProofParams) (urs : URS G)
     (poly : CommitmentId → CPoly)
     (p : Fin pp.numProofs)
-    {activeRows : ℕ} (hactive : activeRows ≤ (actionVk pp urs).n) :
+    {activeRows : ℕ} (hactive : activeRows ≤ actionCircuit.n) :
     Function.Injective fun c :
         ResolverPermutationCell (actionVk pp urs) poly p activeRows =>
-      chunkRowName (actionVk pp urs).omega (actionVk pp urs).delta
-        (actionVk pp urs).chunkLen c.1 c.2.1 c.2.2 := by
+      chunkRowName actionCircuit.omega Zcash.Arithmetic.deltaFp
+        actionCircuit.chunkLen c.1 c.2.1 c.2.2 := by
   have hfull :
       Function.Injective fun c :
           ResolverPermutationCell (actionVk pp urs) poly p
@@ -491,13 +492,13 @@ theorem namesInjective
       (ResolverPermutationPairs (actionVk pp urs) poly p i).length)
     hactive
   have hwname :
-      chunkRowName (actionVk pp urs).omega (actionVk pp urs).delta
-          (actionVk pp urs).chunkLen
+      chunkRowName actionCircuit.omega Zcash.Arithmetic.deltaFp
+          actionCircuit.chunkLen
           (widenPermutationChunkCell hactive c).1
           (widenPermutationChunkCell hactive c).2.1
           (widenPermutationChunkCell hactive c).2.2 =
-        chunkRowName (actionVk pp urs).omega (actionVk pp urs).delta
-          (actionVk pp urs).chunkLen
+        chunkRowName actionCircuit.omega Zcash.Arithmetic.deltaFp
+          actionCircuit.chunkLen
           (widenPermutationChunkCell hactive d).1
           (widenPermutationChunkCell hactive d).2.1
           (widenPermutationChunkCell hactive d).2.2 := by
@@ -513,10 +514,10 @@ def cycleOfKeygenColumnsAt
     (poly : CommitmentId → CPoly)
     (p : Fin pp.numProofs)
     {m : ℕ}
-    (hactive : m ≤ (actionVk pp urs).n)
+    (hactive : m ≤ actionCircuit.n)
     (fullSigma : Equiv.Perm
       (ResolverPermutationCell (actionVk pp urs) poly p
-        (actionVk pp urs).n))
+        actionCircuit.n))
     (sigma : Equiv.Perm
       (ResolverPermutationCell (actionVk pp urs) poly p
         m))
@@ -527,18 +528,25 @@ def cycleOfKeygenColumnsAt
       (ResolverPermutationPairs
           (actionVk pp urs) poly p chunk)[column].2 =
         keygenSigmaColumn
-          (actionVk pp urs).omega (actionVk pp urs).delta
-          (actionVk pp urs).chunkLen fullSigma chunk column)
+          actionCircuit.omega Zcash.Arithmetic.deltaFp
+          actionCircuit.chunkLen fullSigma chunk column)
     (hrestrict : ∀ c :
         ResolverPermutationCell (actionVk pp urs) poly p m,
       widenPermutationChunkCell hactive (sigma c) =
         fullSigma
           (widenPermutationChunkCell hactive c)) :
     ResolverPermutationCycle (actionVk pp urs) poly p m :=
-  ResolverPermutationCycle.ofKeygenColumns
-    (actionVk pp urs) poly p hactive fullSigma sigma
-      (rowsInjective pp urs) hcolumns hrestrict
-      (namesInjective pp urs poly p hactive)
+  by
+    simpa only [actionVk, actionCircuit.toVerifierKey_n,
+      actionCircuit.toVerifierKey_omega,
+      actionCircuit.toVerifierKey_delta,
+      actionCircuit.toVerifierKey_chunkLen] using
+      ResolverPermutationCycle.ofKeygenColumns
+        (actionVk pp urs) poly p hactive fullSigma sigma
+          (TopLevelAssignment.domainRowsInjective
+            (top := actionCircuit) domainExponent_lt)
+          hcolumns hrestrict
+          (namesInjective pp urs poly p hactive)
 
 /-- Assemble the semantic cycle at the verifier-derived active-row boundary. -/
 def cycleOfKeygenColumns
@@ -547,10 +555,10 @@ def cycleOfKeygenColumns
     (p : Fin pp.numProofs)
     (fullSigma : Equiv.Perm
       (ResolverPermutationCell (actionVk pp urs) poly p
-        (actionVk pp urs).n))
+        actionCircuit.n))
     (sigma : Equiv.Perm
       (ResolverPermutationCell (actionVk pp urs) poly p
-        (activeRows pp urs)))
+        activeRows))
     (hcolumns : ∀
       (chunk : Fin (actionShape pp).numPermutationSets)
       (column : Fin
@@ -558,17 +566,17 @@ def cycleOfKeygenColumns
       (ResolverPermutationPairs
           (actionVk pp urs) poly p chunk)[column].2 =
         keygenSigmaColumn
-          (actionVk pp urs).omega (actionVk pp urs).delta
-          (actionVk pp urs).chunkLen fullSigma chunk column)
+          actionCircuit.omega Zcash.Arithmetic.deltaFp
+          actionCircuit.chunkLen fullSigma chunk column)
     (hrestrict : ∀ c :
         ResolverPermutationCell (actionVk pp urs) poly p
-          (activeRows pp urs),
-      widenPermutationChunkCell (activeRows_le pp urs) (sigma c) =
+          activeRows,
+      widenPermutationChunkCell activeRows_le (sigma c) =
         fullSigma
-          (widenPermutationChunkCell (activeRows_le pp urs) c)) :
+          (widenPermutationChunkCell activeRows_le c)) :
     ResolverPermutationCycle (actionVk pp urs) poly p
-      (activeRows pp urs) :=
-  cycleOfKeygenColumnsAt pp urs poly p (activeRows_le pp urs)
+      activeRows :=
+  cycleOfKeygenColumnsAt pp urs poly p activeRows_le
     fullSigma sigma hcolumns hrestrict
 
 assert_no_sorry routingCoherent_of_derived

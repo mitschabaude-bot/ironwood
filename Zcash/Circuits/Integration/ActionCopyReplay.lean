@@ -57,11 +57,11 @@ def actionCopyReplayWitness_or_relation
       urs hk (actionVk pp urs) instanceCommitment ps ch pU pW a
       batchOpenings memberDecode
         (actionCircuit.toVerifierKey_blindingFactors_lt_n pp urs)
-        y hpoly (actionVk pp urs).n)
+        y hpoly actionCircuit.n)
     (hgoodY : ∀ j,
       y ∉ szBadSet
         (foldSplitWitness relation.model.constraints
-          (actionVk pp urs).n j))
+          actionCircuit.n j))
     (fixedCoherence :
       TopLevelFixedCoherence actionCircuit urs)
     (exclusions : ResolverPermutationChallengeExclusions
@@ -75,15 +75,14 @@ def actionCopyReplayWitness_or_relation
         (FlatCell actionNumPermCols actionDomainSize)
         (NontrivialRelation (F := Fp) urs.g urs.u urs.w) ⊕'
       NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
-  have hn : (actionVk pp urs).n ≠ 0 := by
-    rw [actionCircuit.toVerifierKey_n]
-    exact actionCircuit.n_ne_zero
+  have hn : actionCircuit.n ≠ 0 :=
+    actionCircuit.n_ne_zero
   have hsatisfaction :=
     relation.constraintSatisfaction hn hgoodY
   have hdomain : ResolverPermutationDomain
       (actionVk pp urs)
       relation.model.l0 relation.model.lLast relation.model.lBlind
-      (actionVk pp urs).n actionActiveRows := by
+      actionCircuit.n actionActiveRows := by
     simpa only [actionActiveRows, TopLevelCircuit.usableRowsAt] using
       ActionPermutationDomain.domain
         pp urs ch relation.polynomial
@@ -102,10 +101,8 @@ def actionCopyReplayWitness_or_relation
         proofIndex hsatisfaction hdomain cycle hcycleSigma
         (exclusions.good proofIndex)
     have hdomainSize :
-        (actionVk pp urs).n = 2 ^ urs.k := by
-      change
-        actionCircuit.n = 2 ^ urs.k
-      exact congrArg (2 ^ ·) hk
+        actionCircuit.n = 2 ^ urs.k := by
+      rw [actionCircuit.n_eq_two_pow_domainExponent, hk]
     have hfixedRead : ∀ {column row value : ℕ},
         (column, row, value) ∈
             topLevelRequiredFixedEntries actionCircuit →
@@ -118,7 +115,8 @@ def actionCopyReplayWitness_or_relation
       have source :=
         relation.topLevelFixedEntryRead_or_relation
           rfl fixedCoherence
-          (actionRowsInjectiveAtUrs pp urs hk)
+          (TopLevelAssignment.domainRowsInjective_of_domainExponent_eq
+            ActionPermutationDomain.domainExponent_lt hk)
           hdomainSize proofIndex hentry
       simpa only [actionActiveRows] using source
     exact

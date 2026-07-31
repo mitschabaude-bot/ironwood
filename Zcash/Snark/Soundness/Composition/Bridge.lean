@@ -2,7 +2,7 @@ import Zcash.Snark.Soundness.Vesta
 import Zcash.Snark.Soundness.FiatShamir.Adversary.Algebraic
 
 /-!
-# Composing algebraic AGM extraction with the deployed decode
+# Composing the algebraic AGM extraction with the deployed decoded capstone
 
 `Soundness.FiatShamir.Adversary.Algebraic` models the algebraic adversary family; `Soundness.Vesta`
 proves the deployed decoded capstone. The two are architecturally

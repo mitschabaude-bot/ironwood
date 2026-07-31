@@ -51,9 +51,6 @@ def ofTopLevelCanonical
       ConstraintSatisfaction
         (top.constraintModel pp urs ch poly)
         top.n)
-    (hrows : Function.Injective
-      fun row : Fin top.n =>
-        top.omega ^ (row : ℕ))
     (hroot :
       top.omega ^
         top.n = 1)
@@ -95,7 +92,7 @@ def ofTopLevelCanonical
       rw [← pow_mul, Nat.mul_comm, pow_mul, hroot, one_pow]
     · exact selectorActivations
   · exact TopLevelLookup.deployedWitnesses gateCoherence ch poly proofIndex
-      satisfaction hrows hroot lookupConditions
+      satisfaction lookupConditions
 
 /--
 Lift per-proof full bridges to a bundle of circuit-owned statements while

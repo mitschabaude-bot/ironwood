@@ -343,10 +343,8 @@ end SequentialPreXProver
 
 /-! ## A complete sequential online-AGM prover
 
-`SequentialPreXProver.lift` is the small adapter used by the constraint layer.  The public
-coverage model below starts one layer earlier, at the online member family, and carries the
-actual computations stopped before every deployed-root and IPA squeeze.  Its projections build
-the root and IPA traces and then apply the pre-`x` lift; callers do not provide any trace object.
+The public sequential model carries stopped root and IPA computations and derives all traces
+internally before applying the pre-`x` lift.
 -/
 
 /-- Executable stages of an online member prover stopped before each of the six deployed-root

@@ -241,24 +241,24 @@ variable
     (batchOpenings :
       OpenedBatchOpenings urs (evalVector urs.k ch.x3)
         (x4BatchCommitments
-          (instanceCommitment := top.instanceCommitment pp urs inputs)
+          (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
           urs hk (top.toVerifierKey pp urs) ps ch)
         (x4BatchEvals
-          (instanceCommitment := top.instanceCommitment pp urs inputs)
+          (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
           (top.toVerifierKey pp urs) ps ch)
         a pU pW)
     (memberDecode : ∀ i (hi : i <
         deployedX4PairCount
-          (instanceCommitment := top.instanceCommitment pp urs inputs)
+          (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
           (top.toVerifierKey pp urs) ps ch),
       OpenedMemberDecode
-        (instanceCommitment := top.instanceCommitment pp urs inputs)
+        (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
         urs hk (top.toVerifierKey pp urs)
         ps ch batchOpenings i hi)
     (haccepts :
       DeployedAccepts urs hk
         (top.toVerifierKey pp urs)
-        (top.instanceCommitment pp urs inputs) ps ch)
+        (top.instanceCommitmentForShape pp urs inputs) ps ch)
 
 /--
 Satisfaction of the canonical model selected by an accepting verifier run,
@@ -381,24 +381,24 @@ def topLevelStatements_or_relation_of_decodedMemberPolynomial_eq
     (batchOpenings :
       OpenedBatchOpenings urs (evalVector urs.k ch.x3)
         (x4BatchCommitments
-          (instanceCommitment := top.instanceCommitment pp urs inputs)
+          (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
           urs hk (top.toVerifierKey pp urs) ps ch)
         (x4BatchEvals
-          (instanceCommitment := top.instanceCommitment pp urs inputs)
+          (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
           (top.toVerifierKey pp urs) ps ch)
         a pU pW)
     (memberDecode : ∀ i (hi : i <
         deployedX4PairCount
-          (instanceCommitment := top.instanceCommitment pp urs inputs)
+          (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
           (top.toVerifierKey pp urs) ps ch),
       OpenedMemberDecode
-        (instanceCommitment := top.instanceCommitment pp urs inputs)
+        (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
         urs hk (top.toVerifierKey pp urs)
         ps ch batchOpenings i hi)
     (haccepts :
       DeployedAccepts urs hk
         (top.toVerifierKey pp urs)
-        (top.instanceCommitment pp urs inputs) ps ch)
+        (top.instanceCommitmentForShape pp urs inputs) ps ch)
     (hpoly : CPoly)
     (hquot :
       hpoly =
@@ -406,18 +406,18 @@ def topLevelStatements_or_relation_of_decodedMemberPolynomial_eq
           (memberDecode := memberDecode) haccepts .vanishingH)
     (hbind : ∀
       (slot : DeployedMemberSlot
-        (instanceCommitment := top.instanceCommitment pp urs inputs)
+        (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
         (top.toVerifierKey pp urs) ps ch)
       (point : Fp),
       point ∈ deployedSetPts
-          (instanceCommitment := top.instanceCommitment pp urs inputs)
+          (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
           (top.toVerifierKey pp urs) ps ch slot.setIndex →
       (decodedMemberPolynomial
-        (instanceCommitment := top.instanceCommitment pp urs inputs)
+        (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
         urs hk (top.toVerifierKey pp urs)
         ps ch memberDecode slot).eval point =
           deployedMemberClaim
-            (instanceCommitment := top.instanceCommitment pp urs inputs)
+            (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
             (top.toVerifierKey pp urs) ps ch slot point ⊕'
         NontrivialRelation (F := Fp) urs.g urs.u urs.w)
     (domainExponent_lt : top.domainExponent < 33)
@@ -481,7 +481,7 @@ def topLevelStatements_or_relation_of_decodedMemberPolynomial_eq
   rcases
       acceptedModel_circuitSat_or_relation_of_decodedMemberPolynomial_eq
         urs hk (top.toVerifierKey pp urs)
-        (top.instanceCommitment pp urs inputs) ps ch memberDecode
+        (top.instanceCommitmentForShape pp urs inputs) ps ch memberDecode
         haccepts (top.toVerifierKey_blindingFactors_lt_n pp urs)
         hpoly hquot
         (top.toVerifierKey_fixedQueryCount pp urs)

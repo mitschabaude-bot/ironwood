@@ -29,12 +29,12 @@ noncomputable abbrev topLevelRunModel
       top.toVerifierKey pp
         (ursOfAugmentedBasis (pp.mergeDerived top).k basis))
     (hI : ∀ basis, family.instanceCommitment basis =
-      top.instanceCommitment pp
+      top.instanceCommitmentForShape pp
         (ursOfAugmentedBasis (pp.mergeDerived top).k basis) inputs)
     (hchar : ∀ basis O, deployedX4PairCount
       (top.toVerifierKey pp
         (ursOfAugmentedBasis (pp.mergeDerived top).k basis))
-      (top.instanceCommitment pp
+      (top.instanceCommitmentForShape pp
         (ursOfAugmentedBasis (pp.mergeDerived top).k basis) inputs)
       (straightLineRunOutput family basis O).1.proof.1
       (straightLineRunRecord family basis O) < scalarFieldOrder)
@@ -48,7 +48,7 @@ noncomputable abbrev topLevelRunModel
       (straightLineRunDecodeAt family static basis O
         (top.toVerifierKey pp
           (ursOfAugmentedBasis (pp.mergeDerived top).k basis))
-        (top.instanceCommitment pp
+        (top.instanceCommitmentForShape pp
           (ursOfAugmentedBasis (pp.mergeDerived top).k basis) inputs)
         (hvk basis) (hI basis) h).toMemberDecode (hchar basis O) i hi)
     (hblinding := top.toVerifierKey_blindingFactors_lt_n pp
@@ -56,7 +56,7 @@ noncomputable abbrev topLevelRunModel
     (straightLineRunAcceptsAt family static basis O
       (top.toVerifierKey pp
         (ursOfAugmentedBasis (pp.mergeDerived top).k basis))
-      (top.instanceCommitment pp
+      (top.instanceCommitmentForShape pp
         (ursOfAugmentedBasis (pp.mergeDerived top).k basis) inputs)
       (hvk basis) (hI basis) h)
 
@@ -73,12 +73,12 @@ noncomputable abbrev topLevelRunPolynomial
       top.toVerifierKey pp
         (ursOfAugmentedBasis (pp.mergeDerived top).k basis))
     (hI : ∀ basis, family.instanceCommitment basis =
-      top.instanceCommitment pp
+      top.instanceCommitmentForShape pp
         (ursOfAugmentedBasis (pp.mergeDerived top).k basis) inputs)
     (hchar : ∀ basis O, deployedX4PairCount
       (top.toVerifierKey pp
         (ursOfAugmentedBasis (pp.mergeDerived top).k basis))
-      (top.instanceCommitment pp
+      (top.instanceCommitmentForShape pp
         (ursOfAugmentedBasis (pp.mergeDerived top).k basis) inputs)
       (straightLineRunOutput family basis O).1.proof.1
       (straightLineRunRecord family basis O) < scalarFieldOrder)
@@ -92,13 +92,13 @@ noncomputable abbrev topLevelRunPolynomial
       (straightLineRunDecodeAt family static basis O
         (top.toVerifierKey pp
           (ursOfAugmentedBasis (pp.mergeDerived top).k basis))
-        (top.instanceCommitment pp
+        (top.instanceCommitmentForShape pp
           (ursOfAugmentedBasis (pp.mergeDerived top).k basis) inputs)
         (hvk basis) (hI basis) h).toMemberDecode (hchar basis O) i hi)
     (straightLineRunAcceptsAt family static basis O
       (top.toVerifierKey pp
         (ursOfAugmentedBasis (pp.mergeDerived top).k basis))
-      (top.instanceCommitment pp
+      (top.instanceCommitmentForShape pp
         (ursOfAugmentedBasis (pp.mergeDerived top).k basis) inputs)
       (hvk basis) (hI basis) h)
 
@@ -116,12 +116,12 @@ variable
       top.toVerifierKey pp
         (ursOfAugmentedBasis (pp.mergeDerived top).k basis))
     (hI : ∀ basis, family.instanceCommitment basis =
-      top.instanceCommitment pp
+      top.instanceCommitmentForShape pp
         (ursOfAugmentedBasis (pp.mergeDerived top).k basis) inputs)
     (hchar : ∀ basis O, deployedX4PairCount
       (top.toVerifierKey pp
         (ursOfAugmentedBasis (pp.mergeDerived top).k basis))
-      (top.instanceCommitment pp
+      (top.instanceCommitmentForShape pp
         (ursOfAugmentedBasis (pp.mergeDerived top).k basis) inputs)
       (straightLineRunOutput family basis O).1.proof.1
       (straightLineRunRecord family basis O) < scalarFieldOrder)
@@ -240,12 +240,12 @@ def topLevelTerminalRelationFinderCovers
       top.toVerifierKey pp
         (ursOfAugmentedBasis (pp.mergeDerived top).k basis))
     (hI : ∀ basis, family.instanceCommitment basis =
-      top.instanceCommitment pp
+      top.instanceCommitmentForShape pp
         (ursOfAugmentedBasis (pp.mergeDerived top).k basis) inputs)
     (hchar : ∀ basis O, deployedX4PairCount
       (top.toVerifierKey pp
         (ursOfAugmentedBasis (pp.mergeDerived top).k basis))
-      (top.instanceCommitment pp
+      (top.instanceCommitmentForShape pp
         (ursOfAugmentedBasis (pp.mergeDerived top).k basis) inputs)
       (straightLineRunOutput family basis O).1.proof.1
       (straightLineRunRecord family basis O) < scalarFieldOrder)

@@ -31,15 +31,15 @@ So each definition sits on a three-layer stack:
 %%{init: {"flowchart": {"nodeSpacing": 20, "rankSpacing": 50, "padding": 6, "diagramPadding": 4, "subGraphTitleMargin": {"top": 4, "bottom": 18}}, "themeCSS": ".cluster-label { font-weight: 700; font-size: 1.1em; font-family: raleway, sans-serif; }"}}%%
 flowchart TD
   subgraph GAMES["Ledger security games — the capstones"]
-    BAL["Balance<br/>balanceSubsetOrBreak<br/>balanceValueOrBreak"]
+    BAL["Balance integrity<br/>orchardBalanceIntegrity_measure_le"]
     SPEND["Spendability<br/>faerieGoldCore<br/>validLedger_append"]
-    SPENDAUTH["Spend authority<br/>spendAuthorityOrBreak"]
+    SPENDAUTH["Spend authority<br/>orchardSpendAuthority_measure_le"]
   end
 
   BAL --> BS["Binding-signature<br/>balance"]
   BAL --> NCB["Note-commitment<br/>binding"]
   BAL --> MERK["Merkle-path<br/>binding"]
-  BAL --> KB["Key binding<br/>ZIP 2005 (ROM)"]
+  BAL --> KB["Key binding<br/>ZIP 2005"]
   SPEND --> NCB
   SPEND --> MERK
   SPEND --> KB
@@ -62,6 +62,7 @@ flowchart TD
   MERK --->|"<a target='_blank' href='https://github.com/zcash/ironwood/blob/main/Zcash/Security/Ledger/Merkle.lean'>wrong Merkle<br/>path computes</a>"| MC["DefinedCollision<br/>(one height, encoding<br/>domain, success-only)"]
   KB --> STMT
   KB --->|"<a target='_blank' href='https://github.com/zcash/ironwood/blob/main/Zcash/Security/KeyBinding/Basic.lean'>conflicting ivk<br/>witnesses compute</a>"| CUS["CollisionUpToSign<br/>shifted oracle,<br/>distinct queries"]
+  KB --->|"<a target='_blank' href='https://github.com/zcash/ironwood/blob/main/Zcash/Security/Ledger/KeyBindingDLR.lean'>Orchard-protocol<br/>CommitIvkCollision<br/>computes</a>"| SDLR
   NFB --> STMT
   NFB --->|"<a target='_blank' href='https://github.com/zcash/ironwood/blob/main/Zcash/Security/Ledger/Spendability.lean'>distinct derive-inputs +<br/>equal nullifier<br/>computes</a>"| NFC["NullifierCollision"]
   SPENDAUTH --->|"<a target='_blank' href='https://github.com/zcash/ironwood/blob/main/Zcash/Security/Ledger/SpendAuthority.lean'>verified signature over<br/>unsigned sighash computes</a>"| SAF["SpendAuthForgery<br/>(randomization<br/>of ±ak)"]
@@ -107,15 +108,15 @@ flowchart TD
   classDef hyp fill:#cf222e,stroke:#a40e26,color:#ffffff
   classDef assumed fill:#57606a,stroke:#424a53,color:#ffffff
   class BAL,SPEND,SPENDAUTH,KS partial
-  class NCB,BS,KB,MERK,NFB,STMT,NDLR,CUS,NCBK,MC,NFC,SAF checked
-  class SDLR,RDSA hyp
+  class NCB,BS,KB,MERK,NFB,STMT,NDLR,CUS,NCBK,MC,NFC,SAF,SDLR checked
+  class RDSA hyp
   class DL,ROM assumed
 ```
 
 <p>
 <span style="color:#1a7f37">■</span> fully proven — nothing here yet<br/>
 <span style="color:#0969da">■</span> stated and machine-checked in Lean, over abstract primitives<br/>
-<span style="color:#9a6700">■</span> partly machine-checked; remainder tracked (the games' probabilistic capstones; knowledge soundness's <code>hencodes</code> bridge)<br/>
+<span style="color:#9a6700">■</span> partly machine-checked; remainder tracked (discharging the capstones' named ε's end to end: the key-binding oracle connection, the binding-signature extractability, RedDSA; knowledge soundness's <code>hencodes</code> bridge)<br/>
 <span style="color:#cf222e">■</span> named hypothesis; formalization deferred<br/>
 <span style="color:#57606a">■</span> assumption or heuristic model; terminal by design
 </p>
@@ -202,6 +203,14 @@ circuit soundness proof.
 <div class="g"><div class="g-head"><span class="term">pinning lemmas</span><span class="anchor">ivk_pinned · nk_eq_or_break · nf_old_eq_or_break</span></div><div class="def">The deterministic steps of the Balance argument: an address <code>(g_d, pk_d)</code> determines <code>ivk</code> (needs only <code>g_d ≠ 0</code> and torsion-freeness), hence <code>nk</code> is determined up to an exhibited key-binding break, and spends of the same note tuple reveal the same nullifier up to a break.</div></div>
 <div class="g"><div class="g-head"><span class="term">NoteCommitBreak</span><span class="anchor">Ledger.NoteCommitBreak · noteCommitBreakOfNe</span></div><div class="def">A note-commitment opening collision, as data. <code>noteCommitBreakOfNe</code> computes one when an <code>extract</code>-equal commitment fails to pin the note tuple <code>(rcm, note)</code>. Prequantumly, note-commitment binding reduces to a Sinsemilla / discrete-log-relation break.</div></div>
 <div class="g"><div class="g-head"><span class="term">Merkle position binding</span><span class="anchor">Ledger.Merkle.collisionOfWrongLeaf</span></div><div class="def">Fixed-depth Merkle trees are position-binding up to a hash collision: a validating authentication path for a leaf that is <em>not</em> the committed one, against a defined tree, computes a <code>DefinedCollision</code> of one height’s compression — escaped (⊥) evaluations never count as collisions. The vector-commitment property the Balance and Spendability arguments require of the note-commitment tree. Prequantumly, the Sinsemilla compression’s collision resistance reduces to a discrete-log-relation break (SDLR) — the same terminal as note-commitment binding — so BLAKE2b collision resistance does not enter the pre-quantum Balance argument.</div></div>
+</section>
+
+<section>
+<div class="grp">Probabilistic capstones · Ledger/Capstone + Ledger/OrchardCapstone</div>
+<div class="g"><div class="g-head"><span class="term">Balance integrity</span><span class="anchor">Model.balanceIntegrityOrBreak · balanceIntegrityPerTxViolation</span></div><div class="def">The shielded pool is non-negative and the pools sum to the minted issuance. The deterministic <code>balanceIntegrityOrBreak</code> proves it up to a computed break; the probabilistic violation events mirror its conclusion (the transparent conjunct cannot fail on the valid sample space). The interval consequence <code>pool ∈ [0, issuanceTotal]</code> is weaker, and survives as the separate shielded-balance-cap capstones.</div></div>
+<div class="g"><div class="g-head"><span class="term">events as branch preimages</span><span class="anchor">Model.balanceSubsetBreakEvent · txBalanceBreakEvent</span></div><div class="def">An adversary is a <code>PMF</code> over valid annotated ledgers; each event is "the computed reduction lands in this branch on this sample", so no choice is needed to extract break data. Violation events are contained in unions of break events, and each break event's probability is a named ε hypothesis.</div></div>
+<div class="g"><div class="g-head"><span class="term">all-prefixes bounds, no factor of k</span><span class="anchor">Model.balanceIntegrity_measure_le · *Before / *UpTo</span></div><div class="def">One ε per shared break event bounds the violation at <em>every</em> prefix below a bound, where a naive union bound would pay <code>k · ε</code>. Prefix-indexed value events are named <code>*Before</code> and step-indexed Balance-subset events <code>*UpTo</code> (EWD 831 half-open ranges, exclusive bound as the parameter); the one step/prefix crossing is confined to <code>_succ</code>-marked lemmas.</div></div>
+<div class="g"><div class="g-head"><span class="term">the Orchard single-ε collapse</span><span class="anchor">Bridge.orchardRelationEvent · orchardBalanceIntegrity_measure_le</span></div><div class="def">At the Orchard-protocol bases, every Balance-subset arm's break computes a nontrivial discrete-log relation among the fixed Sinsemilla bases, so one <code>ε_sinsemilladlr</code> replaces the three per-arm ε's — and every prefix lands in the same relation event, so the all-prefixes bounds cost no factor of <code>k</code>. <code>ε_sinsemilladlr</code> reduces tightly to discrete-log hardness (Jaeger–Tessaro, <a href="https://eprint.iacr.org/2020/1213">2020/1213</a> Lemma 3, re-proved as <code>relation_prob_le_of_textbookDL</code>); the witness-level model abstracts away Halo 2 knowledge soundness, a separate, lossy reduction on the different Halo 2 bases. <code>ε_bindsig</code> bounds the conservation side (RedDSA discharge: <a href="https://github.com/zcash/ironwood/issues/22">#22</a>).</div></div>
 </section>
 
 <section>

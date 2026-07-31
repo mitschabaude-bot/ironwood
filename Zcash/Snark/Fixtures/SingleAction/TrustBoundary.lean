@@ -36,11 +36,7 @@ captured points. The derivation's supporting data and functions (`capturedUrsGLa
 `native_decide` claims cannot be narrowed by quietly widening what they range over.
 -/
 
--- Every captured fixture and the verifier assembly it runs are bounded at the standard tier — no
--- `sorry`, no unexpected axiom (whole dependency graph). The `native_decide` fixtures carry the
--- compiler-trust axiom, permitted by `+native` and pinned exactly by the `#print axioms` guards below.
--- The static checks and degree budget at the single-Action captured key (issue #128):
--- the twelve facts the Action-level capstone's derived-key checks transfer through.
+-- Census the captured single-Action fixtures, including permitted native-code trust.
 assert_axioms Zcash.Snark.Fixture.vk_advice_layout_length
 assert_axioms Zcash.Snark.Fixture.vk_instance_layout_length
 assert_axioms Zcash.Snark.Fixture.vk_fixed_layout_length

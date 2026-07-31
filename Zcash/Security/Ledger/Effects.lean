@@ -91,4 +91,11 @@ def shieldedPoolBalance (ledger : Ledger KW F G RHO PSI MHASH MENC MSG SIG d) (i
   (((positionedOutputs ledger i).map fun p => (p.opening.note.v : ℤ)).sum : ℤ)
     - ((nonZeroSpends ledger i).map fun p => (p.opening.note.v : ℤ)).sum
 
+/-- The empty prefix holds an empty shielded pool. -/
+@[simp] theorem shieldedPoolBalance_zero
+    (ledger : Ledger KW F G RHO PSI MHASH MENC MSG SIG d) :
+    shieldedPoolBalance ledger 0 = 0 := by
+  simp [shieldedPoolBalance, positionedOutputs, nonZeroSpends, spendActions,
+    outputOpenings, outputActions]
+
 end Zcash.Security.Ledger.Model

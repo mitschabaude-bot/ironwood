@@ -14,7 +14,6 @@ namespace Halo2.TopLevelCircuit
 
 open Zcash.Snark
 open Zcash
-open Zcash.Arithmetic (Fp URS)
 open Zcash.Snark.Keygen
 open Halo2 CompPoly.CPolynomial
 
@@ -89,34 +88,5 @@ theorem constraintModel_eq_constraintModelOfResolver
       (canonicalLagrangePolynomials top.omega
         (top.toVerifierKey_blindingFactors_lt_n pp urs)).2.2 := by
   rfl
-
-/-- The canonical top-level lookup selectors satisfy the verifier's usable-row
-domain laws. -/
-theorem resolverLookupDomain
-    (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams) (urs : URS G)
-    (husable : top.blindingFactors + 1 < top.n)
-    (hrows : Function.Injective fun row : Fin top.n => top.omega ^ (row : ℕ))
-    (hroot : top.omega ^ top.n = 1) :
-    ResolverLookupDomain
-      (top.toVerifierKey pp urs)
-      (canonicalLagrangePolynomials top.omega
-        (top.toVerifierKey_blindingFactors_lt_n pp urs)).1
-      (canonicalLagrangePolynomials top.omega
-        (top.toVerifierKey_blindingFactors_lt_n pp urs)).2.1
-      (canonicalLagrangePolynomials top.omega
-        (top.toVerifierKey_blindingFactors_lt_n pp urs)).2.2
-      top.n (top.n - top.blindingFactors - 2) := by
-  have hdomain :=
-    ResolverLookupDomain.ofCanonicalPolynomials
-      (top.toVerifierKey pp urs)
-      (by
-        simpa only [top.toVerifierKey_blindingFactors, top.toVerifierKey_n] using husable)
-      (by
-        simpa only [top.toVerifierKey_n, top.toVerifierKey_omega] using hrows)
-      (by
-        simpa only [top.toVerifierKey_n, top.toVerifierKey_omega] using hroot)
-  simpa only [top.toVerifierKey_blindingFactors,
-    top.toVerifierKey_n, top.toVerifierKey_omega] using hdomain
 
 end Halo2.TopLevelCircuit

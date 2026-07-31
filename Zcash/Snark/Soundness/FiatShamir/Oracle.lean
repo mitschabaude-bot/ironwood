@@ -5,53 +5,9 @@ import Zcash.Arithmetic
 /-!
 # Random-oracle model for Fiat–Shamir
 
-`Verifier.FiatShamir` derives challenges with an abstract `squeeze`; the deployed verifier uses
-Blake2b. The soundness proof models it as a random function with uniform answers, changeable at
-one query. This module supplies the two primitives the forking development is framed with:
-`reprogram`, which changes the answer at one transcript prefix, and `uniformChallenge` with
-`uniformChallenge_badSet`, a fresh field challenge and its chance of landing in a finite bad set.
-
-## Challenge-vector distribution
-
-`Rewind.roChallenges_ipaRound_uniform` derives the uniform distribution on IPA challenge vectors
-for a fixed proof from one assumption: the Blake2b squeeze is a uniform random function `O` over
-its query domain. Each round reads `O` at a distinct prefix, so the answers are independent and
-uniform. This also assumes injective transcript encoding and an exactly uniform
-`Challenge255 → Fp` conversion. The distribution is therefore proved inside the model; the model
-itself stays an assumption about Blake2b.
-
-## The `Challenge255 → Fp` conversion bias
-
-The deployed conversion is not exactly uniform. Halo2 reduces a fixed-width byte string modulo
-`p`, which leaves each residue with probability `⌊2^w/p⌋/2^w` or `⌈2^w/p⌉/2^w`. Summed over `Fp`
-that is a total-variation distance of at most `|Fp| / 2^w` per squeeze, so a `q`-squeeze run loses
-at most `q · |Fp| / 2^w` — the same `q` that `Adversary.OracleComp` already charges query loss
-against.
-
-`PMFEventBiasLE` is the explicit boundary between that deployed distribution and an ideal
-experiment.  The consensus-generic Action endpoints consume this relation in their final conjunct
-and add its `ε` to the complete accepting-false-statement bound.  Instantiating `ε` still requires
-pinning the conversion width and transcript implementation; their ideal `generatorRO` conjuncts
-do not claim that implementation fact.
-
-## What the adversary model still assumes
-
-The querying-adversary experiment is present: `Adversary.OracleComp` models a bounded-query
-adversary, `Adversary.Algebraic` decodes its deployed transcript into the representation-carrying
-proof the AGM reduction reads, and the straight-line endpoints in
-`Composition.StraightLineConstraint` price failure from the adversary's own advantage. Query loss
-is charged explicitly: `(Q + 1) · (1/p)` per pinned squeeze and for the adaptive `z = 0` slice.
-What remains is:
-
-* **Efficiency modeling.** The deployed combined finder has a pointwise four-invocation bound
-  (`straightLineConstraintRelationFinderCalls_le_four`), so no expected-runs analysis enters the
-  accounting. PPT-ness of the adversary family is external to Lean.
-* **The idealizations.** Blake2b as a random function, the conversion bias above, the AGM,
-  plain-DL hardness, and the generator random-oracle model.
-
-The `Fp`-squeeze exclusions — the Schwartz–Zippel `d / p`, the `z ≠ 0` and `ξ`-recovery `1 / p`
-singletons, and any further point exclusions — combine into one subadditive bound by
-`GoodChallenge.uniformChallenge_szBadSet_union`.
+Models transcript squeezes as a reprogrammable random function. `PMFEventBiasLE` adds explicit
+challenge-conversion bias when transporting ideal bounds. Blake2b randomness, transcript
+injectivity, the AGM, generator random oracle, and DLOG hardness remain assumptions.
 -/
 namespace Zcash.Snark
 

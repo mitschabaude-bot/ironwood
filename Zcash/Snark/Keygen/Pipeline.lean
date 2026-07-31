@@ -206,21 +206,6 @@ structure ProofParams where
   numPointSets : ℕ
 deriving DecidableEq, Repr
 
-end Zcash.Snark.Keygen
-
-namespace Halo2.TopLevelCircuit
-
-open Zcash.Arithmetic (Fp)
-
-variable {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
-
-end Halo2.TopLevelCircuit
-
-namespace Zcash.Snark.Keygen
-
-open Zcash.Snark
-open Halo2
-
 /-- The `Shape` of a top-level circuit's proofs: the proof-shape counts merged with
 everything the circuit derives — the domain exponent (`TopLevelCircuit.domainExponent`),
 column/lookup/permutation counts from the configure-recorded constraint system, the

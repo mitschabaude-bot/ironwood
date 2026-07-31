@@ -57,14 +57,14 @@ def topLevelStatements_or_relation_of_decode
     (pU pW : Fp) (a : Fin (2 ^ urs.k) → Fp)
     (decode : DeployedAlgebraicDecode urs hk
       (top.toVerifierKey pp urs)
-      (top.instanceCommitment pp urs inputs) ps ch a pU pW)
+      (top.instanceCommitmentForShape pp urs inputs) ps ch a pU pW)
     (hchar : deployedX4PairCount
       (top.toVerifierKey pp urs)
-      (top.instanceCommitment pp urs inputs) ps ch < scalarFieldOrder)
+      (top.instanceCommitmentForShape pp urs inputs) ps ch < scalarFieldOrder)
     (haccepts :
       DeployedAccepts urs hk
         (top.toVerifierKey pp urs)
-        (top.instanceCommitment pp urs inputs) ps ch)
+        (top.instanceCommitmentForShape pp urs inputs) ps ch)
     (domainExponent_lt : top.domainExponent < 33)
     (permutationRouting :
       PermutationChunkRoutingCoherent (top.toVerifierKey pp urs))

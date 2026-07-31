@@ -56,12 +56,12 @@ variable
     actionCircuit.toVerifierKey pp
       (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
   (hI : ∀ basis, family.instanceCommitment basis =
-    actionCircuit.instanceCommitment pp
+    actionCircuit.instanceCommitmentForShape pp
       (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) inputs)
   (hchar : ∀ basis O, deployedX4PairCount
     (actionCircuit.toVerifierKey pp
       (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
-    (actionCircuit.instanceCommitment pp
+    (actionCircuit.instanceCommitmentForShape pp
       (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) inputs)
     (straightLineRunOutput family basis O).1.proof.1
     (straightLineRunRecord family basis O) < scalarFieldOrder)
@@ -160,10 +160,8 @@ def actionBetaFailureEvent :
           (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k q.1))
         (straightLineRunRecord family q.1 q.2)
         (actionRunPolynomial pp family static inputs hvk hI hchar q.1 q.2 h)
-        ((actionCircuit.toVerifierKey pp
-            (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k q.1)).n -
-          (actionCircuit.toVerifierKey pp
-            (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k q.1)).blindingFactors - 2))}
+        (actionCircuit.n -
+          actionCircuit.blindingFactors - 2))}
 
 /-- Decoding runs whose `γ` challenge lands in a permutation or lookup resolver exclusion set. -/
 def actionGammaFailureEvent :
@@ -184,10 +182,8 @@ def actionGammaFailureEvent :
           (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k q.1))
         (straightLineRunRecord family q.1 q.2)
         (actionRunPolynomial pp family static inputs hvk hI hchar q.1 q.2 h)
-        ((actionCircuit.toVerifierKey pp
-            (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k q.1)).n -
-          (actionCircuit.toVerifierKey pp
-            (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k q.1)).blindingFactors - 2))}
+        (actionCircuit.n -
+          actionCircuit.blindingFactors - 2))}
 
 /-- Decoding runs whose `θ` challenge lands in the top-level lookup exclusion set. -/
 def actionThetaFailureEvent :
@@ -288,7 +284,7 @@ theorem actionKnowledgeOutcome_isSome_of_good
       (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) rfl
       (actionCircuit.toVerifierKey pp
         (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
-      (actionCircuit.instanceCommitment pp
+      (actionCircuit.instanceCommitmentForShape pp
         (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) inputs)
       (straightLineRunOutput family basis O).1.proof.1
       (straightLineRunRecord family basis O)
@@ -304,7 +300,7 @@ theorem actionKnowledgeOutcome_isSome_of_good
       (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) rfl
       (actionCircuit.toVerifierKey pp
         (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
-      (actionCircuit.instanceCommitment pp
+      (actionCircuit.instanceCommitmentForShape pp
         (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) inputs)
       (straightLineRunOutput family basis O).1.proof.1
       (straightLineRunRecord family basis O) :=
@@ -944,10 +940,8 @@ theorem actionBetaFailureEvent_subset_surface
             (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
           (straightLineRunRecord family basis O)
           (actionRunPolynomial pp family static inputs hvk hI hchar basis O h)
-          ((actionCircuit.toVerifierKey pp
-              (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)).n -
-            (actionCircuit.toVerifierKey pp
-              (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)).blindingFactors
+          (actionCircuit.n -
+            actionCircuit.blindingFactors
             - 2)) ⊆
         badF basis (algebraicFullPrefixesPre family.init ((family.adversary basis).run O) 1)
           (fun i => O (algebraicFullPrefixesPre family.init
@@ -986,10 +980,8 @@ theorem actionGammaFailureEvent_subset_surface
             (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
           (straightLineRunRecord family basis O)
           (actionRunPolynomial pp family static inputs hvk hI hchar basis O h)
-          ((actionCircuit.toVerifierKey pp
-              (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)).n -
-            (actionCircuit.toVerifierKey pp
-              (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)).blindingFactors
+          (actionCircuit.n -
+            actionCircuit.blindingFactors
             - 2)) ⊆
         badF basis (algebraicFullPrefixesPre family.init ((family.adversary basis).run O) 2)
           (fun i => O (algebraicFullPrefixesPre family.init
@@ -1041,8 +1033,7 @@ theorem actionXYFailureEvent_subset_surfaces
           (actionRunModel pp family static inputs hvk hI hchar basis O h).lBlind -
           actionRunPolynomial pp family static inputs hvk hI hchar basis O h
               CommitmentId.vanishingH *
-            (X ^ (actionCircuit.toVerifierKey pp
-              (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)).n - 1))) ⊆
+            (X ^ actionCircuit.n - 1))) ⊆
         badFX basis (algebraicFullPrefixesPre family.init ((family.adversary basis).run O) 4)
           (fun i => O (algebraicFullPrefixesPre family.init
             ((family.adversary basis).run O) (i.castLE (le_of_lt (4 : Fin 11).isLt)))))
@@ -1050,8 +1041,7 @@ theorem actionXYFailureEvent_subset_surfaces
       {v : Fp | ∃ j, v ∈ szBadSet
         (foldSplitWitness
           (actionRunModel pp family static inputs hvk hI hchar basis O h).constraints
-          (actionCircuit.toVerifierKey pp
-            (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)).n j)} ⊆
+          actionCircuit.n j)} ⊆
         badFY basis (algebraicFullPrefixesPre family.init ((family.adversary basis).run O) 3)
           (fun i => O (algebraicFullPrefixesPre family.init
             ((family.adversary basis).run O) (i.castLE (le_of_lt (3 : Fin 11).isLt))))) :

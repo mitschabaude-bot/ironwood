@@ -46,10 +46,8 @@ globs = ["Zcash.Meta.Tests.+"]
 # verifying-key COMMITMENT certificate chain `Keygen/Certificate`.
 #
 # `Keygen/Certificate` and `Keygen/InstanceCapture` (the ironwood#86 join of the captured
-# instance commitments to the circuit-derived family) are pinned explicitly: InstanceCapture lost
-# its only importer when the rewind-based capstones were removed, and Certificate is otherwise
-# reachable only through the capstone entries' imports — the pins keep CI checking both even if
-# those importers move out of `Fixtures/`.
+# instance commitments to the circuit-derived family) are pinned explicitly: InstanceCapture has
+# no importer, and Certificate is otherwise reachable only through the capstone entries' imports.
 [[lean_lib]]
 name = "FixtureCheck"
 globs = [

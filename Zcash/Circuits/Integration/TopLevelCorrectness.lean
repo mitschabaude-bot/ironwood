@@ -247,27 +247,15 @@ def bridgeWitness_of_components
       TopLevelAssignment top pp.numProofs proofIndex :=
     { polynomial := poly }
   change TopLevelBridgeWitness top assignment.proofAssignment cell Bad
-  have hrows :=
-    TopLevelAssignment.domainRowsInjective
-      (top := top) gates.domainExponent_lt
   have hroot :=
     TopLevelAssignment.domainRoot
       (top := top) gates.domainExponent_lt
-  have hrowsVk :
-      Function.Injective
-        (fun row : Fin top.n =>
-          top.omega ^ (row : ℕ)) := by
-    simpa only [top.toVerifierKey_n, top.toVerifierKey_omega] using hrows
-  have hrootVk :
-      top.omega ^
-        top.n = 1 := by
-    simpa only [top.toVerifierKey_n, top.toVerifierKey_omega] using hroot
   let bridge :=
     FullCircuitBridge.ofTopLevelCanonical
       (top := top) (pp := pp) (urs := urs)
       (cell := cell) (Bad := Bad)
       gates ch poly proofIndex satisfaction
-      hrowsVk hrootVk selectorActivations fixed copies lookups
+      hroot selectorActivations fixed copies lookups
   clear_value bridge
   generalize henvironmentValue :
     resolverEnvironment

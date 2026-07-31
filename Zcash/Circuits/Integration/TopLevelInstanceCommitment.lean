@@ -50,12 +50,25 @@ def instanceCommitment
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G)
     (inputs : Fin pp.numProofs → PublicInput Fp) :
-    Fin (pp.mergeDerived top).numProofs → ℕ → G :=
+    Fin pp.numProofs → ℕ → G :=
   fun proofIndex column =>
     (top.instanceCommitmentKey pp urs).commitInstance
-      (top.publicInputRows
-        (inputs (Fin.cast (pp.mergeDerived_numProofs top) proofIndex))
-        ⟨column⟩) 1
+      (top.publicInputRows (inputs proofIndex) ⟨column⟩) 1
+
+/--
+The same commitment family, reindexed by the verifier proof shape.
+
+`ProofParams.mergeDerived` preserves `numProofs`; making that transport explicit
+keeps verifier terms from unfolding the rest of the circuit-derived shape.
+-/
+def instanceCommitmentForShape
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (pp : ProofParams) (urs : URS G)
+    (inputs : Fin pp.numProofs → PublicInput Fp) :
+    Fin (pp.mergeDerived top).numProofs → ℕ → G :=
+  fun proofIndex =>
+    top.instanceCommitment pp urs inputs
+      (Fin.cast (pp.mergeDerived_numProofs top) proofIndex)
 
 omit [DecidableEq G] in
 @[simp] theorem instanceCommitment_column
@@ -63,9 +76,7 @@ omit [DecidableEq G] in
     (pp : ProofParams) (urs : URS G)
     (inputs : Fin pp.numProofs → PublicInput Fp)
     (proofIndex : Fin pp.numProofs) (column : Column .instance) :
-    top.instanceCommitment pp urs inputs
-        (Fin.cast (pp.mergeDerived_numProofs top).symm proofIndex)
-        column.index =
+    top.instanceCommitment pp urs inputs proofIndex column.index =
       (top.instanceCommitmentKey pp urs).commitInstance
         (top.publicInputRows (inputs proofIndex) column) 1 :=
   by
@@ -83,9 +94,7 @@ theorem instanceCommitment_column_eq_commit
     (pp : ProofParams) (urs : URS G)
     (inputs : Fin pp.numProofs → PublicInput Fp)
     (proofIndex : Fin pp.numProofs) (column : Column .instance) :
-    top.instanceCommitment pp urs inputs
-        (Fin.cast (pp.mergeDerived_numProofs top).symm proofIndex)
-        column.index =
+    top.instanceCommitment pp urs inputs proofIndex column.index =
       commit urs
           (instanceCoefficients (2 ^ urs.k)
             top.omega
@@ -120,24 +129,24 @@ variable
     (batchOpenings :
       OpenedBatchOpenings urs (evalVector urs.k ch.x3)
         (x4BatchCommitments
-          (instanceCommitment := top.instanceCommitment pp urs inputs)
+          (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
           urs hk (top.toVerifierKey pp urs) ps ch)
         (x4BatchEvals
-          (instanceCommitment := top.instanceCommitment pp urs inputs)
+          (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
           (top.toVerifierKey pp urs) ps ch)
         a pU pW)
     (memberDecode : ∀ i (hi : i <
         deployedX4PairCount
-          (instanceCommitment := top.instanceCommitment pp urs inputs)
+          (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
           (top.toVerifierKey pp urs) ps ch),
       OpenedMemberDecode
-        (instanceCommitment := top.instanceCommitment pp urs inputs)
+        (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
         urs hk (top.toVerifierKey pp urs)
         ps ch batchOpenings i hi)
     (haccepts :
       DeployedAccepts urs hk
         (top.toVerifierKey pp urs)
-        (top.instanceCommitment pp urs inputs) ps ch)
+        (top.instanceCommitmentForShape pp urs inputs) ps ch)
 
 /--
 Verifier acceptance binds one cell's circuit-derived instance column to its
@@ -174,13 +183,13 @@ def acceptedColumn_eq_rowPolynomial_or_relation
     exact Fin.ext (by
       simpa only [Fin.val_cast] using congrArg Fin.val hcast)
   have hquery : ∃ q ∈ assembleQueries (top.toVerifierKey pp urs)
-      (top.instanceCommitment pp urs inputs) ps ch,
+      (top.instanceCommitmentForShape pp urs inputs) ps ch,
       q.commId = .instanceCol proofIndex column.index := by
     obtain ⟨instanceRotation, hregistered⟩ :=
       top.exists_rotation_mem_instanceQueries_of_publicInputLayout_cell index
     simpa only [verifierProofIndex, Fin.val_cast] using
       (instanceQuery_of_layout
-        (top.toVerifierKey pp urs) (top.instanceCommitment pp urs inputs) ps ch
+        (top.toVerifierKey pp urs) (top.instanceCommitmentForShape pp urs inputs) ps ch
         verifierProofIndex column.index instanceRotation
         (top.toVerifierKey_instanceQueryCount pp urs)
         (top.mem_instanceQueryLayout_of_mem_constraintSystem
