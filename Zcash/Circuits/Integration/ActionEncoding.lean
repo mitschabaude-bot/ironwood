@@ -9,7 +9,7 @@ import Zcash.Circuits.Integration.TopLevelGates
 import Zcash.Circuits.Integration.TopLevelCorrectness
 import Zcash.Circuits.Integration.ActionCopyReplay
 import Zcash.Circuits.Integration.ActionFixedCoherenceCompute
-import Zcash.Circuits.Integration.ActionGateCoherence
+import Zcash.Circuits.Integration.ActionConstraintBounds
 import Zcash.Circuits.Integration.ActionLookupSelectorRows
 import Zcash.Snark.Keygen.Pipeline
 import Mathlib.Util.AssertNoSorry
@@ -118,7 +118,7 @@ def actionTopLevelCircuitCorrectness
     TopLevelAssignment.domainRowsInjective_of_domainExponent_eq
       ActionPermutationDomain.domainExponent_lt hdomainExponent
   refine
-    { gates := ActionGateCoherence.constraintBounds
+    { gates := ActionConstraintBounds.constraintBounds
       fixedEncoding := ?_
       fixed := ?_
       copies := ?_

@@ -1,8 +1,9 @@
 import Zcash.Snark.Keygen.Pipeline
 import Zcash.Circuits.Action.TopLevel
-import Zcash.Circuits.Integration.ActionGateCoherenceCompute
+import Zcash.Circuits.Integration.ActionConstraintBoundsCompute
 import Mathlib.Util.AssertNoSorry
 import Zcash.Snark.Soundness.Canonical.PermutationInstantiation
+import Zcash.Circuits.Integration.PermutationCompiler
 
 /-!
 # Closed computations for the Action permutation layout
@@ -23,7 +24,7 @@ namespace ActionPermutationDomain
 /-- The circuit-derived Action domain exponent is within Pasta's supported range. -/
 theorem domainExponent_lt :
     actionCircuit.domainExponent < 33 :=
-  ActionGateCoherence.domainExponent_lt
+  ActionConstraintBounds.domainExponent_lt
 
 /-- The Action permutation-column prefix fits easily inside `deltaFp`'s
 certified order. This residual concrete count awaits a configure law bounding the

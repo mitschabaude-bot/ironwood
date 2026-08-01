@@ -209,7 +209,7 @@ shared concrete-circuit evaluation, and proof checking are included.
 
 | Certificate group | Containing module | Approximate compile time | Approximate peak memory |
 |---|---|---:|---:|
-| Gate data, degree, domain | `ActionGateCoherenceCompute.lean` | 10 s | 7.0 GB |
+| Constraint degree and domain | `ActionConstraintBoundsCompute.lean` | 10 s | 7.0 GB |
 | Primary-instance registration | `ActionInstanceCommitmentCompute.lean` | 4 s | 3.8 GB |
 | Domain, chunks, layouts, routing, delta powers | `ActionPermutationDomainCompute.lean` | 1–2 min | 7.4 GB |
 | Copy bounds, addresses, constants | `ActionCopyWitness.lean` | 30–40 s | 7.7 GB |

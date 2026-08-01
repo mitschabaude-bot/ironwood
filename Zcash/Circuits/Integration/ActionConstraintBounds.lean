@@ -1,4 +1,4 @@
-import Zcash.Circuits.Integration.ActionGateCoherenceCompute
+import Zcash.Circuits.Integration.ActionConstraintBoundsCompute
 import Mathlib.Util.AssertNoSorry
 
 /-!
@@ -15,12 +15,10 @@ open Halo2 Keygen
 open Halo2
 open Zcash.Circuits.Action (actionCircuit)
 
-namespace ActionGateCoherence
+namespace ActionConstraintBounds
 
-/--
-The deployed Orchard Action circuit satisfies the polynomial bridge's numerical
-bounds.
--/
+/-- The deployed Orchard Action circuit satisfies the polynomial bridge's numerical
+bounds. -/
 theorem constraintBounds :
     TopLevelConstraintBounds actionCircuit where
   domainExponent_lt := domainExponent_lt
@@ -28,6 +26,6 @@ theorem constraintBounds :
 
 assert_no_sorry constraintBounds
 
-end ActionGateCoherence
+end ActionConstraintBounds
 
 end Zcash.Snark

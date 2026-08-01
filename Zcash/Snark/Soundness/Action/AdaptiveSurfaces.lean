@@ -1,3 +1,4 @@
+import Zcash.Circuits.Integration.ActionAdviceQueries
 import Zcash.Snark.Soundness.Action.AdaptiveTerminal
 import Zcash.Snark.Soundness.Action.StraightLineBudgets
 import Zcash.Snark.Soundness.AGM.AdaptiveSurfaces
@@ -470,7 +471,7 @@ theorem adaptiveActionAdviceLayout_column_lt
     (column : ℕ) (rotation : ℤ)
     (hmem : (column, rotation) ∈ (ActionTerminal.vkAt basis).adviceQueryLayout) :
     column < actionCircuit.adviceColumnCount := by
-  apply ActionGateCoherence.adviceQueryColumnsAllocated (column, rotation)
+  apply ActionAdviceQueries.columnsAllocated (column, rotation)
   simpa only [ActionTerminal.vkAt,
     actionCircuit.toVerifierKey_adviceQueryLayout] using hmem
 

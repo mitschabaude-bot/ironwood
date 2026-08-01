@@ -3,7 +3,7 @@ import Zcash.Circuits.Integration.TopLevelGates
 import Mathlib.Util.AssertNoSorry
 
 /-!
-# Closed computations for Action gate coherence
+# Closed computations for Action constraint bounds
 
 This small module isolates the remaining numerical computation certificates.
 -/
@@ -16,7 +16,7 @@ open Halo2 Keygen
 open Zcash.Circuits
 open Zcash.Circuits.Action (actionCircuit)
 
-namespace ActionGateCoherence
+namespace ActionConstraintBounds
 
 /-- The derived Action constraint-system degree is below the Pasta field order. -/
 theorem selectorDegree :
@@ -28,16 +28,9 @@ theorem domainExponent_lt :
     actionCircuit.domainExponent < 33 := by
   native_decide
 
-/-- Every derived advice query names a column allocated by Action's configure program. -/
-theorem adviceQueryColumnsAllocated :
-    ∀ entry ∈ actionCircuit.adviceQueryLayout,
-      entry.1 < actionCircuit.adviceColumnCount := by
-  native_decide
-
 assert_no_sorry selectorDegree
 assert_no_sorry domainExponent_lt
-assert_no_sorry adviceQueryColumnsAllocated
 
-end ActionGateCoherence
+end ActionConstraintBounds
 
 end Zcash.Snark
