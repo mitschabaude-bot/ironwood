@@ -106,34 +106,6 @@ theorem Expression.selectorsCovered_mono
         Bool.and_eq_true] at hcovered ⊢
       exact ⟨ihLeft hcovered.1, ihRight hcovered.2⟩
 
-/-- A selector-free expression is covered by every selector domain. -/
-theorem Expression.selectorsCovered_of_selectorFree
-    {F : Type} (domain : ℕ → Bool)
-    (expression : Expression F Query)
-    (hfree : expression.SelectorFree) :
-    expression.selectorsCovered domain = true := by
-  induction expression with
-  | var query =>
-      cases query with
-      | selector selector =>
-          simp [Expression.SelectorFree] at hfree
-      | fixed column rotation =>
-          rfl
-      | advice column rotation =>
-          rfl
-      | «instance» column rotation =>
-          rfl
-  | const value =>
-      rfl
-  | add left right ihLeft ihRight =>
-      simp only [Expression.SelectorFree,
-        Expression.selectorsCovered, Bool.and_eq_true] at hfree ⊢
-      exact ⟨ihLeft hfree.1, ihRight hfree.2⟩
-  | mul left right ihLeft ihRight =>
-      simp only [Expression.SelectorFree,
-        Expression.selectorsCovered, Bool.and_eq_true] at hfree ⊢
-      exact ⟨ihLeft hfree.1, ihRight hfree.2⟩
-
 /-- The standard `Gate.withSelector` shape mentions no foreign selectors. -/
 @[circuit_norm]
 theorem Gate.selectorsOwned_of_withSelector
@@ -221,11 +193,6 @@ end ConstraintSystem.GateSelectorsAllocated
 
 namespace ConfigureDelta
 
-@[simp] theorem gates_append
-    {F : Type} (left right : ConfigureDelta F) :
-    (left.append right).gates = left.gates ++ right.gates :=
-  rfl
-
 @[simp] theorem queriedCell_gates
     {F : Type} (owner : String) (expression : Expression F Query) :
     (queriedCell owner expression).gates = [] := by
@@ -298,26 +265,6 @@ namespace Configure
       program.finalCounts (ConfigureCounts.ofConstraintSystem cs) :=
   rfl
 
-@[simp] theorem delta_lookup_gates
-    {F : Type} (queriedCells : List (Expression F Query))
-    (tableMap : List (Expression F Query × TableColumn))
-    (counts : ConfigureCounts) :
-    (delta (Halo2.lookup queriedCells tableMap) counts).gates = [] := by
-  simp only [delta, Halo2.lookup, ConfigureDelta.gates_append,
-    ConfigureDelta.queriedCells_gates, List.nil_append]
-  have aux (initial : ConfigureDelta F) (tables : List TableColumn) :
-      (tables.foldl
-        (fun delta table =>
-          delta.append { fixedQueries := [(table.inner, 0)] })
-        initial).gates = initial.gates := by
-    induction tables generalizing initial with
-    | nil =>
-        rfl
-    | cons table tables ih =>
-        rw [List.foldl_cons, ih, ConfigureDelta.gates_append,
-          List.append_nil]
-  simp [aux]
-
 @[simp] theorem delta_createGate_gates
     {F : Type} (gate : Gate F) (counts : ConfigureCounts) :
     (delta (Halo2.createGate gate) counts).gates = [gate] := by
@@ -355,13 +302,6 @@ namespace Configure
     {F : Type} (counts : ConfigureCounts) :
     (delta (Halo2.complexSelector : Configure F Selector) counts).gates = [] :=
   rfl
-
-@[simp] theorem delta_enableEquality_gates
-    {F : Type} (column : AnyColumn) (counts : ConfigureCounts) :
-    (delta (Halo2.enableEquality (F := F) column) counts).gates = [] := by
-  cases column with
-  | mk kind index =>
-      cases kind <;> rfl
 
 @[simp] theorem delta_enableConstant_gates
     {F : Type} (column : Column .fixed) (counts : ConfigureCounts) :

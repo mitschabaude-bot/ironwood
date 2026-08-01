@@ -91,7 +91,7 @@ private structure ConfigureShared where
 /-- The ten advice-column allocations at the start of Action configuration. Kept as a
 small configure program so its elaborated metadata composes without reducing the full
 Action configure chain. -/
-private def configureAdvices : Configure Fp (Fin 10 → Column .advice) := do
+def configureAdvices : Configure Fp (Fin 10 → Column .advice) := do
   let a0 ← adviceColumn; let a1 ← adviceColumn; let a2 ← adviceColumn
   let a3 ← adviceColumn; let a4 ← adviceColumn; let a5 ← adviceColumn
   let a6 ← adviceColumn; let a7 ← adviceColumn; let a8 ← adviceColumn
@@ -102,7 +102,7 @@ private instance : ElaboratedConfigure configureAdvices := by
   unfold configureAdvices
   infer_instance
 
-private def configureAdviceEqualitiesLow (advices : Fin 10 → Column .advice) :
+def configureAdviceEqualitiesLow (advices : Fin 10 → Column .advice) :
     Configure Fp Unit := do
   enableEquality (advices 0); enableEquality (advices 1)
   enableEquality (advices 2); enableEquality (advices 3)
@@ -113,7 +113,7 @@ private instance (advices : Fin 10 → Column .advice) :
   unfold configureAdviceEqualitiesLow
   infer_instance
 
-private def configureAdviceEqualitiesHigh (advices : Fin 10 → Column .advice) :
+def configureAdviceEqualitiesHigh (advices : Fin 10 → Column .advice) :
     Configure Fp Unit := do
   enableEquality (advices 5)
   enableEquality (advices 6); enableEquality (advices 7)
@@ -125,7 +125,7 @@ private instance (advices : Fin 10 → Column .advice) :
   infer_instance
 
 /-- Equality registration for the public input and the ten Action advice columns. -/
-private def configureEqualities
+def configureEqualities
     (primary : Column .instance) (advices : Fin 10 → Column .advice) :
     Configure Fp Unit := do
   enableEquality primary
@@ -138,7 +138,7 @@ private instance (primary : Column .instance) (advices : Fin 10 → Column .advi
   infer_instance
 
 /-- The eight Lagrange columns and their constant-enabled first column. -/
-private def configureLagrange : Configure Fp (Fin 8 → Column .fixed) := do
+def configureLagrange : Configure Fp (Fin 8 → Column .fixed) := do
   let l0 ← fixedColumn; let l1 ← fixedColumn; let l2 ← fixedColumn
   let l3 ← fixedColumn; let l4 ← fixedColumn; let l5 ← fixedColumn
   let l6 ← fixedColumn; let l7 ← fixedColumn
@@ -150,7 +150,7 @@ private instance : ElaboratedConfigure configureLagrange := by
   infer_instance
 
 /-- The shared columns and chips allocated before the range-check configuration. -/
-private def configureShared : Configure Fp ConfigureShared := do
+def configureShared : Configure Fp ConfigureShared := do
   -- circuit.rs:273-284 — the ten advice columns
   let advices ← configureAdvices
   -- circuit.rs:290-329 — `q_orchard` + the top-level checks gate
