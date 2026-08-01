@@ -43,7 +43,7 @@ only the representation boundaries that genuinely come from other streams:
 -/
 def ofTopLevelCanonical
     {k : ℕ}
-    (gateCoherence : TopLevelGateCoherence top)
+    (gateCoherence : TopLevelConstraintBounds top)
     (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)

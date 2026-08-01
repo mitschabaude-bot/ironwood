@@ -210,7 +210,7 @@ def bridgeWitness_of_components
       ConstraintSatisfaction
         (top.constraintModel pp urs ch poly)
         top.n)
-    (gates : TopLevelGateCoherence top)
+    (gates : TopLevelConstraintBounds top)
     (fixedEncoding :
       let assignment :
           TopLevelAssignment top
@@ -306,7 +306,7 @@ structure TopLevelCircuitCorrectness
     (poly : CommitmentId → CPoly)
     (cell : Type) [DecidableEq cell] [Fintype cell]
     (Bad : Type) : Type where
-  gates : TopLevelGateCoherence top
+  gates : TopLevelConstraintBounds top
   fixedEncoding : ∀ proofIndex,
     TopLevelFixedEncoding top pp poly proofIndex ⊕' Bad
   fixed : ∀ proofIndex,

@@ -2,11 +2,11 @@ import Zcash.Circuits.Integration.ActionGateCoherenceCompute
 import Mathlib.Util.AssertNoSorry
 
 /-!
-# Action top-level gate coherence
+# Action polynomial bounds
 
-This module supplies the two Action-specific numerical facts in the generic static
-gate-coherence boundary. Selector allocation follows for every top-level circuit from
-its intrinsic configure and gate lawfulness guarantees.
+This module supplies the two Action-specific numerical facts in the generic
+constraint-bound boundary. Selector allocation follows for every top-level circuit
+from its intrinsic configure and gate lawfulness guarantees.
 -/
 
 namespace Zcash.Snark
@@ -18,15 +18,15 @@ open Zcash.Circuits.Action (actionCircuit)
 namespace ActionGateCoherence
 
 /--
-The deployed Orchard Action circuit satisfies the complete static gate boundary
-against its own derived verifying key.
+The deployed Orchard Action circuit satisfies the polynomial bridge's numerical
+bounds.
 -/
-theorem topLevel :
-    TopLevelGateCoherence actionCircuit where
+theorem constraintBounds :
+    TopLevelConstraintBounds actionCircuit where
   domainExponent_lt := domainExponent_lt
   selectorDegree := selectorDegree
 
-assert_no_sorry topLevel
+assert_no_sorry constraintBounds
 
 end ActionGateCoherence
 

@@ -117,7 +117,7 @@ def actionTopLevelCircuitCorrectness
     TopLevelAssignment.domainRowsInjective_of_domainExponent_eq
       ActionPermutationDomain.domainExponent_lt hdomainExponent
   refine
-    { gates := ActionGateCoherence.topLevel
+    { gates := ActionGateCoherence.constraintBounds
       fixedEncoding := ?_
       fixed := ?_
       copies := ?_

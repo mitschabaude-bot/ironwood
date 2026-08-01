@@ -2,9 +2,9 @@
 
 ## Status and scope
 
-This document specifies the next major integration arc after the Action circuit
-capstone: replace concrete, whole-Action computational certificates with reusable
-Halo2-Clean lawfulness and compiler theorems.
+This document tracks the integration arc replacing concrete, whole-Action
+computational certificates with reusable Halo2-Clean lawfulness and compiler
+theorems.
 
 The deployed verifying-key equality is intentionally **not** part of this cleanup.
 Checking that the circuit-derived key equals the deployed Orchard key is a legitimate
@@ -37,11 +37,10 @@ The guiding rule is:
 > A concrete VK comparison may establish deployment identity. It must not establish
 > that a formal circuit is well formed.
 
-## Why `closeWithOperations` belongs in this inventory
+## How configure/synthesis closure was eliminated
 
-Clean currently defines `FormalCircuit.toConstraintSystem` by taking the raw result of
-`configure` and applying `ConstraintSystem.closeWithOperations` to the circuit's
-synthesis stream. Closure:
+The original Clean pipeline took the raw result of `configure` and applied
+`ConstraintSystem.closeWithOperations` to the synthesis stream. Closure:
 
 1. appends gates enabled by synthesis but absent from `configure`;
 2. appends lookups enabled by synthesis but absent from `configure`;
@@ -49,10 +48,8 @@ synthesis stream. Closure:
 4. increases `numSelectors` when lookup expressions use selectors beyond the bound
    allocated by `configure`.
 
-This produces a self-consistent internal object, but it is not the algorithm Halo2
-uses. In Halo2, synthesis can enable only a gate or lookup already established by
-configuration. If closure changes the raw constraint system, the model has repaired
-an invalid formal circuit instead of rejecting it.
+That produced a self-consistent internal object, but it was not Halo2's algorithm:
+synthesis may enable only gates and lookups established by configuration.
 
 The problem is not cured by comparing the resulting pinned CS with a captured VK.
 Such a comparison says that the *repaired derivation* matches the deployed data; it
@@ -60,7 +57,11 @@ does not say that the repair was inactive. In particular, semantically redundant
 projection-equivalent repairs need not be observable in every downstream pinned
 field.
 
-The desired endpoint is:
+Clean now packages this invariant as `FormalCircuit.KeygenLawful`. Its compositional
+proofs establish gate and lookup registration for every circuit bundle, while
+selector-allocation lawfulness establishes both gate-selector ownership and lookup
+input bounds. Consequently the canonical top-level constraint system is the raw
+configure result:
 
 ```text
 rawCS := (c.configure ci {}).2
@@ -72,24 +73,12 @@ FormalCircuit lawfulness proves:
   every lookup selector is below rawCS.numSelectors
 
 c.toConstraintSystem ci input = rawCS
-c.toPinnedCS ci input = PinnedConstraintSystem.ofClosedOperations rawCS ops
+c.toPinnedCS ci input = PinnedConstraintSystem.derive rawCS selectorMap
 ```
 
-`closeWithOperations` can remain as a diagnostic or migration helper, but it should
-not define the canonical keygen semantics. A useful transition theorem is that lawful
-circuits satisfy
-
-```text
-rawCS.closeWithOperations ops = rawCS.
-```
-
-That theorem makes the current and intended pipelines coincide while callers migrate.
-After migration, the raw configure result should be used directly.
-
-The query-registration folds in closure are not a separate atomic obligation. Once
-both missing-argument lists are empty, those folds are inactive. The selector maximum
-is separate: it can change even with no missing lookup when a configured lookup
-mentions an unallocated selector.
+Ironwood consumes `top.keygenCoherent`, `top.gateSelectorsAllocated`, and
+`top.lookupInputsAllocated` directly. The Action selector-coherence sidecar and the
+closure-based repair path have been deleted.
 
 ## Classification
 
@@ -156,6 +145,8 @@ Row **#18 (R)** is partially closed: all replay and cycle consumers use the deri
 
 The only remaining R/G work is this law-dependent tail of row #18. All listed L rows remain design inputs rather than implementation targets on this branch.
 
+The subsequent keygen-lawfulness work also closes **#12a**, **#12b**, **#25**, and **#26**. These were L-classified because they required new packaged laws rather than because they required Action-specific proofs: `FormalCircuit.KeygenLawful` and the selector-allocation interface now supply them generically. The former `TopLevelGateCoherence` record has accordingly been reduced to numerical domain and degree facts and renamed `TopLevelConstraintBounds`.
+
 ## Additional correctness obligations
 
 | # | Current location or hidden behavior | Class | Structural replacement | Expected difficulty |
@@ -172,12 +163,9 @@ was not imported by the capstone. It belongs here nevertheless: this arc is abou
 correctness of the formal-circuit/keygen interface, not only the minimum imports of one
 terminal theorem.
 
-`Action/SelectorCoherence.lean` is an improvement over a whole-circuit
-`native_decide`: it proves selector allocation compositionally through the configure
-program. It remains architectural debt because the result lives beside the Action
-formal circuit rather than in the circuit package or the construction API whose
-lawfulness it establishes. It is therefore an interim implementation of obligation
-25, not the endpoint.
+The former `Action/SelectorCoherence.lean` sidecar has been deleted. Its 1,448 lines
+were replaced by the packaged selector-allocation law and compositional proofs carried
+by the formal circuits themselves.
 
 ## Withdrawn synthesis-law sidecars and the residual fidelity gap
 
