@@ -1,5 +1,7 @@
 import Zcash.Snark.Keygen.Pipeline
 import Zcash.Snark.Soundness.Canonical.ConstraintModel
+import Zcash.Circuits.Integration.PermutationCompiler
+import Zcash.Circuits.Integration.TopLevelAssignment
 
 /-!
 # Circuit-derived canonical constraint models
@@ -94,5 +96,51 @@ theorem constraintModel_eq_constraintModelOfResolver
       (canonicalLagrangePolynomials top.omega
         (top.toVerifierKey_blindingFactors_lt_n urs)).2.2 := by
   rfl
+
+/-- The canonical model of a circuit-derived key satisfies the complete
+permutation-domain interface. Only support for the circuit's evaluation-domain
+exponent is external; chunking and blinding bounds follow from compilation. -/
+theorem resolverPermutationDomain
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (pp : ProofParams) (urs : URS G)
+    (ch : Challenges top.shape.k Fp)
+    (poly : CommitmentId → CPoly)
+    (hdomainExponent : top.domainExponent < 33) :
+    let model := top.constraintModel pp urs ch poly
+    ResolverPermutationDomain (top.toVerifierKey urs)
+      model.l0 model.lLast model.lBlind
+      top.n (top.n - top.blindingFactors - 1) := by
+  simpa only [top.toVerifierKey_n,
+    top.toVerifierKey_blindingFactors] using
+    ResolverPermutationDomain.ofCanonicalConstraintModel
+      (top.toVerifierKey urs) ch poly
+      (top.toVerifierKey_blindingFactors_lt_n urs)
+      (TopLevelAssignment.toVerifierKey_domainRowsInjective
+        urs hdomainExponent)
+      (TopLevelAssignment.toVerifierKey_domainRoot
+        urs hdomainExponent)
+      (top.toVerifierKey_permutationChunks_length urs)
+
+/-- The last usable row of a circuit-derived verifier domain is the verifier's
+canonical negative blinding rotation. -/
+theorem toVerifierKey_lastUsableRowRotation
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (urs : URS G)
+    (hdomainExponent : top.domainExponent < 33) :
+    (top.toVerifierKey urs).omega ^
+        ((top.toVerifierKey urs).n -
+          (top.toVerifierKey urs).blindingFactors - 1) =
+      (top.toVerifierKey urs).omega ^
+        (-(((top.toVerifierKey urs).blindingFactors : ℤ) + 1)) := by
+  rw [show (top.toVerifierKey urs).n -
+      (top.toVerifierKey urs).blindingFactors - 1 =
+        (top.toVerifierKey urs).n -
+          ((top.toVerifierKey urs).blindingFactors + 1) by omega]
+  exact domain_pow_sub_eq_zpow_neg
+    (by
+      have hblinding := top.toVerifierKey_blindingFactors_lt_n urs
+      omega)
+    (TopLevelAssignment.toVerifierKey_domainRoot
+      urs hdomainExponent)
 
 end Halo2.TopLevelCircuit

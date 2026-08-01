@@ -1366,7 +1366,7 @@ assert_computable Zcash.Snark.ActionTerminal.action_bundleStatement_or_relation_
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
@@ -1389,7 +1389,7 @@ assert_computable Zcash.Snark.ActionTerminal.action_bundleStatement_or_relation_
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt, CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt,
@@ -1414,7 +1414,7 @@ assert_computable Zcash.Snark.ActionTerminal.actionTerminalWitnessOrRelationFind
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt, CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt,
@@ -1437,7 +1437,7 @@ assert_axioms Zcash.Snark.ActionTerminal.action_bundleStatement_or_relation_of_a
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt, CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt,
@@ -1502,7 +1502,7 @@ assert_computable Zcash.Snark.ActionTerminal.action_bundleStatement_or_relation_
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
@@ -1702,7 +1702,7 @@ assert_computable Zcash.Snark.ActionTerminal.adaptiveActionRelationFinder +choic
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
   Zcash.Snark.ActionGateCoherence.adviceQueryColumnsAllocated,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
@@ -1724,7 +1724,7 @@ assert_computable Zcash.Snark.ActionTerminal.adaptiveActionKnowledgeExtractor +c
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
   Zcash.Snark.ActionGateCoherence.adviceQueryColumnsAllocated,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
@@ -1746,7 +1746,7 @@ assert_computable Zcash.Snark.ActionTerminal.actionTerminalRelationFinder +choic
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt, CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt,
@@ -1767,7 +1767,7 @@ assert_computable Zcash.Snark.ActionTerminal.actionRelationFinder +choice +nativ
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt, CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt,
@@ -1788,7 +1788,7 @@ assert_computable Zcash.Snark.ActionTerminal.actionKnowledgeExtractor +choice +n
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt, CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt,
@@ -1817,7 +1817,7 @@ assert_axioms Zcash.Snark.ActionTerminal.actionKnowledgeFailure_prob_le_of_base_
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt, CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt,

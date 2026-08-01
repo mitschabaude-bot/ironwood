@@ -210,7 +210,7 @@ def bridgeWitness_of_components
       ConstraintSatisfaction
         (top.constraintModel pp urs ch poly)
         top.n)
-    (gates : TopLevelGateCoherence top)
+    (fpCompatibility : TopLevelFpCompatibility top)
     (fixedEncoding :
       let assignment :
           TopLevelAssignment top
@@ -249,12 +249,12 @@ def bridgeWitness_of_components
   change TopLevelBridgeWitness top assignment.proofAssignment cell Bad
   have hroot :=
     TopLevelAssignment.domainRoot
-      (top := top) gates.domainExponent_lt
+      (top := top) fpCompatibility.domainExponent_lt
   let bridge :=
     FullCircuitBridge.ofTopLevelCanonical
       (top := top) (pp := pp) (urs := urs)
       (cell := cell) (Bad := Bad)
-      gates ch poly proofIndex satisfaction
+      fpCompatibility ch poly proofIndex satisfaction
       hroot selectorActivations fixed copies lookups
   clear_value bridge
   generalize henvironmentValue :
@@ -306,7 +306,7 @@ structure TopLevelCircuitCorrectness
     (poly : CommitmentId → CPoly)
     (cell : Type) [DecidableEq cell] [Fintype cell]
     (Bad : Type) : Type where
-  gates : TopLevelGateCoherence top
+  fpCompatibility : TopLevelFpCompatibility top
   fixedEncoding : ∀ proofIndex,
     TopLevelFixedEncoding top pp poly proofIndex ⊕' Bad
   fixed : ∀ proofIndex,

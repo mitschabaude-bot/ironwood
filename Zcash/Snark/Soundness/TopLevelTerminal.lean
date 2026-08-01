@@ -66,7 +66,7 @@ def topLevelBundleStatement_or_bad_of_components
       ConstraintSatisfaction
         (top.constraintModel pp urs ch poly)
         top.n)
-    (gates : TopLevelGateCoherence top)
+    (fpCompatibility : TopLevelFpCompatibility top)
     (fixedEncoding : ∀ proofIndex,
       TopLevelFixedEncoding top pp poly proofIndex)
     (fixed : ∀ proofIndex,
@@ -88,7 +88,7 @@ def topLevelBundleStatement_or_bad_of_components
             (top.environment assignment.proofAssignment)))
       fun proofIndex =>
         (TopLevelAssignment.bridgeWitness_of_components
-            proofIndex satisfaction gates
+            proofIndex satisfaction fpCompatibility
             (fixedEncoding proofIndex)
             (fixed proofIndex).1 (fixed proofIndex).2
             (copies proofIndex) (lookups proofIndex)).statement_or_bad
@@ -108,7 +108,7 @@ def topLevelBundleWitness_or_bad_of_components
       ConstraintSatisfaction
         (top.constraintModel pp urs ch poly)
         top.n)
-    (gates : TopLevelGateCoherence top)
+    (fpCompatibility : TopLevelFpCompatibility top)
     (fixedEncoding : ∀ proofIndex,
       TopLevelFixedEncoding top pp poly proofIndex)
     (fixed : ∀ proofIndex,
@@ -120,7 +120,7 @@ def topLevelBundleWitness_or_bad_of_components
     TopLevelWitnessTerminalOutcome top pp poly Bad := by
   exact finForallOrRelationWitness fun proofIndex =>
     (TopLevelAssignment.bridgeWitness_of_components
-      proofIndex satisfaction gates
+      proofIndex satisfaction fpCompatibility
       (fixedEncoding proofIndex)
       (fixed proofIndex).1 (fixed proofIndex).2
       (copies proofIndex) (lookups proofIndex)).semanticWitness_or_bad
@@ -173,7 +173,7 @@ def topLevelBundleStatement_or_bad_of_constraintSatisfaction
       bindOutcome copiesOutcome fun hcopies =>
         bindOutcome lookupsOutcome fun hlookups =>
           topLevelBundleStatement_or_bad_of_components
-            satisfaction correctness.gates
+            satisfaction correctness.fpCompatibility
             hfixedEncoding hfixed hcopies hlookups
 
 /-- The correctness-package terminal retaining executable private witnesses. -/
@@ -220,7 +220,7 @@ def topLevelBundleWitness_or_bad_of_constraintSatisfaction
       bindOutcome copiesOutcome fun hcopies =>
         bindOutcome lookupsOutcome fun hlookups =>
           topLevelBundleWitness_or_bad_of_components
-            satisfaction correctness.gates
+            satisfaction correctness.fpCompatibility
             hfixedEncoding hfixed hcopies hlookups
 
 assert_no_sorry topLevelBundleStatement_or_bad_of_constraintSatisfaction
@@ -326,7 +326,7 @@ def topLevelWitnesses_or_relation_of_circuitSat
   · exact
       TopLevelInstanceCommitment.witnesses_or_relation_of_accepted_topLevelBundleWitness
         top pp urs hk inputs ps ch pU pW a batchOpenings memberDecode
-        haccepts correctness.gates.domainExponent_lt hwitness
+        haccepts correctness.fpCompatibility.domainExponent_lt hwitness
   · exact PSum.inr hrelation
 
 assert_no_sorry topLevelWitnesses_or_relation_of_circuitSat

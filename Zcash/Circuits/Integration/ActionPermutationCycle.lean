@@ -82,26 +82,32 @@ theorem actionPermutationRows_eq_chunkRowName
     actionCircuit.chunkLen
     (Zcash.Snark.actionChunkFlatten pp urs poly proofIndex)
   · intro rc
-    let hcl : 0 < (actionVk pp urs).chunkLen :=
-      Zcash.Snark.actionChunkLen_pos pp urs
+    let hcl : 0 < actionCircuit.chunkLen :=
+      Zcash.Snark.actionChunkLen_pos
     let hcover :
         Zcash.Snark.actionNumPermCols ≤
           (actionShape pp).numPermutationSets *
-            (actionVk pp urs).chunkLen :=
-      Zcash.Snark.actionPermutationChunks_cover pp urs
+            actionCircuit.chunkLen := by
+      simpa only [actionShape,
+        CircuitShape.withProofParams_numPermutationSets,
+        actionCircuit.shape_numPermutationSets] using
+        Zcash.Snark.actionPermutationChunks_cover
     let hw := Zcash.Snark.actionResolverChunkWidth
       pp urs poly proofIndex
     exact congrArg Fin.val
       (Zcash.Snark.Layout.Asm.chunkFlatten_symm_apply_row
         hcl hcover hw rc)
   · intro rc
-    let hcl : 0 < (actionVk pp urs).chunkLen :=
-      Zcash.Snark.actionChunkLen_pos pp urs
+    let hcl : 0 < actionCircuit.chunkLen :=
+      Zcash.Snark.actionChunkLen_pos
     let hcover :
         Zcash.Snark.actionNumPermCols ≤
           (actionShape pp).numPermutationSets *
-            (actionVk pp urs).chunkLen :=
-      Zcash.Snark.actionPermutationChunks_cover pp urs
+            actionCircuit.chunkLen := by
+      simpa only [actionShape,
+        CircuitShape.withProofParams_numPermutationSets,
+        actionCircuit.shape_numPermutationSets] using
+        Zcash.Snark.actionPermutationChunks_cover
     let hw := Zcash.Snark.actionResolverChunkWidth
       pp urs poly proofIndex
     exact Zcash.Snark.Layout.Asm.chunkFlatten_symm_apply_column
@@ -134,7 +140,8 @@ theorem actionChunkCommonIndex
   let global : ℕ := (flatten ⟨chunk, row, column⟩).2
   have hchunk :
       (chunk : ℕ) < vk.permutationChunks.length := by
-    rw [chunkCount urs, actionCircuit.shape_numPermutationSets]
+    rw [actionCircuit.toVerifierKey_permutationChunks_length,
+      actionCircuit.shape_numPermutationSets]
     exact chunk.isLt
   have hcolumn :
       (column : ℕ) <
@@ -144,8 +151,8 @@ theorem actionChunkCommonIndex
   have hprefix :
       (vk.permutationChunks.take chunk).flatten.length =
         (chunk : ℕ) * vk.chunkLen := by
-    exact topLevelPermutationChunks_take_flatten_length
-      actionCircuit urs chunk hchunk
+    exact actionCircuit.toVerifierKey_permutationChunks_take_flatten_length
+      urs chunk hchunk
   have hglobal :
       global <
         actionCircuit.permutationColumnCount := by
@@ -199,11 +206,11 @@ theorem actionChunkCommonIndex
 
 omit [DecidableEq G] in
 theorem actionPermutationCommitment_ofKeygen
-    (pp : ProofParams) (urs : URS G)
-    (hk : (actionShape pp).k = urs.k)
+    (urs : URS G)
+    (hk : actionCircuit.domainExponent = urs.k)
     (setup : LagrangePrefixSetup urs)
-    (column : Fin (actionShape pp).numPermutationColumns) :
-    (actionVk pp urs).permutationCommonCommitment column =
+    (column : Fin actionCircuit.permutationColumnCount) :
+    (actionCircuit.toVerifierKey urs).permutationCommonCommitment column =
       (LagrangeCommitmentKey.ofPrefix urs
         (omegaOf urs.k)
         (derivedUrsGLagrange urs)
@@ -213,41 +220,17 @@ theorem actionPermutationCommitment_ofKeygen
   rw [actionCircuit.toVerifierKey_permutationCommonCommitment]
   apply PermutationCommitmentCoherence.commitment_ofKeygen
     actionCircuit urs hk setup column
-  simpa only [topLevelPermutationColumnCount,
-    Keygen.ProofParams.mergeDerived, Keygen.permColsOf,
-    List.length_map] using column.isLt
+  simpa only [topLevelPermutationColumnCount_eq] using column.isLt
 
 omit [Module Fp G] [DecidableEq G] in
 theorem actionRowsInjectiveAtUrs
-    (pp : ProofParams) (urs : URS G)
-    (hk : (actionShape pp).k = urs.k) :
+    (urs : URS G)
+    (hk : actionCircuit.domainExponent = urs.k) :
     Function.Injective fun i : Fin (2 ^ urs.k) =>
-      (actionVk pp urs).omega ^ (i : ℕ) := by
-  intro left right heq
-  let left' : Fin (actionVk pp urs).n :=
-    ⟨left, by
-      change (left : ℕ) <
-        2 ^ actionCircuit.domainExponent
-      have hdomain :
-          actionCircuit.domainExponent = urs.k := hk
-      rw [hdomain]
-      exact left.isLt⟩
-  let right' : Fin (actionVk pp urs).n :=
-    ⟨right, by
-      change (right : ℕ) <
-        2 ^ actionCircuit.domainExponent
-      have hdomain :
-          actionCircuit.domainExponent = urs.k := hk
-      rw [hdomain]
-      exact right.isLt⟩
-  have hfin := rowsInjective pp urs
-    (show (actionVk pp urs).omega ^ (left' : ℕ) =
-        (actionVk pp urs).omega ^ (right' : ℕ) by
-      exact heq)
-  have hval :
-      (left' : ℕ) = (right' : ℕ) :=
-    congrArg (fun value : Fin (actionVk pp urs).n => (value : ℕ)) hfin
-  exact Fin.ext hval
+      (actionCircuit.toVerifierKey urs).omega ^ (i : ℕ) := by
+  simpa only [actionCircuit.toVerifierKey_omega] using
+    TopLevelAssignment.domainRowsInjective_of_domainExponent_eq
+      (top := actionCircuit) domainExponent_lt hk
 
 set_option maxRecDepth 100000 in
 def actionResolverPermutationCycle_or_relation
@@ -293,9 +276,10 @@ def actionResolverPermutationCycle_or_relation
         actionActiveSigma pp urs relation.polynomial proofIndex}
       ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
   classical
+  have hdomain : actionCircuit.domainExponent = urs.k := by
+    simpa only [actionShape, CircuitShape.withProofParams_k,
+      actionCircuit.shape_k] using hk
   have hkUrs : urs.k ≤ 32 := by
-    have hdomain :
-        actionCircuit.domainExponent = urs.k := hk
     rw [← hdomain]
     exact Nat.le_of_lt_succ domainExponent_lt
   let setup := LagrangePrefixSetup.ofDerived urs hkUrs
@@ -335,10 +319,8 @@ def actionResolverPermutationCycle_or_relation
     ⟨entry.2, hcommon⟩
   have homega :
       vk.omega = omegaOf urs.k := by
-    change
-      omegaOf actionCircuit.domainExponent =
-        omegaOf urs.k
-    exact congrArg omegaOf hk
+    simpa only [vk, actionCircuit.toVerifierKey_omega,
+      TopLevelCircuit.omega] using congrArg omegaOf hdomain
   let key : LagrangeCommitmentKey urs vk.omega := by
     let sourceKey :=
       LagrangeCommitmentKey.ofPrefix urs
@@ -356,7 +338,7 @@ def actionResolverPermutationCycle_or_relation
           (topLevelPermutationRows
             actionCircuit common) 1 := by
     have source :=
-      actionPermutationCommitment_ofKeygen pp urs hk setup common
+      actionPermutationCommitment_ofKeygen urs hdomain setup common
     simpa only [vk, key, LagrangeCommitmentKey.commitInstance,
       LagrangeCommitmentKey.commitRows] using source
   have hj :
@@ -388,9 +370,9 @@ def actionResolverPermutationCycle_or_relation
           ((Zcash.Snark.actionChunkFlatten
             pp urs relation.polynomial proofIndex
             ⟨chunk, i, column⟩).2 : ℕ) := by
-      change entry.2 = _
-      exact actionChunkCommonIndex
-        pp urs relation.polynomial proofIndex chunk column i
+      simpa only [common] using
+        actionChunkCommonIndex
+          pp urs relation.polynomial proofIndex chunk column i
     rw [hcommonRow]
     simpa only [vk] using source
   have hidx :
@@ -408,10 +390,10 @@ def actionResolverPermutationCycle_or_relation
       proofIndex chunk column hj common hidx key
       (topLevelPermutationRows
         actionCircuit common)
-      hcommit (actionRowsInjectiveAtUrs pp urs hk)
+      hcommit (actionRowsInjectiveAtUrs urs hdomain)
       (by
-        unfold Zcash.Snark.actionDomainSize
-        exact congrArg (2 ^ ·) hk)
+        simpa only [Zcash.Snark.actionDomainSize] using
+          congrArg (2 ^ ·) hdomain)
       (Zcash.Snark.actionFullSigma
         pp urs relation.polynomial proofIndex)
       chunk column hval

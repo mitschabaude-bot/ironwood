@@ -656,6 +656,19 @@ theorem verifierCS_permutationChunks_length
     (constraintSystem_chunkLen_pos top.constraintSystem)]
   simp
 
+/-- A circuit-derived verifying key has exactly the circuit-owned number of
+permutation sets. -/
+@[simp] theorem _root_.Halo2.TopLevelCircuit.toVerifierKey_permutationChunks_length
+    {G : Type} [AddCommGroup G] [Inhabited G]
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (urs : URS G) :
+    (top.toVerifierKey urs).permutationChunks.length =
+      top.shape.numPermutationSets := by
+  rw [top.toVerifierKey_permutationChunks,
+    top.shape_numPermutationSets]
+  exact verifierCS_permutationChunks_length top
+
 /-- Each compiler chunk has the standard full-or-final-remainder width. -/
 theorem verifierCS_permutationChunks_getD_length
     {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
@@ -671,6 +684,39 @@ theorem verifierCS_permutationChunks_getD_length
   simp only [List.length_zipIdx, List.length_map,
     TopLevelCircuit.permutationColumnCount,
     TopLevelCircuit.chunkLen]
+
+/-- Every circuit-derived verifier chunk has the compiler-prescribed width. -/
+theorem _root_.Halo2.TopLevelCircuit.toVerifierKey_permutationChunks_getD_length
+    {G : Type} [AddCommGroup G] [Inhabited G]
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (urs : URS G) (i : ℕ)
+    (hi : i < (top.toVerifierKey urs).permutationChunks.length) :
+    ((top.toVerifierKey urs).permutationChunks.getD i []).length =
+      min top.chunkLen
+        (top.permutationColumnCount - i * top.chunkLen) := by
+  rw [top.toVerifierKey_permutationChunks] at hi ⊢
+  exact verifierCS_permutationChunks_getD_length top i hi
+
+/-- Resolver pairing preserves the compiler-prescribed width of every
+circuit-derived permutation chunk. -/
+theorem _root_.Halo2.TopLevelCircuit.resolverPermutationPairs_length
+    {G : Type} [AddCommGroup G] [Inhabited G]
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    {numProofs : ℕ}
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (urs : URS G) (poly : CommitmentId → CPoly)
+    (proofIndex : Fin numProofs)
+    (chunk : Fin top.shape.numPermutationSets) :
+    (ResolverPermutationPairs
+        (top.toVerifierKey urs) poly proofIndex chunk).length =
+      min top.chunkLen
+        (top.permutationColumnCount - (chunk : ℕ) * top.chunkLen) := by
+  simp only [ResolverPermutationPairs,
+    permutationChunkPairsOfResolver, List.length_map]
+  apply top.toVerifierKey_permutationChunks_getD_length
+  rw [top.toVerifierKey_permutationChunks_length]
+  exact chunk.isLt
 
 /-- Every prefix ending before a valid compiler chunk contains `i * chunkLen`
 permutation columns. -/
@@ -688,7 +734,7 @@ theorem verifierCS_permutationChunks_take_flatten_length
 
 /-- Top-level keygen exposes the compiler prefix law without requiring downstream
 proofs to unfold a concrete circuit or verifying-key constructor. -/
-theorem topLevelPermutationChunks_take_flatten_length
+theorem _root_.Halo2.TopLevelCircuit.toVerifierKey_permutationChunks_take_flatten_length
     {G : Type} [AddCommGroup G] [Inhabited G]
     {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)

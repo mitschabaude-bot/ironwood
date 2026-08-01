@@ -39,23 +39,22 @@ theorem _root_.Halo2.TopLevelCircuit.gateSelectorsAllocatedForCompression
       gate hgate)
 
 /--
-Static coherence for a top-level circuit's own derived verifying key.
+Field compatibility for a top-level circuit's own derived verifying key.
 
 No placement, operation stream, selector map, or pinned constraint system is supplied
 by the caller: all four are derived from `top`, and the key is fixed to
-`top.toVerifierKey urs`. Gate/lookup registration coherence is absent because the
-circuit-derived constraint system closes the raw configure result under synthesis by
-construction.
+`top.toVerifierKey urs`. Gate and lookup registration are theorems of the circuit's
+intrinsic keygen lawfulness and therefore do not appear in this interface.
 -/
-structure TopLevelGateCoherence
+structure TopLevelFpCompatibility
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput) : Prop where
   domainExponent_lt : top.domainExponent < 33
-  selectorDegree :
+  constraintDegree_lt :
     csDegree top.constraintSystem < scalarFieldOrder
 
-namespace TopLevelGateCoherence
+namespace TopLevelFpCompatibility
 
 variable
     {G : Type} [AddCommGroup G] [Inhabited G]
@@ -69,7 +68,7 @@ The final pinned query state interprets the resolver feeds, and restricts to the
 intermediate gate-erasure state because lookup erasure only appends query entries.
 -/
 theorem resolverInterpretsGates
-    (coherence : TopLevelGateCoherence top)
+    (compatibility : TopLevelFpCompatibility top)
     (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
     (usableRows row : ℕ) :
@@ -93,7 +92,7 @@ theorem resolverInterpretsGates
         (fun _ => 0) row) := by
   have homega : top.omega ≠ 0 := by
     have hk : top.domainExponent ≤ 32 :=
-      Nat.le_of_lt_succ (by simpa using coherence.domainExponent_lt)
+      Nat.le_of_lt_succ (by simpa using compatibility.domainExponent_lt)
     exact top.omega_ne_zero hk
   have hfinal := resolverQueryFeeds_interpret
     (top.toVerifierKey urs) poly proofIndex usableRows
@@ -117,13 +116,13 @@ theorem resolverInterpretsGates
 
 /-- The circuit-derived selector map has the roots required by gate scaling. -/
 theorem selectorRootsWellFormed
-    (coherence : TopLevelGateCoherence top) :
+    (compatibility : TopLevelFpCompatibility top) :
     SelectorRootsWellFormed top.selectorMap := by
   simp only [TopLevelCircuit.selectorMap]
   exact selectorRootsWellFormed_deriveSelCompressMap
     top.constraintSystem
     top.n
-    top.selectorActivations coherence.selectorDegree
+    top.selectorActivations compatibility.constraintDegree_lt
 
 /-- Selector compression covers every configured gate expression. -/
 theorem gateSelectorsCovered :
@@ -144,7 +143,7 @@ resolver gate polynomial witness.
 -/
 opaque polynomialWitness
     {k : ℕ}
-    (coherence : TopLevelGateCoherence top)
+    (compatibility : TopLevelFpCompatibility top)
     (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (sets : Fin pp.numProofs →
@@ -198,7 +197,7 @@ opaque polynomialWitness
   have hcompressed :
       top.selectorMap.lookup enabled.gate.selector.index =
         some compressed := (Option.some_get hlookupPresent).symm
-  have hinterpret := coherence.resolverInterpretsGates
+  have hinterpret := compatibility.resolverInterpretsGates
     (pp := pp) (urs := urs)
     poly proofIndex usableRows
     (top.placement enabled.region + enabled.row)
@@ -213,7 +212,7 @@ opaque polynomialWitness
       top.selectorMap top.regionStarts (top.operations) 0
       (resolverEnvironment
         (top.toVerifierKey urs) poly proofIndex usableRows)
-      (fun _ => 0) coherence.selectorRootsWellFormed
+      (fun _ => 0) compatibility.selectorRootsWellFormed
     · exact hfixed
     · exact henabled
     · exact hcompressed
@@ -268,7 +267,7 @@ resolver and circuit-owned verification key.
 -/
 theorem canonicalConstraints
     {k : ℕ}
-    (coherence : TopLevelGateCoherence top)
+    (compatibility : TopLevelFpCompatibility top)
     (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
@@ -302,7 +301,7 @@ theorem canonicalConstraints
       top.omega
       (top.toVerifierKey_blindingFactors_lt_n urs)
   rw [top.constraintModel_eq_constraintModelOfResolver]
-  exact coherence.polynomialWitness ch poly
+  exact compatibility.polynomialWitness ch poly
     (permutationSetsOfResolver
       (top.toVerifierKey urs) poly)
     (permutationChunksOfResolver
@@ -311,6 +310,6 @@ theorem canonicalConstraints
     proofIndex (top.usableRowsAt top.domainExponent)
     hfixed enabled henabled constraint hconstraint
 
-end TopLevelGateCoherence
+end TopLevelFpCompatibility
 
 end Zcash.Snark

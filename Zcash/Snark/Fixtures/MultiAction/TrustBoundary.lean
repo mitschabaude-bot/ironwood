@@ -217,7 +217,7 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_prob_le_ca
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
   Zcash.Snark.Fixture.vk_chunk_width_le,
@@ -245,7 +245,7 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_prob_le_ca
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil, Zcash.Snark.Fixture.vk_chunk_width_le,
   Zcash.Snark.Fixture.vk_gates_degree_le, Zcash.Snark.Fixture.vk_lookup_input_degree_le,
@@ -268,7 +268,7 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_prob_le_se
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
   Zcash.Snark.Fixture.vk_chunk_width_le,
@@ -298,7 +298,7 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_prob_le_se
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
   Zcash.Snark.Fixture.actionLookupActivationCount_le,
@@ -325,7 +325,7 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_2pow123_wo
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
   Zcash.Snark.Fixture.actionLookupActivationCount_le,
@@ -355,7 +355,7 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_2pow123_wo
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
   Zcash.Snark.Fixture.actionLookupActivationCount_le,
@@ -381,7 +381,7 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_adaptive_2
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
   Zcash.Snark.ActionGateCoherence.adviceQueryColumnsAllocated,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
@@ -409,7 +409,7 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_knowledgeFailure_adaptive_2pow1
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
   Zcash.Snark.ActionGateCoherence.adviceQueryColumnsAllocated,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
@@ -439,7 +439,7 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_prob_le_ad
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
   Zcash.Snark.ActionGateCoherence.adviceQueryColumnsAllocated,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
@@ -468,7 +468,7 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_prob_le_ad
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
   Zcash.Snark.ActionGateCoherence.adviceQueryColumnsAllocated,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
@@ -495,7 +495,7 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_knowledgeFailure_prob_le_adapti
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
   Zcash.Snark.ActionGateCoherence.adviceQueryColumnsAllocated,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
@@ -522,7 +522,7 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_adaptive_2
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.constraintDegree_lt,
   Zcash.Snark.ActionGateCoherence.adviceQueryColumnsAllocated,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,

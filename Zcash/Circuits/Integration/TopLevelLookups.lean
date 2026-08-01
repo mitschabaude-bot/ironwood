@@ -126,7 +126,7 @@ theorem topLevelLookupInputs_selectorsCovered
 
 /--
 Every configured lookup table expression of a top-level circuit is selector-free.
-This is intrinsic to `LookupArgument`, not an additional coherence assumption.
+This is intrinsic to `LookupArgument`, not an additional compatibility assumption.
 -/
 theorem lookupTables_selectorFree
     (argument : LookupArgument Fp) :
@@ -243,11 +243,11 @@ theorem ofInputSelectorValues
 
 end EnabledLookup.SelectorProjection
 
-namespace TopLevelGateCoherence
+namespace TopLevelFpCompatibility
 
 /-- The resolver feeds interpret the complete circuit-derived pinned query state. -/
 theorem resolverInterpretsPinned
-    (coherence : TopLevelGateCoherence top)
+    (compatibility : TopLevelFpCompatibility top)
     (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
     (usableRows row : ℕ) :
@@ -272,7 +272,7 @@ theorem resolverInterpretsPinned
   have homega : top.omega ≠ 0 := by
     have hk : top.domainExponent ≤ 32 :=
       Nat.le_of_lt_succ (by
-        simpa using coherence.domainExponent_lt)
+        simpa using compatibility.domainExponent_lt)
     exact top.omega_ne_zero hk
   exact resolverQueryFeeds_interpret
     (top.toVerifierKey urs) poly proofIndex usableRows
@@ -291,7 +291,7 @@ theorem resolverInterpretsPinned
     (top.toVerifierKey_fixedQueryCount urs)
     (top.toVerifierKey_instanceQueryCount urs)
 
-end TopLevelGateCoherence
+end TopLevelFpCompatibility
 
 /-- Mapping a projected lookup tuple into `Expr` does not change its evaluations. -/
 theorem map_eval_toExpr
@@ -330,7 +330,7 @@ The circuit-derived verifying key's selected lookup tuples evaluate like the
 enabled Clean lookup's concrete input and table tuples.
 -/
 theorem projectedValues
-    (gateCoherence : TopLevelGateCoherence top)
+    (fpCompatibility : TopLevelFpCompatibility top)
     (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
     (lookup : EnabledLookup Fp)
@@ -415,7 +415,7 @@ theorem projectedValues
         (fun _ => 0) row)
       route.index
       hinputCoverage htableCoverage
-      (gateCoherence.resolverInterpretsPinned
+      (fpCompatibility.resolverInterpretsPinned
         (pp := pp) (urs := urs)
         poly proofIndex
         (top.usableRowsAt top.domainExponent) row)
@@ -468,7 +468,7 @@ Clean tuples compressed with the transcript challenge.
 -/
 theorem projectedPolynomialValues
     {k : ℕ}
-    (gateCoherence : TopLevelGateCoherence top)
+    (fpCompatibility : TopLevelFpCompatibility top)
     (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
@@ -501,7 +501,7 @@ theorem projectedPolynomialValues
   let route :=
     lookup.topLevelRoute (top := top) henabled
   have projected :=
-    projectedValues gateCoherence poly proofIndex
+    projectedValues fpCompatibility poly proofIndex
       lookup henabled selectors
   constructor
   · rw [lookupInputPolyOfResolver_eq,
@@ -538,7 +538,7 @@ challenge exclusions are supplied.
 -/
 def deployedWitness
     {k : ℕ}
-    (gateCoherence : TopLevelGateCoherence top)
+    (fpCompatibility : TopLevelFpCompatibility top)
     (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
@@ -603,13 +603,13 @@ def deployedWitness
       fun row : Fin top.n =>
         top.omega ^ (row : ℕ) :=
     TopLevelAssignment.domainRowsInjective
-      gateCoherence.domainExponent_lt
+      fpCompatibility.domainExponent_lt
   have hroot :
       top.omega ^ top.n = 1 :=
     TopLevelAssignment.domainRoot
-      gateCoherence.domainExponent_lt
+      fpCompatibility.domainExponent_lt
   have projected :=
-    projectedPolynomialValues gateCoherence ch poly
+    projectedPolynomialValues fpCompatibility ch poly
       proofIndex lookup henabled selectors
   have harity' :
       lookup.argument.inputs.length =
@@ -947,7 +947,7 @@ def WitnessConditions.ofChallengeExclusions
 /-- Construct the complete deployed-witness family for one top-level proof. -/
 def deployedWitnesses
     {k : ℕ}
-    (gateCoherence : TopLevelGateCoherence top)
+    (fpCompatibility : TopLevelFpCompatibility top)
     (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
@@ -974,7 +974,7 @@ def deployedWitnesses
       environment lookup
       (conditions.inputSelectorValues lookup henabled)
       (lookupTables_selectorFree lookup.argument)
-  exact deployedWitness gateCoherence ch poly proofIndex
+  exact deployedWitness fpCompatibility ch poly proofIndex
     satisfaction lookup henabled
     selectorProjection
     (lookup.activationRow_lt_usableRows henabled)
@@ -984,7 +984,7 @@ def deployedWitnesses
 /-- The deployed family discharges Clean's complete lookup constraint family. -/
 theorem constraints
     {k : ℕ}
-    (gateCoherence : TopLevelGateCoherence top)
+    (fpCompatibility : TopLevelFpCompatibility top)
     (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
@@ -1000,7 +1000,7 @@ theorem constraints
         (top.usableRowsAt top.domainExponent))
       (top.operations) 0 := by
   apply lookup_constraints_of_deployed_witnesses
-  exact deployedWitnesses gateCoherence ch poly proofIndex
+  exact deployedWitnesses fpCompatibility ch poly proofIndex
     satisfaction conditions
 
 end TopLevelLookup

@@ -157,27 +157,20 @@ theorem actionResolverChunkWidth
 
 /-- The circuit-derived Action permutation chunk width is positive. -/
 theorem actionChunkLen_pos
-    {G : Type} [AddCommGroup G] [Inhabited G]
-    (pp : ProofParams) (urs : URS G) :
-    0 < (ActionPermutationDomain.actionVk pp urs).chunkLen :=
+    : 0 < actionCircuit.chunkLen :=
   constraintSystem_chunkLen_pos
     actionCircuit.constraintSystem
 
 /-- The derived chunk family has enough total slots for every Action
 permutation column. -/
 theorem actionPermutationChunks_cover
-    {G : Type} [AddCommGroup G] [Inhabited G]
-    (pp : ProofParams) (urs : URS G) :
-    actionNumPermCols ≤
-      (ActionPermutationDomain.actionShape pp).numPermutationSets *
-        (ActionPermutationDomain.actionVk pp urs).chunkLen := by
+    : actionNumPermCols ≤
+      actionCircuit.permutationSetCount * actionCircuit.chunkLen := by
   rw [actionNumPermCols_eq_derived]
   have hcover :=
     permutationColumns_length_le_chunks_mul actionCircuit
   rw [verifierCS_permutationChunks_length] at hcover
-  simpa only [ActionPermutationDomain.actionShape,
-    ProofParams.mergeDerived_numPermutationSets,
-    actionCircuit.toVerifierKey_chunkLen] using hcover
+  exact hcover
 
 /-- Flatten the compiler-derived Action chunks to `(row, global column)`. -/
 def actionChunkFlatten
@@ -199,8 +192,12 @@ def actionChunkFlatten
       (ResolverPermutationPairs
         (actionCircuit.toVerifierKey urs)
         poly proofIndex chunk).length)
-    (actionChunkLen_pos pp urs)
-    (actionPermutationChunks_cover pp urs)
+    actionChunkLen_pos
+    (by
+      simpa only [ActionPermutationDomain.actionShape,
+        CircuitShape.withProofParams_numPermutationSets,
+        actionCircuit.shape_numPermutationSets] using
+        actionPermutationChunks_cover)
     (actionResolverChunkWidth pp urs poly proofIndex)
 
 /-- The full-domain Action keygen permutation in resolver chunk coordinates. -/
@@ -377,7 +374,8 @@ theorem actionActiveChunkCell_columnAddress
       (cell.1 : ℕ) < vk.permutationChunks.length := by
     rw [hvkChunks, verifierCS_permutationChunks_length]
     simpa only [ActionPermutationDomain.actionShape,
-      ProofParams.mergeDerived_numPermutationSets] using cell.1.isLt
+      CircuitShape.withProofParams_numPermutationSets,
+      actionCircuit.shape_numPermutationSets] using cell.1.isLt
   have hcolumn :
       (cell.2.2 : ℕ) <
         (vk.permutationChunks.getD cell.1 []).length := by
@@ -406,8 +404,8 @@ theorem actionActiveChunkCell_columnAddress
     have hprefix :
         (vk.permutationChunks.take cell.1).flatten.length =
           (cell.1 : ℕ) * vk.chunkLen := by
-      exact topLevelPermutationChunks_take_flatten_length
-        actionCircuit urs cell.1 hchunk
+      exact actionCircuit.toVerifierKey_permutationChunks_take_flatten_length
+        urs cell.1 hchunk
     rw [hprefix]
     exact hcoordinate
   have hdecoded := decodedChunkAddress_eq_sourceColumn

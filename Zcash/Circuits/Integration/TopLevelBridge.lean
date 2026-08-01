@@ -43,7 +43,7 @@ only the representation boundaries that genuinely come from other streams:
 -/
 def ofTopLevelCanonical
     {k : ℕ}
-    (gateCoherence : TopLevelGateCoherence top)
+    (fpCompatibility : TopLevelFpCompatibility top)
     (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
@@ -86,12 +86,12 @@ def ofTopLevelCanonical
       copies := copies
       theta := ch.theta
       lookups := ?_ }
-  · apply gateCoherence.canonicalConstraints ch poly proofIndex
+  · apply fpCompatibility.canonicalConstraints ch poly proofIndex
       satisfaction
     · intro row
       rw [← pow_mul, Nat.mul_comm, pow_mul, hroot, one_pow]
     · exact selectorActivations
-  · exact TopLevelLookup.deployedWitnesses gateCoherence ch poly proofIndex
+  · exact TopLevelLookup.deployedWitnesses fpCompatibility ch poly proofIndex
       satisfaction lookupConditions
 
 /--

@@ -19,7 +19,7 @@ open Zcash.Circuits.Action (actionCircuit)
 namespace ActionGateCoherence
 
 /-- The derived Action constraint-system degree is below the Pasta field order. -/
-theorem selectorDegree :
+theorem constraintDegree_lt :
     csDegree actionCircuit.constraintSystem < scalarFieldOrder := by
   native_decide
 
@@ -34,7 +34,7 @@ theorem adviceQueryColumnsAllocated :
       entry.1 < actionCircuit.constraintSystem.numAdviceColumns := by
   native_decide
 
-assert_no_sorry selectorDegree
+assert_no_sorry constraintDegree_lt
 assert_no_sorry domainExponent_lt
 assert_no_sorry adviceQueryColumnsAllocated
 

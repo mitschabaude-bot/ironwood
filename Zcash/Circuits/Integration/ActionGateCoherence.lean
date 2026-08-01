@@ -22,9 +22,9 @@ The deployed Orchard Action circuit satisfies the complete static gate boundary
 against its own derived verifying key.
 -/
 theorem topLevel :
-    TopLevelGateCoherence actionCircuit where
+    TopLevelFpCompatibility actionCircuit where
   domainExponent_lt := domainExponent_lt
-  selectorDegree := selectorDegree
+  constraintDegree_lt := constraintDegree_lt
 
 assert_no_sorry topLevel
 
