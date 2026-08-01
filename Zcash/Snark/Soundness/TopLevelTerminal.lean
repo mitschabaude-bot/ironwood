@@ -66,7 +66,7 @@ def topLevelBundleStatement_or_bad_of_components
       ConstraintSatisfaction
         (top.constraintModel pp urs ch poly)
         top.n)
-    (gates : TopLevelGateCoherence top)
+    (gates : TopLevelConstraintBounds top)
     (fixedEncoding : ∀ proofIndex,
       TopLevelFixedEncoding top pp poly proofIndex)
     (fixed : ∀ proofIndex,
@@ -108,7 +108,7 @@ def topLevelBundleWitness_or_bad_of_components
       ConstraintSatisfaction
         (top.constraintModel pp urs ch poly)
         top.n)
-    (gates : TopLevelGateCoherence top)
+    (gates : TopLevelConstraintBounds top)
     (fixedEncoding : ∀ proofIndex,
       TopLevelFixedEncoding top pp poly proofIndex)
     (fixed : ∀ proofIndex,

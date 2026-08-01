@@ -243,11 +243,11 @@ theorem ofInputSelectorValues
 
 end EnabledLookup.SelectorProjection
 
-namespace TopLevelGateCoherence
+namespace TopLevelConstraintBounds
 
 /-- The resolver feeds interpret the complete circuit-derived pinned query state. -/
 theorem resolverInterpretsPinned
-    (coherence : TopLevelGateCoherence top)
+    (coherence : TopLevelConstraintBounds top)
     (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
     (usableRows row : ℕ) :
@@ -291,7 +291,7 @@ theorem resolverInterpretsPinned
     (top.toVerifierKey_fixedQueryCount urs)
     (top.toVerifierKey_instanceQueryCount urs)
 
-end TopLevelGateCoherence
+end TopLevelConstraintBounds
 
 /-- Mapping a projected lookup tuple into `Expr` does not change its evaluations. -/
 theorem map_eval_toExpr
@@ -330,7 +330,7 @@ The circuit-derived verifying key's selected lookup tuples evaluate like the
 enabled Clean lookup's concrete input and table tuples.
 -/
 theorem projectedValues
-    (gateCoherence : TopLevelGateCoherence top)
+    (gateCoherence : TopLevelConstraintBounds top)
     (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
     (lookup : EnabledLookup Fp)
@@ -468,7 +468,7 @@ Clean tuples compressed with the transcript challenge.
 -/
 theorem projectedPolynomialValues
     {k : ℕ}
-    (gateCoherence : TopLevelGateCoherence top)
+    (gateCoherence : TopLevelConstraintBounds top)
     (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
@@ -538,7 +538,7 @@ challenge exclusions are supplied.
 -/
 def deployedWitness
     {k : ℕ}
-    (gateCoherence : TopLevelGateCoherence top)
+    (gateCoherence : TopLevelConstraintBounds top)
     (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
@@ -947,7 +947,7 @@ def WitnessConditions.ofChallengeExclusions
 /-- Construct the complete deployed-witness family for one top-level proof. -/
 def deployedWitnesses
     {k : ℕ}
-    (gateCoherence : TopLevelGateCoherence top)
+    (gateCoherence : TopLevelConstraintBounds top)
     (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
@@ -984,7 +984,7 @@ def deployedWitnesses
 /-- The deployed family discharges Clean's complete lookup constraint family. -/
 theorem constraints
     {k : ℕ}
-    (gateCoherence : TopLevelGateCoherence top)
+    (gateCoherence : TopLevelConstraintBounds top)
     (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs)
