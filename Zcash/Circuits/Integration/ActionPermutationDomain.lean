@@ -220,7 +220,7 @@ theorem deltaFp_domainCosets
 /-! ## Derived evaluation-domain facts -/
 
 /-- The active permutation prefix ends at the last usable Action row. -/
-abbrev activeRows : ℕ :=
+def activeRows : ℕ :=
   actionCircuit.n - actionCircuit.blindingFactors - 1
 
 theorem activeRows_le :
@@ -228,27 +228,14 @@ theorem activeRows_le :
   unfold activeRows
   omega
 
-/-- Canonical selectors and the derived usable-row count form the complete
-generic permutation-domain record. In particular its `lastRotation` field is
-the verifier's `omega^(-(blindingFactors + 1))` rotation. -/
-theorem domain
-    (pp : ProofParams) (urs : URS G)
-    (ch : Challenges actionCircuit.domainExponent Fp)
-    (poly : CommitmentId → CPoly) :
-    let model :=
-      actionCircuit.constraintModel pp urs ch poly
-    ResolverPermutationDomain (actionCircuit.toVerifierKey urs)
-      model.l0 model.lLast model.lBlind
-      actionCircuit.n
-      activeRows := by
-  exact ResolverPermutationDomain.ofCanonicalConstraintModel
-    (actionCircuit.toVerifierKey urs) ch poly
-      (actionCircuit.toVerifierKey_blindingFactors_lt_n urs)
-      (TopLevelAssignment.domainRowsInjective
-        (top := actionCircuit) domainExponent_lt)
-      (TopLevelAssignment.domainRoot
-        (top := actionCircuit) domainExponent_lt)
-      chunkCount
+/-- The last usable Action row is exactly the verifier's negative rotation. -/
+theorem lastRowRotation (urs : URS G) :
+    (actionCircuit.toVerifierKey urs).omega ^
+        ((actionCircuit.toVerifierKey urs).n - (actionCircuit.toVerifierKey urs).blindingFactors - 1) =
+      (actionCircuit.toVerifierKey urs).omega ^
+        (-(((actionCircuit.toVerifierKey urs).blindingFactors : ℤ) + 1)) :=
+  actionCircuit.toVerifierKey_lastUsableRowRotation
+    urs domainExponent_lt
 
 set_option maxRecDepth 100000 in
 /-- Action chunk names are injective on any active prefix of the derived
@@ -400,7 +387,7 @@ theorem namesInjective
       exact (Fin.heq_ext_iff hwidth).mpr hcolumn
   intro c d hname
   have hwiden := widenPermutationChunkCell_injective
-    (nc := actionCircuit.permutationSetCount)
+    (nc := actionCircuit.shape.numPermutationSets)
     (width := fun i =>
       (ResolverPermutationPairs (actionCircuit.toVerifierKey urs) poly p i).length)
     hactive
@@ -435,7 +422,7 @@ def cycleOfKeygenColumnsAt
       (ResolverPermutationCell (actionCircuit.toVerifierKey urs) poly p
         m))
     (hcolumns : ∀
-      (chunk : Fin actionCircuit.permutationSetCount)
+      (chunk : Fin actionCircuit.shape.numPermutationSets)
       (column : Fin
         (ResolverPermutationPairs (actionCircuit.toVerifierKey urs) poly p chunk).length),
       (ResolverPermutationPairs
@@ -449,17 +436,10 @@ def cycleOfKeygenColumnsAt
         fullSigma
           (widenPermutationChunkCell hactive c)) :
     ResolverPermutationCycle (actionCircuit.toVerifierKey urs) poly p m :=
-  by
-    simpa only [actionCircuit.toVerifierKey_n,
-      actionCircuit.toVerifierKey_omega,
-      actionCircuit.toVerifierKey_delta,
-      actionCircuit.toVerifierKey_chunkLen] using
-      ResolverPermutationCycle.ofKeygenColumns
-        (actionCircuit.toVerifierKey urs) poly p hactive fullSigma sigma
-          (TopLevelAssignment.domainRowsInjective
-            (top := actionCircuit) domainExponent_lt)
-          hcolumns hrestrict
-          (namesInjective pp urs poly p hactive)
+  actionCircuit.resolverPermutationCycleOfKeygenColumns
+    urs poly p hactive fullSigma sigma domainExponent_lt
+      hcolumns hrestrict
+      (namesInjective pp urs poly p hactive)
 
 /-- Assemble the semantic cycle at the verifier-derived active-row boundary. -/
 def cycleOfKeygenColumns
@@ -473,7 +453,7 @@ def cycleOfKeygenColumns
       (ResolverPermutationCell (actionCircuit.toVerifierKey urs) poly p
         activeRows))
     (hcolumns : ∀
-      (chunk : Fin actionCircuit.permutationSetCount)
+      (chunk : Fin actionCircuit.shape.numPermutationSets)
       (column : Fin
         (ResolverPermutationPairs (actionCircuit.toVerifierKey urs) poly p chunk).length),
       (ResolverPermutationPairs
@@ -494,7 +474,6 @@ def cycleOfKeygenColumns
 
 assert_no_sorry routingCoherent_of_derived
 assert_no_sorry deltaFp_domainCosets
-assert_no_sorry domain
 assert_no_sorry namesInjective
 assert_no_sorry cycleOfKeygenColumnsAt
 assert_no_sorry cycleOfKeygenColumns

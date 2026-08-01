@@ -292,6 +292,12 @@ def ursOfAugmentedBasis (k : ℕ) (basis : AugmentedIndex (2 ^ k) → G) : URS G
     w := basis AugmentedIndex.w }
 
 omit [AddCommGroup G] in
+@[simp] theorem ursOfAugmentedBasis_k (k : ℕ)
+    (basis : AugmentedIndex (2 ^ k) → G) :
+    (ursOfAugmentedBasis k basis).k = k := by
+  simp only [ursOfAugmentedBasis]
+
+omit [AddCommGroup G] in
 /-- Splitting an augmented basis into a URS and reassembling it loses no public group element. -/
 @[simp] theorem augmentedBasis_ursOfAugmentedBasis (k : ℕ)
     (basis : AugmentedIndex (2 ^ k) → G) :
@@ -359,6 +365,16 @@ def toAlgebraicRelationWitness {n : ℕ} {g : Fin n → G} {U W : G}
     relation := by
       rw [representationEval_augmentedBasis]
       exact r.relation }
+
+/-- Interpret a relation over the URS split from an augmented basis as a relation over that
+basis itself. -/
+def toBasisRelation {k : ℕ} (basis : AugmentedIndex (2 ^ k) → G)
+    (r : AugmentedRelationWitness (F := F)
+      (ursOfAugmentedBasis k basis).g
+      (ursOfAugmentedBasis k basis).u
+      (ursOfAugmentedBasis k basis).w) :
+    AlgebraicRelationWitness (F := F) basis :=
+  augmentedBasis_ursOfAugmentedBasis k basis ▸ r.toAlgebraicRelationWitness
 
 /-- The same relation witness, viewed as an AGM representation of zero over the augmented basis. -/
 def toGroupRepresentation {n : ℕ} {g : Fin n → G} {U W : G}

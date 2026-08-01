@@ -10,7 +10,7 @@ autoImplicit = false
 [[require]]
 name = "Clean"
 git = "https://github.com/Verified-zkEVM/clean"
-rev = "b4bb352e"
+rev = "4fc6220b"
 
 [[require]]
 name = "CompElliptic"

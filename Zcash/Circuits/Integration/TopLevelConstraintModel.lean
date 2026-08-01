@@ -1,5 +1,7 @@
 import Zcash.Snark.Keygen.Pipeline
 import Zcash.Snark.Soundness.Canonical.ConstraintModel
+import Zcash.Circuits.Integration.PermutationCompiler
+import Zcash.Circuits.Integration.TopLevelAssignment
 
 /-!
 # Circuit-derived canonical constraint models
@@ -68,6 +70,21 @@ theorem constraintModel_eq_constraintModelOfResolver
         selectors.1 selectors.2.1 selectors.2.2 := by
   rfl
 
+/-- For challenges indexed by the circuit domain, the top-level model is the
+canonical model of its derived verification key. -/
+theorem constraintModel_eq_toVerifierKey_constraintModel
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (pp : ProofParams) (urs : URS G)
+    (ch : Challenges top.shape.k Fp) (poly : CommitmentId → CPoly) :
+    top.constraintModel pp urs ch poly =
+      (top.toVerifierKey urs).constraintModel
+        (numProofs := pp.numProofs) ch poly
+        (top.toVerifierKey_blindingFactors_lt_n urs) := by
+  simp only [TopLevelCircuit.constraintModel,
+    VerifyingKey.constraintModel,
+    top.toVerifierKey_omega]
+  congr 1
+
 @[simp] theorem constraintModel_l0
     {k : ℕ} (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G)
@@ -94,5 +111,114 @@ theorem constraintModel_eq_constraintModelOfResolver
       (canonicalLagrangePolynomials top.omega
         (top.toVerifierKey_blindingFactors_lt_n urs)).2.2 := by
   rfl
+
+/-- Resolver pairing preserves the compiler-prescribed width of every
+circuit-derived permutation chunk. -/
+theorem resolverPermutationPairs_length
+    (top : TopLevelCircuit Fp Config PublicInput)
+    {numProofs : ℕ} (urs : URS G) (poly : CommitmentId → CPoly)
+    (proofIndex : Fin numProofs)
+    (chunk : Fin top.shape.numPermutationSets) :
+    (ResolverPermutationPairs
+        (top.toVerifierKey urs) poly proofIndex chunk).length =
+      min top.chunkLen
+        (top.permutationColumnCount - (chunk : ℕ) * top.chunkLen) := by
+  simp only [ResolverPermutationPairs,
+    permutationChunkPairsOfResolver, List.length_map]
+  apply top.toVerifierKey_permutationChunks_getD_length
+  rw [top.toVerifierKey_permutationChunks_length]
+  exact chunk.isLt
+
+/-- The canonical model of a circuit-derived key satisfies the complete
+permutation-domain interface. Only support for the circuit's evaluation-domain
+exponent is external; chunking and blinding bounds follow from compilation. -/
+theorem resolverPermutationDomain
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (pp : ProofParams) (urs : URS G)
+    (ch : Challenges top.shape.k Fp)
+    (poly : CommitmentId → CPoly)
+    (hdomainExponent : top.domainExponent < 33) :
+    ResolverPermutationDomain (top.toVerifierKey urs)
+      (top.constraintModel pp urs ch poly).l0
+      (top.constraintModel pp urs ch poly).lLast
+      (top.constraintModel pp urs ch poly).lBlind
+      top.n (top.usableRowsAt top.domainExponent) := by
+  simpa only [top.toVerifierKey_n,
+    top.toVerifierKey_blindingFactors,
+    top.usableRowsAt_domainExponent] using
+    ResolverPermutationDomain.ofCanonicalConstraintModel
+      (top.toVerifierKey urs) ch poly
+      (top.toVerifierKey_blindingFactors_lt_n urs)
+      (TopLevelAssignment.toVerifierKey_domainRowsInjective
+        urs hdomainExponent)
+      (TopLevelAssignment.toVerifierKey_domainRoot
+        urs hdomainExponent)
+      (top.toVerifierKey_permutationChunks_length urs)
+
+/-- Assemble a semantic permutation cycle from a circuit-derived keygen
+permutation while keeping circuit-owned domain and chunk constants in their
+canonical spelling. -/
+def resolverPermutationCycleOfKeygenColumns
+    (top : TopLevelCircuit Fp Config PublicInput)
+    {numProofs : ℕ} (urs : URS G)
+    (poly : CommitmentId → CPoly) (p : Fin numProofs)
+    {activeRows : ℕ} (hactive : activeRows ≤ top.n)
+    (fullSigma : Equiv.Perm
+      (ResolverPermutationCell (top.toVerifierKey urs) poly p top.n))
+    (sigma : Equiv.Perm
+      (ResolverPermutationCell (top.toVerifierKey urs) poly p activeRows))
+    (hdomainExponent : top.domainExponent < 33)
+    (hcolumns : ∀
+      (chunk : Fin top.shape.numPermutationSets)
+      (column : Fin
+        (ResolverPermutationPairs
+          (top.toVerifierKey urs) poly p chunk).length),
+      (ResolverPermutationPairs
+          (top.toVerifierKey urs) poly p chunk)[column].2 =
+        keygenSigmaColumn top.omega Zcash.Arithmetic.deltaFp
+          top.chunkLen fullSigma chunk column)
+    (hrestrict : ∀ c :
+        ResolverPermutationCell
+          (top.toVerifierKey urs) poly p activeRows,
+      widenPermutationChunkCell hactive (sigma c) =
+        fullSigma (widenPermutationChunkCell hactive c))
+    (hnames : Function.Injective fun c :
+        ResolverPermutationCell
+          (top.toVerifierKey urs) poly p activeRows =>
+      chunkRowName top.omega Zcash.Arithmetic.deltaFp
+        top.chunkLen c.1 c.2.1 c.2.2) :
+    ResolverPermutationCycle
+      (top.toVerifierKey urs) poly p activeRows := by
+  simpa only [top.toVerifierKey_n,
+    top.toVerifierKey_omega,
+    top.toVerifierKey_delta,
+    top.toVerifierKey_chunkLen] using
+    ResolverPermutationCycle.ofKeygenColumns
+      (top.toVerifierKey urs) poly p hactive fullSigma sigma
+        (TopLevelAssignment.domainRowsInjective
+          (top := top) hdomainExponent)
+        hcolumns hrestrict hnames
+
+/-- The last usable row of a circuit-derived verifier domain is the verifier's
+canonical negative blinding rotation. -/
+theorem toVerifierKey_lastUsableRowRotation
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (urs : URS G)
+    (hdomainExponent : top.domainExponent < 33) :
+    (top.toVerifierKey urs).omega ^
+        ((top.toVerifierKey urs).n -
+          (top.toVerifierKey urs).blindingFactors - 1) =
+      (top.toVerifierKey urs).omega ^
+        (-(((top.toVerifierKey urs).blindingFactors : ℤ) + 1)) := by
+  rw [show (top.toVerifierKey urs).n -
+      (top.toVerifierKey urs).blindingFactors - 1 =
+        (top.toVerifierKey urs).n -
+          ((top.toVerifierKey urs).blindingFactors + 1) by omega]
+  exact domain_pow_sub_eq_zpow_neg
+    (by
+      have hblinding := top.toVerifierKey_blindingFactors_lt_n urs
+      omega)
+    (TopLevelAssignment.toVerifierKey_domainRoot
+      urs hdomainExponent)
 
 end Halo2.TopLevelCircuit
