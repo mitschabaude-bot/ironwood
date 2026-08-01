@@ -193,7 +193,7 @@ def acceptedInstanceColumn_eq_rowPolynomial_or_relation
         (instanceCommitment := instanceCommitment)
         urs hk vk ps ch batchOpenings i hi}
     (haccepts :
-      DeployedAccepts urs hk vk instanceCommitment ps ch)
+      DeployedAccepts shape urs hk vk instanceCommitment ps ch)
     (proofIndex : Fin shape.numProofs)
     (column : ℕ)
     (key : LagrangeCommitmentKey urs vk.omega)

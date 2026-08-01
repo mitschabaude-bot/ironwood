@@ -20,11 +20,10 @@ exponent and selector map; this module adds the group side — the Lagrange-basi
 inverse FFT, the dense fixed columns from the derived layout, the keygen permutation
 polynomials, `commit_lagrange` for both commitment families — and assembles the record.
 
-`ProofParams` carries the only two `Shape` counts that are proof-shape rather than
-circuit data (batch size, multiopen point sets); `ProofParams.mergeDerived` computes the
-rest from the circuit, so `TopLevelCircuit.toVerifierKey` carries its derived `Shape` in
-the return type with no lawfulness side condition. The Action capture certification
-lives in `Certificate.lean`.
+`TopLevelCircuit.shape` records every circuit-fixed count. Proof invocation parameters
+remain separate and do not enter `TopLevelCircuit.toVerifierKey`; callers combine them
+with `CircuitShape.withProofParams` only when they need a complete proof `Shape`. The
+Action capture certification lives in `Certificate.lean`.
 
 ## Rust reference
 
@@ -193,136 +192,6 @@ def permutationCommitmentsOf (blind : G) (lagrange : List G) (k : ℕ)
 
 end Zcash.Snark.Keygen
 
-namespace Zcash.Snark.Keygen
-
-open Zcash.Snark
-open Halo2
-
-/-- The two `Shape` counts that are genuinely proof-shape rather than circuit data: the
-batch size and the multiopen point-set count. Everything else merges in derived
-(`ProofParams.mergeDerived`). -/
-structure ProofParams where
-  numProofs : ℕ
-  numPointSets : ℕ
-deriving DecidableEq, Repr
-
-/-- The `Shape` of a top-level circuit's proofs: the proof-shape counts merged with
-everything the circuit derives — the domain exponent (`TopLevelCircuit.domainExponent`),
-column/lookup/permutation counts from the configure-recorded constraint system, the
-query counts from the derived pinned CS layouts (`TopLevelCircuit.pinnedCS`), the
-verifier's permutation chunking `⌈columns / chunkLen⌉` (`permutation/verifier.rs:43-47`),
-and the quotient split `cs.degree() − 1` (`vk.domain.get_quotient_poly_degree()`). -/
-def ProofParams.mergeDerived (pp : ProofParams)
-    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
-    (top : TopLevelCircuit Fp Config PublicInput) : Shape :=
-  { k := top.domainExponent
-    numProofs := pp.numProofs
-    numAdviceColumns := top.adviceColumnCount
-    numLookups := top.lookupCount
-    numPermutationSets := top.permutationSetCount
-    numPermutationColumns := top.permutationColumnCount
-    numQuotientPieces := top.quotientPieceCount
-    numInstanceQueries := top.instanceQueryCount
-    numAdviceQueries := top.adviceQueryCount
-    numFixedQueries := top.fixedQueryCount
-    numPointSets := pp.numPointSets }
-
-theorem ProofParams.mergeDerived_k
-    (pp : ProofParams)
-    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
-    (top : TopLevelCircuit Fp Config PublicInput) :
-    (pp.mergeDerived top).k = top.domainExponent := by
-  simp [ProofParams.mergeDerived]
-
-theorem ProofParams.mergeDerived_numProofs
-    (pp : ProofParams)
-    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
-    (top : TopLevelCircuit Fp Config PublicInput) :
-    (pp.mergeDerived top).numProofs = pp.numProofs := by
-  simp [ProofParams.mergeDerived]
-
-theorem ProofParams.mergeDerived_numAdviceColumns
-    (pp : ProofParams)
-    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
-    (top : TopLevelCircuit Fp Config PublicInput) :
-    (pp.mergeDerived top).numAdviceColumns = top.adviceColumnCount := by
-  simp only [ProofParams.mergeDerived,
-    TopLevelCircuit.adviceColumnCount]
-
-theorem ProofParams.mergeDerived_numLookups
-    (pp : ProofParams)
-    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
-    (top : TopLevelCircuit Fp Config PublicInput) :
-    (pp.mergeDerived top).numLookups = top.lookupCount := by
-  simp only [ProofParams.mergeDerived,
-    TopLevelCircuit.lookupCount]
-
-theorem ProofParams.mergeDerived_numPermutationSets
-    (pp : ProofParams)
-    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
-    (top : TopLevelCircuit Fp Config PublicInput) :
-    (pp.mergeDerived top).numPermutationSets =
-      top.permutationSetCount := by
-  simp only [ProofParams.mergeDerived,
-    TopLevelCircuit.permutationSetCount,
-    TopLevelCircuit.permutationColumnCount,
-    TopLevelCircuit.permutationColumns,
-    TopLevelCircuit.chunkLen]
-
-theorem ProofParams.mergeDerived_numPermutationColumns
-    (pp : ProofParams)
-    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
-    (top : TopLevelCircuit Fp Config PublicInput) :
-    (pp.mergeDerived top).numPermutationColumns =
-      top.permutationColumnCount := by
-  simp only [ProofParams.mergeDerived,
-    TopLevelCircuit.permutationColumnCount,
-    TopLevelCircuit.permutationColumns]
-
-theorem ProofParams.mergeDerived_numQuotientPieces
-    (pp : ProofParams)
-    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
-    (top : TopLevelCircuit Fp Config PublicInput) :
-    (pp.mergeDerived top).numQuotientPieces = top.quotientPieceCount := by
-  simp only [ProofParams.mergeDerived,
-    TopLevelCircuit.quotientPieceCount]
-
-theorem ProofParams.mergeDerived_numInstanceQueries
-    (pp : ProofParams)
-    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
-    (top : TopLevelCircuit Fp Config PublicInput) :
-    (pp.mergeDerived top).numInstanceQueries = top.instanceQueryCount := by
-  simp only [ProofParams.mergeDerived,
-    TopLevelCircuit.instanceQueryCount,
-    TopLevelCircuit.instanceQueryLayout]
-
-theorem ProofParams.mergeDerived_numAdviceQueries
-    (pp : ProofParams)
-    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
-    (top : TopLevelCircuit Fp Config PublicInput) :
-    (pp.mergeDerived top).numAdviceQueries = top.adviceQueryCount := by
-  simp only [ProofParams.mergeDerived,
-    TopLevelCircuit.adviceQueryCount,
-    TopLevelCircuit.adviceQueryLayout]
-
-theorem ProofParams.mergeDerived_numFixedQueries
-    (pp : ProofParams)
-    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
-    (top : TopLevelCircuit Fp Config PublicInput) :
-    (pp.mergeDerived top).numFixedQueries = top.fixedQueryCount := by
-  simp only [ProofParams.mergeDerived,
-    TopLevelCircuit.fixedQueryCount,
-    TopLevelCircuit.fixedQueryLayout]
-
-theorem ProofParams.mergeDerived_numPointSets
-    (pp : ProofParams)
-    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
-    (top : TopLevelCircuit Fp Config PublicInput) :
-    (pp.mergeDerived top).numPointSets = pp.numPointSets := by
-  simp [ProofParams.mergeDerived]
-
-end Zcash.Snark.Keygen
-
 namespace Halo2.TopLevelCircuit
 
 open Zcash.Snark
@@ -371,14 +240,70 @@ theorem omega_ne_zero
   (Zcash.Arithmetic.omegaOf_isPrimitiveRoot
     top.domainExponent hbound).isUnit (by positivity) |>.ne_zero
 
+/-- The circuit-fixed shape shared by the top-level circuit's verifying key and proofs. -/
+def shape (top : TopLevelCircuit Fp Config PublicInput) : CircuitShape :=
+  { k := top.domainExponent
+    numAdviceColumns := top.adviceColumnCount
+    numLookups := top.lookupCount
+    numPermutationSets := top.permutationSetCount
+    numPermutationColumns := top.permutationColumnCount
+    numQuotientPieces := top.quotientPieceCount
+    numInstanceQueries := top.instanceQueryCount
+    numAdviceQueries := top.adviceQueryCount
+    numFixedQueries := top.fixedQueryCount }
+
+@[simp] theorem shape_k
+    (top : TopLevelCircuit Fp Config PublicInput) :
+    top.shape.k = top.domainExponent := by
+  simp only [shape]
+
+@[simp] theorem shape_numAdviceColumns
+    (top : TopLevelCircuit Fp Config PublicInput) :
+    top.shape.numAdviceColumns = top.adviceColumnCount := by
+  simp only [shape]
+
+@[simp] theorem shape_numLookups
+    (top : TopLevelCircuit Fp Config PublicInput) :
+    top.shape.numLookups = top.lookupCount := by
+  simp only [shape]
+
+@[simp] theorem shape_numPermutationSets
+    (top : TopLevelCircuit Fp Config PublicInput) :
+    top.shape.numPermutationSets = top.permutationSetCount := by
+  simp only [shape]
+
+@[simp] theorem shape_numPermutationColumns
+    (top : TopLevelCircuit Fp Config PublicInput) :
+    top.shape.numPermutationColumns = top.permutationColumnCount := by
+  simp only [shape]
+
+@[simp] theorem shape_numQuotientPieces
+    (top : TopLevelCircuit Fp Config PublicInput) :
+    top.shape.numQuotientPieces = top.quotientPieceCount := by
+  simp only [shape]
+
+@[simp] theorem shape_numInstanceQueries
+    (top : TopLevelCircuit Fp Config PublicInput) :
+    top.shape.numInstanceQueries = top.instanceQueryCount := by
+  simp only [shape]
+
+@[simp] theorem shape_numAdviceQueries
+    (top : TopLevelCircuit Fp Config PublicInput) :
+    top.shape.numAdviceQueries = top.adviceQueryCount := by
+  simp only [shape]
+
+@[simp] theorem shape_numFixedQueries
+    (top : TopLevelCircuit Fp Config PublicInput) :
+    top.shape.numFixedQueries = top.fixedQueryCount := by
+  simp only [shape]
+
 /-- **The verifying key of a closed top-level circuit**: the `TopLevelCircuit` carries
-unit configuration and synthesis inputs, so the only remaining inputs are the
-proof-shape counts and the URS — `keygen_vk` at the `TopLevelCircuit` level, with the
-derived `Shape` in the return type. -/
+unit configuration and synthesis inputs, so the only remaining input is the URS —
+`keygen_vk` at the `TopLevelCircuit` level, indexed by the circuit-owned shape. -/
 def toVerifierKey
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G) :
-    VerifyingKey (pp.mergeDerived top) Fp G :=
+    (urs : URS G) :
+    VerifyingKey top.shape Fp G :=
   let verifierCS := top.verifierCS
   let fixedCommitments := top.fixedCommitments urs
   let permutationCommitments := top.permutationCommitments urs
@@ -401,8 +326,8 @@ def toVerifierKey
 /-- The derived key uses the circuit's fitting-domain generator. -/
 @[simp] theorem toVerifierKey_omega
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G) :
-    (top.toVerifierKey pp urs).omega =
+    (urs : URS G) :
+    (top.toVerifierKey urs).omega =
       top.omega := by
   simp only [toVerifierKey]
 
@@ -410,31 +335,31 @@ def toVerifierKey
 @[simp]
 theorem toVerifierKey_n
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G) :
-    (top.toVerifierKey pp urs).n = top.n := by
+    (urs : URS G) :
+    (top.toVerifierKey urs).n = top.n := by
   simp only [toVerifierKey]
 
 /-- The derived key preserves the closed constraint system's blinding count. -/
 @[simp]
 theorem toVerifierKey_blindingFactors
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G) :
-    (top.toVerifierKey pp urs).blindingFactors = top.blindingFactors := by
+    (urs : URS G) :
+    (top.toVerifierKey urs).blindingFactors = top.blindingFactors := by
   simp only [toVerifierKey]
 
 /-- The derived key uses the protocol's fixed permutation delta. -/
 @[simp] theorem toVerifierKey_delta
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G) :
-    (top.toVerifierKey pp urs).delta =
+    (urs : URS G) :
+    (top.toVerifierKey urs).delta =
       Zcash.Arithmetic.deltaFp := by
   simp only [toVerifierKey]
 
 /-- The derived key uses the circuit-owned permutation chunk width. -/
 @[simp] theorem toVerifierKey_chunkLen
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G) :
-    (top.toVerifierKey pp urs).chunkLen = top.chunkLen := by
+    (urs : URS G) :
+    (top.toVerifierKey urs).chunkLen = top.chunkLen := by
   simp only [toVerifierKey]
 
 /--
@@ -443,17 +368,17 @@ the circuit's blinding rows.
 -/
 theorem toVerifierKey_blindingFactors_lt_n
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G) :
-    (top.toVerifierKey pp urs).blindingFactors <
-      (top.toVerifierKey pp urs).n := by
+    (urs : URS G) :
+    (top.toVerifierKey urs).blindingFactors <
+      (top.toVerifierKey urs).n := by
   rw [top.toVerifierKey_blindingFactors, top.toVerifierKey_n]
   exact top.blindingFactors_lt_domainSize
 
 /-- The derived key exposes the fixed commitments computed from its own dense rows. -/
 theorem toVerifierKey_fixedCommitment
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G) (column : ℕ) :
-    (top.toVerifierKey pp urs).fixedCommitment column =
+    (urs : URS G) (column : ℕ) :
+    (top.toVerifierKey urs).fixedCommitment column =
       (top.fixedCommitments urs).getD column 0 := by
   simp only [toVerifierKey]
 
@@ -461,66 +386,66 @@ theorem toVerifierKey_fixedCommitment
 its own keygen permutation rows. -/
 theorem toVerifierKey_permutationCommonCommitment
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G)
+    (urs : URS G)
     (column : Fin top.permutationColumnCount) :
-    (top.toVerifierKey pp urs).permutationCommonCommitment column =
+    (top.toVerifierKey urs).permutationCommonCommitment column =
       (top.permutationCommitments urs).getD column.val 0 := by
   simp only [toVerifierKey]
 
 /-- The derived key uses the circuit-owned advice-query layout. -/
 @[simp] theorem toVerifierKey_adviceQueryLayout
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G) :
-    (top.toVerifierKey pp urs).adviceQueryLayout =
+    (urs : URS G) :
+    (top.toVerifierKey urs).adviceQueryLayout =
       top.adviceQueryLayout := by
   simp only [toVerifierKey]
 
 /-- The derived key uses the circuit-owned fixed-query layout. -/
 @[simp] theorem toVerifierKey_fixedQueryLayout
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G) :
-    (top.toVerifierKey pp urs).fixedQueryLayout =
+    (urs : URS G) :
+    (top.toVerifierKey urs).fixedQueryLayout =
       top.fixedQueryLayout := by
   simp only [toVerifierKey]
 
 /-- The derived key uses the circuit-owned instance-query layout. -/
 @[simp] theorem toVerifierKey_instanceQueryLayout
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G) :
-    (top.toVerifierKey pp urs).instanceQueryLayout =
+    (urs : URS G) :
+    (top.toVerifierKey urs).instanceQueryLayout =
       top.instanceQueryLayout := by
   simp only [toVerifierKey]
 
 /-- The derived key uses the circuit's Ironwood-native gate expressions. -/
 @[simp] theorem toVerifierKey_gates
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G) :
-    (top.toVerifierKey pp urs).gates = top.verifierCS.gates := by
+    (urs : URS G) :
+    (top.toVerifierKey urs).gates = top.verifierCS.gates := by
   simp only [toVerifierKey]
 
 /-- The derived key uses the circuit's Ironwood-native permutation chunks. -/
 @[simp] theorem toVerifierKey_permutationChunks
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G) :
-    (top.toVerifierKey pp urs).permutationChunks =
+    (urs : URS G) :
+    (top.toVerifierKey urs).permutationChunks =
       top.verifierCS.permutationChunks := by
   simp only [toVerifierKey]
 
 /-- The derived key uses the circuit's Ironwood-native lookup input expressions. -/
 @[simp] theorem toVerifierKey_lookupInputExprs
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G)
+    (urs : URS G)
     (lookup : Fin top.lookupCount) :
-    (top.toVerifierKey pp urs).lookupInputExprs lookup =
+    (top.toVerifierKey urs).lookupInputExprs lookup =
       top.verifierCS.lookupInputExprs lookup := by
   simp only [toVerifierKey]
 
 /-- The derived key uses the circuit's Ironwood-native lookup table expressions. -/
 @[simp] theorem toVerifierKey_lookupTableExprs
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G)
+    (urs : URS G)
     (lookup : Fin top.lookupCount) :
-    (top.toVerifierKey pp urs).lookupTableExprs lookup =
+    (top.toVerifierKey urs).lookupTableExprs lookup =
       top.verifierCS.lookupTableExprs lookup := by
   simp only [toVerifierKey]
 
@@ -528,30 +453,30 @@ theorem toVerifierKey_permutationCommonCommitment
 top-level pinned constraint system. -/
 theorem toVerifierKey_adviceQueryCount
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G) :
-    (top.toVerifierKey pp urs).adviceQueryLayout.length =
+    (urs : URS G) :
+    (top.toVerifierKey urs).adviceQueryLayout.length =
       top.adviceQueryCount := by
   simpa only [adviceQueryCount] using
-    congrArg List.length (top.toVerifierKey_adviceQueryLayout pp urs)
+    congrArg List.length (top.toVerifierKey_adviceQueryLayout urs)
 
 /-- The derived key's fixed-query layout has the shape count computed from the same
 top-level pinned constraint system. -/
 theorem toVerifierKey_fixedQueryCount
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G) :
-    (top.toVerifierKey pp urs).fixedQueryLayout.length =
+    (urs : URS G) :
+    (top.toVerifierKey urs).fixedQueryLayout.length =
       top.fixedQueryCount := by
   simpa only [fixedQueryCount] using
-    congrArg List.length (top.toVerifierKey_fixedQueryLayout pp urs)
+    congrArg List.length (top.toVerifierKey_fixedQueryLayout urs)
 
 /-- The derived key's instance-query layout has the shape count computed from the same
 top-level pinned constraint system. -/
 theorem toVerifierKey_instanceQueryCount
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : ProofParams) (urs : URS G) :
-    (top.toVerifierKey pp urs).instanceQueryLayout.length =
+    (urs : URS G) :
+    (top.toVerifierKey urs).instanceQueryLayout.length =
       top.instanceQueryCount := by
   simpa only [instanceQueryCount] using
-    congrArg List.length (top.toVerifierKey_instanceQueryLayout pp urs)
+    congrArg List.length (top.toVerifierKey_instanceQueryLayout urs)
 
 end Halo2.TopLevelCircuit

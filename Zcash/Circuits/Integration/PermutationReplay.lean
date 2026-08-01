@@ -846,14 +846,14 @@ chunk flattening, restricting to the active rows, and applying the resolver copy
 theorem yields equal committed values at the two cells. This is the per-pair fact the
 copy-replay witness consumes, with every coordinate translation explicit. -/
 theorem chunkRowValue_eq_of_mem_copies
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
-    (l0 lLast lBlind : CPoly) (p : Fin shape.numProofs) {n m : ℕ}
+    (l0 lLast lBlind : CPoly) (p : Fin numProofs) {n m : ℕ}
     (h : ConstraintSatisfaction
-      (constraintModelOfResolver vk ch poly
-        (permutationSetsOfResolver vk poly)
-        (permutationChunksOfResolver vk poly)
+      (constraintModelOfResolver (numProofs := numProofs) vk ch poly
+        (permutationSetsOfResolver (numProofs := numProofs) vk poly)
+        (permutationChunksOfResolver (numProofs := numProofs) vk poly)
         l0 lLast lBlind) n)
     (hdom : ResolverPermutationDomain vk l0 lLast lBlind n m)
     (hcycle : ResolverPermutationCycle vk poly p m)

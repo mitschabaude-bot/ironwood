@@ -32,8 +32,9 @@ theorem vk_instanceQueryLayout_length : vk.instanceQueryLayout.length = 1 := rfl
 theorem vk_fixedQueryLayout_length : vk.fixedQueryLayout.length = 29 := rfl
 
 private theorem action_domainExponent_eq : actionCircuit.domainExponent = 11 := by
-  have h := congrArg Shape.k Keygen.shape_eq_mergeDerived
-  simp only [Keygen.ProofParams.mergeDerived] at h
+  have h := congrArg (fun proofShape : Shape => proofShape.k)
+    Keygen.actionShape_eq_fixtureShape
+  simp only [CircuitShape.withProofParams_k, actionCircuit.shape_k] at h
   simpa only [shape] using h
 
 private theorem vk_domain_eq :

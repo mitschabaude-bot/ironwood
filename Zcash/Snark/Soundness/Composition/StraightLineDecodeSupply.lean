@@ -25,9 +25,9 @@ def DeployedAlgebraicDecode.reRound {G : Type*} [AddCommGroup G] [Module Fp G]
     {ic : Fin shape.numProofs → Nat → G} {ps : ProofString shape Fp G}
     {nu : Fin 11 → Fp} {r₁ : Fin shape.k → Fp}
     {a : Fin (2 ^ urs.k) → Fp} {aU aW : Fp}
-    (d : DeployedAlgebraicDecode urs hk vk ic ps (chRecord nu r₁) a aU aW)
+    (d : DeployedAlgebraicDecode shape urs hk vk ic ps (chRecord nu r₁) a aU aW)
     (r₂ : Fin shape.k → Fp) :
-    DeployedAlgebraicDecode urs hk vk ic ps (chRecord nu r₂) a aU aW where
+    DeployedAlgebraicDecode shape urs hk vk ic ps (chRecord nu r₂) a aU aW where
   batches := ⟨d.batches.x4, d.batches.x1⟩
   x4Values := d.x4Values
   memberValues := d.memberValues
@@ -59,7 +59,7 @@ theorem straightLineConstraintDecoded_nonempty_decode
     (O : BTranscript Fp VestaG
       (preIpaLen shape family.init.length 10 + 3 * shape.k) -> Fp)
     (h : family.straightLineConstraintDecoded static basis O) :
-    Nonempty (DeployedAlgebraicDecode (ursOfAugmentedBasis shape.k basis) rfl
+    Nonempty (DeployedAlgebraicDecode shape (ursOfAugmentedBasis shape.k basis) rfl
       (family.vk basis) (family.instanceCommitment basis)
       (straightLineRunOutput family basis O).1.proof.1
       (wrappedPreIpaRecord (straightLineRunOutput family basis O))
@@ -113,7 +113,7 @@ theorem straightLineAccepts_of_decoded
     (O : BTranscript Fp VestaG
       (preIpaLen shape family.init.length 10 + 3 * shape.k) -> Fp)
     (h : family.straightLineConstraintDecoded static basis O) :
-    DeployedAccepts (ursOfAugmentedBasis shape.k basis) rfl (family.vk basis)
+    DeployedAccepts shape (ursOfAugmentedBasis shape.k basis) rfl (family.vk basis)
       (family.instanceCommitment basis)
       (straightLineRunOutput family basis O).1.proof.1
       (straightLineRunRecord family basis O) :=

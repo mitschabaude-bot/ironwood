@@ -116,7 +116,7 @@ theorem deployedAccepts_of_fsWinsFull (family : ComputedAlgebraicFSFamily shape)
       (fullAlgebraicAcceptDeployed basis (family.vk basis)
         (family.instanceCommitment basis))
       (algebraicFullPrefixesPre family.init) (algebraicFullPrefixes family.init) O) :
-    DeployedAccepts (ursOfAugmentedBasis shape.k basis) rfl (family.vk basis)
+    DeployedAccepts shape (ursOfAugmentedBasis shape.k basis) rfl (family.vk basis)
       (family.instanceCommitment basis) (runProof family basis O).proof.1
       (runRecord family basis O) :=
   hwin

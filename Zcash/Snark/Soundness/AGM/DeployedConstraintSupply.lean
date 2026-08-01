@@ -59,7 +59,7 @@ theorem DeployedConstraintChecks.of_accepts_chRecord [DecidableEq G] [Inhabited 
     {shape : Shape} (urs : URS G) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → Nat → G) (ps : ProofString shape Fp G)
     (nu : Fin 11 -> Fp) (rounds : Fin shape.k -> Fp)
-    (hacc : DeployedAccepts urs hk vk instanceCommitment ps (chRecord nu rounds)) :
+    (hacc : DeployedAccepts shape urs hk vk instanceCommitment ps (chRecord nu rounds)) :
     DeployedConstraintChecks vk instanceCommitment ps (chRecord nu (fun _ => 0)) := by
   obtain ⟨hdup, hu⟩ := deployedAccepts_pipeline urs hk vk instanceCommitment ps (chRecord nu rounds) hacc
   have hxn := deployedAccepts_xn_ne_one urs hk vk instanceCommitment ps (chRecord nu rounds) hacc
@@ -225,7 +225,7 @@ def DeployedAlgebraicDecode.memberPoly [DecidableEq G] [Inhabited G]
     {shape : Shape} {urs : URS G} {hk : shape.k = urs.k} {vk : VerifyingKey shape Fp G} {instanceCommitment : Fin shape.numProofs → Nat → G}
     {ps : ProofString shape Fp G} {ch : Challenges shape.k Fp}
     {aggregate : Fin (2 ^ urs.k) -> Fp} {aggregateU aggregateW : Fp}
-    (decoded : DeployedAlgebraicDecode urs hk vk instanceCommitment ps ch aggregate aggregateU aggregateW)
+    (decoded : DeployedAlgebraicDecode shape urs hk vk instanceCommitment ps ch aggregate aggregateU aggregateW)
     (i : Nat) (hi : i < deployedX4PairCount vk instanceCommitment ps ch)
     (m : Fin (deployedSetQueries vk instanceCommitment ps ch i).length) : CPoly :=
   coeffsToPoly ((decoded.batches.x1 i hi).coeffs m)
@@ -237,7 +237,7 @@ theorem DeployedAlgebraicDecode.memberPoly_eval_at_point [DecidableEq G] [Inhabi
     {shape : Shape} {urs : URS G} {hk : shape.k = urs.k} {vk : VerifyingKey shape Fp G} {instanceCommitment : Fin shape.numProofs → Nat → G}
     {ps : ProofString shape Fp G} {ch : Challenges shape.k Fp}
     {aggregate : Fin (2 ^ urs.k) -> Fp} {aggregateU aggregateW : Fp}
-    (decoded : DeployedAlgebraicDecode urs hk vk instanceCommitment ps ch aggregate aggregateU aggregateW)
+    (decoded : DeployedAlgebraicDecode shape urs hk vk instanceCommitment ps ch aggregate aggregateU aggregateW)
     (i : Nat) (hi : i < deployedX4PairCount vk instanceCommitment ps ch)
     (m : Fin (deployedSetQueries vk instanceCommitment ps ch i).length)
     {p : Fp} (hpt : p ∈ deployedSetPts vk instanceCommitment ps ch i) :
@@ -289,7 +289,7 @@ def DeployedAlgebraicDecode.toMemberPolynomials [DecidableEq G] [Inhabited G]
     {shape : Shape} {urs : URS G} {hk : shape.k = urs.k} {vk : VerifyingKey shape Fp G} {instanceCommitment : Fin shape.numProofs → Nat → G}
     {ps : ProofString shape Fp G} {ch : Challenges shape.k Fp}
     {aggregate : Fin (2 ^ urs.k) -> Fp} {aggregateU aggregateW : Fp}
-    (decoded : DeployedAlgebraicDecode urs hk vk instanceCommitment ps ch aggregate aggregateU aggregateW) :
+    (decoded : DeployedAlgebraicDecode shape urs hk vk instanceCommitment ps ch aggregate aggregateU aggregateW) :
     DeployedMemberPolynomials vk instanceCommitment ps ch :=
   { poly := decoded.memberPoly
     eval_at_point := decoded.memberPoly_eval_at_point }
@@ -300,7 +300,7 @@ theorem DeployedAlgebraicDecode.ipaRelation [DecidableEq G] [Inhabited G]
     {shape : Shape} {urs : URS G} {hk : shape.k = urs.k} {vk : VerifyingKey shape Fp G} {instanceCommitment : Fin shape.numProofs → Nat → G}
     {ps : ProofString shape Fp G} {ch : Challenges shape.k Fp}
     {aggregate : Fin (2 ^ urs.k) -> Fp} {aggregateU aggregateW : Fp}
-    (decoded : DeployedAlgebraicDecode urs hk vk instanceCommitment ps ch aggregate aggregateU aggregateW) :
+    (decoded : DeployedAlgebraicDecode shape urs hk vk instanceCommitment ps ch aggregate aggregateU aggregateW) :
     IpaRelation urs
       (deployedCommitment urs hk vk instanceCommitment ps ch - aggregateU • urs.u - aggregateW • urs.w)
       (evalVector urs.k ch.x3) (multiopenValue vk instanceCommitment ps ch) aggregate := by
@@ -481,7 +481,7 @@ def DeployedAlgebraicDecode.quotientEvalEqCommittedPreXOrRelationWitness
     {vk : VerifyingKey shape Fp G} {instanceCommitment : Fin shape.numProofs → Nat → G}
     {ps : ProofString shape Fp G} {ch : Challenges shape.k Fp}
     {aggregate : Fin (2 ^ urs.k) -> Fp} {aggregateU aggregateW : Fp}
-    (decoded : DeployedAlgebraicDecode urs hk vk instanceCommitment ps ch
+    (decoded : DeployedAlgebraicDecode shape urs hk vk instanceCommitment ps ch
       aggregate aggregateU aggregateW)
     (pieceCoeffs : Fin shape.numQuotientPieces -> Fin (2 ^ urs.k) -> Fp)
     (pieceU pieceW : Fin shape.numQuotientPieces -> Fp)
@@ -971,7 +971,7 @@ structure DeployedConstraintWitness [DecidableEq G] [Inhabited G] {shape : Shape
   lBlindP : CPoly
   hpolyP : CPoly
   /-- The concrete algebraic decode from which all carrier polynomials were routed. -/
-  decode : DeployedAlgebraicDecode urs hk vk instanceCommitment ps ch
+  decode : DeployedAlgebraicDecode shape urs hk vk instanceCommitment ps ch
     aggregate aggregateU aggregateW
   /-- Canonical polynomial assigned to each plain commitment. -/
   commitmentPolynomial : G → CPoly
@@ -1056,7 +1056,7 @@ def deployedConstraintOutcomeOfDecode
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → Nat → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
     {aggregate : Fin (2 ^ urs.k) -> Fp} {aggregateU aggregateW : Fp}
-    (decoded : DeployedAlgebraicDecode urs hk vk instanceCommitment ps ch aggregate aggregateU aggregateW)
+    (decoded : DeployedAlgebraicDecode shape urs hk vk instanceCommitment ps ch aggregate aggregateU aggregateW)
     (poly : G -> CPoly)
     (pieceCoeffs : Fin shape.numQuotientPieces -> Fin (2 ^ urs.k) -> Fp)
     (pieceU pieceW : Fin shape.numQuotientPieces -> Fp)
@@ -1429,7 +1429,7 @@ theorem constraints_supply_of_deployedAlgebraicDecode
     (instanceCommitment : Fin shape.numProofs → Nat → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
     {aggregate : Fin (2 ^ urs.k) -> Fp} {aggregateU aggregateW : Fp}
-    (decoded : DeployedAlgebraicDecode urs hk vk instanceCommitment ps ch
+    (decoded : DeployedAlgebraicDecode shape urs hk vk instanceCommitment ps ch
       aggregate aggregateU aggregateW)
     (poly : G -> CPoly)
     (pieceCoeffs : Fin shape.numQuotientPieces -> Fin (2 ^ urs.k) -> Fp)

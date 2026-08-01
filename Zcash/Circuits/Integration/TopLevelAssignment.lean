@@ -91,10 +91,10 @@ theorem domainRowsInjective_of_domainExponent_eq
 evaluation-domain row names. -/
 theorem toVerifierKey_domainRowsInjective
     {G : Type} [AddCommGroup G] [Inhabited G]
-    (pp : Keygen.ProofParams) (urs : URS G)
+    (urs : URS G)
     (hbound : top.domainExponent < 33) :
-    Function.Injective fun row : Fin (top.toVerifierKey pp urs).n =>
-      (top.toVerifierKey pp urs).omega ^ (row : ℕ) := by
+    Function.Injective fun row : Fin (top.toVerifierKey urs).n =>
+      (top.toVerifierKey urs).omega ^ (row : ℕ) := by
   simpa only [top.toVerifierKey_n, top.toVerifierKey_omega] using
     domainRowsInjective (top := top) hbound
 
@@ -102,10 +102,10 @@ theorem toVerifierKey_domainRowsInjective
 evaluation-domain root. -/
 theorem toVerifierKey_domainRoot
     {G : Type} [AddCommGroup G] [Inhabited G]
-    (pp : Keygen.ProofParams) (urs : URS G)
+    (urs : URS G)
     (hbound : top.domainExponent < 33) :
-    (top.toVerifierKey pp urs).omega ^
-        (top.toVerifierKey pp urs).n = 1 := by
+    (top.toVerifierKey urs).omega ^
+        (top.toVerifierKey urs).n = 1 := by
   simpa only [top.toVerifierKey_n, top.toVerifierKey_omega] using
     domainRoot (top := top) hbound
 
@@ -169,13 +169,13 @@ circuit-owned environment built from the corresponding proof assignment.
 -/
 theorem resolverEnvironment_eq_environment
     {G : Type} [AddCommGroup G] [Inhabited G]
-    (pp : Keygen.ProofParams) (urs : URS G)
+    (pp : ProofParams) (urs : URS G)
     {proofIndex : Fin pp.numProofs}
     (assignment :
       TopLevelAssignment top pp.numProofs proofIndex)
     (hfixed : assignment.FixedColumnEncoding) :
     resolverEnvironment
-        (top.toVerifierKey pp urs) assignment.polynomial proofIndex
+        (top.toVerifierKey urs) assignment.polynomial proofIndex
         (top.usableRowsAt top.domainExponent) =
       assignment.environment := by
   apply congrArg₂ Environment.mk

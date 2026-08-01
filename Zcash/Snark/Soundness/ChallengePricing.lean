@@ -328,7 +328,7 @@ theorem lookup_beta_failure_measure_le (a s inp tbl : Multiset Fp) :
 /-- The complete `γ` exclusion for one deployed lookup: the product-difference roots together
 with the table-column zero factors used to eliminate the residual running-product branch. -/
 def resolverLookupGammaBadSet
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) : Finset Fp :=
@@ -340,7 +340,7 @@ def resolverLookupGammaBadSet
 the product difference together with the input-column zero factors. There are at most `u + 2`
 coefficients because the `γ` degree is at most `u + 1`. -/
 def resolverLookupBetaBadSet
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) : Finset Fp :=
@@ -352,7 +352,7 @@ def resolverLookupBetaBadSet
 /-- Avoiding the two finite bad sets supplies exactly the four challenge facts consumed by one
 resolver-backed lookup endpoint. -/
 theorem ResolverLookupGoodChallenges.ofBadSets
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) (u : ℕ)
@@ -382,7 +382,7 @@ theorem ResolverLookupGoodChallenges.ofBadSets
 /-- One deployed lookup's full `γ` exclusion costs at most two values per participating row: one
 for multiset recovery and one for the table-column zero factor. -/
 theorem resolverLookupGammaBadSet_card_le
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) :
@@ -427,7 +427,7 @@ theorem resolverLookupGammaBadSet_card_le
 /-- Uniform `γ` hits one deployed lookup's complete bad set with probability at most two values
 per participating row over the scalar-field size. -/
 theorem uniformChallenge_resolverLookupGammaBadSet
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) :
@@ -441,7 +441,7 @@ theorem uniformChallenge_resolverLookupGammaBadSet
 /-- One deployed lookup's full `β` exclusion costs at most
 `(u + 2)·(u + 1) + (u + 1) = (u + 3)·(u + 1)` challenge values. -/
 theorem resolverLookupBetaBadSet_card_le
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) :
@@ -494,7 +494,7 @@ theorem resolverLookupBetaBadSet_card_le
 /-- Uniform `β` hits one deployed lookup's complete coefficient/zero-factor bad set with the
 corresponding root-count probability. -/
 theorem uniformChallenge_resolverLookupBetaBadSet
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) :
@@ -509,7 +509,7 @@ theorem uniformChallenge_resolverLookupBetaBadSet
 /-- The union of all lookup `γ` exclusions in one proof bundle. The challenge is shared by every
 proof and lookup argument, so this is the event the transcript squeeze must avoid. -/
 def allResolverLookupGammaBadSet
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (numProofs : ℕ) (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly) (u : ℕ) : Finset Fp :=
   (Finset.univ : Finset (Fin numProofs × Fin shape.numLookups)).biUnion fun q =>
@@ -517,7 +517,7 @@ def allResolverLookupGammaBadSet
 
 /-- The union of all lookup `β` exclusions in one proof bundle. -/
 def allResolverLookupBetaBadSet
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (numProofs : ℕ) (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly) (u : ℕ) : Finset Fp :=
   (Finset.univ : Finset (Fin numProofs × Fin shape.numLookups)).biUnion fun q =>
@@ -526,7 +526,7 @@ def allResolverLookupBetaBadSet
 /-- Avoiding the bundle-wide lookup bad sets supplies the good-challenge record for every proof
 and every deployed lookup argument. -/
 theorem resolverLookupGoodChallenges_of_not_mem
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (numProofs : ℕ) (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly) (u : ℕ)
     (hgamma : ch.gamma ∉ allResolverLookupGammaBadSet numProofs vk ch poly u)
@@ -545,7 +545,7 @@ theorem resolverLookupGoodChallenges_of_not_mem
 /-- Compute one lookup good-challenge package from finite point tests.  As with the permutation
 adapter, the specification-level root sets appear only in erased proofs. -/
 def resolverLookupGoodChallenges?
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) :
@@ -593,7 +593,7 @@ def resolverLookupGoodChallenges?
 
 /-- Executable bundle-wide lookup `β`/`γ` exclusions. -/
 def resolverLookupBundleExclusions?
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (numProofs : ℕ) (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly) (u : ℕ) :
     Option (PLift ((ch.gamma ∉ allResolverLookupGammaBadSet numProofs vk ch poly u) ∧
@@ -617,7 +617,7 @@ def resolverLookupBundleExclusions?
         · exact (good q.1 q.2).down.inputNonzero hzero⟩⟩
 
 theorem resolverLookupGoodChallenges?_isSome_of
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) (u : ℕ)
@@ -655,7 +655,7 @@ theorem resolverLookupGoodChallenges?_isSome_of
   rfl
 
 theorem resolverLookupBundleExclusions?_isSome_of
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (numProofs : ℕ) (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly) (u : ℕ)
     (hgamma : ch.gamma ∉ allResolverLookupGammaBadSet numProofs vk ch poly u)
@@ -680,7 +680,7 @@ theorem resolverLookupBundleExclusions?_isSome_of
 /-- The bundle-wide lookup `γ` surface is the number of proof/lookup pairs times the per-argument
 two-values-per-row budget. -/
 theorem uniformChallenge_allResolverLookupGammaBadSet
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (numProofs : ℕ) (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly) (u : ℕ) :
     uniformChallenge.toOuterMeasure
@@ -704,7 +704,7 @@ theorem uniformChallenge_allResolverLookupGammaBadSet
 /-- The bundle-wide lookup `β` surface is the number of proof/lookup pairs times the
 coefficient-and-zero-factor budget for one argument. -/
 theorem uniformChallenge_allResolverLookupBetaBadSet
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (numProofs : ℕ) (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly) (u : ℕ) :
     uniformChallenge.toOuterMeasure
@@ -863,10 +863,10 @@ theorem card_chunkedCellPairs_eq_fintypeCard
 /-- The finite `β` exclusion for one resolver-backed permutation argument.  There is one
 coefficient root set for each potentially nonzero coefficient of `pairProdDiff`. -/
 def resolverPermutationBetaBadSet
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly)
-    (p : Fin shape.numProofs) (m : ℕ) : Finset Fp :=
+    (p : Fin numProofs) (m : ℕ) : Finset Fp :=
   (Finset.range (Fintype.card (ResolverPermutationCell vk poly p m) + 1)).biUnion fun j =>
     szBadSet (pairProdDiffCoeff
       (chunkedCellPairs shape.numPermutationSets m
@@ -881,10 +881,10 @@ def resolverPermutationBetaBadSet
 /-- Avoiding the two per-proof bad sets supplies exactly the good-challenge record consumed by
 the resolver permutation endpoint. -/
 theorem ResolverPermutationGoodChallenges.ofBadSets
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
-    (p : Fin shape.numProofs) (m : ℕ)
+    (p : Fin numProofs) (m : ℕ)
     (hgamma : ch.gamma ∉ resolverPermutationGammaBadSet vk ch poly p m)
     (hbeta : ch.beta ∉ resolverPermutationBetaBadSet vk poly p m) :
     ResolverPermutationGoodChallenges vk ch poly p m where
@@ -930,40 +930,44 @@ theorem ResolverPermutationGoodChallenges.ofBadSets
 
 /-- The union of all resolver permutation `γ` exclusions in one proof bundle. -/
 def allResolverPermutationGammaBadSet
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
+    (numProofs : ℕ)
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly) (m : ℕ) : Finset Fp :=
-  (Finset.univ : Finset (Fin shape.numProofs)).biUnion fun p =>
+  (Finset.univ : Finset (Fin numProofs)).biUnion fun p =>
     resolverPermutationGammaBadSet vk ch poly p m
 
 /-- The union of all resolver permutation `β` exclusions in one proof bundle. -/
 def allResolverPermutationBetaBadSet
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
+    (numProofs : ℕ)
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly) (m : ℕ) : Finset Fp :=
-  (Finset.univ : Finset (Fin shape.numProofs)).biUnion fun p =>
+  (Finset.univ : Finset (Fin numProofs)).biUnion fun p =>
     resolverPermutationBetaBadSet vk poly p m
 
 /-- Bundle-wide permutation challenge exclusions at one active-row boundary.
 This is the verifier-native package consumed by circuit integrations. -/
 structure ResolverPermutationChallengeExclusions
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
+    (numProofs : ℕ)
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly) (m : ℕ) : Prop where
   gamma :
-    ch.gamma ∉ allResolverPermutationGammaBadSet vk ch poly m
+    ch.gamma ∉ allResolverPermutationGammaBadSet numProofs vk ch poly m
   beta :
-    ch.beta ∉ allResolverPermutationBetaBadSet vk poly m
+    ch.beta ∉ allResolverPermutationBetaBadSet numProofs vk poly m
 
 /-- Avoiding the bundle-wide permutation bad sets supplies the good-challenge record for every
 proof. -/
 theorem resolverPermutationGoodChallenges_of_not_mem
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
+    (numProofs : ℕ)
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly) (m : ℕ)
-    (hgamma : ch.gamma ∉ allResolverPermutationGammaBadSet vk ch poly m)
-    (hbeta : ch.beta ∉ allResolverPermutationBetaBadSet vk poly m) :
-    ∀ p : Fin shape.numProofs,
+    (hgamma : ch.gamma ∉ allResolverPermutationGammaBadSet numProofs vk ch poly m)
+    (hbeta : ch.beta ∉ allResolverPermutationBetaBadSet numProofs vk poly m) :
+    ∀ p : Fin numProofs,
       ResolverPermutationGoodChallenges vk ch poly p m := by
   intro p
   apply ResolverPermutationGoodChallenges.ofBadSets
@@ -977,23 +981,23 @@ theorem resolverPermutationGoodChallenges_of_not_mem
 /-- A bundle exclusion package supplies the per-proof record used by the
 permutation semantic endpoint. -/
 theorem ResolverPermutationChallengeExclusions.good
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     {vk : VerifyingKey shape Fp G} {ch : Challenges shape.k Fp}
     {poly : CommitmentId → CPoly} {m : ℕ}
     (exclusions :
-      ResolverPermutationChallengeExclusions vk ch poly m) :
-    ∀ p : Fin shape.numProofs,
+      ResolverPermutationChallengeExclusions numProofs vk ch poly m) :
+    ∀ p : Fin numProofs,
       ResolverPermutationGoodChallenges vk ch poly p m :=
   resolverPermutationGoodChallenges_of_not_mem
-    vk ch poly m exclusions.gamma exclusions.beta
+    numProofs vk ch poly m exclusions.gamma exclusions.beta
 
 /-- Compute one permutation good-challenge package using point evaluations and finite factor
 checks.  Root sets occur only in the erased certificate; no root enumeration is performed. -/
 def resolverPermutationGoodChallenges?
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
-    (p : Fin shape.numProofs) (m : ℕ) :
+    (p : Fin numProofs) (m : ℕ) :
     Option (PLift (ResolverPermutationGoodChallenges vk ch poly p m)) := by
   let source :=
     chunkedCellPairs shape.numPermutationSets m
@@ -1054,11 +1058,12 @@ def resolverPermutationGoodChallenges?
 
 /-- Bundle-wide executable permutation exclusions, obtained by traversing every proof. -/
 def resolverPermutationChallengeExclusions?
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
+    (numProofs : ℕ)
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly) (m : ℕ) :
-    Option (PLift (ResolverPermutationChallengeExclusions vk ch poly m)) :=
-  match finForallOption (fun p : Fin shape.numProofs =>
+    Option (PLift (ResolverPermutationChallengeExclusions numProofs vk ch poly m)) :=
+  match finForallOption (fun p : Fin numProofs =>
       resolverPermutationGoodChallenges? vk ch poly p m) with
   | none => none
   | some good => some ⟨
@@ -1074,10 +1079,10 @@ def resolverPermutationChallengeExclusions?
           exact (good p).down.beta j hj }⟩
 
 theorem resolverPermutationGoodChallenges?_isSome_of
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
-    (p : Fin shape.numProofs) (m : ℕ)
+    (p : Fin numProofs) (m : ℕ)
     (hgood : ResolverPermutationGoodChallenges vk ch poly p m) :
     (resolverPermutationGoodChallenges? vk ch poly p m).isSome := by
   have hroot : ch.gamma ∉ szBadSet
@@ -1131,29 +1136,30 @@ theorem resolverPermutationGoodChallenges?_isSome_of
   rfl
 
 theorem resolverPermutationChallengeExclusions?_isSome_of
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
+    (numProofs : ℕ)
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly) (m : ℕ)
-    (hexclusions : ResolverPermutationChallengeExclusions vk ch poly m) :
-    (resolverPermutationChallengeExclusions? vk ch poly m).isSome := by
-  have hall : ∀ p : Fin shape.numProofs,
+    (hexclusions : ResolverPermutationChallengeExclusions numProofs vk ch poly m) :
+    (resolverPermutationChallengeExclusions? numProofs vk ch poly m).isSome := by
+  have hall : ∀ p : Fin numProofs,
       (resolverPermutationGoodChallenges? vk ch poly p m).isSome :=
     fun p => resolverPermutationGoodChallenges?_isSome_of vk ch poly p m
       (hexclusions.good p)
   obtain ⟨good, hgood⟩ := Option.isSome_iff_exists.mp
     (finForallOption_isSome_of _ hall)
   unfold resolverPermutationChallengeExclusions?
-  generalize hresult : finForallOption (fun p : Fin shape.numProofs =>
+  generalize hresult : finForallOption (fun p : Fin numProofs =>
       resolverPermutationGoodChallenges? vk ch poly p m) = result at hgood ⊢
   cases result <;> simp_all
 
 /-- One resolver permutation `γ` exclusion costs at most two challenge values per active
 permutation cell: one for multiset recovery and one for source-factor nonvanishing. -/
 theorem resolverPermutationGammaBadSet_card_le
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
-    (p : Fin shape.numProofs) (m : ℕ) :
+    (p : Fin numProofs) (m : ℕ) :
     (resolverPermutationGammaBadSet vk ch poly p m).card ≤
       2 * Fintype.card (ResolverPermutationCell vk poly p m) := by
   let source :=
@@ -1200,10 +1206,10 @@ theorem resolverPermutationGammaBadSet_card_le
 /-- One resolver permutation `β` exclusion costs at most `(d + 1)·d`, where `d` is the number
 of active permutation cells. -/
 theorem resolverPermutationBetaBadSet_card_le
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly)
-    (p : Fin shape.numProofs) (m : ℕ) :
+    (p : Fin numProofs) (m : ℕ) :
     (resolverPermutationBetaBadSet vk poly p m).card ≤
       (Fintype.card (ResolverPermutationCell vk poly p m) + 1) *
         Fintype.card (ResolverPermutationCell vk poly p m) := by
@@ -1249,39 +1255,41 @@ theorem resolverPermutationBetaBadSet_card_le
 /-- The bundle-wide permutation `γ` surface is bounded by the sum of the per-proof active-cell
 budgets. -/
 theorem uniformChallenge_allResolverPermutationGammaBadSet
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
+    (numProofs : ℕ)
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly) (m : ℕ) :
     uniformChallenge.toOuterMeasure
-        (allResolverPermutationGammaBadSet vk ch poly m)
-      ≤ (∑ p : Fin shape.numProofs,
+        (allResolverPermutationGammaBadSet numProofs vk ch poly m)
+      ≤ (∑ p : Fin numProofs,
           (2 * Fintype.card (ResolverPermutationCell vk poly p m) : ℕ)) /
         (Fintype.card Fp : ℝ≥0∞) := by
   rw [uniformChallenge_badSet]
   gcongr
   rw [allResolverPermutationGammaBadSet]
   calc
-    ((Finset.univ : Finset (Fin shape.numProofs)).biUnion fun p =>
+    ((Finset.univ : Finset (Fin numProofs)).biUnion fun p =>
         resolverPermutationGammaBadSet vk ch poly p m).card
-      ≤ ∑ p ∈ (Finset.univ : Finset (Fin shape.numProofs)),
+      ≤ ∑ p ∈ (Finset.univ : Finset (Fin numProofs)),
           (resolverPermutationGammaBadSet vk ch poly p m).card :=
         Finset.card_biUnion_le
-    _ ≤ ∑ p ∈ (Finset.univ : Finset (Fin shape.numProofs)),
+    _ ≤ ∑ p ∈ (Finset.univ : Finset (Fin numProofs)),
           2 * Fintype.card (ResolverPermutationCell vk poly p m) :=
         Finset.sum_le_sum fun p _ =>
           resolverPermutationGammaBadSet_card_le vk ch poly p m
-    _ = ∑ p : Fin shape.numProofs,
+    _ = ∑ p : Fin numProofs,
           2 * Fintype.card (ResolverPermutationCell vk poly p m) := by simp
 
 /-- The bundle-wide permutation `β` surface is bounded by the sum of the per-proof coefficient
 budgets. -/
 theorem uniformChallenge_allResolverPermutationBetaBadSet
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
+    (numProofs : ℕ)
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly) (m : ℕ) :
     uniformChallenge.toOuterMeasure
-        (allResolverPermutationBetaBadSet vk poly m)
-      ≤ (∑ p : Fin shape.numProofs,
+        (allResolverPermutationBetaBadSet numProofs vk poly m)
+      ≤ (∑ p : Fin numProofs,
           ((Fintype.card (ResolverPermutationCell vk poly p m) + 1) *
             Fintype.card (ResolverPermutationCell vk poly p m) : ℕ)) /
         (Fintype.card Fp : ℝ≥0∞) := by
@@ -1289,17 +1297,17 @@ theorem uniformChallenge_allResolverPermutationBetaBadSet
   gcongr
   rw [allResolverPermutationBetaBadSet]
   calc
-    ((Finset.univ : Finset (Fin shape.numProofs)).biUnion fun p =>
+    ((Finset.univ : Finset (Fin numProofs)).biUnion fun p =>
         resolverPermutationBetaBadSet vk poly p m).card
-      ≤ ∑ p ∈ (Finset.univ : Finset (Fin shape.numProofs)),
+      ≤ ∑ p ∈ (Finset.univ : Finset (Fin numProofs)),
           (resolverPermutationBetaBadSet vk poly p m).card :=
         Finset.card_biUnion_le
-    _ ≤ ∑ p ∈ (Finset.univ : Finset (Fin shape.numProofs)),
+    _ ≤ ∑ p ∈ (Finset.univ : Finset (Fin numProofs)),
           (Fintype.card (ResolverPermutationCell vk poly p m) + 1) *
             Fintype.card (ResolverPermutationCell vk poly p m) :=
         Finset.sum_le_sum fun p _ =>
           resolverPermutationBetaBadSet_card_le vk poly p m
-    _ = ∑ p : Fin shape.numProofs,
+    _ = ∑ p : Fin numProofs,
           (Fintype.card (ResolverPermutationCell vk poly p m) + 1) *
             Fintype.card (ResolverPermutationCell vk poly p m) := by simp
 

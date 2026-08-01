@@ -177,7 +177,7 @@ theorem polynomialEnvironment_query_instance
 /-- The canonical Clean environment selected by a commitment-ID polynomial resolver for one
 sub-proof. -/
 def resolverEnvironment
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (usableRows : ℕ) :
@@ -188,7 +188,7 @@ def resolverEnvironment
     (fun column => poly (.instanceCol p column))
 
 @[simp] theorem resolverEnvironment_fixed
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (usableRows : ℕ)
@@ -197,7 +197,7 @@ def resolverEnvironment
       (poly (.fixedCol column.index)).eval (vk.omega ^ row) := rfl
 
 @[simp] theorem resolverEnvironment_advice
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (usableRows : ℕ)
@@ -206,7 +206,7 @@ def resolverEnvironment
       (poly (.adviceCol p column.index)).eval (vk.omega ^ row) := rfl
 
 @[simp] theorem resolverEnvironment_instance
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (usableRows : ℕ)
@@ -219,7 +219,7 @@ Once commitment binding identifies a resolved instance column with its canonical
 zero-padded row polynomial, the Clean environment reads the supplied public values.
 -/
 theorem resolverEnvironment_instance_of_rowPolynomial
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (usableRows : ℕ)
@@ -245,7 +245,7 @@ def circuitSatViaOperations
 
 /-- Full circuit satisfaction through witness-indexed commitment-ID polynomial resolvers. -/
 def circuitSatViaResolverOperations
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (decodePoly :
       (Fin (2 ^ shape.k) → Fp) → CommitmentId → CPoly)

@@ -19,7 +19,7 @@ attribute [local irreducible] deployedSetQueries deployedX4PairCount x4BatchComm
   x4BatchEvals deployedSetMemberCommitments
 
 /-- The concrete output of rewind-free deployed value decoding. -/
-structure DeployedAlgebraicDecode [DecidableEq G] [Inhabited G] {shape : Shape}
+structure DeployedAlgebraicDecode [DecidableEq G] [Inhabited G] (shape : Shape)
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → Nat → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
@@ -49,7 +49,7 @@ def deployedAlgebraicDecode_of_good_roots [DecidableEq G] [Inhabited G]
     (hgood2 : ch.x2 ∉ deployedX2RootSet urs hk vk instanceCommitment ps ch batches)
     (hgood1 : forall i, i < deployedX4PairCount vk instanceCommitment ps ch ->
       ch.x1 ∉ deployedX1RootSet urs hk vk instanceCommitment ps ch batches i) :
-    DeployedAlgebraicDecode urs hk vk instanceCommitment ps ch aggregate aggregateU aggregateW := by
+    DeployedAlgebraicDecode shape urs hk vk instanceCommitment ps ch aggregate aggregateU aggregateW := by
   have hx4 : ch.x4 ∉ szBadSet
       (algebraicBatchErrorPolynomial (evalVector urs.k ch.x3)
         batches.x4.coeffs (x4BatchEvals vk instanceCommitment ps ch)) := by
