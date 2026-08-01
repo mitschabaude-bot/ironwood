@@ -15,7 +15,7 @@ There are currently 22 Action-specific computations on the live integration path
 That number understates the architectural debt:
 
 * `ActionGateCoherence.gateData_eq` bundles two independent facts;
-* the VK-match bundle contains two further non-capture wellformedness checks; and
+* the original VK-match bundle contained two further non-capture wellformedness checks; and
 * `ConstraintSystem.closeWithOperations` silently repairs one further missing
   configure/synthesis fact without proving that the repair is inactive.
 
@@ -152,7 +152,7 @@ The subsequent keygen-lawfulness work also closes **#12a**, **#12b**, **#25**, a
 | # | Current location or hidden behavior | Class | Structural replacement | Expected difficulty |
 |---:|---|:---:|---|---|
 | 24 | `action_queriedCells_wellFormed` in the VK-match bundle | L | Gate/lookup query declarations consist only of valid query atoms and match expression support. This belongs in argument lawfulness, not in a concrete capture. | Easy–medium |
-| 25 | `action_gates_selectorsCovered` in the VK-match bundle, currently replaced by the Action-specific `Action/SelectorCoherence.lean` sidecar | L | Move gate-selector allocation into the `FormalCircuit` lawfulness package or enforce it through the configure API. The existing compositional proof can discharge that packaged law during migration; selector-compression coverage then follows from a generic compiler theorem. | Medium |
+| 25 | `action_gates_selectorsCovered` in the VK-match bundle, formerly replaced by the Action-specific `Action/SelectorCoherence.lean` sidecar | L | Move gate-selector allocation into the `FormalCircuit` lawfulness package or enforce it through the configure API. The existing compositional proof can discharge that packaged law during migration; selector-compression coverage then follows from a generic compiler theorem. | Medium |
 | 26 | lookup component of closure inactivity | L | Every synthesis-enabled lookup is present in the raw configure lookup list. This is currently repaired by `closeWithOperations` and is not directly proved for Action. | Medium |
 
 Together with rows 12a and 12b, these bring the inventory to 26 atomic obligations.
@@ -164,6 +164,7 @@ correctness of the formal-circuit/keygen interface, not only the minimum imports
 terminal theorem.
 
 The former `Action/SelectorCoherence.lean` sidecar has been deleted. Its 1,448 lines
+and the duplicate `action_gates_selectorsCovered` computation in the VK-match bundle
 were replaced by the packaged selector-allocation law and compositional proofs carried
 by the formal circuits themselves.
 
