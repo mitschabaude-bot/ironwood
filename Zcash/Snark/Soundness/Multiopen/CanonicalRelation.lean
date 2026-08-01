@@ -41,7 +41,7 @@ theorem canonicalRoutingConditions_of_accepts
     (ps : ProofString shape Fp G)
     (ch : Challenges shape.k Fp)
     (haccepts :
-      DeployedAccepts urs hk vk instanceCommitment ps ch) :
+      DeployedAccepts shape urs hk vk instanceCommitment ps ch) :
     deployedX4PairCount
         (instanceCommitment := instanceCommitment)
         vk ps ch =
@@ -111,7 +111,8 @@ structure CanonicalMemberConstraintRelation
       decodedPolynomialResolver
         (instanceCommitment := instanceCommitment)
         urs hk vk ps ch memberDecode route
-    let model := vk.constraintModel ch poly hblinding
+    let model := vk.constraintModel
+      (numProofs := shape.numProofs) ch poly hblinding
     model.CircuitSat y hpoly deg a
 
 namespace CanonicalMemberConstraintRelation
@@ -146,7 +147,7 @@ variable
 /-- The canonical commitment-ID route selected by an accepting verifier run. -/
 def acceptedRoute
     (haccepts :
-      DeployedAccepts urs hk vk instanceCommitment ps ch) :
+      DeployedAccepts shape urs hk vk instanceCommitment ps ch) :
     CommitmentId →
       Option (DeployedMemberSlot
         (instanceCommitment := instanceCommitment)
@@ -161,7 +162,7 @@ def acceptedRoute
 /-- Decoded member polynomials routed by the accepting assembler. -/
 def acceptedPolynomial
     (haccepts :
-      DeployedAccepts urs hk vk instanceCommitment ps ch) :
+      DeployedAccepts shape urs hk vk instanceCommitment ps ch) :
     CommitmentId → CPoly :=
   decodedPolynomialResolver
     (instanceCommitment := instanceCommitment)
@@ -176,7 +177,7 @@ canonical constraint terminal; no caller-selected route or resolver remains.
 -/
 def acceptedPolynomial_opens_or_relation
     (haccepts :
-      DeployedAccepts urs hk vk instanceCommitment ps ch)
+      DeployedAccepts shape urs hk vk instanceCommitment ps ch)
     (hbind : ∀
       (slot : DeployedMemberSlot
         (instanceCommitment := instanceCommitment) vk ps ch)
@@ -216,9 +217,9 @@ def acceptedPolynomial_opens_or_relation
 /-- The complete constraint model canonically determined by an accepting run. -/
 def acceptedModel
     (haccepts :
-      DeployedAccepts urs hk vk instanceCommitment ps ch) :
+      DeployedAccepts shape urs hk vk instanceCommitment ps ch) :
     ConstraintPolyModel shape.numProofs :=
-  vk.constraintModel ch
+  vk.constraintModel (numProofs := shape.numProofs) ch
     (acceptedPolynomial
       (memberDecode := memberDecode) haccepts)
     hblinding
@@ -230,7 +231,7 @@ polynomial family is supplied independently.
 -/
 def ofAcceptedCircuitSat
     (haccepts :
-      DeployedAccepts urs hk vk instanceCommitment ps ch)
+      DeployedAccepts shape urs hk vk instanceCommitment ps ch)
     (hsatisfied :
       (acceptedModel
         (memberDecode := memberDecode)
@@ -247,7 +248,7 @@ def ofAcceptedCircuitSat
       noDuplicateQueries := routing.2
       satisfiesCircuit := ?_ }
   change
-    (vk.constraintModel ch
+    (vk.constraintModel (numProofs := shape.numProofs) ch
       (decodedPolynomialResolver
         (instanceCommitment := instanceCommitment)
         urs hk vk ps ch memberDecode
@@ -287,7 +288,8 @@ def model
       urs hk vk instanceCommitment ps ch pU pW a
       batchOpenings memberDecode hblinding y hpoly deg) :
     ConstraintPolyModel shape.numProofs :=
-  vk.constraintModel ch relation.polynomial hblinding
+  vk.constraintModel (numProofs := shape.numProofs)
+    ch relation.polynomial hblinding
 
 /--
 A good folding challenge splits the canonical bundle-wide identity into the exact

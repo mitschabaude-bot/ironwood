@@ -28,7 +28,7 @@ variable {G : Type*} [AddCommGroup G] [Module Fp G]
 -- concrete Orchard statement and proving `hencodes`. The deployed Action key is separately derived
 -- and certified against the capture by `Keygen/Certificate.lean`; only the capture's Rust provenance
 -- remains an input-side boundary. The semantic bridge described here remains open.
-def DeployedAccepts [DecidableEq G] [Inhabited G] {shape : Shape} (urs : URS G)
+def DeployedAccepts [DecidableEq G] [Inhabited G] (shape : Shape) (urs : URS G)
     (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → ℕ → G) (ps : ProofString shape Fp G)
     (ch : Challenges shape.k Fp) : Prop :=
   match assemble? vk instanceCommitment ps ch with
@@ -49,7 +49,7 @@ theorem eval_cast {shape : Shape} {urs : URS G} (hk : shape.k = urs.k) (m : Msm 
 /-- Deployed acceptance implies halo2's explicit IPA verifier equation. -/
 theorem deployedAccepts_verifierEq [DecidableEq G] [Inhabited G] {shape : Shape}
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G) (instanceCommitment : Fin shape.numProofs → ℕ → G) (ps : ProofString shape Fp G)
-    (ch : Challenges shape.k Fp) (h : DeployedAccepts urs hk vk instanceCommitment ps ch) :
+    (ch : Challenges shape.k Fp) (h : DeployedAccepts shape urs hk vk instanceCommitment ps ch) :
     DeployedIpaVerifierEq (hk ▸ urs.g) urs.w urs.u vk instanceCommitment ps ch := by
   unfold DeployedAccepts at h
   cases hm : assemble? vk instanceCommitment ps ch with

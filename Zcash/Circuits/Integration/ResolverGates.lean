@@ -118,7 +118,7 @@ theorem selectorScale_ne_zero_of_enabledGate
 
 /-- The polynomial obtained by evaluating one VK gate over the rotated resolver feeds. -/
 def resolverGatePolynomial
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly)
     (proofIndex : ℕ)
@@ -129,7 +129,7 @@ def resolverGatePolynomial
     (instanceQueryFeedOfResolver vk poly proofIndex)
 
 theorem resolverGatePolynomial_eq
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly)
     (proofIndex : ℕ)
@@ -154,7 +154,7 @@ private theorem eval_map_C
 
 /-- Evaluating a lifted resolver gate is evaluation of the VK expression's feeds. -/
 theorem resolverGatePolynomial_eval
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly)
     (proofIndex : ℕ)
@@ -176,7 +176,7 @@ theorem resolverGatePolynomial_eval
 
 /-- The selected lifted VK gate occurs in the resolver model's gate family. -/
 theorem resolverGatePolynomial_mem
-    {shape : Shape} {numProofs k : ℕ} {G : Type*}
+    {shape : CircuitShape} {numProofs k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
@@ -208,7 +208,7 @@ The premises are exactly the static representation boundary:
 No circuit, placement algorithm, or concrete verification key is selected here.
 -/
 def enabledGatePolynomialWitnessOfResolver
-    {shape : Shape} {numProofs k : ℕ} {G : Type*}
+    {shape : CircuitShape} {numProofs k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (cs : ConstraintSystem Fp) (map : SelCompressMap)
     (ch : Challenges k Fp)

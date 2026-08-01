@@ -34,7 +34,7 @@ structure DeployedRootDecodeWitness (family : ComputedDeployedRootFSFamily shape
   batchWitness : DeployedBatchWitness family.toFamily basis
     (deployedRootRunOutput family basis coins)
   outcome_eq : family.outcome basis coins = PSum.inl batchWitness
-  decoded : DeployedAlgebraicDecode (ursOfAugmentedBasis shape.k basis) rfl
+  decoded : DeployedAlgebraicDecode shape (ursOfAugmentedBasis shape.k basis) rfl
     (family.vk basis) (family.instanceCommitment basis)
     (deployedRootRunOutput family basis coins).1.proof.1
     (wrappedPreIpaRecord (deployedRootRunOutput family basis coins))

@@ -22,7 +22,7 @@ open scoped ENNReal
 local instance vestaInhabitedStraightLineActionEvent : Inhabited VestaG := ⟨0⟩
 
 variable (pp : ProofParams)
-  (family : ComputedStraightLineDeployedFSFamily (pp.mergeDerived actionCircuit))
+  (family : ComputedStraightLineDeployedFSFamily (actionCircuit.shape.withProofParams pp))
   (static : DeployedConstraintStaticChecks family.toRootFamily)
   (inputs : Fin pp.numProofs → PublicInputs Fp)
 
@@ -30,39 +30,37 @@ variable (pp : ProofParams)
 data is represented separately by `actionTerminalRelationEvent` and priced through the executable
 relation finder. -/
 def actionBundleStatementDecoded :
-    (AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG) →
+    (AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG) →
     (BTranscript Fp VestaG
-      (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-        + 3 * (pp.mergeDerived actionCircuit).k) → Fp) → Prop :=
+      (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+        + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp) → Prop :=
   fun _ _ => BundleStatement inputs
 
 /-- Runs on which an executable Action-terminal finder returns explicit augmented-basis relation
 coefficients.  The finder, not propositional relation existence, is the DLOG-priced event. -/
 def actionTerminalRelationEvent
     (finder :
-      (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG) →
+      (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG) →
       (BTranscript Fp VestaG
-        (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-          + 3 * (pp.mergeDerived actionCircuit).k) → Fp) →
+        (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+          + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp) →
       Option (AlgebraicRelationWitness (F := Fp) basis)) :
-    Set ((AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG) ×
+    Set ((AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG) ×
       (BTranscript Fp VestaG
-        (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-          + 3 * (pp.mergeDerived actionCircuit).k) → Fp)) :=
+        (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+          + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp)) :=
   {q | (finder q.1 q.2).isSome}
 
 variable
   (hvk : ∀ basis, family.vk basis =
-    actionCircuit.toVerifierKey pp
-      (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
+    actionCircuit.toVerifierKey
+      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
   (hI : ∀ basis, family.instanceCommitment basis =
-    actionCircuit.instanceCommitmentForShape pp
-      (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) inputs)
+    actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
   (hchar : ∀ basis O, deployedX4PairCount
-    (actionCircuit.toVerifierKey pp
-      (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
-    (actionCircuit.instanceCommitmentForShape pp
-      (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) inputs)
+    (actionCircuit.toVerifierKey
+      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
+    (actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
     (straightLineRunOutput family basis O).1.proof.1
     (straightLineRunRecord family basis O) < scalarFieldOrder)
 
@@ -70,10 +68,10 @@ variable
 accepts, but the executable projection of the shared terminal outcome returns no private Action
 witness bundle. -/
 def actionKnowledgeFailureEvent :
-    Set ((AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG) ×
+    Set ((AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG) ×
       (BTranscript Fp VestaG
-        (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-          + 3 * (pp.mergeDerived actionCircuit).k) → Fp)) :=
+        (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+          + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp)) :=
   {q | fsWinsFull (family.adversary q.1)
       (fullAlgebraicAcceptDeployed q.1 (family.vk q.1)
         (family.instanceCommitment q.1))
@@ -82,25 +80,25 @@ def actionKnowledgeFailureEvent :
 
 /-- The accepted constraint model at the run's own decode. -/
 abbrev actionRunModel
-    (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
+    (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG)
     (O : BTranscript Fp VestaG
-      (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-        + 3 * (pp.mergeDerived actionCircuit).k) → Fp)
+      (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+        + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp)
     (h : family.straightLineConstraintDecoded static basis O) :=
   CanonicalMemberConstraintRelation.acceptedModel
     (memberDecode := fun i hi =>
       (actionRunDecode pp family static basis O inputs (hvk basis) (hI basis) h).toMemberDecode
         (hchar basis O) i hi)
-    (hblinding := actionCircuit.toVerifierKey_blindingFactors_lt_n pp
-      (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
+    (hblinding := actionCircuit.toVerifierKey_blindingFactors_lt_n
+      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
     (actionRunAccepts pp family static basis O inputs (hvk basis) (hI basis) h)
 
 /-- The accepted member polynomial at the run's own decode. -/
 abbrev actionRunPolynomial
-    (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
+    (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG)
     (O : BTranscript Fp VestaG
-      (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-        + 3 * (pp.mergeDerived actionCircuit).k) → Fp)
+      (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+        + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp)
     (h : family.straightLineConstraintDecoded static basis O) :=
   CanonicalMemberConstraintRelation.acceptedPolynomial
     (memberDecode := fun i hi =>
@@ -111,10 +109,10 @@ abbrev actionRunPolynomial
 /-- Decoding runs whose `x` or `y` challenge lands in the terminal's constraint-fold exclusion
 sets: `x` in the combined-constraint difference roots, `y` in a fold-split witness. -/
 def actionXYFailureEvent :
-    Set ((AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG) ×
+    Set ((AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG) ×
       (BTranscript Fp VestaG
-        (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-          + 3 * (pp.mergeDerived actionCircuit).k) → Fp)) :=
+        (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+          + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp)) :=
   {q | ∃ h : family.straightLineConstraintDecoded static q.1 q.2,
     ¬(((straightLineRunRecord family q.1 q.2).x ∉ szBadSet
         (combineConstraints
@@ -144,20 +142,20 @@ def actionXYFailureEvent :
 
 /-- Decoding runs whose `β` challenge lands in a permutation or lookup resolver exclusion set. -/
 def actionBetaFailureEvent :
-    Set ((AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG) ×
+    Set ((AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG) ×
       (BTranscript Fp VestaG
-        (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-          + 3 * (pp.mergeDerived actionCircuit).k) → Fp)) :=
+        (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+          + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp)) :=
   {q | ∃ h : family.straightLineConstraintDecoded static q.1 q.2,
     ¬(((straightLineRunRecord family q.1 q.2).beta ∉ allResolverPermutationBetaBadSet
-        (actionCircuit.toVerifierKey pp
-          (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k q.1))
+        pp.numProofs (actionCircuit.toVerifierKey
+          (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k q.1))
         (actionRunPolynomial pp family static inputs hvk hI hchar q.1 q.2 h)
         actionActiveRows) ∧
       (straightLineRunRecord family q.1 q.2).beta ∉ allResolverLookupBetaBadSet
         pp.numProofs
-        (actionCircuit.toVerifierKey pp
-          (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k q.1))
+        (actionCircuit.toVerifierKey
+          (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k q.1))
         (straightLineRunRecord family q.1 q.2)
         (actionRunPolynomial pp family static inputs hvk hI hchar q.1 q.2 h)
         (actionCircuit.n -
@@ -165,21 +163,21 @@ def actionBetaFailureEvent :
 
 /-- Decoding runs whose `γ` challenge lands in a permutation or lookup resolver exclusion set. -/
 def actionGammaFailureEvent :
-    Set ((AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG) ×
+    Set ((AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG) ×
       (BTranscript Fp VestaG
-        (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-          + 3 * (pp.mergeDerived actionCircuit).k) → Fp)) :=
+        (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+          + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp)) :=
   {q | ∃ h : family.straightLineConstraintDecoded static q.1 q.2,
     ¬(((straightLineRunRecord family q.1 q.2).gamma ∉ allResolverPermutationGammaBadSet
-        (actionCircuit.toVerifierKey pp
-          (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k q.1))
+        pp.numProofs (actionCircuit.toVerifierKey
+          (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k q.1))
         (straightLineRunRecord family q.1 q.2)
         (actionRunPolynomial pp family static inputs hvk hI hchar q.1 q.2 h)
         actionActiveRows) ∧
       (straightLineRunRecord family q.1 q.2).gamma ∉ allResolverLookupGammaBadSet
         pp.numProofs
-        (actionCircuit.toVerifierKey pp
-          (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k q.1))
+        (actionCircuit.toVerifierKey
+          (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k q.1))
         (straightLineRunRecord family q.1 q.2)
         (actionRunPolynomial pp family static inputs hvk hI hchar q.1 q.2 h)
         (actionCircuit.n -
@@ -187,24 +185,24 @@ def actionGammaFailureEvent :
 
 /-- Decoding runs whose `θ` challenge lands in the top-level lookup exclusion set. -/
 def actionThetaFailureEvent :
-    Set ((AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG) ×
+    Set ((AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG) ×
       (BTranscript Fp VestaG
-        (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-          + 3 * (pp.mergeDerived actionCircuit).k) → Fp)) :=
+        (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+          + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp)) :=
   {q | ∃ h : family.straightLineConstraintDecoded static q.1 q.2,
     ¬((straightLineRunRecord family q.1 q.2).theta ∉
       TopLevelLookup.thetaBadSet actionCircuit pp
-        (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k q.1)
+        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k q.1)
         (actionRunPolynomial pp family static inputs hvk hI hchar q.1 q.2 h))}
 
 /-- The Action terminal on a decoded run outside all four challenge-failure events.  This is a
 specification object: the DLOG reduction must not project its relation branch noncomputably, but
 must cover that branch with `actionTerminalRelationFinderCovers` below. -/
 def actionTerminalOutcomeOfGood
-    (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
+    (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG)
     (O : BTranscript Fp VestaG
-      (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-        + 3 * (pp.mergeDerived actionCircuit).k) → Fp)
+      (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+        + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp)
     (hdecoded : family.straightLineConstraintDecoded static basis O)
     (hXY : (basis, O) ∉ actionXYFailureEvent pp family static inputs hvk hI hchar)
     (hBeta : (basis, O) ∉ actionBetaFailureEvent pp family static inputs hvk hI hchar)
@@ -212,9 +210,9 @@ def actionTerminalOutcomeOfGood
     (hTheta : (basis, O) ∉ actionThetaFailureEvent pp family static inputs hvk hI hchar) :
     BundleStatement inputs ⊕'
       NontrivialRelation (F := Fp)
-        (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis).g
-        (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis).u
-        (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis).w := by
+        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis).g
+        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis).u
+        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis).w := by
   have hxy := not_exists.mp hXY hdecoded
   rw [not_not] at hxy
   have hbeta := not_exists.mp hBeta hdecoded
@@ -230,10 +228,10 @@ def actionTerminalOutcomeOfGood
 /-- Coverage requires every decoded good false-statement run to return explicit relation data. -/
 def actionTerminalRelationFinderCovers
     (finder :
-      (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG) →
+      (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG) →
       (BTranscript Fp VestaG
-        (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-          + 3 * (pp.mergeDerived actionCircuit).k) → Fp) →
+        (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+          + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp) →
       Option (AlgebraicRelationWitness (F := Fp) basis)) : Prop :=
   ∀ basis O,
     family.straightLineConstraintDecoded static basis O →
@@ -248,10 +246,10 @@ set_option maxHeartbeats 800000 in
 /-- Outside the four semantic challenge surfaces, a decoded run computes either all private
 witnesses or explicit relation data. -/
 theorem actionKnowledgeOutcome_isSome_of_good
-    (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
+    (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG)
     (O : BTranscript Fp VestaG
-      (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-        + 3 * (pp.mergeDerived actionCircuit).k) → Fp)
+      (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+        + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp)
     (hdecoded : family.straightLineConstraintDecoded static basis O)
     (hXY : (basis, O) ∉ actionXYFailureEvent pp family static inputs hvk hI hchar)
     (hBeta : (basis, O) ∉ actionBetaFailureEvent pp family static inputs hvk hI hchar)
@@ -281,11 +279,11 @@ theorem actionKnowledgeOutcome_isSome_of_good
       hI basis ▸ hvk basis ▸ success.accepts :=
     Subsingleton.elim _ _
   let successDecode : DeployedAlgebraicDecode
-      (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) rfl
-      (actionCircuit.toVerifierKey pp
-        (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
-      (actionCircuit.instanceCommitmentForShape pp
-        (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) inputs)
+      (actionCircuit.shape.withProofParams pp)
+      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) rfl
+      (actionCircuit.toVerifierKey
+        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
+      (actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
       (straightLineRunOutput family basis O).1.proof.1
       (straightLineRunRecord family basis O)
       ((straightLineRunOutput family basis O).1.aMulti
@@ -297,11 +295,11 @@ theorem actionKnowledgeOutcome_isSome_of_good
     hI basis ▸ hvk basis ▸
       success.witness.decode.reRound (runRounds family.toFamily basis O)
   let successAccepts : DeployedAccepts
-      (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) rfl
-      (actionCircuit.toVerifierKey pp
-        (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
-      (actionCircuit.instanceCommitmentForShape pp
-        (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) inputs)
+      (actionCircuit.shape.withProofParams pp)
+      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) rfl
+      (actionCircuit.toVerifierKey
+        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
+      (actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
       (straightLineRunOutput family basis O).1.proof.1
       (straightLineRunRecord family basis O) :=
     hI basis ▸ hvk basis ▸ success.accepts
@@ -314,8 +312,8 @@ theorem actionKnowledgeOutcome_isSome_of_good
       CanonicalMemberConstraintRelation.acceptedModel
         (memberDecode := fun i hi =>
           successDecode.toMemberDecode (hchar basis O) i hi)
-        (hblinding := actionCircuit.toVerifierKey_blindingFactors_lt_n pp
-          (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
+        (hblinding := actionCircuit.toVerifierKey_blindingFactors_lt_n
+          (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
         successAccepts := by
     unfold actionRunModel
     rw [hdecodeEq]
@@ -366,18 +364,18 @@ theorem actionKnowledgeOutcome_isSome_of_good
       split
       · rename_i hgoodYProof _
         have hpermutation' : ResolverPermutationChallengeExclusions
-                (actionCircuit.toVerifierKey pp
-                  (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
+                pp.numProofs (actionCircuit.toVerifierKey
+                  (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
                 (straightLineRunRecord family basis O)
                 (actionRunPolynomial pp family static inputs hvk hI hchar
                   basis O hdecoded) actionActiveRows := ⟨hgamma.1, hbeta.1⟩
         rw [hpolyEq] at hpermutation'
         have hpermutationSome := resolverPermutationChallengeExclusions?_isSome_of
-          _ _ _ _ hpermutation'
+          pp.numProofs _ _ _ _ hpermutation'
         split
         · have hlookup' : TopLevelLookup.ChallengeExclusions
                   actionCircuit pp
-                  (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)
+                  (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis)
                   (straightLineRunRecord family basis O)
                   (actionRunPolynomial pp family static inputs hvk hI hchar
                     basis O hdecoded) := ⟨hgamma.2, hbeta.2, htheta⟩
@@ -385,7 +383,7 @@ theorem actionKnowledgeOutcome_isSome_of_good
           have hlookupSome :=
             TopLevelLookup.topLevelLookupChallengeExclusions?_isSome_of
               actionCircuit pp
-              (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis) _ _ hlookup'
+              (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) _ _ hlookup'
           split
           · split
             · rfl
@@ -458,17 +456,17 @@ theorem actionKnowledgeFailure_subset_union :
 proved four-call bound, and the terminal fallback performs at most two further represented-run
 evaluations. -/
 def actionRelationFinderCalls
-    (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
+    (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG)
     (O : BTranscript Fp VestaG
-      (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-        + 3 * (pp.mergeDerived actionCircuit).k) → Fp) : Nat :=
+      (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+        + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp) : Nat :=
   family.straightLineConstraintRelationFinderCalls basis O + 2
 
 theorem actionRelationFinderCalls_le_six
-    (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
+    (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG)
     (O : BTranscript Fp VestaG
-      (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-        + 3 * (pp.mergeDerived actionCircuit).k) → Fp) :
+      (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+        + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp) :
     actionRelationFinderCalls pp family basis O ≤ 6 := by
   unfold actionRelationFinderCalls
   have hcalls := family.straightLineConstraintRelationFinderCalls_le_four basis O
@@ -557,10 +555,10 @@ theorem StraightLineActionDirectDlogProfile.knowledgeExtractorCost_le
 /-- The combined finder exactly extends the old constraint finder on every successful old branch.
 -/
 theorem actionRelationFinder_extends_constraint
-    (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG)
+    (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG)
     (O : BTranscript Fp VestaG
-      (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-        + 3 * (pp.mergeDerived actionCircuit).k) → Fp) :
+      (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+        + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp) :
     (family.straightLineConstraintRelationFinder basis O).isSome →
       (actionRelationFinder pp family static inputs hvk hI hchar basis O).isSome := by
   intro hsome
@@ -580,7 +578,7 @@ The combined DLOG advantage occurs once. -/
 theorem actionBaseUnion_prob_le_of_dlogProfile
     {T : Type*} [DecidableEq T]
     (B : VestaG) (hB : B ≠ 0)
-    (query : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → T)
+    (query : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → T)
     (hquery : Function.Injective query)
     {epsilonX : ENNReal}
     (schedule : DeployedConstraintXSqueezeSchedule family.toRootFamily epsilonX)
@@ -588,19 +586,19 @@ theorem actionBaseUnion_prob_le_of_dlogProfile
     (independentProductPMF (orchardGeneratorROSetup query)
       (PMF.uniformOfFintype
         (BTranscript Fp VestaG
-          (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-            + 3 * (pp.mergeDerived actionCircuit).k) → Fp))).toOuterMeasure
+          (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+            + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp))).toOuterMeasure
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
           (family.straightLineConstraintFailureEvent static ∪
             family.straightLineRelationEvent
               (actionRelationFinder pp family static inputs hvk hI hchar))) ≤
       (family.Q + 1 : Nat) * (1 / Fintype.card Fp) +
         (family.Q + 1 : Nat) *
-          ((pp.mergeDerived actionCircuit).k *
+          ((actionCircuit.shape.withProofParams pp).k *
             (2 / (Fintype.card Fp : ENNReal))) +
-        (family.Q + (11 + (pp.mergeDerived actionCircuit).k) + 1 : Nat) *
-          algebraicRootBudget (pp.mergeDerived actionCircuit)
-            (pp.mergeDerived actionCircuit).k +
+        (family.Q + (11 + (actionCircuit.shape.withProofParams pp).k) + 1 : Nat) *
+          algebraicRootBudget (actionCircuit.shape.withProofParams pp)
+            (actionCircuit.shape.withProofParams pp).k +
         (profile.advantage (actionDlogRandomOracleQueries pp family)
             (actionDlogGroupWork profile.proverGroupWork profile.reductionGroupWork) +
           1 / Fintype.card Fp) +
@@ -610,7 +608,7 @@ theorem actionBaseUnion_prob_le_of_dlogProfile
     (actionRelationFinder pp family static inputs hvk hI hchar)
     (orchardGeneratorROBasis query)
     (orchard_uniformURSIdentification_of_generatorRO
-      (pp.mergeDerived actionCircuit).k B hB query hquery)]
+      (actionCircuit.shape.withProofParams pp).k B hB query hquery)]
   exact family.straightLineConstraintFailure_union_relation_prob_le_of_relationSupersetTextbookDL
     B static (actionRelationFinder pp family static inputs hvk hI hchar)
     (actionRelationFinder_extends_constraint pp family static inputs hvk hI hchar)
@@ -622,10 +620,10 @@ branch.  A covering computed finder therefore turns that branch into the explici
 by DLOG. -/
 theorem actionBundleStatementUpgradeContained
     (finder :
-      (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG) →
+      (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG) →
       (BTranscript Fp VestaG
-        (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-          + 3 * (pp.mergeDerived actionCircuit).k) → Fp) →
+        (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+          + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp) →
       Option (AlgebraicRelationWitness (F := Fp) basis))
     (hcovers : actionTerminalRelationFinderCovers pp family static inputs hvk hI hchar finder) :
     family.StraightLineConstraintSemanticUpgradeContained static
@@ -652,10 +650,10 @@ failure or the combined relation finder) plus the four semantic challenge surfac
 event is not added again after the compressed bound. -/
 theorem actionBundleStatementFailure_subset_union
     (finder :
-      (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG) →
+      (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG) →
       (BTranscript Fp VestaG
-        (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-          + 3 * (pp.mergeDerived actionCircuit).k) → Fp) →
+        (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+          + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp) →
       Option (AlgebraicRelationWitness (F := Fp) basis))
     (hcovers : actionTerminalRelationFinderCovers pp family static inputs hvk hI hchar finder) :
     family.straightLineConstraintSemanticFailureEvent
@@ -682,20 +680,20 @@ theorem actionBundleStatementFailure_subset_union
 /-- Exact Action probability composition with the combined relation event priced once. -/
 theorem actionBundleStatementFailure_prob_le_of_base_union_bound
     {T : Type*} [DecidableEq T]
-    (query : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → T)
+    (query : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → T)
     (finder :
-      (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG) →
+      (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG) →
       (BTranscript Fp VestaG
-        (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-          + 3 * (pp.mergeDerived actionCircuit).k) → Fp) →
+        (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+          + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp) →
       Option (AlgebraicRelationWitness (F := Fp) basis))
     (hcovers : actionTerminalRelationFinderCovers pp family static inputs hvk hI hchar finder)
     {baseBound xyBound betaBound gammaBound thetaBound : ENNReal}
     (hbase : (independentProductPMF (orchardGeneratorROSetup query)
       (PMF.uniformOfFintype
         (BTranscript Fp VestaG
-          (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-            + 3 * (pp.mergeDerived actionCircuit).k) → Fp))).toOuterMeasure
+          (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+            + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp))).toOuterMeasure
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
           (family.straightLineConstraintFailureEvent static ∪
             family.straightLineRelationEvent finder)) ≤ baseBound)
@@ -718,8 +716,8 @@ theorem actionBundleStatementFailure_prob_le_of_base_union_bound
     (independentProductPMF (orchardGeneratorROSetup query)
       (PMF.uniformOfFintype
         (BTranscript Fp VestaG
-          (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-            + 3 * (pp.mergeDerived actionCircuit).k) → Fp))).toOuterMeasure
+          (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+            + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp))).toOuterMeasure
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
           family.straightLineConstraintSemanticFailureEvent
             (actionBundleStatementDecoded pp family inputs)) <=
@@ -741,13 +739,13 @@ theorem actionBundleStatementFailure_prob_le_of_base_union_bound
 union and four semantic challenge bounds as the ordinary-soundness endpoint. -/
 theorem actionKnowledgeFailure_prob_le_of_base_union_bound
     {T : Type*} [DecidableEq T]
-    (query : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → T)
+    (query : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → T)
     {baseBound xyBound betaBound gammaBound thetaBound : ENNReal}
     (hbase : (independentProductPMF (orchardGeneratorROSetup query)
       (PMF.uniformOfFintype
         (BTranscript Fp VestaG
-          (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-            + 3 * (pp.mergeDerived actionCircuit).k) → Fp))).toOuterMeasure
+          (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+            + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp))).toOuterMeasure
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
           (family.straightLineConstraintFailureEvent static ∪
             family.straightLineRelationEvent
@@ -771,8 +769,8 @@ theorem actionKnowledgeFailure_prob_le_of_base_union_bound
     (independentProductPMF (orchardGeneratorROSetup query)
       (PMF.uniformOfFintype
         (BTranscript Fp VestaG
-          (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-            + 3 * (pp.mergeDerived actionCircuit).k) → Fp))).toOuterMeasure
+          (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+            + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp))).toOuterMeasure
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
           actionKnowledgeFailureEvent pp family static inputs hvk hI hchar) ≤
       baseBound + (xyBound + (betaBound + (gammaBound + thetaBound))) := by
@@ -793,62 +791,62 @@ theorem actionKnowledgeFailure_prob_le_of_base_union_bound
 profile. -/
 theorem actionBundleStatementFailure_prob_le_of_compressed_bound
     {T : Type*} [DecidableEq T]
-    (query : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → T)
+    (query : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → T)
     (finder :
-      (basis : AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG) →
+      (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG) →
       (BTranscript Fp VestaG
-        (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-          + 3 * (pp.mergeDerived actionCircuit).k) → Fp) →
+        (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+          + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp) →
       Option (AlgebraicRelationWitness (F := Fp) basis))
     (hcovers : actionTerminalRelationFinderCovers pp family static inputs hvk hI hchar finder)
     {compressedBound xyBound betaBound gammaBound thetaBound relationBound : ENNReal}
     (hcompressed : (independentProductPMF (orchardGeneratorROSetup query)
       (PMF.uniformOfFintype
         (BTranscript Fp VestaG
-          (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-            + 3 * (pp.mergeDerived actionCircuit).k) → Fp))).toOuterMeasure
+          (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+            + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp))).toOuterMeasure
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
           family.straightLineConstraintFailureEvent static) ≤ compressedBound)
     (hXY : (independentProductPMF (orchardGeneratorROSetup query)
       (PMF.uniformOfFintype
         (BTranscript Fp VestaG
-          (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-            + 3 * (pp.mergeDerived actionCircuit).k) → Fp))).toOuterMeasure
+          (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+            + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp))).toOuterMeasure
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
           actionXYFailureEvent pp family static inputs hvk hI hchar) ≤ xyBound)
     (hBeta : (independentProductPMF (orchardGeneratorROSetup query)
       (PMF.uniformOfFintype
         (BTranscript Fp VestaG
-          (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-            + 3 * (pp.mergeDerived actionCircuit).k) → Fp))).toOuterMeasure
+          (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+            + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp))).toOuterMeasure
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
           actionBetaFailureEvent pp family static inputs hvk hI hchar) ≤ betaBound)
     (hGamma : (independentProductPMF (orchardGeneratorROSetup query)
       (PMF.uniformOfFintype
         (BTranscript Fp VestaG
-          (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-            + 3 * (pp.mergeDerived actionCircuit).k) → Fp))).toOuterMeasure
+          (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+            + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp))).toOuterMeasure
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
           actionGammaFailureEvent pp family static inputs hvk hI hchar) ≤ gammaBound)
     (hTheta : (independentProductPMF (orchardGeneratorROSetup query)
       (PMF.uniformOfFintype
         (BTranscript Fp VestaG
-          (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-            + 3 * (pp.mergeDerived actionCircuit).k) → Fp))).toOuterMeasure
+          (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+            + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp))).toOuterMeasure
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
           actionThetaFailureEvent pp family static inputs hvk hI hchar) ≤ thetaBound)
     (hRelation : (independentProductPMF (orchardGeneratorROSetup query)
       (PMF.uniformOfFintype
         (BTranscript Fp VestaG
-          (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-            + 3 * (pp.mergeDerived actionCircuit).k) → Fp))).toOuterMeasure
+          (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+            + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp))).toOuterMeasure
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
           actionTerminalRelationEvent pp family finder) ≤ relationBound) :
     (independentProductPMF (orchardGeneratorROSetup query)
       (PMF.uniformOfFintype
         (BTranscript Fp VestaG
-          (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-            + 3 * (pp.mergeDerived actionCircuit).k) → Fp))).toOuterMeasure
+          (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+            + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp))).toOuterMeasure
         ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
           family.straightLineConstraintSemanticFailureEvent
             (actionBundleStatementDecoded pp family inputs))
@@ -898,14 +896,14 @@ supplied here as the `hcompat` premises.
 
 /-- The `θ` event embeds into the index-`0` squeeze surface. -/
 theorem actionThetaFailureEvent_subset_surface
-    (badF : (AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG) →
+    (badF : (AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG) →
       BTranscript Fp VestaG
-        (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-          + 3 * (pp.mergeDerived actionCircuit).k) →
+        (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+          + 3 * (actionCircuit.shape.withProofParams pp).k) →
       (Fin 0 → Fp) → Set Fp)
     (hcompat : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
       ↑(TopLevelLookup.thetaBadSet actionCircuit pp
-          (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis)
+          (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis)
           (actionRunPolynomial pp family static inputs hvk hI hchar basis O h)) ⊆
         badF basis (algebraicFullPrefixesPre family.init ((family.adversary basis).run O) 0)
           (fun i => O (algebraicFullPrefixesPre family.init
@@ -923,21 +921,21 @@ theorem actionThetaFailureEvent_subset_surface
 
 /-- The `β` event embeds into the index-`1` squeeze surface. -/
 theorem actionBetaFailureEvent_subset_surface
-    (badF : (AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG) →
+    (badF : (AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG) →
       BTranscript Fp VestaG
-        (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-          + 3 * (pp.mergeDerived actionCircuit).k) →
+        (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+          + 3 * (actionCircuit.shape.withProofParams pp).k) →
       (Fin 1 → Fp) → Set Fp)
     (hcompat : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
       ↑(allResolverPermutationBetaBadSet
-          (actionCircuit.toVerifierKey pp
-            (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
+          pp.numProofs (actionCircuit.toVerifierKey
+            (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
           (actionRunPolynomial pp family static inputs hvk hI hchar basis O h)
           actionActiveRows ∪
         allResolverLookupBetaBadSet
           pp.numProofs
-          (actionCircuit.toVerifierKey pp
-            (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
+          (actionCircuit.toVerifierKey
+            (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
           (straightLineRunRecord family basis O)
           (actionRunPolynomial pp family static inputs hvk hI hchar basis O h)
           (actionCircuit.n -
@@ -962,22 +960,22 @@ theorem actionBetaFailureEvent_subset_surface
 
 /-- The `γ` event embeds into the index-`2` squeeze surface. -/
 theorem actionGammaFailureEvent_subset_surface
-    (badF : (AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG) →
+    (badF : (AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG) →
       BTranscript Fp VestaG
-        (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-          + 3 * (pp.mergeDerived actionCircuit).k) →
+        (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+          + 3 * (actionCircuit.shape.withProofParams pp).k) →
       (Fin 2 → Fp) → Set Fp)
     (hcompat : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
       ↑(allResolverPermutationGammaBadSet
-          (actionCircuit.toVerifierKey pp
-            (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
+          pp.numProofs (actionCircuit.toVerifierKey
+            (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
           (straightLineRunRecord family basis O)
           (actionRunPolynomial pp family static inputs hvk hI hchar basis O h)
           actionActiveRows ∪
         allResolverLookupGammaBadSet
           pp.numProofs
-          (actionCircuit.toVerifierKey pp
-            (ursOfAugmentedBasis (pp.mergeDerived actionCircuit).k basis))
+          (actionCircuit.toVerifierKey
+            (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
           (straightLineRunRecord family basis O)
           (actionRunPolynomial pp family static inputs hvk hI hchar basis O h)
           (actionCircuit.n -
@@ -1002,15 +1000,15 @@ theorem actionGammaFailureEvent_subset_surface
 
 /-- The `x`/`y` event embeds into the union of the index-`4` and index-`3` squeeze surfaces. -/
 theorem actionXYFailureEvent_subset_surfaces
-    (badFX : (AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG) →
+    (badFX : (AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG) →
       BTranscript Fp VestaG
-        (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-          + 3 * (pp.mergeDerived actionCircuit).k) →
+        (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+          + 3 * (actionCircuit.shape.withProofParams pp).k) →
       (Fin 4 → Fp) → Set Fp)
-    (badFY : (AugmentedIndex (2 ^ (pp.mergeDerived actionCircuit).k) → VestaG) →
+    (badFY : (AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG) →
       BTranscript Fp VestaG
-        (preIpaLen (pp.mergeDerived actionCircuit) family.init.length 10
-          + 3 * (pp.mergeDerived actionCircuit).k) →
+        (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+          + 3 * (actionCircuit.shape.withProofParams pp).k) →
       (Fin 3 → Fp) → Set Fp)
     (hcompatX : ∀ basis O (h : family.straightLineConstraintDecoded static basis O),
       ↑(szBadSet

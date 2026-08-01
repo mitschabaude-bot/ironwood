@@ -23,7 +23,7 @@ namespace Zcash.Snark
 
 open CompPoly.CPolynomial
 
-variable {shape : Shape} {G : Type*}
+variable {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
 
 /-! ## The slot classes -/
 
@@ -68,7 +68,7 @@ theorem CommitmentId.isColumnInput.toLookup {id : CommitmentId}
 /-- Column selection reads only the three query-column classes. -/
 theorem permutationColumnPolynomialOfResolver_congr
     (vk : VerifyingKey shape Fp G) {poly₁ poly₂ : CommitmentId → CPoly}
-    (p : Fin shape.numProofs)
+    (p : Fin numProofs)
     (h : ∀ id, id.isColumnInput → poly₁ id = poly₂ id) (cr : ColumnRef) :
     permutationColumnPolynomialOfResolver vk poly₁ p cr =
       permutationColumnPolynomialOfResolver vk poly₂ p cr := by
@@ -83,7 +83,7 @@ theorem permutationColumnPolynomialOfResolver_congr
 /-- **The permutation pairs read only the permutation input slots.** -/
 theorem resolverPermutationPairs_congr
     (vk : VerifyingKey shape Fp G) {poly₁ poly₂ : CommitmentId → CPoly}
-    (p : Fin shape.numProofs)
+    (p : Fin numProofs)
     (h : ∀ id, id.isPermutationInput → poly₁ id = poly₂ id) :
     ResolverPermutationPairs vk poly₁ p = ResolverPermutationPairs vk poly₂ p := by
   funext c
@@ -97,7 +97,7 @@ theorem resolverPermutationPairs_congr
 /-- The per-proof permutation `β` exclusion reads only the permutation input slots. -/
 theorem resolverPermutationBetaBadSet_congr
     (vk : VerifyingKey shape Fp G) {poly₁ poly₂ : CommitmentId → CPoly}
-    (p : Fin shape.numProofs) (m : ℕ)
+    (p : Fin numProofs) (m : ℕ)
     (h : ∀ id, id.isPermutationInput → poly₁ id = poly₂ id) :
     resolverPermutationBetaBadSet vk poly₁ p m =
       resolverPermutationBetaBadSet vk poly₂ p m := by
@@ -109,7 +109,7 @@ challenge record only `β`. -/
 theorem resolverPermutationGammaBadSet_congr
     (vk : VerifyingKey shape Fp G) {ch₁ ch₂ : Challenges shape.k Fp}
     {poly₁ poly₂ : CommitmentId → CPoly}
-    (p : Fin shape.numProofs) (m : ℕ) (hbeta : ch₁.beta = ch₂.beta)
+    (p : Fin numProofs) (m : ℕ) (hbeta : ch₁.beta = ch₂.beta)
     (h : ∀ id, id.isPermutationInput → poly₁ id = poly₂ id) :
     resolverPermutationGammaBadSet vk ch₁ poly₁ p m =
       resolverPermutationGammaBadSet vk ch₂ poly₂ p m := by
@@ -120,21 +120,23 @@ theorem resolverPermutationGammaBadSet_congr
 
 /-- **The bundle-wide permutation `β` exclusion reads only the permutation input slots.** -/
 theorem allResolverPermutationBetaBadSet_congr
+    (numProofs : ℕ)
     (vk : VerifyingKey shape Fp G) {poly₁ poly₂ : CommitmentId → CPoly} (m : ℕ)
     (h : ∀ id, id.isPermutationInput → poly₁ id = poly₂ id) :
-    allResolverPermutationBetaBadSet vk poly₁ m =
-      allResolverPermutationBetaBadSet vk poly₂ m := by
+    allResolverPermutationBetaBadSet numProofs vk poly₁ m =
+      allResolverPermutationBetaBadSet numProofs vk poly₂ m := by
   unfold allResolverPermutationBetaBadSet
   exact Finset.biUnion_congr rfl
     (fun p _ => resolverPermutationBetaBadSet_congr vk p m h)
 
 /-- **The bundle-wide permutation `γ` exclusion reads only the permutation input slots.** -/
 theorem allResolverPermutationGammaBadSet_congr
+    (numProofs : ℕ)
     (vk : VerifyingKey shape Fp G) {ch₁ ch₂ : Challenges shape.k Fp}
     {poly₁ poly₂ : CommitmentId → CPoly} (m : ℕ) (hbeta : ch₁.beta = ch₂.beta)
     (h : ∀ id, id.isPermutationInput → poly₁ id = poly₂ id) :
-    allResolverPermutationGammaBadSet vk ch₁ poly₁ m =
-      allResolverPermutationGammaBadSet vk ch₂ poly₂ m := by
+    allResolverPermutationGammaBadSet numProofs vk ch₁ poly₁ m =
+      allResolverPermutationGammaBadSet numProofs vk ch₂ poly₂ m := by
   unfold allResolverPermutationGammaBadSet
   exact Finset.biUnion_congr rfl
     (fun p _ => resolverPermutationGammaBadSet_congr vk p m hbeta h)
@@ -297,6 +299,7 @@ theorem allResolverLookupGammaBadSet_congr
 
 /-- The row environment reads only the proof's query columns. -/
 theorem resolverEnvironment_congr
+    {shape : CircuitShape}
     (vk : VerifyingKey shape Fp G) {poly₁ poly₂ : CommitmentId → CPoly}
     (p : ℕ) (usableRows : ℕ)
     (h : ∀ id, id.isColumnInput → poly₁ id = poly₂ id) :
@@ -316,7 +319,7 @@ theorem TopLevelLookup.thetaBudget_eq
     {G' : Type} [AddCommGroup G'] [Inhabited G']
     {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
     (top : Halo2.TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams) (urs : URS G')
+    (pp : ProofParams) (urs : URS G')
     (poly : CommitmentId → CPoly) :
     TopLevelLookup.thetaBudget top pp urs poly =
       ∑ index : TopLevelLookup.ActivationIndex top pp,
@@ -331,7 +334,7 @@ theorem TopLevelLookup.thetaBadSet_congr
     {G' : Type} [AddCommGroup G'] [Inhabited G']
     {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
     (top : Halo2.TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams) (urs : URS G')
+    (pp : ProofParams) (urs : URS G')
     {poly₁ poly₂ : CommitmentId → CPoly}
     (h : ∀ id, id.isColumnInput → poly₁ id = poly₂ id) :
     TopLevelLookup.thetaBadSet top pp urs poly₁ =
@@ -340,7 +343,7 @@ theorem TopLevelLookup.thetaBadSet_congr
   exact Finset.biUnion_congr rfl fun index _ =>
     congrArg (fun env => EnabledLookup.thetaBadSet top.placement env
         ((operationEnabledLookups top.operations 0).get index.2))
-      (resolverEnvironment_congr (top.toVerifierKey pp urs) index.1
+      (resolverEnvironment_congr (top.toVerifierKey urs) index.1
         (top.usableRowsAt top.domainExponent) h)
 
 end Zcash.Snark

@@ -22,7 +22,7 @@ def TopLevelBundleStatement
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams)
+    (pp : ProofParams)
     (poly : CommitmentId → CPoly) : Prop :=
   ∀ proofIndex : Fin pp.numProofs,
     let environment := ({
@@ -36,7 +36,7 @@ def TopLevelBundleWitness
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams)
+    (pp : ProofParams)
     (poly : CommitmentId → CPoly) : Type :=
   ∀ proofIndex : Fin pp.numProofs,
     let environment := ({
@@ -65,7 +65,7 @@ theorem of_publicInputEncoding
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams)
+    (pp : ProofParams)
     (poly : CommitmentId → CPoly)
     (inputs : Fin pp.numProofs → PublicInput Fp)
     (hencoding : ∀ proofIndex,
@@ -95,7 +95,7 @@ def of_publicInputEncoding
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams)
+    (pp : ProofParams)
     (poly : CommitmentId → CPoly)
     (inputs : Fin pp.numProofs → PublicInput Fp)
     (hencoding : ∀ proofIndex,
@@ -120,7 +120,7 @@ theorem statement
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     {top : TopLevelCircuit Fp Config PublicInput}
-    {pp : Keygen.ProofParams}
+    {pp : ProofParams}
     {poly : CommitmentId → CPoly}
     (witness : TopLevelBundleWitness top pp poly) :
     TopLevelBundleStatement top pp poly :=
@@ -132,7 +132,7 @@ abbrev TopLevelFixedEncoding
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams)
+    (pp : ProofParams)
     (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs) : Prop :=
   let assignment :
@@ -145,17 +145,17 @@ abbrev TopLevelFixed
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams) (urs : URS G)
+    (pp : ProofParams) (urs : URS G)
     (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs) : Prop :=
   (SelectorActivationsRealized
       top.selectorMap top.selectorActivations
       (resolverEnvironment
-        (top.toVerifierKey pp urs) poly proofIndex
+        (top.toVerifierKey urs) poly proofIndex
         (top.usableRowsAt top.domainExponent))
     ∧ CircuitConstraintFamily.constraints .fixed top.placement
       (resolverEnvironment
-        (top.toVerifierKey pp urs) poly proofIndex
+        (top.toVerifierKey urs) poly proofIndex
         (top.usableRowsAt top.domainExponent))
       top.operations 0)
 
@@ -164,14 +164,14 @@ abbrev TopLevelCopies
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams) (urs : URS G)
+    (pp : ProofParams) (urs : URS G)
     (poly : CommitmentId → CPoly)
     (cell : Type) [DecidableEq cell] [Fintype cell]
     (Bad : Type)
     (proofIndex : Fin pp.numProofs) : Type :=
   CopyReplayWitness top.placement
     (resolverEnvironment
-      (top.toVerifierKey pp urs) poly proofIndex
+      (top.toVerifierKey urs) poly proofIndex
       (top.usableRowsAt top.domainExponent))
     top.operations cell Bad
 
@@ -181,7 +181,7 @@ abbrev TopLevelLookups
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams) (urs : URS G)
+    (pp : ProofParams) (urs : URS G)
     (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (proofIndex : Fin pp.numProofs) : Prop :=
@@ -200,7 +200,7 @@ def bridgeWitness_of_components
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     {top : TopLevelCircuit Fp Config PublicInput}
-    {pp : Keygen.ProofParams} {urs : URS G}
+    {pp : ProofParams} {urs : URS G}
     {k : ℕ} {ch : Challenges k Fp}
     {poly : CommitmentId → CPoly}
     {cell : Type} [DecidableEq cell] [Fintype cell]
@@ -221,18 +221,18 @@ def bridgeWitness_of_components
       SelectorActivationsRealized
         top.selectorMap top.selectorActivations
         (resolverEnvironment
-          (top.toVerifierKey pp urs) poly proofIndex
+          (top.toVerifierKey urs) poly proofIndex
           (top.usableRowsAt top.domainExponent)))
     (fixed :
       CircuitConstraintFamily.constraints .fixed top.placement
         (resolverEnvironment
-          (top.toVerifierKey pp urs) poly proofIndex
+          (top.toVerifierKey urs) poly proofIndex
           (top.usableRowsAt top.domainExponent))
         top.operations 0)
     (copies :
       CopyReplayWitness top.placement
         (resolverEnvironment
-          (top.toVerifierKey pp urs) poly proofIndex
+          (top.toVerifierKey urs) poly proofIndex
           (top.usableRowsAt top.domainExponent))
         top.operations cell Bad)
     (lookups :
@@ -259,7 +259,7 @@ def bridgeWitness_of_components
   clear_value bridge
   generalize henvironmentValue :
     resolverEnvironment
-      (top.toVerifierKey pp urs) poly proofIndex
+      (top.toVerifierKey urs) poly proofIndex
       (top.usableRowsAt top.domainExponent) = environment at bridge
   generalize hoperations : top.operations = operations at bridge
   have henvironment :=
@@ -267,7 +267,7 @@ def bridgeWitness_of_components
       pp urs fixedEncoding
   have henvironment' :
       resolverEnvironment
-          (top.toVerifierKey pp urs) poly proofIndex
+          (top.toVerifierKey urs) poly proofIndex
           (top.usableRowsAt top.domainExponent) =
         top.environment assignment.proofAssignment :=
     henvironment
@@ -301,7 +301,7 @@ structure TopLevelCircuitCorrectness
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams) (urs : URS G)
+    (pp : ProofParams) (urs : URS G)
     {k : ℕ} (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (cell : Type) [DecidableEq cell] [Fintype cell]

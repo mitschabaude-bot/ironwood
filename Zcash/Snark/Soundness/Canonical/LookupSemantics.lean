@@ -20,7 +20,7 @@ set_option maxHeartbeats 20000
 
 /-- Evaluation-domain facts shared by every resolver-backed lookup in one circuit. -/
 structure ResolverLookupDomain
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (l0 lLast lBlind : CPoly) (n u : ℕ) : Prop where
   omegaNonzero : vk.omega ≠ 0
@@ -36,7 +36,7 @@ blinding-row selectors. The selector evaluations are independent of the lookup
 and of the circuit being instantiated.
 -/
 theorem ResolverLookupDomain.ofCanonicalSelectors
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
     (vk : VerifyingKey shape Fp G) {n u : ℕ}
     (hlast : u + 1 < n)
     (hrows : Function.Injective fun i : Fin n => vk.omega ^ (i : ℕ))
@@ -60,7 +60,7 @@ theorem ResolverLookupDomain.ofCanonicalSelectors
 /-- The product-difference polynomial whose roots are excluded at the selected lookup's `γ`
 squeeze.  It is fixed after `β`. -/
 noncomputable def resolverLookupProductDifference
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) :
@@ -80,7 +80,7 @@ noncomputable def resolverLookupProductDifference
 /-- The selected lookup difference after fixing `β`, computed without constructing a nested
 polynomial. -/
 def resolverLookupProductDifferenceGamma
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) : CPoly :=
@@ -98,7 +98,7 @@ def resolverLookupProductDifferenceGamma
     ch.beta
 
 theorem toPoly_resolverLookupProductDifferenceGamma
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) :
@@ -109,7 +109,7 @@ theorem toPoly_resolverLookupProductDifferenceGamma
 
 /-- One `γ` coefficient of the selected lookup difference, computed directly over `Fp`. -/
 def resolverLookupProductDifferenceCoeff
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) (u j : ℕ) : CPoly :=
@@ -127,7 +127,7 @@ def resolverLookupProductDifferenceCoeff
     j
 
 theorem toPoly_resolverLookupProductDifferenceCoeff
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) (u j : ℕ) :
@@ -139,7 +139,7 @@ theorem toPoly_resolverLookupProductDifferenceCoeff
 /-- All separately priced challenges used by the selected lookup endpoint, including the two
 row-factor exclusions that eliminate its residual zero-product branch. -/
 structure ResolverLookupGoodChallenges
-    {shape : Shape} {k : ℕ} {G : Type*}
+    {shape : CircuitShape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) (u : ℕ) : Prop where
@@ -154,7 +154,7 @@ structure ResolverLookupGoodChallenges
 of a selected compressed lookup.  Tuple recovery is intentionally downstream: it uses the Clean
 operation's concrete input/table tuples and the separately priced `θ` collision exclusion. -/
 theorem ConstraintSatisfaction.resolverLookupSubset
-    {shape : Shape} {numProofs k : ℕ} {G : Type*}
+    {shape : CircuitShape} {numProofs k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (sets : Fin numProofs → List (PermSetEval CPoly))

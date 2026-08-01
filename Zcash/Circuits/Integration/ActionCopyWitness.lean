@@ -131,7 +131,7 @@ theorem actionResolverChunkWidth
     (chunk :
       Fin (ActionPermutationDomain.actionShape pp).numPermutationSets) :
     (ResolverPermutationPairs
-        (ActionPermutationDomain.actionVk pp urs)
+        (actionCircuit.toVerifierKey urs)
         poly proofIndex chunk).length =
       min actionCircuit.chunkLen
         (actionNumPermCols -
@@ -144,7 +144,8 @@ theorem actionResolverChunkWidth
         actionCircuit.verifierCS.permutationChunks.length := by
     rw [verifierCS_permutationChunks_length]
     simpa only [ActionPermutationDomain.actionShape,
-      ProofParams.mergeDerived_numPermutationSets] using chunk.isLt
+      CircuitShape.withProofParams_numPermutationSets,
+      actionCircuit.shape_numPermutationSets] using chunk.isLt
   change
     (actionCircuit.verifierCS.permutationChunks.getD chunk []).length =
       min actionCircuit.chunkLen
@@ -156,27 +157,20 @@ theorem actionResolverChunkWidth
 
 /-- The circuit-derived Action permutation chunk width is positive. -/
 theorem actionChunkLen_pos
-    {G : Type} [AddCommGroup G] [Inhabited G]
-    (pp : ProofParams) (urs : URS G) :
-    0 < (ActionPermutationDomain.actionVk pp urs).chunkLen :=
+    : 0 < actionCircuit.chunkLen :=
   constraintSystem_chunkLen_pos
     actionCircuit.constraintSystem
 
 /-- The derived chunk family has enough total slots for every Action
 permutation column. -/
 theorem actionPermutationChunks_cover
-    {G : Type} [AddCommGroup G] [Inhabited G]
-    (pp : ProofParams) (urs : URS G) :
-    actionNumPermCols ≤
-      (ActionPermutationDomain.actionShape pp).numPermutationSets *
-        (ActionPermutationDomain.actionVk pp urs).chunkLen := by
+    : actionNumPermCols ≤
+      actionCircuit.permutationSetCount * actionCircuit.chunkLen := by
   rw [actionNumPermCols_eq_derived]
   have hcover :=
     permutationColumns_length_le_chunks_mul actionCircuit
   rw [verifierCS_permutationChunks_length] at hcover
-  simpa only [ActionPermutationDomain.actionShape,
-    ProofParams.mergeDerived_numPermutationSets,
-    actionCircuit.toVerifierKey_chunkLen] using hcover
+  exact hcover
 
 /-- Flatten the compiler-derived Action chunks to `(row, global column)`. -/
 def actionChunkFlatten
@@ -186,7 +180,7 @@ def actionChunkFlatten
     (proofIndex :
       Fin (ActionPermutationDomain.actionShape pp).numProofs) :
     ResolverPermutationCell
-        (ActionPermutationDomain.actionVk pp urs)
+        (actionCircuit.toVerifierKey urs)
         poly proofIndex actionDomainSize ≃
       Fin actionDomainSize × Fin actionNumPermCols :=
   Layout.Asm.chunkFlatten
@@ -196,10 +190,14 @@ def actionChunkFlatten
     actionDomainSize
     (fun chunk =>
       (ResolverPermutationPairs
-        (ActionPermutationDomain.actionVk pp urs)
+        (actionCircuit.toVerifierKey urs)
         poly proofIndex chunk).length)
-    (actionChunkLen_pos pp urs)
-    (actionPermutationChunks_cover pp urs)
+    actionChunkLen_pos
+    (by
+      simpa only [ActionPermutationDomain.actionShape,
+        CircuitShape.withProofParams_numPermutationSets,
+        actionCircuit.shape_numPermutationSets] using
+        actionPermutationChunks_cover)
     (actionResolverChunkWidth pp urs poly proofIndex)
 
 /-- The full-domain Action keygen permutation in resolver chunk coordinates. -/
@@ -211,7 +209,7 @@ def actionFullSigma
       Fin (ActionPermutationDomain.actionShape pp).numProofs) :
     Equiv.Perm
       (ResolverPermutationCell
-        (ActionPermutationDomain.actionVk pp urs)
+        (actionCircuit.toVerifierKey urs)
         poly proofIndex actionDomainSize) :=
   chunkPermutationOfFlat
     (actionChunkFlatten pp urs poly proofIndex)
@@ -229,7 +227,7 @@ theorem actionFullSigma_preservesActive
     (proofIndex :
       Fin (ActionPermutationDomain.actionShape pp).numProofs)
     (cell : ResolverPermutationCell
-      (ActionPermutationDomain.actionVk pp urs)
+      (actionCircuit.toVerifierKey urs)
       poly proofIndex actionActiveRows) :
     (((actionFullSigma pp urs poly proofIndex)
         (widenPermutationChunkCell actionActiveRows_le_domainSize cell)).2.1 :
@@ -260,7 +258,7 @@ def actionActiveSigma
       Fin (ActionPermutationDomain.actionShape pp).numProofs) :
     Equiv.Perm
       (ResolverPermutationCell
-        (ActionPermutationDomain.actionVk pp urs)
+        (actionCircuit.toVerifierKey urs)
         poly proofIndex actionActiveRows) :=
   Layout.Asm.restrictActivePerm actionActiveRows_le_domainSize
     (actionFullSigma pp urs poly proofIndex)
@@ -274,7 +272,7 @@ theorem actionActiveSigma_widen
     (proofIndex :
       Fin (ActionPermutationDomain.actionShape pp).numProofs)
     (cell : ResolverPermutationCell
-      (ActionPermutationDomain.actionVk pp urs)
+      (actionCircuit.toVerifierKey urs)
       poly proofIndex actionActiveRows) :
     widenPermutationChunkCell actionActiveRows_le_domainSize
         (actionActiveSigma pp urs poly proofIndex cell) =
@@ -296,7 +294,7 @@ def actionActiveChunkCell
     (flat : FlatCell actionNumPermCols actionDomainSize)
     (hrow : (flat.2 : ℕ) < actionActiveRows) :
     ResolverPermutationCell
-      (ActionPermutationDomain.actionVk pp urs)
+      (actionCircuit.toVerifierKey urs)
       poly proofIndex actionActiveRows :=
   let full :=
     (actionChunkFlatten pp urs poly proofIndex).symm (flat.2, flat.1)
@@ -359,24 +357,25 @@ theorem actionActiveChunkCell_columnAddress
     let cell :=
       actionActiveChunkCell pp urs poly proofIndex flat hrow
     permutationColumnAddress
-        (ActionPermutationDomain.actionVk pp urs)
+        (actionCircuit.toVerifierKey urs)
         ((actionCircuit.verifierCS.permutationChunks.getD
           cell.1 []).getD cell.2.2 ((.advice 0), 0)).1 =
       ColRef.toAny
         (actionPermCols.getD flat.1 (.advice 0)) := by
-  let vk := ActionPermutationDomain.actionVk pp urs
+  let vk := actionCircuit.toVerifierKey urs
   let cell :=
     actionActiveChunkCell pp urs poly proofIndex flat hrow
   have hvkChunks :
       vk.permutationChunks =
         actionCircuit.verifierCS.permutationChunks := by
     simpa only [vk] using
-      actionCircuit.toVerifierKey_permutationChunks pp urs
+      actionCircuit.toVerifierKey_permutationChunks urs
   have hchunk :
       (cell.1 : ℕ) < vk.permutationChunks.length := by
     rw [hvkChunks, verifierCS_permutationChunks_length]
     simpa only [ActionPermutationDomain.actionShape,
-      ProofParams.mergeDerived_numPermutationSets] using cell.1.isLt
+      CircuitShape.withProofParams_numPermutationSets,
+      actionCircuit.shape_numPermutationSets] using cell.1.isLt
   have hcolumn :
       (cell.2.2 : ℕ) <
         (vk.permutationChunks.getD cell.1 []).length := by
@@ -405,8 +404,8 @@ theorem actionActiveChunkCell_columnAddress
     have hprefix :
         (vk.permutationChunks.take cell.1).flatten.length =
           (cell.1 : ℕ) * vk.chunkLen := by
-      exact topLevelPermutationChunks_take_flatten_length
-        actionCircuit pp urs cell.1 hchunk
+      exact actionCircuit.toVerifierKey_permutationChunks_take_flatten_length
+        urs cell.1 hchunk
     rw [hprefix]
     exact hcoordinate
   have hdecoded := decodedChunkAddress_eq_sourceColumn
@@ -418,7 +417,7 @@ theorem actionActiveChunkCell_columnAddress
     (actionPermCols.map ColRef.toAny)
     (by
       simpa only [vk, actionPermCols] using
-        ActionPermutationDomain.permutationColumnAddresses_eq pp urs)
+        ActionPermutationDomain.permutationColumnAddresses_eq urs)
     cell.1 cell.2.2 flat.1
     hchunk hcolumn hglobal hindex
   have hmap :
@@ -441,69 +440,108 @@ theorem actionCopyValue_eq_activeChunkRowValue
       Fin (ActionPermutationDomain.actionShape pp).numProofs)
     (flat : FlatCell actionNumPermCols actionDomainSize)
     (hrow : (flat.2 : ℕ) < actionActiveRows) :
-    let vk := ActionPermutationDomain.actionVk pp urs
-    let cell :=
+    let circuitShape : CircuitShape := actionCircuit.shape
+    let vk : VerifyingKey circuitShape Fp G :=
+      actionCircuit.toVerifierKey urs
+    let cell : ResolverPermutationCell
+        (shape := circuitShape) (numProofs := pp.numProofs)
+        vk poly proofIndex actionActiveRows :=
       actionActiveChunkCell pp urs poly proofIndex flat hrow
     actionCopyValue
         (resolverEnvironment vk poly proofIndex actionActiveRows) flat =
       chunkRowValue actionCircuit.omega
-        (ResolverPermutationPairs vk poly proofIndex)
+        (ResolverPermutationPairs (shape := circuitShape)
+          (numProofs := pp.numProofs) vk poly proofIndex)
         cell.1 cell.2.1 cell.2.2 := by
-  let vk := ActionPermutationDomain.actionVk pp urs
-  let cell :=
+  let circuitShape : CircuitShape := actionCircuit.shape
+  let vk : VerifyingKey circuitShape Fp G :=
+    actionCircuit.toVerifierKey urs
+  let cell : ResolverPermutationCell
+      (shape := circuitShape) (numProofs := pp.numProofs)
+      vk poly proofIndex actionActiveRows :=
     actionActiveChunkCell pp urs poly proofIndex flat hrow
-  change
-    actionCopyValue
-        (resolverEnvironment vk poly proofIndex actionActiveRows) flat =
-      chunkRowValue actionCircuit.omega
-        (ResolverPermutationPairs vk poly proofIndex)
-        cell.1 cell.2.1 cell.2.2
+  simp only
+  let chunk : ℕ := cell.1
+  let row : ℕ := cell.2.1
+  let column : ℕ := cell.2.2
   have hvkChunks :
       vk.permutationChunks =
         actionCircuit.verifierCS.permutationChunks := by
     simpa only [vk] using
-      actionCircuit.toVerifierKey_permutationChunks pp urs
+      actionCircuit.toVerifierKey_permutationChunks urs
   have hchunk :
       (cell.1 : ℕ) < vk.permutationChunks.length := by
     rw [hvkChunks, verifierCS_permutationChunks_length]
     simpa only [ActionPermutationDomain.actionShape,
-      ProofParams.mergeDerived_numPermutationSets] using cell.1.isLt
+      CircuitShape.withProofParams_numPermutationSets,
+      actionCircuit.shape_numPermutationSets] using cell.1.isLt
   have hcolumn :
-      (cell.2.2 : ℕ) <
-        (vk.permutationChunks.getD cell.1 []).length := by
-    simpa only [cell, vk, ResolverPermutationPairs,
+      column <
+        (vk.permutationChunks.getD chunk []).length := by
+    simpa only [column, chunk, cell, vk, ResolverPermutationPairs,
       permutationChunkPairsOfResolver, List.length_map] using
         cell.2.2.isLt
   have hchunkMem :
-      vk.permutationChunks.getD cell.1 [] ∈
+      vk.permutationChunks.getD chunk [] ∈
         vk.permutationChunks := by
     rw [List.getD_eq_getElem _ _ hchunk]
     exact List.getElem_mem ..
   have hreferenceMem :
-      (vk.permutationChunks.getD cell.1 [])[cell.2.2] ∈
-        vk.permutationChunks.getD cell.1 [] :=
-    List.getElem_mem ..
+      (vk.permutationChunks.getD chunk []).getD
+          column ((.advice 0), 0) ∈
+        vk.permutationChunks.getD chunk [] := by
+    rw [List.getD_eq_getElem _ _ hcolumn]
+    exact List.getElem_mem ..
   have hcoherent :
       PermutationColumnRef.Coherent vk
-        ((vk.permutationChunks.getD cell.1 [])[cell.2.2]).1 :=
-    (ActionPermutationDomain.routingCoherent_of_derived pp urs
+        ((vk.permutationChunks.getD chunk []).getD
+          column ((.advice 0), 0)).1 :=
+    (ActionPermutationDomain.routingCoherent_of_derived urs
       _ hchunkMem _ hreferenceMem).1
-  have hresolver :=
-    chunkRowValue_eq_resolverEnvironment
-      vk poly proofIndex actionActiveRows
-      cell.1 cell.2.1 cell.2.2 hcolumn hcoherent
-  have haddress :=
+  generalize hreference :
+    ((vk.permutationChunks.getD chunk []).getD
+      column ((.advice 0), 0)).1 = reference at hcoherent
+  have hcolumnReference :
+      (vk.permutationChunks.getD chunk [])[column].1 = reference := by
+    calc
+      (vk.permutationChunks.getD chunk [])[column].1 =
+          ((vk.permutationChunks.getD chunk []).getD
+            column ((.advice 0), 0)).1 :=
+        congrArg Prod.fst (List.getD_eq_getElem _ _ hcolumn).symm
+      _ = reference := hreference
+  have hresolver :
+      chunkRowValue vk.omega
+          (permutationChunkPairsOfResolver vk poly proofIndex)
+          chunk row column =
+        (resolverEnvironment vk poly proofIndex actionActiveRows).get
+          (permutationColumnAddress vk reference)
+          (row : ℤ) := by
+    rw [chunkRowValue, rowValue]
+    have hpairs :
+        column <
+          (permutationChunkPairsOfResolver
+            vk poly proofIndex chunk).length := by
+      simpa only [permutationChunkPairsOfResolver,
+        List.length_map] using hcolumn
+    rw [List.getD_eq_getElem _ _ hpairs]
+    simp only [permutationChunkPairsOfResolver, List.getElem_map]
+    rw [hcolumnReference]
+    apply permutationColumnPolynomial_eval_environment
+    assumption
+  rw [← hcolumnReference] at hresolver
+  have haddressRaw :=
     actionActiveChunkCell_columnAddress
       pp urs poly proofIndex flat hrow
-  dsimp only at haddress
-  change
-    permutationColumnAddress vk
-        ((vk.permutationChunks.getD cell.1 []).getD
-          cell.2.2 ((.advice 0), 0)).1 =
-      ColRef.toAny
-        (actionPermCols.getD flat.1 (.advice 0)) at haddress
+  simp only at haddressRaw
+  rw [← hvkChunks] at haddressRaw
+  have haddress :
+      permutationColumnAddress vk
+          ((vk.permutationChunks.getD chunk []).getD
+            column ((.advice 0), 0)).1 =
+        ColRef.toAny (actionPermCols.getD flat.1 (.advice 0)) := by
+    simpa only [chunk, column] using haddressRaw
   rw [List.getD_eq_getElem _ _ hcolumn] at haddress
-  have hcellRow : (cell.2.1 : ℕ) = (flat.2 : ℕ) := by
+  have hcellRow : row = (flat.2 : ℕ) := by
     have hflatten :=
       actionActiveChunkCell_flatten
         pp urs poly proofIndex flat hrow
@@ -511,25 +549,35 @@ theorem actionCopyValue_eq_activeChunkRowValue
       congrArg (fun coordinate => (coordinate.1 : ℕ)) hflatten
     simpa only [actionChunkFlatten,
       _root_.Zcash.Snark.Layout.Asm.chunkFlatten_apply_row,
-      widenPermutationChunkCell_row, cell] using hfirst
-  calc
+      widenPermutationChunkCell_row, row, cell] using hfirst
+  have hresult :
     actionCopyValue
         (resolverEnvironment vk poly proofIndex actionActiveRows) flat =
-      (resolverEnvironment vk poly proofIndex actionActiveRows).get
-        (ColRef.toAny (actionPermCols.getD flat.1 (.advice 0)))
-        (flat.2 : ℤ) := rfl
-    _ = (resolverEnvironment vk poly proofIndex actionActiveRows).get
-        (permutationColumnAddress vk
-          ((vk.permutationChunks.getD cell.1 [])[cell.2.2]).1)
-        (cell.2.1 : ℤ) := by
-          rw [← hcellRow]
-          congr 1
-          exact haddress.symm
-    _ = chunkRowValue actionCircuit.omega
-        (ResolverPermutationPairs vk poly proofIndex)
-        cell.1 cell.2.1 cell.2.2 := by
-          simpa only [vk, ActionPermutationDomain.actionVk,
-            actionCircuit.toVerifierKey_omega] using hresolver.symm
+      chunkRowValue actionCircuit.omega
+        (ResolverPermutationPairs (shape := circuitShape)
+          (numProofs := pp.numProofs) vk poly proofIndex)
+        chunk row column := by
+    calc
+      actionCopyValue
+          (resolverEnvironment vk poly proofIndex actionActiveRows) flat =
+        (resolverEnvironment vk poly proofIndex actionActiveRows).get
+          (ColRef.toAny (actionPermCols.getD flat.1 (.advice 0)))
+          (flat.2 : ℤ) := by
+            simp only [actionCopyValue]
+      _ = (resolverEnvironment vk poly proofIndex actionActiveRows).get
+          (permutationColumnAddress vk
+            ((vk.permutationChunks.getD chunk [])[column]).1)
+          (row : ℤ) := by
+            rw [← hcellRow]
+            congr 1
+            exact haddress.symm
+      _ = chunkRowValue actionCircuit.omega
+          (ResolverPermutationPairs (shape := circuitShape)
+            (numProofs := pp.numProofs) vk poly proofIndex)
+          chunk row column := by
+            simpa only [vk,
+              actionCircuit.toVerifierKey_omega] using hresolver.symm
+  simpa only [chunk, row, column] using hresult
 
 /--
 Every decoded Action keygen-copy pair has equal values in the canonical
@@ -548,38 +596,38 @@ theorem actionCopyPairValue_of_resolverPermutation
       Fin (ActionPermutationDomain.actionShape pp).numProofs)
     {n : ℕ}
     (hsat : ConstraintSatisfaction
-      (constraintModelOfResolver
-        (ActionPermutationDomain.actionVk pp urs) ch poly
-        (permutationSetsOfResolver
-          (ActionPermutationDomain.actionVk pp urs) poly)
-        (permutationChunksOfResolver
-          (ActionPermutationDomain.actionVk pp urs) poly)
+      (constraintModelOfResolver (numProofs := pp.numProofs)
+        (actionCircuit.toVerifierKey urs) ch poly
+        (permutationSetsOfResolver (numProofs := pp.numProofs)
+          (actionCircuit.toVerifierKey urs) poly)
+        (permutationChunksOfResolver (numProofs := pp.numProofs)
+          (actionCircuit.toVerifierKey urs) poly)
         l0 lLast lBlind) n)
     (hdom : ResolverPermutationDomain
-      (ActionPermutationDomain.actionVk pp urs)
+      (actionCircuit.toVerifierKey urs)
       l0 lLast lBlind n actionActiveRows)
     (hcycle : ResolverPermutationCycle
-      (ActionPermutationDomain.actionVk pp urs)
+      (actionCircuit.toVerifierKey urs)
       poly proofIndex actionActiveRows)
     (hcycleSigma :
       hcycle.sigma =
         actionActiveSigma pp urs poly proofIndex)
     (hgood : ResolverPermutationGoodChallenges
-      (ActionPermutationDomain.actionVk pp urs)
+      (actionCircuit.toVerifierKey urs)
       ch poly proofIndex actionActiveRows) :
     ∀ pair ∈ actionCopies,
       actionCopyValue
           (resolverEnvironment
-            (ActionPermutationDomain.actionVk pp urs)
+            (actionCircuit.toVerifierKey urs)
             poly proofIndex actionActiveRows)
           pair.1 =
         actionCopyValue
           (resolverEnvironment
-            (ActionPermutationDomain.actionVk pp urs)
+            (actionCircuit.toVerifierKey urs)
             poly proofIndex actionActiveRows)
           pair.2 := by
   intro pair hpair
-  let vk := ActionPermutationDomain.actionVk pp urs
+  let vk := actionCircuit.toVerifierKey urs
   have hrows := actionCopyRowsActive pair hpair
   let left :=
     actionActiveChunkCell pp urs poly proofIndex pair.1 hrows.1
@@ -604,6 +652,7 @@ theorem actionCopyPairValue_of_resolverPermutation
       actionActiveSigma_widen pp urs poly proofIndex cell
   have hchunkValues :=
     Layout.Asm.chunkRowValue_eq_of_mem_copies
+      (numProofs := pp.numProofs)
       vk ch poly l0 lLast lBlind proofIndex
       hsat hdom hcycle hgood
       actionActiveRows_le_domainSize actionCopies
@@ -623,15 +672,15 @@ theorem actionCopyPairValue_of_resolverPermutation
         (resolverEnvironment vk poly proofIndex actionActiveRows)
         pair.1 =
       chunkRowValue actionCircuit.omega
-        (ResolverPermutationPairs vk poly proofIndex)
+        (ResolverPermutationPairs (numProofs := pp.numProofs) vk poly proofIndex)
         left.1 left.2.1 left.2.2 := by
           simpa only [vk, left] using
             actionCopyValue_eq_activeChunkRowValue
               pp urs poly proofIndex pair.1 hrows.1
     _ = chunkRowValue actionCircuit.omega
-        (ResolverPermutationPairs vk poly proofIndex)
+        (ResolverPermutationPairs (numProofs := pp.numProofs) vk poly proofIndex)
         right.1 right.2.1 right.2.2 := by
-          simpa only [vk, ActionPermutationDomain.actionVk,
+          simpa only [vk,
             actionCircuit.toVerifierKey_omega] using hchunkValues
     _ = actionCopyValue
         (resolverEnvironment vk poly proofIndex actionActiveRows)

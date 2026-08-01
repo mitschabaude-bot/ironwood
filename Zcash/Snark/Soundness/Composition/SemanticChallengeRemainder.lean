@@ -46,10 +46,13 @@ variable {shape : Shape} {G : Type*}
 
 /-- The bundle-wide permutation `γ` exclusion costs the summed cell counts, doubled. -/
 theorem allResolverPermutationGammaBadSet_measure_le
-    (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
+    {circuitShape : CircuitShape}
+    (numProofs : ℕ)
+    (vk : VerifyingKey circuitShape Fp G) (ch : Challenges circuitShape.k Fp)
     (poly : CommitmentId → CPoly) (m : ℕ) :
-    uniformChallenge.toOuterMeasure (allResolverPermutationGammaBadSet vk ch poly m) ≤
-      ((∑ p : Fin shape.numProofs,
+    uniformChallenge.toOuterMeasure
+        (allResolverPermutationGammaBadSet numProofs vk ch poly m) ≤
+      ((∑ p : Fin numProofs,
         2 * Fintype.card (ResolverPermutationCell vk poly p m) : ℕ) : ℝ≥0∞) /
         Fintype.card Fp := by
   refine le_trans (le_of_eq (uniformChallenge_badSet _)) (ENNReal.div_le_div_right ?_ _)
@@ -58,10 +61,13 @@ theorem allResolverPermutationGammaBadSet_measure_le
 
 /-- The bundle-wide permutation `β` exclusion costs the summed quadratic cell counts. -/
 theorem allResolverPermutationBetaBadSet_measure_le
-    (vk : VerifyingKey shape Fp G)
+    {circuitShape : CircuitShape}
+    (numProofs : ℕ)
+    (vk : VerifyingKey circuitShape Fp G)
     (poly : CommitmentId → CPoly) (m : ℕ) :
-    uniformChallenge.toOuterMeasure (allResolverPermutationBetaBadSet vk poly m) ≤
-      ((∑ p : Fin shape.numProofs,
+    uniformChallenge.toOuterMeasure
+        (allResolverPermutationBetaBadSet numProofs vk poly m) ≤
+      ((∑ p : Fin numProofs,
         (Fintype.card (ResolverPermutationCell vk poly p m) + 1) *
           Fintype.card (ResolverPermutationCell vk poly p m) : ℕ) : ℝ≥0∞) /
         Fintype.card Fp := by
@@ -73,12 +79,12 @@ theorem allResolverPermutationBetaBadSet_measure_le
 
 /-- The bundle-wide lookup `γ` exclusion costs `2(u+1)` per (proof, lookup) pair. -/
 theorem allResolverLookupGammaBadSet_measure_le
-    {k : ℕ} (numProofs : ℕ)
-    (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
+    {circuitShape : CircuitShape} {k : ℕ} (numProofs : ℕ)
+    (vk : VerifyingKey circuitShape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly) (u : ℕ) :
     uniformChallenge.toOuterMeasure
         (allResolverLookupGammaBadSet numProofs vk ch poly u) ≤
-      ((numProofs * shape.numLookups * (2 * (u + 1)) : ℕ) : ℝ≥0∞) /
+      ((numProofs * circuitShape.numLookups * (2 * (u + 1)) : ℕ) : ℝ≥0∞) /
         Fintype.card Fp := by
   refine le_trans (le_of_eq (uniformChallenge_badSet _)) (ENNReal.div_le_div_right ?_ _)
   refine_lift Nat.cast_le.mpr ?_
@@ -89,12 +95,12 @@ theorem allResolverLookupGammaBadSet_measure_le
 
 /-- The bundle-wide lookup `β` exclusion costs `(u+2)(u+1) + (u+1)` per pair. -/
 theorem allResolverLookupBetaBadSet_measure_le
-    {k : ℕ} (numProofs : ℕ)
-    (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
+    {circuitShape : CircuitShape} {k : ℕ} (numProofs : ℕ)
+    (vk : VerifyingKey circuitShape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly) (u : ℕ) :
     uniformChallenge.toOuterMeasure
         (allResolverLookupBetaBadSet numProofs vk ch poly u) ≤
-      ((numProofs * shape.numLookups * ((u + 2) * (u + 1) + (u + 1)) : ℕ) : ℝ≥0∞) /
+      ((numProofs * circuitShape.numLookups * ((u + 2) * (u + 1) + (u + 1)) : ℕ) : ℝ≥0∞) /
         Fintype.card Fp := by
   refine le_trans (le_of_eq (uniformChallenge_badSet _)) (ENNReal.div_le_div_right ?_ _)
   refine_lift Nat.cast_le.mpr ?_
@@ -115,9 +121,9 @@ noncomputable def semanticChallengeRemainder
     (poly : CommitmentId → CPoly) (constraints : List (CPoly))
     (m u : ℕ) : ℝ≥0∞ :=
   ((vk.n * constraints.length : ℕ) : ℝ≥0∞) / Fintype.card Fp +
-    ((∑ p : Fin shape.numProofs,
+    ((∑ p : Fin numProofs,
       2 * Fintype.card (ResolverPermutationCell vk poly p m) : ℕ) : ℝ≥0∞) / Fintype.card Fp +
-    ((∑ p : Fin shape.numProofs,
+    ((∑ p : Fin numProofs,
       (Fintype.card (ResolverPermutationCell vk poly p m) + 1) *
         Fintype.card (ResolverPermutationCell vk poly p m) : ℕ) : ℝ≥0∞) / Fintype.card Fp +
     ((numProofs * shape.numLookups * (2 * (u + 1)) : ℕ) : ℝ≥0∞) / Fintype.card Fp +
@@ -134,8 +140,10 @@ theorem semanticChallengeRemainder_covers
     (m u : ℕ) (hn : vk.n ≠ 0) :
     uniformChallenge.toOuterMeasure
         {y : Fp | ∃ j, y ∈ szBadSet (foldSplitWitness constraints vk.n j)} +
-      uniformChallenge.toOuterMeasure (allResolverPermutationGammaBadSet vk ch poly m) +
-      uniformChallenge.toOuterMeasure (allResolverPermutationBetaBadSet vk poly m) +
+      uniformChallenge.toOuterMeasure
+          (allResolverPermutationGammaBadSet numProofs vk ch poly m) +
+      uniformChallenge.toOuterMeasure
+          (allResolverPermutationBetaBadSet numProofs vk poly m) +
       uniformChallenge.toOuterMeasure
           (allResolverLookupGammaBadSet numProofs vk ch poly u) +
       uniformChallenge.toOuterMeasure
@@ -144,8 +152,8 @@ theorem semanticChallengeRemainder_covers
   unfold semanticChallengeRemainder
   gcongr
   · exact goodY_failure_measure_le constraints hn
-  · exact allResolverPermutationGammaBadSet_measure_le vk ch poly m
-  · exact allResolverPermutationBetaBadSet_measure_le vk poly m
+  · exact allResolverPermutationGammaBadSet_measure_le numProofs vk ch poly m
+  · exact allResolverPermutationBetaBadSet_measure_le numProofs vk poly m
   · exact allResolverLookupGammaBadSet_measure_le numProofs vk ch poly u
   · exact allResolverLookupBetaBadSet_measure_le numProofs vk ch poly u
 
@@ -269,16 +277,17 @@ the usable-row count alone.
 -/
 
 /-- The resolver's chunk pair count is the key's, not the run's. -/
-theorem resolverPermutationPairs_length {shape : Shape} {G : Type*}
+theorem resolverPermutationPairs_length {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
-    (p : Fin shape.numProofs) (c : ℕ) :
+    (p : Fin numProofs) (c : ℕ) :
     (ResolverPermutationPairs vk poly p c).length = (vk.permutationChunks.getD c []).length :=
   List.length_map _
 
 /-- Hence two runs give the same permutation cell count, so the epsilon is run-uniform. -/
-theorem resolverPermutationCell_card_congr {shape : Shape} {G : Type*}
+theorem resolverPermutationCell_card_congr
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (poly poly' : CommitmentId → CPoly)
-    (p : Fin shape.numProofs) (m : ℕ) :
+    (p : Fin numProofs) (m : ℕ) :
     Fintype.card (ResolverPermutationCell vk poly p m) =
       Fintype.card (ResolverPermutationCell vk poly' p m) := by
   unfold ResolverPermutationCell

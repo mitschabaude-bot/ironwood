@@ -31,7 +31,7 @@ def TopLevelTerminalOutcome
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams)
+    (pp : ProofParams)
     (poly : CommitmentId → CPoly)
     (Bad : Type) : Type :=
   TopLevelBundleStatement top pp poly ⊕' Bad
@@ -41,7 +41,7 @@ def TopLevelWitnessTerminalOutcome
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams)
+    (pp : ProofParams)
     (poly : CommitmentId → CPoly)
     (Bad : Type) : Type :=
   TopLevelBundleWitness top pp poly ⊕' Bad
@@ -57,7 +57,7 @@ def topLevelBundleStatement_or_bad_of_components
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     {top : TopLevelCircuit Fp Config PublicInput}
-    {pp : Keygen.ProofParams} {urs : URS G}
+    {pp : ProofParams} {urs : URS G}
     {k : ℕ} {ch : Challenges k Fp}
     {poly : CommitmentId → CPoly}
     {cell : Type} [DecidableEq cell] [Fintype cell]
@@ -99,7 +99,7 @@ def topLevelBundleWitness_or_bad_of_components
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     {top : TopLevelCircuit Fp Config PublicInput}
-    {pp : Keygen.ProofParams} {urs : URS G}
+    {pp : ProofParams} {urs : URS G}
     {k : ℕ} {ch : Challenges k Fp}
     {poly : CommitmentId → CPoly}
     {cell : Type} [DecidableEq cell] [Fintype cell]
@@ -135,7 +135,7 @@ def topLevelBundleStatement_or_bad_of_constraintSatisfaction
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     {top : TopLevelCircuit Fp Config PublicInput}
-    {pp : Keygen.ProofParams} {urs : URS G}
+    {pp : ProofParams} {urs : URS G}
     {k : ℕ} {ch : Challenges k Fp}
     {poly : CommitmentId → CPoly}
     {cell : Type} [DecidableEq cell] [Fintype cell]
@@ -182,7 +182,7 @@ def topLevelBundleWitness_or_bad_of_constraintSatisfaction
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     {top : TopLevelCircuit Fp Config PublicInput}
-    {pp : Keygen.ProofParams} {urs : URS G}
+    {pp : ProofParams} {urs : URS G}
     {k : ℕ} {ch : Challenges k Fp}
     {poly : CommitmentId → CPoly}
     {cell : Type} [DecidableEq cell] [Fintype cell]
@@ -232,33 +232,37 @@ variable
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams) (urs : URS G)
-    (hk : (pp.mergeDerived top).k = urs.k)
+    (pp : ProofParams) (urs : URS G)
+    (hk : top.shape.k = urs.k)
     (inputs : Fin pp.numProofs → PublicInput Fp)
-    (ps : ProofString (pp.mergeDerived top) Fp G)
-    (ch : Challenges (pp.mergeDerived top).k Fp)
+    (ps : ProofString (top.shape.withProofParams pp) Fp G)
+    (ch : Challenges top.shape.k Fp)
     (pU pW : Fp) (a : Fin (2 ^ urs.k) → Fp)
     (batchOpenings :
       OpenedBatchOpenings urs (evalVector urs.k ch.x3)
         (x4BatchCommitments
-          (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
-          urs hk (top.toVerifierKey pp urs) ps ch)
+          (shape := top.shape.withProofParams pp)
+          (instanceCommitment := top.instanceCommitment urs inputs)
+          urs hk (top.toVerifierKey urs) ps ch)
         (x4BatchEvals
-          (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
-          (top.toVerifierKey pp urs) ps ch)
+          (shape := top.shape.withProofParams pp)
+          (instanceCommitment := top.instanceCommitment urs inputs)
+          (top.toVerifierKey urs) ps ch)
         a pU pW)
     (memberDecode : ∀ i (hi : i <
         deployedX4PairCount
-          (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
-          (top.toVerifierKey pp urs) ps ch),
+          (shape := top.shape.withProofParams pp)
+          (instanceCommitment := top.instanceCommitment urs inputs)
+          (top.toVerifierKey urs) ps ch),
       OpenedMemberDecode
-        (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
-        urs hk (top.toVerifierKey pp urs)
+        (shape := top.shape.withProofParams pp)
+        (instanceCommitment := top.instanceCommitment urs inputs)
+        urs hk (top.toVerifierKey urs)
         ps ch batchOpenings i hi)
     (haccepts :
-      DeployedAccepts urs hk
-        (top.toVerifierKey pp urs)
-        (top.instanceCommitmentForShape pp urs inputs) ps ch)
+      DeployedAccepts (top.shape.withProofParams pp) urs hk
+        (top.toVerifierKey urs)
+        (top.instanceCommitment urs inputs) ps ch)
 
 /--
 Satisfaction of the canonical model selected by an accepting verifier run,
@@ -269,23 +273,26 @@ def topLevelWitnesses_or_relation_of_circuitSat
     (hpoly : CPoly)
     (hsatisfied :
       (CanonicalMemberConstraintRelation.acceptedModel
+        (shape := top.shape.withProofParams pp)
         (memberDecode := memberDecode)
         (hblinding :=
-          top.toVerifierKey_blindingFactors_lt_n pp urs) haccepts).CircuitSat
+          top.toVerifierKey_blindingFactors_lt_n urs) haccepts).CircuitSat
           ch.y hpoly top.n a)
     (hgoodY : ∀ j,
       ch.y ∉ szBadSet
         (foldSplitWitness
           (CanonicalMemberConstraintRelation.acceptedModel
+            (shape := top.shape.withProofParams pp)
             (memberDecode := memberDecode)
             (hblinding :=
-              top.toVerifierKey_blindingFactors_lt_n pp urs)
+              top.toVerifierKey_blindingFactors_lt_n urs)
             haccepts).constraints
           top.n j))
     {cell : Type} [DecidableEq cell] [Fintype cell]
     (correctness :
       TopLevelCircuitCorrectness top pp urs ch
         (CanonicalMemberConstraintRelation.acceptedPolynomial
+          (shape := top.shape.withProofParams pp)
           (memberDecode := memberDecode) haccepts)
         cell
         (NontrivialRelation (F := Fp) urs.g urs.u urs.w)) :
@@ -297,6 +304,7 @@ def topLevelWitnesses_or_relation_of_circuitSat
   have hpolynomial :
       relation.polynomial =
         CanonicalMemberConstraintRelation.acceptedPolynomial
+          (shape := top.shape.withProofParams pp)
           (memberDecode := memberDecode) haccepts := by
     rfl
   have hn :
@@ -328,23 +336,26 @@ def topLevelStatements_or_relation_of_circuitSat
     (hpoly : CPoly)
     (hsatisfied :
       (CanonicalMemberConstraintRelation.acceptedModel
+        (shape := top.shape.withProofParams pp)
         (memberDecode := memberDecode)
         (hblinding :=
-          top.toVerifierKey_blindingFactors_lt_n pp urs) haccepts).CircuitSat
+          top.toVerifierKey_blindingFactors_lt_n urs) haccepts).CircuitSat
           ch.y hpoly top.n a)
     (hgoodY : ∀ j,
       ch.y ∉ szBadSet
         (foldSplitWitness
           (CanonicalMemberConstraintRelation.acceptedModel
+            (shape := top.shape.withProofParams pp)
             (memberDecode := memberDecode)
             (hblinding :=
-              top.toVerifierKey_blindingFactors_lt_n pp urs)
+              top.toVerifierKey_blindingFactors_lt_n urs)
             haccepts).constraints
           top.n j))
     {cell : Type} [DecidableEq cell] [Fintype cell]
     (correctness :
       TopLevelCircuitCorrectness top pp urs ch
         (CanonicalMemberConstraintRelation.acceptedPolynomial
+          (shape := top.shape.withProofParams pp)
           (memberDecode := memberDecode) haccepts)
         cell
         (NontrivialRelation (F := Fp) urs.g urs.u urs.w)) :
@@ -372,63 +383,73 @@ def topLevelStatements_or_relation_of_decodedMemberPolynomial_eq
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams) (urs : URS G)
-    (hk : (pp.mergeDerived top).k = urs.k)
+    (pp : ProofParams) (urs : URS G)
+    (hk : (top.shape.withProofParams pp).k = urs.k)
     (inputs : Fin pp.numProofs → PublicInput Fp)
-    (ps : ProofString (pp.mergeDerived top) Fp G)
-    (ch : Challenges (pp.mergeDerived top).k Fp)
+    (ps : ProofString (top.shape.withProofParams pp) Fp G)
+    (ch : Challenges (top.shape.withProofParams pp).k Fp)
     (pU pW : Fp) (a : Fin (2 ^ urs.k) → Fp)
     (batchOpenings :
       OpenedBatchOpenings urs (evalVector urs.k ch.x3)
         (x4BatchCommitments
-          (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
-          urs hk (top.toVerifierKey pp urs) ps ch)
+          (shape := top.shape.withProofParams pp)
+          (instanceCommitment := top.instanceCommitment urs inputs)
+          urs hk (top.toVerifierKey urs) ps ch)
         (x4BatchEvals
-          (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
-          (top.toVerifierKey pp urs) ps ch)
+          (shape := top.shape.withProofParams pp)
+          (instanceCommitment := top.instanceCommitment urs inputs)
+          (top.toVerifierKey urs) ps ch)
         a pU pW)
     (memberDecode : ∀ i (hi : i <
         deployedX4PairCount
-          (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
-          (top.toVerifierKey pp urs) ps ch),
+          (shape := top.shape.withProofParams pp)
+          (instanceCommitment := top.instanceCommitment urs inputs)
+          (top.toVerifierKey urs) ps ch),
       OpenedMemberDecode
-        (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
-        urs hk (top.toVerifierKey pp urs)
+        (shape := top.shape.withProofParams pp)
+        (instanceCommitment := top.instanceCommitment urs inputs)
+        urs hk (top.toVerifierKey urs)
         ps ch batchOpenings i hi)
     (haccepts :
-      DeployedAccepts urs hk
-        (top.toVerifierKey pp urs)
-        (top.instanceCommitmentForShape pp urs inputs) ps ch)
+      DeployedAccepts (top.shape.withProofParams pp) urs hk
+        (top.toVerifierKey urs)
+        (top.instanceCommitment urs inputs) ps ch)
     (hpoly : CPoly)
     (hquot :
       hpoly =
         CanonicalMemberConstraintRelation.acceptedPolynomial
+          (shape := top.shape.withProofParams pp)
           (memberDecode := memberDecode) haccepts .vanishingH)
     (hbind : ∀
       (slot : DeployedMemberSlot
-        (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
-        (top.toVerifierKey pp urs) ps ch)
+        (shape := top.shape.withProofParams pp)
+        (instanceCommitment := top.instanceCommitment urs inputs)
+        (top.toVerifierKey urs) ps ch)
       (point : Fp),
       point ∈ deployedSetPts
-          (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
-          (top.toVerifierKey pp urs) ps ch slot.setIndex →
+          (shape := top.shape.withProofParams pp)
+          (instanceCommitment := top.instanceCommitment urs inputs)
+          (top.toVerifierKey urs) ps ch slot.setIndex →
       (decodedMemberPolynomial
-        (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
-        urs hk (top.toVerifierKey pp urs)
+        (shape := top.shape.withProofParams pp)
+        (instanceCommitment := top.instanceCommitment urs inputs)
+        urs hk (top.toVerifierKey urs)
         ps ch memberDecode slot).eval point =
           deployedMemberClaim
-            (instanceCommitment := top.instanceCommitmentForShape pp urs inputs)
-            (top.toVerifierKey pp urs) ps ch slot point ⊕'
+            (shape := top.shape.withProofParams pp)
+            (instanceCommitment := top.instanceCommitment urs inputs)
+            (top.toVerifierKey urs) ps ch slot point ⊕'
         NontrivialRelation (F := Fp) urs.g urs.u urs.w)
     (domainExponent_lt : top.domainExponent < 33)
     (permutationRouting :
-      PermutationChunkRoutingCoherent (top.toVerifierKey pp urs))
+      PermutationChunkRoutingCoherent (top.toVerifierKey urs))
     (hxgood :
       let model :=
         CanonicalMemberConstraintRelation.acceptedModel
+          (shape := top.shape.withProofParams pp)
           (memberDecode := memberDecode)
           (hblinding :=
-            top.toVerifierKey_blindingFactors_lt_n pp urs)
+            top.toVerifierKey_blindingFactors_lt_n urs)
           haccepts
       ch.x ∉ szBadSet
         (combineConstraints
@@ -441,21 +462,24 @@ def topLevelStatements_or_relation_of_decodedMemberPolynomial_eq
       ch.y ∉ szBadSet
         (foldSplitWitness
           (CanonicalMemberConstraintRelation.acceptedModel
+            (shape := top.shape.withProofParams pp)
             (memberDecode := memberDecode)
             (hblinding :=
-              top.toVerifierKey_blindingFactors_lt_n pp urs)
+              top.toVerifierKey_blindingFactors_lt_n urs)
             haccepts).constraints
           top.n j))
     {cell : Type} [DecidableEq cell] [Fintype cell]
     (correctness :
         (CanonicalMemberConstraintRelation.acceptedModel
+          (shape := top.shape.withProofParams pp)
           (memberDecode := memberDecode)
           (hblinding :=
-            top.toVerifierKey_blindingFactors_lt_n pp urs)
+            top.toVerifierKey_blindingFactors_lt_n urs)
           haccepts).CircuitSat
             ch.y hpoly top.n a →
       TopLevelCircuitCorrectness top pp urs ch
         (CanonicalMemberConstraintRelation.acceptedPolynomial
+          (shape := top.shape.withProofParams pp)
           (memberDecode := memberDecode) haccepts)
         cell
         (NontrivialRelation (F := Fp) urs.g urs.u urs.w)) :
@@ -480,13 +504,13 @@ def topLevelStatements_or_relation_of_decodedMemberPolynomial_eq
         (top := top) domainExponent_lt)
   rcases
       acceptedModel_circuitSat_or_relation_of_decodedMemberPolynomial_eq
-        urs hk (top.toVerifierKey pp urs)
-        (top.instanceCommitmentForShape pp urs inputs) ps ch memberDecode
-        haccepts (top.toVerifierKey_blindingFactors_lt_n pp urs)
+        urs hk (top.toVerifierKey urs)
+        (top.instanceCommitment urs inputs) ps ch memberDecode
+        haccepts (top.toVerifierKey_blindingFactors_lt_n urs)
         hpoly hquot
-        (top.toVerifierKey_fixedQueryCount pp urs)
-        (top.toVerifierKey_adviceQueryCount pp urs)
-        (top.toVerifierKey_instanceQueryCount pp urs)
+        (top.toVerifierKey_fixedQueryCount urs)
+        (top.toVerifierKey_adviceQueryCount urs)
+        (top.toVerifierKey_instanceQueryCount urs)
         hbind permutationRouting hrows hroot hnFp hxgood with
     hsatisfied | relation
   · exact topLevelStatements_or_relation_of_circuitSat

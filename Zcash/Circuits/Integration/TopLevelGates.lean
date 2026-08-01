@@ -28,7 +28,7 @@ Static coherence for a top-level circuit's own derived verifying key.
 
 No placement, operation stream, selector map, or pinned constraint system is supplied
 by the caller: all four are derived from `top`, and the key is fixed to
-`top.toVerifierKey pp urs`. Gate/lookup registration coherence is absent because the
+`top.toVerifierKey urs`. Gate/lookup registration coherence is absent because the
 circuit-derived constraint system closes the raw configure result under synthesis by
 construction.
 -/
@@ -64,26 +64,26 @@ theorem resolverInterpretsGates
       top.gateQueryState
       (fun query =>
         (fixedQueryFeedOfResolver
-          (top.toVerifierKey pp urs) poly query).eval
+          (top.toVerifierKey urs) poly query).eval
           (top.omega ^ row))
       (fun query =>
         (adviceQueryFeedOfResolver
-          (top.toVerifierKey pp urs) poly proofIndex query).eval
+          (top.toVerifierKey urs) poly proofIndex query).eval
           (top.omega ^ row))
       (fun query =>
         (instanceQueryFeedOfResolver
-          (top.toVerifierKey pp urs) poly proofIndex query).eval
+          (top.toVerifierKey urs) poly proofIndex query).eval
           (top.omega ^ row))
       (Query.eval
         (resolverEnvironment
-          (top.toVerifierKey pp urs) poly proofIndex usableRows)
+          (top.toVerifierKey urs) poly proofIndex usableRows)
         (fun _ => 0) row) := by
   have homega : top.omega ≠ 0 := by
     have hk : top.domainExponent ≤ 32 :=
       Nat.le_of_lt_succ (by simpa using coherence.domainExponent_lt)
     exact top.omega_ne_zero hk
   have hfinal := resolverQueryFeeds_interpret
-    (top.toVerifierKey pp urs) poly proofIndex usableRows
+    (top.toVerifierKey urs) poly proofIndex usableRows
     (fun _ => 0) row
     homega
     (pinnedQueryState top.pinnedCS)
@@ -96,9 +96,9 @@ theorem resolverInterpretsGates
     (by
       simp only [top.toVerifierKey_instanceQueryLayout,
         TopLevelCircuit.instanceQueryLayout, pinnedQueryState])
-    (top.toVerifierKey_adviceQueryCount pp urs)
-    (top.toVerifierKey_fixedQueryCount pp urs)
-    (top.toVerifierKey_instanceQueryCount pp urs)
+    (top.toVerifierKey_adviceQueryCount urs)
+    (top.toVerifierKey_fixedQueryCount urs)
+    (top.toVerifierKey_instanceQueryCount urs)
   apply hfinal.mono
   exact top.pinnedQueryState_extends_gates
 
@@ -145,7 +145,7 @@ opaque polynomialWitness
     (hfixed : SelectorActivationsRealized top.selectorMap
       top.selectorActivations
       (resolverEnvironment
-        (top.toVerifierKey pp urs) poly proofIndex usableRows))
+        (top.toVerifierKey urs) poly proofIndex usableRows))
     (enabled : EnabledGate Fp)
     (henabled :
       enabled ∈ operationEnabledGates (top.operations) 0)
@@ -155,12 +155,12 @@ opaque polynomialWitness
       (constraintModelOfResolver
         (numProofs := pp.numProofs)
         (k := k)
-        (top.toVerifierKey pp urs) ch poly sets chunks
+        (top.toVerifierKey urs) ch poly sets chunks
         l0 lLast lBlind)
       proofIndex
       top.omega top.placement
       (resolverEnvironment
-        (top.toVerifierKey pp urs) poly proofIndex usableRows)
+        (top.toVerifierKey urs) poly proofIndex usableRows)
       enabled constraint := by
   have hgate : enabled.gate ∈ top.constraintSystem.gates :=
     OperationsKeygenCoherent.gate
@@ -194,13 +194,13 @@ opaque polynomialWitness
       (selReplacement compressed).eval
         (Query.eval
           (resolverEnvironment
-            (top.toVerifierKey pp urs) poly proofIndex usableRows)
+            (top.toVerifierKey urs) poly proofIndex usableRows)
           (fun _ => 0)
           (top.placement enabled.region + enabled.row)) ≠ 0 := by
     apply selectorScale_ne_zero_of_enabledGate
       top.selectorMap top.regionStarts (top.operations) 0
       (resolverEnvironment
-        (top.toVerifierKey pp urs) poly proofIndex usableRows)
+        (top.toVerifierKey urs) poly proofIndex usableRows)
       (fun _ => 0) coherence.selectorRootsWellFormed
     · exact hfixed
     · exact henabled
@@ -208,7 +208,7 @@ opaque polynomialWitness
   exact enabledGatePolynomialWitnessOfResolver
     (numProofs := pp.numProofs)
     (k := k)
-    (top.toVerifierKey pp urs)
+    (top.toVerifierKey urs)
     top.constraintSystem top.selectorMap ch poly sets chunks
     l0 lLast lBlind proofIndex
     top.placement usableRows
@@ -223,22 +223,22 @@ opaque polynomialWitness
         top.verifierCS_gates_eval
           (fun query =>
             (fixedQueryFeedOfResolver
-              (top.toVerifierKey pp urs) poly query).eval
+              (top.toVerifierKey urs) poly query).eval
               (top.omega ^
                 (top.placement enabled.region + enabled.row)))
           (fun query =>
             (adviceQueryFeedOfResolver
-              (top.toVerifierKey pp urs) poly proofIndex query).eval
+              (top.toVerifierKey urs) poly proofIndex query).eval
               (top.omega ^
                 (top.placement enabled.region + enabled.row)))
           (fun query =>
             (instanceQueryFeedOfResolver
-              (top.toVerifierKey pp urs) poly proofIndex query).eval
+              (top.toVerifierKey urs) poly proofIndex query).eval
               (top.omega ^
                 (top.placement enabled.region + enabled.row)))
           (Query.eval
             (resolverEnvironment
-              (top.toVerifierKey pp urs) poly proofIndex usableRows)
+              (top.toVerifierKey urs) poly proofIndex usableRows)
             (fun _ => 0)
             (top.placement enabled.region + enabled.row))
           coherence.gateSelectorsCovered hinterpret
@@ -270,31 +270,31 @@ theorem canonicalConstraints
     (hfixed : SelectorActivationsRealized top.selectorMap
       top.selectorActivations
       (resolverEnvironment
-        (top.toVerifierKey pp urs) poly proofIndex
+        (top.toVerifierKey urs) poly proofIndex
         (top.usableRowsAt top.domainExponent))) :
     CircuitConstraintFamily.constraints .gate top.placement
       (resolverEnvironment
-        (top.toVerifierKey pp urs) poly proofIndex
+        (top.toVerifierKey urs) poly proofIndex
         (top.usableRowsAt top.domainExponent))
       (top.operations) 0 := by
   apply gate_constraints_of_polynomial_witnesses
     (top.constraintModel pp urs ch poly)
     proofIndex top.omega top.placement
     (resolverEnvironment
-      (top.toVerifierKey pp urs) poly proofIndex
+      (top.toVerifierKey urs) poly proofIndex
       (top.usableRowsAt top.domainExponent))
     (top.operations) 0 satisfaction domain
   intro enabled henabled constraint hconstraint
   let selectors :=
     canonicalLagrangePolynomials
       top.omega
-      (top.toVerifierKey_blindingFactors_lt_n pp urs)
+      (top.toVerifierKey_blindingFactors_lt_n urs)
   rw [top.constraintModel_eq_constraintModelOfResolver]
   exact coherence.polynomialWitness ch poly
     (permutationSetsOfResolver
-      (top.toVerifierKey pp urs) poly)
+      (top.toVerifierKey urs) poly)
     (permutationChunksOfResolver
-      (top.toVerifierKey pp urs) poly)
+      (top.toVerifierKey urs) poly)
     selectors.1 selectors.2.1 selectors.2.2
     proofIndex (top.usableRowsAt top.domainExponent)
     hfixed enabled henabled constraint hconstraint

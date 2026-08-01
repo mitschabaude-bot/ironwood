@@ -89,7 +89,7 @@ def straightLineDecodeOfOutcome?
       (preIpaLen shape family.init.length 10 + 3 * shape.k) -> Fp)
     (witness : DeployedBatchWitness family.toFamily basis
       ((wrappedAdversary family.toFamily basis).run O)) :
-    Option { decoded : DeployedAlgebraicDecode (ursOfAugmentedBasis shape.k basis) rfl
+    Option { decoded : DeployedAlgebraicDecode shape (ursOfAugmentedBasis shape.k basis) rfl
       (family.vk basis) (family.instanceCommitment basis)
       ((wrappedAdversary family.toFamily basis).run O).1.proof.1
       (wrappedPreIpaRecord ((wrappedAdversary family.toFamily basis).run O))
@@ -137,7 +137,7 @@ def straightLineAccepts?
     (O : BTranscript Fp VestaG
       (preIpaLen shape family.init.length 10 + 3 * shape.k) -> Fp) :
     let pnu := (wrappedAdversary family.toFamily basis).run O
-    Option (PLift (DeployedAccepts (ursOfAugmentedBasis shape.k basis) rfl
+    Option (PLift (DeployedAccepts shape (ursOfAugmentedBasis shape.k basis) rfl
       (family.vk basis) (family.instanceCommitment basis) pnu.1.proof.1
       (chRecord (wrappedPreIpaReads pnu) (runRounds family.toFamily basis O)))) := by
   let pnu := (wrappedAdversary family.toFamily basis).run O
@@ -159,13 +159,13 @@ theorem straightLineAccepts?_isSome_of
     (O : BTranscript Fp VestaG
       (preIpaLen shape family.init.length 10 + 3 * shape.k) -> Fp)
     (haccepts : let pnu := (wrappedAdversary family.toFamily basis).run O
-      DeployedAccepts (ursOfAugmentedBasis shape.k basis) rfl
+      DeployedAccepts shape (ursOfAugmentedBasis shape.k basis) rfl
         (family.vk basis) (family.instanceCommitment basis) pnu.1.proof.1
         (chRecord (wrappedPreIpaReads pnu) (runRounds family.toFamily basis O))) :
     (family.straightLineAccepts? basis O).isSome := by
   let pnu := (wrappedAdversary family.toFamily basis).run O
   let fullCh := chRecord (wrappedPreIpaReads pnu) (runRounds family.toFamily basis O)
-  change DeployedAccepts (ursOfAugmentedBasis shape.k basis) rfl
+  change DeployedAccepts shape (ursOfAugmentedBasis shape.k basis) rfl
     (family.vk basis) (family.instanceCommitment basis) pnu.1.proof.1 fullCh at haccepts
   unfold DeployedAccepts at haccepts
   unfold straightLineAccepts?
@@ -192,7 +192,7 @@ structure StraightLineConstraintSuccess
       (pnu.1.multiU (wrappedPreIpaReads pnu))
       (pnu.1.multiBlind (wrappedPreIpaReads pnu))
   accepts : let pnu := (wrappedAdversary family.toFamily basis).run O
-    DeployedAccepts (ursOfAugmentedBasis shape.k basis) rfl
+    DeployedAccepts shape (ursOfAugmentedBasis shape.k basis) rfl
       (family.vk basis) (family.instanceCommitment basis) pnu.1.proof.1
       (chRecord (wrappedPreIpaReads pnu) (runRounds family.toFamily basis O))
 
@@ -459,7 +459,7 @@ theorem straightLineConstraintDecoded_of_root
         rw [hx4Eq, hmemberEq]
       have haccepts := deployedAccepts_of_fsWinsFull family.toFamily basis O haccept
       have haccepts' : let pnu := (wrappedAdversary family.toFamily basis).run O
-          DeployedAccepts (ursOfAugmentedBasis shape.k basis) rfl
+          DeployedAccepts shape (ursOfAugmentedBasis shape.k basis) rfl
             (family.vk basis) (family.instanceCommitment basis) pnu.1.proof.1
             (chRecord (wrappedPreIpaReads pnu) (runRounds family.toFamily basis O)) := by
         simpa [runProof, runRecord, wrappedAdversary_run_fst, wrappedPreIpaReads_run]

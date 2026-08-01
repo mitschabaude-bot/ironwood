@@ -19,7 +19,7 @@ def fullAlgebraicAcceptDeployed {shape : Shape}
     (instanceCommitment : Fin shape.numProofs → Nat → VestaG)
     (p : AlgebraicWfProof basis vk instanceCommitment)
     (nu : Fin 11 → Fp) (rounds : Fin shape.k → Fp) : Prop :=
-  DeployedAccepts (ursOfAugmentedBasis shape.k basis) rfl vk instanceCommitment p.proof.1
+  DeployedAccepts shape (ursOfAugmentedBasis shape.k basis) rfl vk instanceCommitment p.proof.1
     (chRecord nu rounds)
 
 /-- Deployed acceptance implies the explicit verifier-equation predicate. -/

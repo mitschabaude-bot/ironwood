@@ -778,6 +778,19 @@ theorem verifierCS_permutationChunks_length
     (constraintSystem_chunkLen_pos top.constraintSystem)]
   simp
 
+/-- A circuit-derived verifying key has exactly the circuit-owned number of
+permutation sets. -/
+@[simp] theorem _root_.Halo2.TopLevelCircuit.toVerifierKey_permutationChunks_length
+    {G : Type} [AddCommGroup G] [Inhabited G]
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (urs : URS G) :
+    (top.toVerifierKey urs).permutationChunks.length =
+      top.shape.numPermutationSets := by
+  rw [top.toVerifierKey_permutationChunks,
+    top.shape_numPermutationSets]
+  exact verifierCS_permutationChunks_length top
+
 /-- Each compiler chunk has the standard full-or-final-remainder width. -/
 theorem verifierCS_permutationChunks_getD_length
     {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
@@ -793,6 +806,19 @@ theorem verifierCS_permutationChunks_getD_length
   simp only [List.length_zipIdx, List.length_map,
     TopLevelCircuit.permutationColumnCount,
     TopLevelCircuit.chunkLen]
+
+/-- Every circuit-derived verifier chunk has the compiler-prescribed width. -/
+theorem _root_.Halo2.TopLevelCircuit.toVerifierKey_permutationChunks_getD_length
+    {G : Type} [AddCommGroup G] [Inhabited G]
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (urs : URS G) (i : ℕ)
+    (hi : i < (top.toVerifierKey urs).permutationChunks.length) :
+    ((top.toVerifierKey urs).permutationChunks.getD i []).length =
+      min top.chunkLen
+        (top.permutationColumnCount - i * top.chunkLen) := by
+  rw [top.toVerifierKey_permutationChunks] at hi ⊢
+  exact verifierCS_permutationChunks_getD_length top i hi
 
 /-- Every prefix ending before a valid compiler chunk contains `i * chunkLen`
 permutation columns. -/
@@ -810,14 +836,14 @@ theorem verifierCS_permutationChunks_take_flatten_length
 
 /-- Top-level keygen exposes the compiler prefix law without requiring downstream
 proofs to unfold a concrete circuit or verifying-key constructor. -/
-theorem topLevelPermutationChunks_take_flatten_length
+theorem _root_.Halo2.TopLevelCircuit.toVerifierKey_permutationChunks_take_flatten_length
     {G : Type} [AddCommGroup G] [Inhabited G]
     {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams) (urs : URS G)
-    (i : ℕ) (hi : i < (top.toVerifierKey pp urs).permutationChunks.length) :
-    (((top.toVerifierKey pp urs).permutationChunks.take i).flatten.length) =
-      i * (top.toVerifierKey pp urs).chunkLen := by
+    (urs : URS G)
+    (i : ℕ) (hi : i < (top.toVerifierKey urs).permutationChunks.length) :
+    (((top.toVerifierKey urs).permutationChunks.take i).flatten.length) =
+      i * (top.toVerifierKey urs).chunkLen := by
   rw [top.toVerifierKey_permutationChunks] at hi ⊢
   rw [top.toVerifierKey_chunkLen]
   exact verifierCS_permutationChunks_take_flatten_length top i hi
@@ -859,7 +885,7 @@ theorem permutationColumns_length_le_chunks_mul
 /-- A coherent compiled query reference decodes to the concrete column from
 which the compiler created it. -/
 theorem permutationColumnAddress_queryReference
-    {shape : Shape} {F G : Type}
+    {shape : CircuitShape} {F G : Type}
     (vk : VerifyingKey shape F G)
     (adviceQueryLayout fixedQueryLayout instanceQueryLayout :
       List (ℕ × ℤ))
@@ -903,18 +929,18 @@ theorem topLevelPermutationColumnAddresses_eq
     {G : Type} [AddCommGroup G] [Inhabited G]
     {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams) (urs : URS G)
+    (urs : URS G)
     (hcoherent :
-      PermutationChunkRoutingCoherent (top.toVerifierKey pp urs)) :
+      PermutationChunkRoutingCoherent (top.toVerifierKey urs)) :
     top.verifierCS.permutationChunks.flatten.map
           (fun reference =>
-            permutationColumnAddress (top.toVerifierKey pp urs) reference.1) =
+            permutationColumnAddress (top.toVerifierKey urs) reference.1) =
       (Keygen.permColsOf top.constraintSystem).map
         Halo2.Layout.ColRef.toAny := by
   rw [verifierCS_permutationChunks_flatten]
   change
     List.map
-        (permutationColumnAddress (top.toVerifierKey pp urs) ∘ Prod.fst)
+        (permutationColumnAddress (top.toVerifierKey urs) ∘ Prod.fst)
         _ =
       _
   rw [← List.map_map, List.zipIdx_map_fst]
@@ -953,18 +979,18 @@ theorem topLevelPermutationColumnAddresses_eq
     indexed hindexedChunk
   have hreferenceCoherent :
       PermutationColumnRef.Coherent
-        (top.toVerifierKey pp urs) reference := by
+        (top.toVerifierKey urs) reference := by
     rw [← hindexedReference]
     exact hrouted.1
   have hdecoded :
-      permutationColumnAddress (top.toVerifierKey pp urs) reference =
+      permutationColumnAddress (top.toVerifierKey urs) reference =
         column :=
     permutationColumnAddress_queryReference
-      (top.toVerifierKey pp urs)
+      (top.toVerifierKey urs)
       top.adviceQueryLayout top.fixedQueryLayout top.instanceQueryLayout
-      (top.toVerifierKey_adviceQueryLayout pp urs)
-      (top.toVerifierKey_fixedQueryLayout pp urs)
-      (top.toVerifierKey_instanceQueryLayout pp urs)
+      (top.toVerifierKey_adviceQueryLayout urs)
+      (top.toVerifierKey_fixedQueryLayout urs)
+      (top.toVerifierKey_instanceQueryLayout urs)
       column hreferenceCoherent
   rcases column with ⟨kind, index⟩
   cases kind <;>

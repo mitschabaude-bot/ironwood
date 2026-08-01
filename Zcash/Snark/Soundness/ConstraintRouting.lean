@@ -22,7 +22,7 @@ theorem deployedAccepts_pipeline [DecidableEq G] [Inhabited G] {shape : Shape}
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → Nat → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
-    (hacc : DeployedAccepts urs hk vk instanceCommitment ps ch) :
+    (hacc : DeployedAccepts shape urs hk vk instanceCommitment ps ch) :
     hasDuplicateCommitmentPoint (assembleQueries vk instanceCommitment ps ch) = false ∧
     (List.ofFn ps.multiopenU).length =
       (constructIntermediateSets (assembleQueries vk instanceCommitment ps ch)).sets.length := by

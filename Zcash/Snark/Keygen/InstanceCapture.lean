@@ -7,7 +7,7 @@ import Mathlib.Util.AssertNoSorry
 # The captured instance commitments are the circuit-derived ones
 
 The Action model uses the *circuit-derived* public-instance family
-`actionCircuit.instanceCommitment actionProofParams capturedURS inputs` — commitments computed
+`actionCircuit.instanceCommitment capturedURS inputs` — commitments computed
 from the public inputs, as halo2's `verify_proof` computes them from its `instances` argument. The
 captured artifacts, meanwhile, are exercised
 against the fixture's own family `Fixture.derivedInstanceCommitment` (the Fiat–Shamir fingerprint,
@@ -186,8 +186,8 @@ theorem publicInputRows_capturedActionInputs (proofIndex : Fin Fixture.shape.num
 /-- The keygen domain exponent is the captured URS's `k`, read off the certificate's `Shape`
 component rather than by reducing `minimalKForRows`. -/
 theorem actionCircuit_domainExponent : actionCircuit.domainExponent = capturedURS.k := by
-  have h := congrArg Shape.k shape_eq_mergeDerived
-  simp only [ProofParams.mergeDerived] at h
+  have h := congrArg (fun proofShape : Shape => proofShape.k) actionShape_eq_fixtureShape
+  simp only [CircuitShape.withProofParams_k, actionCircuit.shape_k] at h
   rw [h]
   decide
 
@@ -205,10 +205,10 @@ theorem actionCircuit_omega_captured :
 This is the join that was missing (ironwood#86): the circuit model and capture now speak of the same
 group elements. -/
 theorem instanceCommitment_capturedActionInputs :
-    actionCircuit.instanceCommitment actionProofParams capturedURS capturedActionInputs =
+    actionCircuit.instanceCommitment capturedURS capturedActionInputs =
       Fixture.derivedInstanceCommitment := by
   funext proofIndex column
-  show (actionCircuit.instanceCommitmentKey actionProofParams capturedURS).commitInstance
+  show (actionCircuit.instanceCommitmentKey capturedURS).commitInstance
       (actionCircuit.publicInputRows (capturedActionInputs proofIndex) ⟨column⟩) 1 =
     commitLagrange
       (capturedPublicInstances.getD
@@ -217,7 +217,7 @@ theorem instanceCommitment_capturedActionInputs :
   · -- The single populated column: the circuit's serialization is the captured column itself.
     rw [Nat.add_zero, publicInputRows_capturedActionInputs proofIndex,
       commitLagrange_eq_commitInstance
-        ((actionCircuit.toVerifierKey_omega actionProofParams capturedURS).trans
+        ((actionCircuit.toVerifierKey_omega capturedURS).trans
           actionCircuit_omega_captured) _ _
         (by fin_cases proofIndex; native_decide)]
   · -- Every other column: the circuit serializes zeros, the capture stores nothing, both give `w`.
@@ -235,7 +235,7 @@ inputs, the circuit-derived commitments are exactly the points the deployed veri
 theorem instanceCommitment_eq_capturedInstanceCommitments
     (proofIndex : Fin Fixture.shape.numProofs) {column : ℕ}
     (hcolumn : column < capturedNumInstanceColumns) :
-    actionCircuit.instanceCommitment actionProofParams capturedURS capturedActionInputs
+    actionCircuit.instanceCommitment capturedURS capturedActionInputs
         proofIndex column =
       capturedInstanceCommitments.getD
         (proofIndex.val * capturedNumInstanceColumns + column) 0 := by

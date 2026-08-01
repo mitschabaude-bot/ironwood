@@ -84,7 +84,7 @@ theorem deployedAccepts_xn_ne_one [DecidableEq G] [Inhabited G] {shape : Shape}
     (urs : URS G) (hk : shape.k = urs.k) (vk : VerifyingKey shape Fp G)
     (instanceCommitment : Fin shape.numProofs → Nat → G)
     (ps : ProofString shape Fp G) (ch : Challenges shape.k Fp)
-    (hacc : DeployedAccepts urs hk vk instanceCommitment ps ch) : ch.x ^ vk.n ≠ 1 := by
+    (hacc : DeployedAccepts shape urs hk vk instanceCommitment ps ch) : ch.x ^ vk.n ≠ 1 := by
   intro hx
   have hnone : assemble? vk instanceCommitment ps ch = none := by
     unfold assemble?

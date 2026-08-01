@@ -63,6 +63,16 @@ def topLevelPermutationColumnCount
     (top : TopLevelCircuit Fp Config PublicInput) : ℕ :=
   (Keygen.permColsOf top.constraintSystem).length
 
+@[simp] theorem topLevelPermutationColumnCount_eq
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput) :
+    topLevelPermutationColumnCount top = top.permutationColumnCount := by
+  simp only [topLevelPermutationColumnCount,
+    TopLevelCircuit.permutationColumnCount,
+    TopLevelCircuit.permutationColumns,
+    Keygen.permColsOf, List.length_map]
+
 /-- Total natural-number projection of a common-permutation commitment.
 The in-range theorem below reconnects it to the verifier's `Fin`-indexed
 interface without making every circuit-coherence record reduce its derived
