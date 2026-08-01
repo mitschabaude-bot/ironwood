@@ -30,8 +30,6 @@ open Zcash.Circuits
 open Zcash.Circuits.Action
 open Keygen
 
-set_option maxHeartbeats 20000
-
 variable {G : Type} [AddCommGroup G] [Module Fp G]
   [DecidableEq G] [Inhabited G]
 
@@ -46,14 +44,14 @@ presentation.
 def actionTopLevelCircuitCorrectness
     (pp : ProofParams) (urs : URS G)
     (hk :
-      actionCircuit.shape.k = urs.k)
+      (actionCircuit.shape.withProofParams pp).k = urs.k)
     (instanceCommitment :
       Fin pp.numProofs →
         ℕ → G)
     (ps : ProofString
       (actionCircuit.shape.withProofParams pp) Fp G)
     (ch : Challenges
-      actionCircuit.shape.k Fp)
+      (actionCircuit.shape.withProofParams pp).k Fp)
     (pU pW : Fp) (a : Fin (2 ^ urs.k) → Fp)
     (batchOpenings :
       OpenedBatchOpenings urs (evalVector urs.k ch.x3)
@@ -101,20 +99,23 @@ def actionTopLevelCircuitCorrectness
       (FlatCell actionNumPermCols actionDomainSize)
       (NontrivialRelation (F := Fp) urs.g urs.u urs.w) := by
   classical
-  let fixedCoherence :
+  have hdomainExponent :
+      actionCircuit.domainExponent = urs.k := by
+    simpa only [CircuitShape.withProofParams_k,
+      actionCircuit.shape_k] using hk
+  have fixedCoherence :
       TopLevelFixedCoherence actionCircuit urs :=
-    ActionFixedCoherence.ofDerived urs hk
+    ActionFixedCoherence.ofDerived urs hdomainExponent
   have hdomainSize :
       actionCircuit.n = 2 ^ urs.k := by
     rw [actionCircuit.n_eq_two_pow_domainExponent]
-    exact congrArg (2 ^ ·)
-      ((actionCircuit.shape.withProofParams_k pp).trans hk)
+    exact congrArg (2 ^ ·) hdomainExponent
   have hfixedRows : Function.Injective
       fun i : Fin (2 ^ urs.k) =>
         actionCircuit.omega ^
           (i : ℕ) :=
     TopLevelAssignment.domainRowsInjective_of_domainExponent_eq
-      ActionPermutationDomain.domainExponent_lt hk
+      ActionPermutationDomain.domainExponent_lt hdomainExponent
   refine
     { gates := ActionGateCoherence.topLevel
       fixedEncoding := ?_
@@ -123,14 +124,8 @@ def actionTopLevelCircuitCorrectness
       lookups := ?_ }
   · intro proofIndex
     refine bindOrRelationWitness
-      (relation.fixedColumns_eq_rowPolynomials_or_relation
-        actionCircuit.pinnedCS.numFixedColumns
-        actionCircuit.fixedRows
-        actionCircuit.fixedRows_length
-        fixedCoherence.key fixedCoherence.commitment
-        (actionCircuit.toVerifierKey_fixedQueryCount urs)
-        fixedCoherence.queryLayout
-        fixedCoherence.queryLayoutBounded hfixedRows)
+      (relation.topLevelFixedColumns_eq_rowPolynomials_or_relation
+        fixedCoherence hfixedRows)
       fun hbinding => ?_
     let assignment :
         TopLevelAssignment actionCircuit
@@ -146,15 +141,10 @@ def actionTopLevelCircuitCorrectness
         (top := actionCircuit)
         ActionPermutationDomain.domainExponent_lt)
     intro column
-    have hkTop :
-        actionCircuit.domainExponent = urs.k :=
-      hk
-    simpa only [assignment,
-      actionCircuit.n_eq_two_pow_domainExponent, hkTop,
-      actionCircuit.toVerifierKey_omega] using hbinding column
+    simpa only [assignment, hdomainSize] using hbinding column
   · intro proofIndex
     exact relation.topLevelFixedConstraints_or_relation
-      rfl fixedCoherence hfixedRows hdomainSize proofIndex
+      fixedCoherence hfixedRows hdomainSize proofIndex
   · intro proofIndex
     simpa only [actionActiveRows] using
       actionCopyReplayWitness_or_relation
@@ -191,9 +181,7 @@ def actionTopLevelCircuitCorrectness
           by
             exact
               (lookup.activationRow_lt_usableRows henabled).trans_le
-                (by
-                  unfold TopLevelCircuit.usableRowsAt
-                  exact (Nat.sub_le _ _).trans (Nat.sub_le _ _))
+                actionCircuit.usableRowsAt_domainExponent_le_n
         have hexact :=
           actionLookupInputSelectorLeafRowsExact
             fixedCoherence lookup henabled
@@ -214,11 +202,9 @@ def actionTopLevelCircuitCorrectness
                 (by
                   obtain ⟨rotation, hlayout⟩ :=
                     fixedCoherence.queryLayout column hcolumn
-                  exact fixedQuery_of_layout
-                    (shape := actionCircuit.shape.withProofParams pp)
-                    (actionCircuit.toVerifierKey urs)
-                    instanceCommitment ps ch column rotation
-                    (actionCircuit.toVerifierKey_fixedQueryCount urs) hlayout))
+                  exact topLevelFixedQuery_of_layout
+                    actionCircuit urs pp instanceCommitment ps ch
+                    column rotation hlayout))
             proofIndex hrow hexact
         exact hvalues
 

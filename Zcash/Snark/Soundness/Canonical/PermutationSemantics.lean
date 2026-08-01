@@ -418,6 +418,17 @@ structure ResolverPermutationCycle
     Function.Injective fun c : ResolverPermutationCell vk poly p m =>
       chunkRowName vk.omega vk.delta vk.chunkLen c.1 c.2.1 c.2.2
 
+/-- A semantic permutation cycle together with identification of its permutation.
+Keeping this package generic prevents concrete circuit definitions from being
+normalized merely to elaborate the equality. -/
+structure ResolverPermutationCycleWitness
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
+    (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
+    (p : Fin numProofs) (m : ℕ)
+    (sigma : Equiv.Perm (ResolverPermutationCell vk poly p m)) where
+  cycle : ResolverPermutationCycle vk poly p m
+  sigma_eq : cycle.sigma = sigma
+
 /-- Construct the resolver's active-row semantic cycle from the full-domain keygen permutation and
 its generated common columns.
 
