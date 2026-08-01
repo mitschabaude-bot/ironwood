@@ -73,7 +73,7 @@ def deployedConstraintOutcomeOfRoot
         (ursOfAugmentedBasis shape.k basis).w := by
   let pnu := deployedRootRunOutput family basis coins
   have hdeployed := deployedAccepts_of_fsWinsFull family.toFamily basis coins haccept
-  have hdeployed' : DeployedAccepts (ursOfAugmentedBasis shape.k basis) rfl
+  have hdeployed' : DeployedAccepts shape (ursOfAugmentedBasis shape.k basis) rfl
       (family.vk basis) (family.instanceCommitment basis) pnu.1.proof.1
       (chRecord (wrappedPreIpaReads pnu) (runRounds family.toFamily basis coins)) := by
     simpa [pnu, deployedRootRunOutput, wrappedAdversary_run_fst,
@@ -110,7 +110,7 @@ theorem deployedConstraintOutcomeOfRoot_relation_eq_online
       (deployedRootRunOutput family basis coins) = PSum.inr relation := by
   let pnu := deployedRootRunOutput family basis coins
   have hdeployed := deployedAccepts_of_fsWinsFull family.toFamily basis coins haccept
-  have hdeployed' : DeployedAccepts (ursOfAugmentedBasis shape.k basis) rfl
+  have hdeployed' : DeployedAccepts shape (ursOfAugmentedBasis shape.k basis) rfl
       (family.vk basis) (family.instanceCommitment basis) pnu.1.proof.1
       (chRecord (wrappedPreIpaReads pnu) (runRounds family.toFamily basis coins)) := by
     simpa [pnu, deployedRootRunOutput, wrappedAdversary_run_fst,

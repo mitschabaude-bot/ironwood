@@ -24,7 +24,7 @@ variable
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     {top : TopLevelCircuit Fp Config PublicInput}
-    {pp : Keygen.ProofParams} {urs : URS G}
+    {pp : ProofParams} {urs : URS G}
     {cell : Type} [DecidableEq cell] [Fintype cell]
     {Bad : Type}
 
@@ -58,18 +58,18 @@ def ofTopLevelCanonical
       SelectorActivationsRealized top.selectorMap
         top.selectorActivations
         (resolverEnvironment
-          (top.toVerifierKey pp urs) poly proofIndex
+          (top.toVerifierKey urs) poly proofIndex
           (top.usableRowsAt top.domainExponent)))
     (fixed :
       CircuitConstraintFamily.constraints .fixed top.placement
         (resolverEnvironment
-          (top.toVerifierKey pp urs) poly proofIndex
+          (top.toVerifierKey urs) poly proofIndex
           (top.usableRowsAt top.domainExponent))
         (top.operations) 0)
     (copies :
       CopyReplayWitness top.placement
         (resolverEnvironment
-          (top.toVerifierKey pp urs) poly proofIndex
+          (top.toVerifierKey urs) poly proofIndex
           (top.usableRowsAt top.domainExponent))
         (top.operations) cell Bad)
     (lookupConditions :
@@ -77,7 +77,7 @@ def ofTopLevelCanonical
         top pp urs ch poly proofIndex) :
     FullCircuitBridge top.placement
       (resolverEnvironment
-        (top.toVerifierKey pp urs) poly proofIndex
+        (top.toVerifierKey urs) poly proofIndex
         (top.usableRowsAt top.domainExponent))
       (top.operations) 0 cell Bad := by
   refine

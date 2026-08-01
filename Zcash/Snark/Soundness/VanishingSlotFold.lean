@@ -54,7 +54,7 @@ def hfold_of_member_budget {G : Type*} [AddCommGroup G] [Module Fp G] [Decidable
             (lagrangeBasis vk.omega vk.n vk.blindingFactors (ch.x ^ vk.n) ch.x).2.1
             (lagrangeBasis vk.omega vk.n vk.blindingFactors (ch.x ^ vk.n) ch.x).2.2)
           ch.y (ch.x ^ vk.n)])
-    (hacc : DeployedAccepts urs hk vk instanceCommitment ps ch)
+    (hacc : DeployedAccepts shape urs hk vk instanceCommitment ps ch)
     (hfp : constraints.foldl (fun acc v => acc * ch.y + v) 0
         = (allExpressions vk ps ch
             (lagrangeBasis vk.omega vk.n vk.blindingFactors (ch.x ^ vk.n) ch.x).1
@@ -124,7 +124,7 @@ def hfold_of_constraint_polys {G : Type*} [AddCommGroup G] [Module Fp G] [Decida
             (lagrangeBasis vk.omega vk.n vk.blindingFactors (ch.x ^ vk.n) ch.x).2.1
             (lagrangeBasis vk.omega vk.n vk.blindingFactors (ch.x ^ vk.n) ch.x).2.2)
           ch.y (ch.x ^ vk.n)])
-    (hacc : DeployedAccepts urs hk vk instanceCommitment ps ch)
+    (hacc : DeployedAccepts shape urs hk vk instanceCommitment ps ch)
     (hfixed : ∀ j, (fixedCols j).eval ch.x = finFn ps.fixedEvals j)
     (hadvice : ∀ p j, (adviceCols p j).eval ch.x = finFn (ps.adviceEvals p) j)
     (hinstance : ∀ p j, (instanceCols p j).eval ch.x = finFn (ps.instanceEvals p) j)

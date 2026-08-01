@@ -1,4 +1,4 @@
-import Mathlib.Tactic
+import Zcash.Snark.Core.Shape
 
 /-!
 # The proof string as opaque field and group elements
@@ -17,40 +17,12 @@ instances to `plonk::verify_proof`, which reads the per-action elements `N` time
 shared set of challenges and a single multiopen/IPA opening. So the proof string splits into
 per-sub-proof vectors and shared elements; the field order below is the verifier's read order.
 
-`Shape` records the per-circuit counts that fix every vector length; `ProofString shape F G` is
-the proof itself, generic over the field and group carriers, with concrete instantiation
-`F = F_p`, `G = E_q`.
+`Shape` records the circuit and invocation counts that fix every vector length;
+`ProofString shape F G` is the proof itself, generic over the field and group carriers,
+with concrete instantiation `F = F_p`, `G = E_q`.
 -/
 
 namespace Zcash.Snark
-
-/-- Per-circuit element counts, read off the verifying key; they fix every vector length in a
-`ProofString` and the read schedule.
-
-* `k` — `log₂` of the domain size (`n = 2 ^ k`); the IPA opening has `k` rounds.
-* `numProofs` — sub-proofs verified together: the bundle's Orchard action count (`instances.len()`).
-* `numAdviceColumns` — `vk.cs.num_advice_columns` (`10` for Orchard).
-* `numLookups` — `vk.cs.lookups`.
-* `numPermutationSets` — permutation product-commitment chunks,
-  `vk.cs.permutation.columns.chunks(cs_degree − 2)`.
-* `numPermutationColumns` — `vk.permutation.commitments`, one common eval each.
-* `numQuotientPieces` — `vk.domain.get_quotient_poly_degree()`.
-* `numInstanceQueries` / `numAdviceQueries` / `numFixedQueries` —
-  `vk.cs.{instance,advice,fixed}_queries`.
-* `numPointSets` — multiopen point sets, one `u` scalar each. -/
-structure Shape where
-  k : ℕ
-  numProofs : ℕ
-  numAdviceColumns : ℕ
-  numLookups : ℕ
-  numPermutationSets : ℕ
-  numPermutationColumns : ℕ
-  numQuotientPieces : ℕ
-  numInstanceQueries : ℕ
-  numAdviceQueries : ℕ
-  numFixedQueries : ℕ
-  numPointSets : ℕ
-deriving DecidableEq, Repr
 
 /-- Per-set permutation product evaluations (halo2 `EvaluatedSet`): the product polynomial `zᵢ` at
 `x` (`eval`) and `ω x` (`nextEval`), plus — for every set except the last — at `ω^{last} x`

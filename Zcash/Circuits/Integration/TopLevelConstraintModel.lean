@@ -30,63 +30,69 @@ argument: domain fitting follows from the `TopLevelCircuit` compilation.
 -/
 def constraintModel {k : ℕ}
     (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams) (urs : URS G)
+    (pp : ProofParams) (urs : URS G)
     (ch : Challenges k Fp) (poly : CommitmentId → CPoly) :
     ConstraintPolyModel pp.numProofs :=
-  let vk := top.toVerifierKey pp urs
+  let vk := top.toVerifierKey urs
   let selectors := canonicalLagrangePolynomials vk.omega
-    (top.toVerifierKey_blindingFactors_lt_n pp urs)
+    (top.toVerifierKey_blindingFactors_lt_n urs)
   constraintModelOfResolver
     (numProofs := pp.numProofs)
     (k := k)
     vk ch poly
-    (permutationSetsOfResolver vk poly)
-    (permutationChunksOfResolver vk poly)
+    (permutationSetsOfResolver
+      (shape := top.shape.withProofParams pp) vk poly)
+    (permutationChunksOfResolver
+      (shape := top.shape.withProofParams pp) vk poly)
     selectors.1 selectors.2.1 selectors.2.2
 
 /-- The top-level canonical model exposes the resolver construction used by its
 verification key without requiring consumers to unfold circuit compilation. -/
 theorem constraintModel_eq_constraintModelOfResolver
     {k : ℕ} (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams) (urs : URS G)
+    (pp : ProofParams) (urs : URS G)
     (ch : Challenges k Fp) (poly : CommitmentId → CPoly) :
     let selectors := canonicalLagrangePolynomials top.omega
-      (top.toVerifierKey_blindingFactors_lt_n pp urs)
+      (top.toVerifierKey_blindingFactors_lt_n urs)
     top.constraintModel pp urs ch poly =
       constraintModelOfResolver
         (numProofs := pp.numProofs)
         (k := k)
-        (top.toVerifierKey pp urs) ch poly
-        (permutationSetsOfResolver (top.toVerifierKey pp urs) poly)
-        (permutationChunksOfResolver (top.toVerifierKey pp urs) poly)
+        (top.toVerifierKey urs) ch poly
+        (permutationSetsOfResolver
+          (shape := top.shape.withProofParams pp)
+          (top.toVerifierKey urs) poly)
+        (permutationChunksOfResolver
+          (shape := top.shape.withProofParams pp)
+          (top.toVerifierKey urs) poly)
         selectors.1 selectors.2.1 selectors.2.2 := by
   rfl
 
 @[simp] theorem constraintModel_l0
     {k : ℕ} (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams) (urs : URS G)
+    (pp : ProofParams) (urs : URS G)
     (ch : Challenges k Fp) (poly : CommitmentId → CPoly) :
     (top.constraintModel pp urs ch poly).l0 =
       (canonicalLagrangePolynomials top.omega
-        (top.toVerifierKey_blindingFactors_lt_n pp urs)).1 := by
+        (top.toVerifierKey_blindingFactors_lt_n urs)).1 := by
   rfl
 
 @[simp] theorem constraintModel_lLast
     {k : ℕ} (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams) (urs : URS G)
+    (pp : ProofParams) (urs : URS G)
     (ch : Challenges k Fp) (poly : CommitmentId → CPoly) :
     (top.constraintModel pp urs ch poly).lLast =
       (canonicalLagrangePolynomials top.omega
-        (top.toVerifierKey_blindingFactors_lt_n pp urs)).2.1 := by
+        (top.toVerifierKey_blindingFactors_lt_n urs)).2.1 := by
   rfl
 
 @[simp] theorem constraintModel_lBlind
     {k : ℕ} (top : TopLevelCircuit Fp Config PublicInput)
-    (pp : Keygen.ProofParams) (urs : URS G)
+    (pp : ProofParams) (urs : URS G)
     (ch : Challenges k Fp) (poly : CommitmentId → CPoly) :
     (top.constraintModel pp urs ch poly).lBlind =
       (canonicalLagrangePolynomials top.omega
-        (top.toVerifierKey_blindingFactors_lt_n pp urs)).2.2 := by
+        (top.toVerifierKey_blindingFactors_lt_n urs)).2.2 := by
   rfl
 
 end Halo2.TopLevelCircuit

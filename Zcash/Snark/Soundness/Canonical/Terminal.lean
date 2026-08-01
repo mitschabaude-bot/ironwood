@@ -35,7 +35,7 @@ theorem permutationLastEvalsWellFormed_of_deployedAccepts
     (ps : ProofString shape Fp G)
     (ch : Challenges shape.k Fp)
     (haccepts :
-      DeployedAccepts urs hk vk instanceCommitment ps ch) :
+      DeployedAccepts shape urs hk vk instanceCommitment ps ch) :
     permutationLastEvalsWellFormed ps = true := by
   unfold DeployedAccepts at haccepts
   cases hassemble :
@@ -80,7 +80,7 @@ structure AcceptedModelClaimedEvaluations
         urs hk vk ps ch batchOpenings i hi}
     {hblinding : vk.blindingFactors < vk.n}
     (haccepts :
-      DeployedAccepts urs hk vk instanceCommitment ps ch) : Prop where
+      DeployedAccepts shape urs hk vk instanceCommitment ps ch) : Prop where
   fixed : ∀ column,
     ((CanonicalMemberConstraintRelation.acceptedModel
       (memberDecode := memberDecode)
@@ -176,7 +176,7 @@ def ofOpenings
         urs hk vk ps ch batchOpenings i hi}
     {hblinding : vk.blindingFactors < vk.n}
     (haccepts :
-      DeployedAccepts urs hk vk instanceCommitment ps ch)
+      DeployedAccepts shape urs hk vk instanceCommitment ps ch)
     (hfixedLayout :
       vk.fixedQueryLayout.length = shape.numFixedQueries)
     (hadviceLayout :
@@ -207,6 +207,7 @@ def ofOpenings
     canonicalLagrangePolynomials vk.omega hblinding
   have hselectorEvaluations :=
     VerifyingKey.constraintModel_selectorEvaluations
+      (numProofs := shape.numProofs)
       vk ch polynomial hblinding hrows hroot hnFp hxDomain
   refine
     { fixed := ?_
@@ -331,7 +332,7 @@ def ofNodeBinding_or_relation
         urs hk vk ps ch batchOpenings i hi}
     {hblinding : vk.blindingFactors < vk.n}
     (haccepts :
-      DeployedAccepts urs hk vk instanceCommitment ps ch)
+      DeployedAccepts shape urs hk vk instanceCommitment ps ch)
     (hfixedLayout :
       vk.fixedQueryLayout.length = shape.numFixedQueries)
     (hadviceLayout :
@@ -405,7 +406,7 @@ def acceptedModel_circuitSat_or_relation
         (instanceCommitment := instanceCommitment)
         urs hk vk ps ch batchOpenings i hi)
     (haccepts :
-      DeployedAccepts urs hk vk instanceCommitment ps ch)
+      DeployedAccepts shape urs hk vk instanceCommitment ps ch)
     (hblinding : vk.blindingFactors < vk.n)
     (hpoly : CPoly)
     (i m : ℕ)
@@ -570,7 +571,7 @@ theorem acceptedModel_circuitSat_of_openings
         (instanceCommitment := instanceCommitment)
         urs hk vk ps ch batchOpenings i hi)
     (haccepts :
-      DeployedAccepts urs hk vk instanceCommitment ps ch)
+      DeployedAccepts shape urs hk vk instanceCommitment ps ch)
     (hblinding : vk.blindingFactors < vk.n)
     (hpoly : CPoly)
     (hquot :
@@ -749,7 +750,7 @@ def acceptedModel_circuitSat_or_relation_of_decodedMemberPolynomial_eq
         (instanceCommitment := instanceCommitment)
         urs hk vk ps ch batchOpenings i hi)
     (haccepts :
-      DeployedAccepts urs hk vk instanceCommitment ps ch)
+      DeployedAccepts shape urs hk vk instanceCommitment ps ch)
     (hblinding : vk.blindingFactors < vk.n)
     (hpoly : CPoly)
     (hquot :

@@ -550,7 +550,7 @@ theorem topLevelFixedEntryRead_of_column
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     {top : TopLevelCircuit Fp Config PublicInput}
-    {pp : Keygen.ProofParams} {urs : URS G}
+    {pp : ProofParams} {urs : URS G}
     (poly : CommitmentId → CPoly)
     (rows : ℕ → List Fp)
     (hrows : Function.Injective
@@ -570,7 +570,7 @@ theorem topLevelFixedEntryRead_of_column
       instanceRowPolynomial (2 ^ urs.k)
         top.omega (rows column)) :
     (resolverEnvironment
-        (top.toVerifierKey pp urs) poly proofIndex
+        (top.toVerifierKey urs) poly proofIndex
         (top.usableRowsAt top.domainExponent)).fixed
           ⟨column⟩ (row : ℤ) = (value : Fp) := by
   obtain ⟨hrow, hcolumn, hvalue⟩ :=
@@ -591,7 +591,7 @@ def topLevelFixedEntryRead_or_bad
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     {top : TopLevelCircuit Fp Config PublicInput}
-    {pp : Keygen.ProofParams} {urs : URS G}
+    {pp : ProofParams} {urs : URS G}
     (poly : CommitmentId → CPoly)
     (rows : ℕ → List Fp)
     (hrows : Function.Injective
@@ -615,7 +615,7 @@ def topLevelFixedEntryRead_or_bad
     (hentry :
       (column, row, value) ∈ topLevelRequiredFixedEntries top) :
     (resolverEnvironment
-        (top.toVerifierKey pp urs) poly proofIndex
+        (top.toVerifierKey urs) poly proofIndex
         (top.usableRowsAt top.domainExponent)).fixed
           ⟨column⟩ (row : ℤ) = (value : Fp) ⊕'
       Bad :=
@@ -633,7 +633,7 @@ def topLevelFixedConstraints_or_bad
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     {top : TopLevelCircuit Fp Config PublicInput}
-    {pp : Keygen.ProofParams} {urs : URS G}
+    {pp : ProofParams} {urs : URS G}
     (poly : CommitmentId → CPoly)
     (rows : ℕ → List Fp)
     (hrows : Function.Injective
@@ -657,11 +657,11 @@ def topLevelFixedConstraints_or_bad
     (SelectorActivationsRealized
         top.selectorMap top.selectorActivations
         (resolverEnvironment
-          (top.toVerifierKey pp urs) poly proofIndex
+          (top.toVerifierKey urs) poly proofIndex
           (top.usableRowsAt top.domainExponent)) ∧
       CircuitConstraintFamily.constraints .fixed top.placement
         (resolverEnvironment
-          (top.toVerifierKey pp urs) poly proofIndex
+          (top.toVerifierKey urs) poly proofIndex
           (top.usableRowsAt top.domainExponent))
         (top.operations) 0) ⊕' Bad :=
   bindOrRelationWitness
@@ -669,7 +669,7 @@ def topLevelFixedConstraints_or_bad
     fun hbinding => by
     let environment :=
       resolverEnvironment
-        (top.toVerifierKey pp urs) poly proofIndex
+        (top.toVerifierKey urs) poly proofIndex
         (top.usableRowsAt top.domainExponent)
     have fixedRead :
         ∀ {column row value},
@@ -717,14 +717,17 @@ variable
           (instanceCommitment := instanceCommitment)
           urs hk vk ps ch)
         (x4BatchEvals
+          (shape := shape)
           (instanceCommitment := instanceCommitment)
           vk ps ch)
         a pU pW}
     {memberDecode : ∀ i (hi : i <
         deployedX4PairCount
+          (shape := shape)
           (instanceCommitment := instanceCommitment)
           vk ps ch),
       OpenedMemberDecode
+        (shape := shape)
         (instanceCommitment := instanceCommitment)
         urs hk vk ps ch batchOpenings i hi}
     {hblinding : vk.blindingFactors < vk.n}
@@ -918,38 +921,43 @@ def topLevelFixedConstraints_or_relation
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     {top : TopLevelCircuit Fp Config PublicInput}
-    {pp : Keygen.ProofParams}
+    {pp : ProofParams}
     {urs : URS G}
-    {hk : (pp.mergeDerived top).k = urs.k}
-    {vk : VerifyingKey (pp.mergeDerived top) Fp G}
+    {hk : top.shape.k = urs.k}
+    {vk : VerifyingKey top.shape Fp G}
     {instanceCommitment :
       Fin pp.numProofs → ℕ → G}
-    {ps : ProofString (pp.mergeDerived top) Fp G}
-    {ch : Challenges (pp.mergeDerived top).k Fp}
+    {ps : ProofString (top.shape.withProofParams pp) Fp G}
+    {ch : Challenges top.shape.k Fp}
     {pU pW : Fp} {a : Fin (2 ^ urs.k) → Fp}
     {batchOpenings :
       OpenedBatchOpenings urs (evalVector urs.k ch.x3)
         (x4BatchCommitments
+          (shape := top.shape.withProofParams pp)
           (instanceCommitment := instanceCommitment)
           urs hk vk ps ch)
         (x4BatchEvals
+          (shape := top.shape.withProofParams pp)
           (instanceCommitment := instanceCommitment)
           vk ps ch)
         a pU pW}
     {memberDecode : ∀ i (hi : i <
         deployedX4PairCount
+          (shape := top.shape.withProofParams pp)
           (instanceCommitment := instanceCommitment)
           vk ps ch),
       OpenedMemberDecode
+        (shape := top.shape.withProofParams pp)
         (instanceCommitment := instanceCommitment)
         urs hk vk ps ch batchOpenings i hi}
     {hblinding : vk.blindingFactors < vk.n}
     {y : Fp} {hpoly : CPoly}
     (relation :
       CanonicalMemberConstraintRelation
+        (shape := top.shape.withProofParams pp)
         urs hk vk instanceCommitment ps ch pU pW a
         batchOpenings memberDecode hblinding y hpoly vk.n)
-    (hvk : vk = top.toVerifierKey pp urs)
+    (hvk : vk = top.toVerifierKey urs)
     (coherence : TopLevelFixedCoherence top urs)
     (hrows : Function.Injective
       fun i : Fin (2 ^ urs.k) =>
@@ -959,11 +967,11 @@ def topLevelFixedConstraints_or_relation
     (SelectorActivationsRealized
         top.selectorMap top.selectorActivations
         (resolverEnvironment
-          (top.toVerifierKey pp urs) relation.polynomial proofIndex
+          (top.toVerifierKey urs) relation.polynomial proofIndex
           (top.usableRowsAt top.domainExponent)) ∧
       CircuitConstraintFamily.constraints .fixed top.placement
         (resolverEnvironment
-          (top.toVerifierKey pp urs) relation.polynomial proofIndex
+          (top.toVerifierKey urs) relation.polynomial proofIndex
           (top.usableRowsAt top.domainExponent))
         (top.operations) 0) ⊕'
       NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
@@ -974,7 +982,7 @@ def topLevelFixedConstraints_or_relation
       hrows hn coherence.realizes
   · intro column hcolumn
     have hcommitment :
-        (top.toVerifierKey pp urs).fixedCommitment column =
+        (top.toVerifierKey urs).fixedCommitment column =
           coherence.key.commitInstance
             (top.fixedRows.getD column []) 1 := by
       rw [top.toVerifierKey_fixedCommitment]
@@ -986,8 +994,9 @@ def topLevelFixedConstraints_or_relation
         obtain ⟨rotation, hlayout⟩ :=
           coherence.queryLayout column hcolumn
         exact fixedQuery_of_layout
-          (top.toVerifierKey pp urs) instanceCommitment ps ch
-          column rotation (top.toVerifierKey_fixedQueryCount pp urs) hlayout)
+          (shape := top.shape.withProofParams pp)
+          (top.toVerifierKey urs) instanceCommitment ps ch
+          column rotation (top.toVerifierKey_fixedQueryCount urs) hlayout)
 
 /--
 Pointwise fixed-cell realization at the canonical decoded-member relation.
@@ -998,38 +1007,43 @@ def topLevelFixedEntryRead_or_relation
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     {top : TopLevelCircuit Fp Config PublicInput}
-    {pp : Keygen.ProofParams}
+    {pp : ProofParams}
     {urs : URS G}
-    {hk : (pp.mergeDerived top).k = urs.k}
-    {vk : VerifyingKey (pp.mergeDerived top) Fp G}
+    {hk : top.shape.k = urs.k}
+    {vk : VerifyingKey top.shape Fp G}
     {instanceCommitment :
       Fin pp.numProofs → ℕ → G}
-    {ps : ProofString (pp.mergeDerived top) Fp G}
-    {ch : Challenges (pp.mergeDerived top).k Fp}
+    {ps : ProofString (top.shape.withProofParams pp) Fp G}
+    {ch : Challenges top.shape.k Fp}
     {pU pW : Fp} {a : Fin (2 ^ urs.k) → Fp}
     {batchOpenings :
       OpenedBatchOpenings urs (evalVector urs.k ch.x3)
         (x4BatchCommitments
+          (shape := top.shape.withProofParams pp)
           (instanceCommitment := instanceCommitment)
           urs hk vk ps ch)
         (x4BatchEvals
+          (shape := top.shape.withProofParams pp)
           (instanceCommitment := instanceCommitment)
           vk ps ch)
         a pU pW}
     {memberDecode : ∀ i (hi : i <
         deployedX4PairCount
+          (shape := top.shape.withProofParams pp)
           (instanceCommitment := instanceCommitment)
           vk ps ch),
       OpenedMemberDecode
+        (shape := top.shape.withProofParams pp)
         (instanceCommitment := instanceCommitment)
         urs hk vk ps ch batchOpenings i hi}
     {hblinding : vk.blindingFactors < vk.n}
     {y : Fp} {hpoly : CPoly}
     (relation :
       CanonicalMemberConstraintRelation
+        (shape := top.shape.withProofParams pp)
         urs hk vk instanceCommitment ps ch pU pW a
         batchOpenings memberDecode hblinding y hpoly vk.n)
-    (hvk : vk = top.toVerifierKey pp urs)
+    (hvk : vk = top.toVerifierKey urs)
     (coherence : TopLevelFixedCoherence top urs)
     (hrows : Function.Injective
       fun i : Fin (2 ^ urs.k) =>
@@ -1040,7 +1054,7 @@ def topLevelFixedEntryRead_or_relation
     (hentry :
       (column, row, value) ∈ topLevelRequiredFixedEntries top) :
     (resolverEnvironment
-        (top.toVerifierKey pp urs) relation.polynomial proofIndex
+        (top.toVerifierKey urs) relation.polynomial proofIndex
         (top.usableRowsAt top.domainExponent)).fixed
           ⟨column⟩ (row : ℤ) = (value : Fp) ⊕'
       NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
@@ -1051,7 +1065,7 @@ def topLevelFixedEntryRead_or_relation
       hrows hn coherence.realizes
   · intro fixedColumn hcolumn
     have hcommitment :
-        (top.toVerifierKey pp urs).fixedCommitment fixedColumn =
+        (top.toVerifierKey urs).fixedCommitment fixedColumn =
           coherence.key.commitInstance
             (top.fixedRows.getD fixedColumn []) 1 := by
       rw [top.toVerifierKey_fixedCommitment]
@@ -1063,8 +1077,9 @@ def topLevelFixedEntryRead_or_relation
         obtain ⟨rotation, hlayout⟩ :=
           coherence.queryLayout fixedColumn hcolumn
         exact fixedQuery_of_layout
-          (top.toVerifierKey pp urs) instanceCommitment ps ch
-          fixedColumn rotation (top.toVerifierKey_fixedQueryCount pp urs) hlayout)
+          (shape := top.shape.withProofParams pp)
+          (top.toVerifierKey urs) instanceCommitment ps ch
+          fixedColumn rotation (top.toVerifierKey_fixedQueryCount urs) hlayout)
   · exact hentry
 
 end CanonicalMemberConstraintRelation

@@ -60,7 +60,7 @@ def DeployedAlgebraicDecode.toOpenedBatch
     {instanceCommitment : Fin shape.numProofs → Nat → G}
     {ps : ProofString shape Fp G} {ch : Challenges shape.k Fp}
     {aggregate : Fin (2 ^ urs.k) → Fp} {aggregateU aggregateW : Fp}
-    (decode : DeployedAlgebraicDecode urs hk vk instanceCommitment ps ch
+    (decode : DeployedAlgebraicDecode shape urs hk vk instanceCommitment ps ch
       aggregate aggregateU aggregateW)
     (hchar : deployedX4PairCount vk instanceCommitment ps ch < scalarFieldOrder) :
     OpenedBatchOpenings urs (evalVector urs.k ch.x3)
@@ -77,7 +77,7 @@ def DeployedAlgebraicDecode.toMemberDecode
     {instanceCommitment : Fin shape.numProofs → Nat → G}
     {ps : ProofString shape Fp G} {ch : Challenges shape.k Fp}
     {aggregate : Fin (2 ^ urs.k) → Fp} {aggregateU aggregateW : Fp}
-    (decode : DeployedAlgebraicDecode urs hk vk instanceCommitment ps ch
+    (decode : DeployedAlgebraicDecode shape urs hk vk instanceCommitment ps ch
       aggregate aggregateU aggregateW)
     (hchar : deployedX4PairCount vk instanceCommitment ps ch < scalarFieldOrder)
     (i : Nat) (hi : i < deployedX4PairCount vk instanceCommitment ps ch) :
@@ -95,7 +95,7 @@ theorem DeployedAlgebraicDecode.toOpenedBatch_current
     {instanceCommitment : Fin shape.numProofs → Nat → G}
     {ps : ProofString shape Fp G} {ch : Challenges shape.k Fp}
     {aggregate : Fin (2 ^ urs.k) → Fp} {aggregateU aggregateW : Fp}
-    (decode : DeployedAlgebraicDecode urs hk vk instanceCommitment ps ch
+    (decode : DeployedAlgebraicDecode shape urs hk vk instanceCommitment ps ch
       aggregate aggregateU aggregateW)
     (hchar : deployedX4PairCount vk instanceCommitment ps ch < scalarFieldOrder) :
     (decode.toOpenedBatch hchar).batchChallenge (decode.toOpenedBatch hchar).current = ch.x4 :=
@@ -117,7 +117,7 @@ theorem DeployedAlgebraicDecode.memberBinding
     {instanceCommitment : Fin shape.numProofs → Nat → G}
     {ps : ProofString shape Fp G} {ch : Challenges shape.k Fp}
     {aggregate : Fin (2 ^ urs.k) → Fp} {aggregateU aggregateW : Fp}
-    (decode : DeployedAlgebraicDecode urs hk vk instanceCommitment ps ch
+    (decode : DeployedAlgebraicDecode shape urs hk vk instanceCommitment ps ch
       aggregate aggregateU aggregateW)
     (hchar : deployedX4PairCount vk instanceCommitment ps ch < scalarFieldOrder)
     (slot : DeployedMemberSlot (instanceCommitment := instanceCommitment) vk ps ch)

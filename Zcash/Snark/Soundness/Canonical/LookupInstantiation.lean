@@ -103,7 +103,7 @@ theorem resolverQueryFeed_eval_of_columnQueries
 
 /-- Fixed-query polynomials selected from commitment identities and the VK layout. -/
 def fixedQueryFeedOfResolver
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly) : ℕ → CPoly :=
   resolverQueryFeed (n := shape.numFixedQueries)
@@ -111,7 +111,7 @@ def fixedQueryFeedOfResolver
 
 /-- Advice-query polynomials for one proof, selected from the VK layout. -/
 def adviceQueryFeedOfResolver
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly)
     (p : ℕ) : ℕ → CPoly :=
@@ -120,7 +120,7 @@ def adviceQueryFeedOfResolver
 
 /-- Instance-query polynomials for one proof, selected from the VK layout. -/
 def instanceQueryFeedOfResolver
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly)
     (p : ℕ) : ℕ → CPoly :=
@@ -171,7 +171,7 @@ theorem mem_assembleQueries_of_mem_subProofLookupQueries
 
 /-- Polynomial lookup entries built from an arbitrary commitment-ID resolver.  Coherence of the
 rotations is definitional through `lookupEvalPolys`. -/
-def lookupEntriesOfResolver {shape : Shape} {G : Type*}
+def lookupEntriesOfResolver {shape : CircuitShape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
     (p : ℕ) :
     List (LookupEval (CPoly) × List (Expr Fp) × List (Expr Fp)) :=
@@ -184,7 +184,7 @@ def lookupEntriesOfResolver {shape : Shape} {G : Type*}
      vk.lookupTableExprs l)
 
 /-- The selected lookup's compressed input polynomial under the resolver-backed column feeds. -/
-def lookupInputPolyOfResolver {shape : Shape} {k : ℕ} {G : Type*}
+def lookupInputPolyOfResolver {shape : CircuitShape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) : CPoly :=
@@ -195,7 +195,7 @@ def lookupInputPolyOfResolver {shape : Shape} {k : ℕ} {G : Type*}
     (C ch.theta)
     ((vk.lookupInputExprs l).map (Expr.map C))
 
-theorem lookupInputPolyOfResolver_eq {shape : Shape} {k : ℕ} {G : Type*}
+theorem lookupInputPolyOfResolver_eq {shape : CircuitShape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) :
@@ -207,7 +207,7 @@ theorem lookupInputPolyOfResolver_eq {shape : Shape} {k : ℕ} {G : Type*}
         (C ch.theta) ((vk.lookupInputExprs l).map (Expr.map C)) := rfl
 
 /-- The selected lookup's compressed table polynomial under the same resolver-backed feeds. -/
-def lookupTablePolyOfResolver {shape : Shape} {k : ℕ} {G : Type*}
+def lookupTablePolyOfResolver {shape : CircuitShape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) : CPoly :=
@@ -218,7 +218,7 @@ def lookupTablePolyOfResolver {shape : Shape} {k : ℕ} {G : Type*}
     (C ch.theta)
     ((vk.lookupTableExprs l).map (Expr.map C))
 
-theorem lookupTablePolyOfResolver_eq {shape : Shape} {k : ℕ} {G : Type*}
+theorem lookupTablePolyOfResolver_eq {shape : CircuitShape} {k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) :
@@ -233,7 +233,7 @@ theorem lookupTablePolyOfResolver_eq {shape : Shape} {k : ℕ} {G : Type*}
 commitment identities.  The permutation sets/chunks remain parameters until their analogous
 canonical routing layer is installed. -/
 def constraintModelOfResolver
-    {shape : Shape} {numProofs k : ℕ} {G : Type*}
+    {shape : CircuitShape} {numProofs k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (sets : Fin numProofs → List (PermSetEval CPoly))
@@ -260,18 +260,20 @@ def constraintModelOfResolver
   lLast := lLast
   lBlind := lBlind
 
-@[simp] theorem constraintModelOfResolver_lookups {shape : Shape} {G : Type*}
+@[simp] theorem constraintModelOfResolver_lookups
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
-    (sets : Fin shape.numProofs → List (PermSetEval (CPoly)))
-    (chunks : Fin shape.numProofs →
+    (sets : Fin numProofs → List (PermSetEval (CPoly)))
+    (chunks : Fin numProofs →
       List (PermSetEval (CPoly) × List (CPoly × CPoly)))
-    (l0 lLast lBlind : CPoly) (p : Fin shape.numProofs) :
+    (l0 lLast lBlind : CPoly) (p : Fin numProofs) :
     (constraintModelOfResolver vk ch poly sets chunks l0 lLast lBlind).lookups p
       = lookupEntriesOfResolver vk poly p := rfl
 
 /-- The selected coherent lookup entry occurs in the resolver-built lookup list. -/
-theorem lookupEntry_mem_lookupEntriesOfResolver {shape : Shape} {G : Type*}
+theorem lookupEntry_mem_lookupEntriesOfResolver
+    {shape : CircuitShape} {G : Type*}
     (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
     (p : ℕ) (l : Fin shape.numLookups) :
     (lookupEvalPolys vk.omega
@@ -286,7 +288,7 @@ theorem lookupEntry_mem_lookupEntriesOfResolver {shape : Shape} {G : Type*}
 membership fact passed to `ConstraintSatisfaction.lookupStart`, `lookupEnd`,
 `lookupProductStep`, `lookupRunStart`, and `lookupRunStep`. -/
 theorem lookupEntry_mem_constraintModelOfResolver
-    {shape : Shape} {numProofs k : ℕ} {G : Type*}
+    {shape : CircuitShape} {numProofs k : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (sets : Fin numProofs → List (PermSetEval CPoly))
@@ -473,7 +475,7 @@ theorem eval_constraintModelOfResolver_lookups_of_assembleQueries
 /-- Full family satisfaction specialized to one resolver-built lookup gives exactly the five
 coherent divisibility facts consumed by `deployed_lookup_subset`. -/
 theorem ConstraintSatisfaction.lookupConstraintsDvdOfResolver
-    {shape : Shape} {numProofs k : ℕ} {G : Type*} {n : ℕ}
+    {shape : CircuitShape} {numProofs k : ℕ} {G : Type*} {n : ℕ}
     (vk : VerifyingKey shape Fp G) (ch : Challenges k Fp)
     (poly : CommitmentId → CPoly)
     (sets : Fin numProofs → List (PermSetEval CPoly))

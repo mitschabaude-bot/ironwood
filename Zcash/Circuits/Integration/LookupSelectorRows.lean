@@ -384,13 +384,13 @@ instance EnabledLookup.inputSelectorLeafRowsExactDecidable
 
 omit [AddCommGroup G] [Module Fp G] [DecidableEq G] [Inhabited G] in
 private theorem resolverFixedRead_of_rowPolynomial
-    {shape : Shape} (urs : URS G)
+    {shape : CircuitShape} {numProofs : ℕ} (urs : URS G)
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly)
     (rows : ℕ → List Fp)
     (hrows : Function.Injective
       fun i : Fin (2 ^ urs.k) => vk.omega ^ (i : ℕ))
-    (proofIndex : Fin shape.numProofs) (usableRows column row : ℕ)
+    (proofIndex : Fin numProofs) (usableRows column row : ℕ)
     (hrow : row < 2 ^ urs.k)
     (hpolynomial :
       poly (.fixedCol column) =
@@ -408,7 +408,7 @@ expression-level selector boundary consumed by lookup projection.
 -/
 def EnabledLookup.inputSelectorValuesRealized_or_bad
     {top : TopLevelCircuit Fp Config PublicInput}
-    {pp : Keygen.ProofParams} {urs : URS G}
+    {pp : ProofParams} {urs : URS G}
     (poly : CommitmentId → CPoly)
     (rows : ℕ → List Fp)
     (hrows : Function.Injective
@@ -430,7 +430,7 @@ def EnabledLookup.inputSelectorValuesRealized_or_bad
     (hexact : lookup.InputSelectorLeafRowsExact top rows) :
     lookup.InputSelectorValuesRealized top
         (resolverEnvironment
-          (top.toVerifierKey pp urs) poly proofIndex
+          (top.toVerifierKey urs) poly proofIndex
           (top.usableRowsAt top.domainExponent)) ⊕'
       Bad :=
   bindOrRelationWitness
@@ -458,14 +458,14 @@ def EnabledLookup.inputSelectorValuesRealized_or_bad
           rwa [← hn]
         have hfixed :
             (resolverEnvironment
-                (top.toVerifierKey pp urs) poly proofIndex
+                (top.toVerifierKey urs) poly proofIndex
                 (top.usableRowsAt top.domainExponent)).fixed
                 ⟨compressed.packedCol⟩
                 (top.placement lookup.region + lookup.row : ℕ) =
               (rows compressed.packedCol).getD
                 (top.placement lookup.region + lookup.row) 0 := by
           exact resolverFixedRead_of_rowPolynomial
-            urs (top.toVerifierKey pp urs) poly rows hrows proofIndex
+            urs (top.toVerifierKey urs) poly rows hrows proofIndex
             (top.usableRowsAt top.domainExponent) compressed.packedCol
             (top.placement lookup.region + lookup.row)
             hdomainRow hpolynomial
@@ -474,7 +474,7 @@ def EnabledLookup.inputSelectorValuesRealized_or_bad
           (selReplacement compressed).eval
               (Query.eval
                 (resolverEnvironment
-                  (top.toVerifierKey pp urs) poly proofIndex
+                  (top.toVerifierKey urs) poly proofIndex
                   (top.usableRowsAt top.domainExponent))
                 (fun _ => 0)
                 (top.placement lookup.region + lookup.row)) =
@@ -483,7 +483,7 @@ def EnabledLookup.inputSelectorValuesRealized_or_bad
         rw [selReplacement_eval] at hstatic
         have hfixed' :
             (resolverEnvironment
-                (top.toVerifierKey pp urs) poly proofIndex
+                (top.toVerifierKey urs) poly proofIndex
                 (top.usableRowsAt top.domainExponent)).fixed
                 ⟨compressed.packedCol⟩
                 ((top.placement lookup.region : ℤ) +

@@ -3516,7 +3516,7 @@ def ComputedAdaptiveOnlineAGMFSFamily.adaptiveAlgebraicDecode_of_deployedGoodRoo
     (hgood : family.AdaptiveDeployedGoodRoots basis O witness)
     (hshifted : family.AdaptiveShiftedValue basis O) :
     let pnu := (wrappedAdversary family.toFamily basis).run O
-    DeployedAlgebraicDecode (ursOfAugmentedBasis shape.k basis) rfl
+    DeployedAlgebraicDecode shape (ursOfAugmentedBasis shape.k basis) rfl
       (family.vk basis) (family.instanceCommitment basis) pnu.1.proof.1
       (wrappedPreIpaRecord pnu) (pnu.1.aMulti (wrappedPreIpaReads pnu))
       (pnu.1.multiU (wrappedPreIpaReads pnu))
@@ -3583,7 +3583,7 @@ noncomputable def ComputedAdaptiveOnlineAGMFSFamily.adaptiveAlgebraicDecode_of_g
     (hgood : family.AdaptiveAllRootGood basis O)
     (hshifted : family.AdaptiveShiftedValue basis O) :
     let pnu := (wrappedAdversary family.toFamily basis).run O
-    DeployedAlgebraicDecode (ursOfAugmentedBasis shape.k basis) rfl
+    DeployedAlgebraicDecode shape (ursOfAugmentedBasis shape.k basis) rfl
       (family.vk basis) (family.instanceCommitment basis) pnu.1.proof.1
       (wrappedPreIpaRecord pnu) (pnu.1.aMulti (wrappedPreIpaReads pnu))
       (pnu.1.multiU (wrappedPreIpaReads pnu))

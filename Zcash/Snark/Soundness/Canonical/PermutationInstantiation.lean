@@ -35,15 +35,16 @@ theorem PermSetEval.ext {F : Type*} {a b : PermSetEval F}
 /-- The commitment identity selected by a permutation column's evaluation reference.  The
 reference indexes an evaluation/query-layout entry, whose first component is the committed column
 index. -/
-def permutationColumnCommitmentId {shape : Shape} {F G : Type*}
-    (vk : VerifyingKey shape F G) (p : Fin shape.numProofs) : ColumnRef → CommitmentId
+def permutationColumnCommitmentId
+    {shape : CircuitShape} {numProofs : ℕ} {F G : Type*}
+    (vk : VerifyingKey shape F G) (p : Fin numProofs) : ColumnRef → CommitmentId
   | .advice i => .adviceCol p (vk.adviceQueryLayout.getD i (0, 0)).1
   | .fixed i => .fixedCol (vk.fixedQueryLayout.getD i (0, 0)).1
   | .instance i => .instanceCol p (vk.instanceQueryLayout.getD i (0, 0)).1
 
 /-- A permutation value-column reference is usable at the unrotated challenge `x`: its evaluation
 index and query-layout entry are in range, and that layout entry has rotation zero. -/
-def PermutationColumnRef.Coherent {shape : Shape} {F G : Type*}
+def PermutationColumnRef.Coherent {shape : CircuitShape} {F G : Type*}
     (vk : VerifyingKey shape F G) : ColumnRef → Prop
   | .advice i =>
       i < shape.numAdviceQueries ∧ i < vk.adviceQueryLayout.length ∧
@@ -56,16 +57,17 @@ def PermutationColumnRef.Coherent {shape : Shape} {F G : Type*}
         (vk.instanceQueryLayout.getD i (0, 0)).2 = 0
 
 /-- VK coherence needed to route every `(value, σ-name)` pair in every permutation chunk. -/
-def PermutationChunkRoutingCoherent {shape : Shape} {F G : Type*}
+def PermutationChunkRoutingCoherent {shape : CircuitShape} {F G : Type*}
     (vk : VerifyingKey shape F G) : Prop :=
   ∀ chunk ∈ vk.permutationChunks, ∀ ref ∈ chunk,
     PermutationColumnRef.Coherent vk ref.1 ∧ ref.2 < shape.numPermutationColumns
 
 /-- Resolve a permutation column reference to its polynomial.  `finFn` mirrors the verifier's
 total claimed-evaluation feeds: an out-of-range evaluation reference reads zero. -/
-def permutationColumnPolynomialOfResolver {shape : Shape} {G : Type*}
+def permutationColumnPolynomialOfResolver
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
-    (p : Fin shape.numProofs) (cr : ColumnRef) : CPoly :=
+    (p : Fin numProofs) (cr : ColumnRef) : CPoly :=
   cr.resolve
     (finFn fun i : Fin shape.numInstanceQueries =>
       poly (permutationColumnCommitmentId vk p (.instance i)))
@@ -76,9 +78,10 @@ def permutationColumnPolynomialOfResolver {shape : Shape} {G : Type*}
 
 /-- The polynomial-valued evaluation record for one permutation running product.  Its optional
 last-row opening follows the shape-level Halo2 read schedule. -/
-def permutationSetOfResolver {shape : Shape} {G : Type*}
+def permutationSetOfResolver
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
-    (p : Fin shape.numProofs) (s : Fin shape.numPermutationSets) :
+    (p : Fin numProofs) (s : Fin shape.numPermutationSets) :
     PermSetEval (CPoly) :=
   { eval := poly (.permProduct p s)
     nextEval := comp (poly (.permProduct p s)) (C vk.omega * X)
@@ -88,48 +91,51 @@ def permutationSetOfResolver {shape : Shape} {G : Type*}
         (C (vk.omega ^ (-((vk.blindingFactors : ℤ) + 1))) * X)) }
 
 /-- One sub-proof's permutation running products, in verifier order. -/
-def permutationSetsOfResolver {shape : Shape} {G : Type*}
+def permutationSetsOfResolver
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
-    (p : Fin shape.numProofs) : List (PermSetEval (CPoly)) :=
+    (p : Fin numProofs) : List (PermSetEval (CPoly)) :=
   List.ofFn fun s => permutationSetOfResolver vk poly p s
 
 /-- One sub-proof's permutation chunks, with the value and common-permutation columns selected by
 their stable commitment identities. -/
-def permutationChunksOfResolver {shape : Shape} {G : Type*}
+def permutationChunksOfResolver
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
-    (p : Fin shape.numProofs) :
+    (p : Fin numProofs) :
     List (PermSetEval (CPoly) × List (CPoly × CPoly)) :=
   ((permutationSetsOfResolver vk poly p).zip vk.permutationChunks).map fun sc =>
     (sc.1, sc.2.map fun cr =>
       (permutationColumnPolynomialOfResolver vk poly p cr.1, poly (.permCommon cr.2)))
 
 /-- The value/σ polynomial pairs of chunk `c`, totalized by the empty chunk out of range. -/
-def permutationChunkPairsOfResolver {shape : Shape} {G : Type*}
+def permutationChunkPairsOfResolver
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
-    (p : Fin shape.numProofs) (c : ℕ) : List (CPoly × CPoly) :=
+    (p : Fin numProofs) (c : ℕ) : List (CPoly × CPoly) :=
   (vk.permutationChunks.getD c []).map fun cr =>
     (permutationColumnPolynomialOfResolver vk poly p cr.1, poly (.permCommon cr.2))
 
 @[simp] theorem permutationSetsOfResolver_length
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
-    (p : Fin shape.numProofs) :
+    (p : Fin numProofs) :
     (permutationSetsOfResolver vk poly p).length = shape.numPermutationSets := by
   simp [permutationSetsOfResolver]
 
 theorem permutationChunksOfResolver_length
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
-    (p : Fin shape.numProofs) :
+    (p : Fin numProofs) :
     (permutationChunksOfResolver vk poly p).length =
       min shape.numPermutationSets vk.permutationChunks.length := by
   simp [permutationChunksOfResolver]
 
 /-- In-range chunk lookup exposes the corresponding running-product set and routed pair list. -/
 theorem permutationChunksOfResolver_getElem
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (poly : CommitmentId → CPoly)
-    (p : Fin shape.numProofs) {c : ℕ}
+    (p : Fin numProofs) {c : ℕ}
     (hcs : c < shape.numPermutationSets) (hcv : c < vk.permutationChunks.length) :
     (permutationChunksOfResolver vk poly p)[c]'(by
       rw [permutationChunksOfResolver_length]
@@ -572,11 +578,11 @@ theorem eval_permutationChunksOfResolver
 /-- The four divisibility families consumed by
 `deployed_perm_copy_constraints_all_chunks`, specialized to one resolver-backed proof. -/
 structure ResolverPermutationConstraints
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
     (l0 lLast lBlind : CPoly)
-    (p : Fin shape.numProofs) (n m : ℕ) : Prop where
+    (p : Fin numProofs) (n m : ℕ) : Prop where
   step : ∀ c < shape.numPermutationSets, (X ^ n - 1 : CPoly) ∣
     permChunkExpression (C ch.beta) (C ch.gamma) X (C vk.delta) vk.chunkLen c
       (permSetPolys vk.omega (poly (.permProduct p c)) none)
@@ -593,15 +599,15 @@ structure ResolverPermutationConstraints
 inter-set chain, start, and end constraints.  The two structural premises are VK facts: chunks and
 permutation sets have the same count, and the last-row rotation is `ω^m`. -/
 theorem ConstraintSatisfaction.resolverPermutationConstraints
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
     (l0 lLast lBlind : CPoly)
-    (p : Fin shape.numProofs) {n m : ℕ}
+    (p : Fin numProofs) {n m : ℕ}
     (h : ConstraintSatisfaction
-      (constraintModelOfResolver vk ch poly
-        (permutationSetsOfResolver vk poly)
-        (permutationChunksOfResolver vk poly)
+      (constraintModelOfResolver (numProofs := numProofs) vk ch poly
+        (permutationSetsOfResolver (numProofs := numProofs) vk poly)
+        (permutationChunksOfResolver (numProofs := numProofs) vk poly)
         l0 lLast lBlind) n)
     (hnonempty : 0 < shape.numPermutationSets)
     (hchunks : vk.permutationChunks.length = shape.numPermutationSets)

@@ -28,82 +28,82 @@ The full commitment-ID resolver model with its selector polynomials determined
 by the verification key's domain and blinding count.
 -/
 def constraintModel
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n) :
-    ConstraintPolyModel shape.numProofs :=
+    ConstraintPolyModel numProofs :=
   let selectors :=
     canonicalLagrangePolynomials vk.omega hblinding
-  constraintModelOfResolver vk ch poly
-    (permutationSetsOfResolver vk poly)
-    (permutationChunksOfResolver vk poly)
+  constraintModelOfResolver (numProofs := numProofs) vk ch poly
+    (permutationSetsOfResolver (numProofs := numProofs) vk poly)
+    (permutationChunksOfResolver (numProofs := numProofs) vk poly)
     selectors.1 selectors.2.1 selectors.2.2
 
 @[simp] theorem constraintModel_fixedCols
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n) :
-    (vk.constraintModel ch poly hblinding).fixedCols =
+    (vk.constraintModel (numProofs := numProofs) ch poly hblinding).fixedCols =
       fixedQueryFeedOfResolver vk poly :=
   rfl
 
 @[simp] theorem constraintModel_adviceCols
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n) :
-    (vk.constraintModel ch poly hblinding).adviceCols =
-      fun proofIndex : Fin shape.numProofs =>
+    (vk.constraintModel (numProofs := numProofs) ch poly hblinding).adviceCols =
+      fun proofIndex : Fin numProofs =>
         adviceQueryFeedOfResolver vk poly proofIndex :=
   rfl
 
 @[simp] theorem constraintModel_instanceCols
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n) :
-    (vk.constraintModel ch poly hblinding).instanceCols =
-      fun proofIndex : Fin shape.numProofs =>
+    (vk.constraintModel (numProofs := numProofs) ch poly hblinding).instanceCols =
+      fun proofIndex : Fin numProofs =>
         instanceQueryFeedOfResolver vk poly proofIndex :=
   rfl
 
 @[simp] theorem constraintModel_gates
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n) :
-    (vk.constraintModel ch poly hblinding).gates = vk.gates :=
+    (vk.constraintModel (numProofs := numProofs) ch poly hblinding).gates = vk.gates :=
   rfl
 
 @[simp] theorem constraintModel_sets
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n)
-    (proofIndex : Fin shape.numProofs) :
-    (vk.constraintModel ch poly hblinding).sets proofIndex =
+    (proofIndex : Fin numProofs) :
+    (vk.constraintModel (numProofs := numProofs) ch poly hblinding).sets proofIndex =
       permutationSetsOfResolver vk poly proofIndex :=
   rfl
 
 @[simp] theorem constraintModel_chunks
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n)
-    (proofIndex : Fin shape.numProofs) :
-    (vk.constraintModel ch poly hblinding).chunks proofIndex =
+    (proofIndex : Fin numProofs) :
+    (vk.constraintModel (numProofs := numProofs) ch poly hblinding).chunks proofIndex =
       permutationChunksOfResolver vk poly proofIndex :=
   rfl
 
 @[simp] theorem constraintModel_lookups
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n)
-    (proofIndex : Fin shape.numProofs) :
-    (vk.constraintModel ch poly hblinding).lookups proofIndex =
+    (proofIndex : Fin numProofs) :
+    (vk.constraintModel (numProofs := numProofs) ch poly hblinding).lookups proofIndex =
       lookupEntriesOfResolver vk poly proofIndex :=
   rfl
 
@@ -112,43 +112,43 @@ Expose the resolver-backed construction without forcing downstream proofs to
 unfold the computable polynomial implementation.
 -/
 theorem constraintModel_eq_constraintModelOfResolver
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n) :
-    vk.constraintModel ch poly hblinding =
-      constraintModelOfResolver vk ch poly
-        (permutationSetsOfResolver vk poly)
-        (permutationChunksOfResolver vk poly)
-        (vk.constraintModel ch poly hblinding).l0
-        (vk.constraintModel ch poly hblinding).lLast
-        (vk.constraintModel ch poly hblinding).lBlind := by
+    vk.constraintModel (numProofs := numProofs) ch poly hblinding =
+      constraintModelOfResolver (numProofs := numProofs) vk ch poly
+        (permutationSetsOfResolver (numProofs := numProofs) vk poly)
+        (permutationChunksOfResolver (numProofs := numProofs) vk poly)
+        (vk.constraintModel (numProofs := numProofs) ch poly hblinding).l0
+        (vk.constraintModel (numProofs := numProofs) ch poly hblinding).lLast
+        (vk.constraintModel (numProofs := numProofs) ch poly hblinding).lBlind := by
   rfl
 
 @[simp] theorem constraintModel_l0
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n) :
-    (vk.constraintModel ch poly hblinding).l0 =
+    (vk.constraintModel (numProofs := numProofs) ch poly hblinding).l0 =
       (canonicalLagrangePolynomials vk.omega hblinding).1 :=
   rfl
 
 @[simp] theorem constraintModel_lLast
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n) :
-    (vk.constraintModel ch poly hblinding).lLast =
+    (vk.constraintModel (numProofs := numProofs) ch poly hblinding).lLast =
       (canonicalLagrangePolynomials vk.omega hblinding).2.1 :=
   rfl
 
 @[simp] theorem constraintModel_lBlind
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n) :
-    (vk.constraintModel ch poly hblinding).lBlind =
+    (vk.constraintModel (numProofs := numProofs) ch poly hblinding).lBlind =
       (canonicalLagrangePolynomials vk.omega hblinding).2.2 :=
   rfl
 
@@ -158,7 +158,7 @@ verifier's exact deployed selector triple at every challenge outside the
 evaluation domain.
 -/
 theorem constraintModel_selectorEvaluations
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n)
@@ -167,7 +167,7 @@ theorem constraintModel_selectorEvaluations
     (hroot : vk.omega ^ vk.n = 1)
     (hnFp : (vk.n : Fp) ≠ 0)
     (hxDomain : ch.x ^ vk.n ≠ 1) :
-    let model := vk.constraintModel ch poly hblinding
+    let model := vk.constraintModel (numProofs := numProofs) ch poly hblinding
     (model.l0.eval ch.x, model.lLast.eval ch.x,
       model.lBlind.eval ch.x) =
         lagrangeBasis vk.omega vk.n vk.blindingFactors
@@ -184,7 +184,7 @@ selector and last-rotation obligations are derived here; callers retain only
 the actual VK chunk facts and root-domain facts.
 -/
 theorem ResolverPermutationDomain.ofCanonicalConstraintModel
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G) (ch : Challenges shape.k Fp)
     (poly : CommitmentId → CPoly)
     (hblinding : vk.blindingFactors < vk.n)
@@ -193,7 +193,7 @@ theorem ResolverPermutationDomain.ofCanonicalConstraintModel
     (hroot : vk.omega ^ vk.n = 1)
     (hchunkCount :
       vk.permutationChunks.length = shape.numPermutationSets) :
-    let model := vk.constraintModel ch poly hblinding
+    let model := vk.constraintModel (numProofs := numProofs) ch poly hblinding
     ResolverPermutationDomain vk model.l0 model.lLast model.lBlind
       vk.n (vk.n - vk.blindingFactors - 1) := by
   have hn : 0 < vk.n := Nat.zero_lt_of_lt hblinding
@@ -216,7 +216,7 @@ The canonical row-selector polynomials satisfy the lookup-domain interface
 through every row strictly before its final usable row.
 -/
 theorem ResolverLookupDomain.ofCanonicalPolynomials
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (husable : vk.blindingFactors + 1 < vk.n)
     (hrows : Function.Injective fun i : Fin vk.n =>

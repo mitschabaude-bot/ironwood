@@ -21,7 +21,7 @@ set_option maxHeartbeats 20000
 /-- Decode a verifier permutation query reference back to the concrete Clean
 column selected by its query-layout entry. -/
 def permutationColumnAddress
-    {shape : Shape} {F G : Type*}
+    {shape : CircuitShape} {F G : Type*}
     (vk : VerifyingKey shape F G) : ColumnRef → AnyColumn
   | .advice query =>
       ⟨.advice, (vk.adviceQueryLayout.getD query (0, 0)).1⟩
@@ -35,10 +35,10 @@ The value polynomial selected by a coherent permutation query reference reads
 the same natural-numbered row as its decoded Clean column.
 -/
 theorem permutationColumnPolynomial_eval_environment
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly)
-    (proofIndex : Fin shape.numProofs)
+    (proofIndex : Fin numProofs)
     (usableRows row : ℕ) (reference : ColumnRef)
     (hcoherent : PermutationColumnRef.Coherent vk reference) :
     (permutationColumnPolynomialOfResolver
@@ -67,22 +67,24 @@ One resolver permutation chunk value is the canonical environment read at the
 concrete column decoded from that chunk's query reference.
 -/
 theorem chunkRowValue_eq_resolverEnvironment
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly)
-    (proofIndex : Fin shape.numProofs)
+    (proofIndex : Fin numProofs)
     (usableRows chunk row column : ℕ)
     (hcolumn :
       column < (vk.permutationChunks.getD chunk []).length)
     (hcoherent :
       PermutationColumnRef.Coherent vk
-        ((vk.permutationChunks.getD chunk [])[column]).1) :
+        ((vk.permutationChunks.getD chunk []).getD
+          column ((.advice 0), 0)).1) :
     chunkRowValue vk.omega
         (permutationChunkPairsOfResolver vk poly proofIndex)
         chunk row column =
       (resolverEnvironment vk poly proofIndex usableRows).get
         (permutationColumnAddress vk
-          ((vk.permutationChunks.getD chunk [])[column]).1)
+          ((vk.permutationChunks.getD chunk []).getD
+            column ((.advice 0), 0)).1)
         (row : ℤ) := by
   rw [chunkRowValue, rowValue]
   have hpairs :
@@ -92,6 +94,7 @@ theorem chunkRowValue_eq_resolverEnvironment
     simpa [permutationChunkPairsOfResolver] using hcolumn
   rw [List.getD_eq_getElem _ _ hpairs]
   simp only [permutationChunkPairsOfResolver, List.getElem_map]
+  rw [List.getD_eq_getElem _ _ hcolumn] at hcoherent ⊢
   exact permutationColumnPolynomial_eval_environment
     vk poly proofIndex usableRows row
       ((vk.permutationChunks.getD chunk [])[column]).1 hcoherent
@@ -296,10 +299,10 @@ theorem rotateOmega_domainPoint
 
 /-- A fixed query feed reads the same row as the canonical resolver environment. -/
 theorem fixedQueryFeedOfResolver_eval_environment
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly)
-    (p : Fin shape.numProofs) (usableRows : ℕ)
+    (p : Fin numProofs) (usableRows : ℕ)
     (selectors : ℕ → Fp)
     {query column : ℕ} {rotation : ℤ}
     (hquery : query < shape.numFixedQueries)
@@ -320,10 +323,10 @@ theorem fixedQueryFeedOfResolver_eval_environment
 
 /-- An advice query feed reads the same row as the canonical resolver environment. -/
 theorem adviceQueryFeedOfResolver_eval_environment
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly)
-    (p : Fin shape.numProofs) (usableRows : ℕ)
+    (p : Fin numProofs) (usableRows : ℕ)
     (selectors : ℕ → Fp)
     {query column : ℕ} {rotation : ℤ}
     (hquery : query < shape.numAdviceQueries)
@@ -344,10 +347,10 @@ theorem adviceQueryFeedOfResolver_eval_environment
 
 /-- An instance query feed reads the same row as the canonical resolver environment. -/
 theorem instanceQueryFeedOfResolver_eval_environment
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly)
-    (p : Fin shape.numProofs) (usableRows : ℕ)
+    (p : Fin numProofs) (usableRows : ℕ)
     (selectors : ℕ → Fp)
     {query column : ℕ} {rotation : ℤ}
     (hquery : query < shape.numInstanceQueries)
@@ -371,10 +374,10 @@ The three resolver query feeds interpret an arbitrary keygen query state wheneve
 the state layouts are the VK layouts and the shape counts those layouts exactly.
 -/
 theorem resolverQueryFeeds_interpret
-    {shape : Shape} {G : Type*}
+    {shape : CircuitShape} {numProofs : ℕ} {G : Type*}
     (vk : VerifyingKey shape Fp G)
     (poly : CommitmentId → CPoly)
-    (p : Fin shape.numProofs) (usableRows : ℕ)
+    (p : Fin numProofs) (usableRows : ℕ)
     (selectors : ℕ → Fp) (row : ℕ)
     (homega : vk.omega ≠ 0)
     (state : QueryState)

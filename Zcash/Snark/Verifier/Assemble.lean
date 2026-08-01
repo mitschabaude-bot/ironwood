@@ -68,7 +68,7 @@ The instance commitment is deliberately **not** a field: like halo2's `verify_pr
 computes it per proof from the public instances (`commit_lagrange`) rather than reading it from the
 VK, and supplies it to the assembly as a separate argument (`instanceCommitment` of
 `assembleQueries`/`assemble`). This keeps the VK a faithful image of the pinned Rust key. -/
-structure VerifyingKey (shape : Shape) (F G : Type*) where
+structure VerifyingKey (shape : CircuitShape) (F G : Type*) where
   omega : F
   n : ℕ
   blindingFactors : ℕ

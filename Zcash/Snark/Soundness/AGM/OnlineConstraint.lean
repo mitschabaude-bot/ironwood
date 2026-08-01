@@ -249,7 +249,7 @@ theorem deployedConstraint_memberPoly_eq_online
     (pnu : WrappedAlgebraicOutput family.toFamily basis)
     (witness : DeployedBatchWitness family.toFamily basis pnu)
     (hsrc : witness.fixedRepresentations = family.fixedRepresentations basis)
-    (decoded : DeployedAlgebraicDecode (ursOfAugmentedBasis shape.k basis) rfl
+    (decoded : DeployedAlgebraicDecode shape (ursOfAugmentedBasis shape.k basis) rfl
       (family.vk basis) (family.instanceCommitment basis) pnu.1.proof.1
       (wrappedPreIpaRecord pnu) (pnu.1.aMulti (wrappedPreIpaReads pnu))
       (pnu.1.multiU (wrappedPreIpaReads pnu)) (pnu.1.multiBlind (wrappedPreIpaReads pnu)))
@@ -281,7 +281,7 @@ theorem deployedConstraint_vanishing_components_eq_online
     (pnu : WrappedAlgebraicOutput family.toFamily basis)
     (witness : DeployedBatchWitness family.toFamily basis pnu)
     (hsrc : witness.fixedRepresentations = family.fixedRepresentations basis)
-    (decoded : DeployedAlgebraicDecode (ursOfAugmentedBasis shape.k basis) rfl
+    (decoded : DeployedAlgebraicDecode shape (ursOfAugmentedBasis shape.k basis) rfl
       (family.vk basis) (family.instanceCommitment basis) pnu.1.proof.1
       (wrappedPreIpaRecord pnu) (pnu.1.aMulti (wrappedPreIpaReads pnu))
       (pnu.1.multiU (wrappedPreIpaReads pnu)) (pnu.1.multiBlind (wrappedPreIpaReads pnu)))
@@ -341,7 +341,7 @@ theorem deployedConstraint_quotient_relation_eq_online
     (pnu : WrappedAlgebraicOutput family.toFamily basis)
     (witness : DeployedBatchWitness family.toFamily basis pnu)
     (hsrc : witness.fixedRepresentations = family.fixedRepresentations basis)
-    (decoded : DeployedAlgebraicDecode (ursOfAugmentedBasis shape.k basis) rfl
+    (decoded : DeployedAlgebraicDecode shape (ursOfAugmentedBasis shape.k basis) rfl
       (family.vk basis) (family.instanceCommitment basis) pnu.1.proof.1
       (wrappedPreIpaRecord pnu) (pnu.1.aMulti (wrappedPreIpaReads pnu))
       (pnu.1.multiU (wrappedPreIpaReads pnu)) (pnu.1.multiBlind (wrappedPreIpaReads pnu)))
@@ -423,7 +423,7 @@ def deployedOnlineConstraintOutcomeOfDecode
     (pnu : WrappedAlgebraicOutput family.toFamily basis)
     (witness : DeployedBatchWitness family.toFamily basis pnu)
     (hsrc : witness.fixedRepresentations = family.fixedRepresentations basis)
-    (decoded : DeployedAlgebraicDecode (ursOfAugmentedBasis shape.k basis) rfl
+    (decoded : DeployedAlgebraicDecode shape (ursOfAugmentedBasis shape.k basis) rfl
       (family.vk basis) (family.instanceCommitment basis) pnu.1.proof.1
       (wrappedPreIpaRecord pnu) (pnu.1.aMulti (wrappedPreIpaReads pnu))
       (pnu.1.multiU (wrappedPreIpaReads pnu)) (pnu.1.multiBlind (wrappedPreIpaReads pnu)))
@@ -469,7 +469,7 @@ theorem deployedOnlineConstraintOutcome_relation_eq_online
     (pnu : WrappedAlgebraicOutput family.toFamily basis)
     (witness : DeployedBatchWitness family.toFamily basis pnu)
     (hsrc : witness.fixedRepresentations = family.fixedRepresentations basis)
-    (decoded : DeployedAlgebraicDecode (ursOfAugmentedBasis shape.k basis) rfl
+    (decoded : DeployedAlgebraicDecode shape (ursOfAugmentedBasis shape.k basis) rfl
       (family.vk basis) (family.instanceCommitment basis) pnu.1.proof.1
       (wrappedPreIpaRecord pnu) (pnu.1.aMulti (wrappedPreIpaReads pnu))
       (pnu.1.multiU (wrappedPreIpaReads pnu)) (pnu.1.multiBlind (wrappedPreIpaReads pnu)))
