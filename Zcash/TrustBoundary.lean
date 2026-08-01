@@ -1366,7 +1366,7 @@ assert_computable Zcash.Snark.ActionTerminal.action_bundleStatement_or_relation_
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.ActionGateCoherence.domainExponent_lt,
-  Zcash.Snark.ActionGateCoherence.gateData_eq, Zcash.Snark.ActionGateCoherence.selectorDegree,
+  Zcash.Snark.ActionGateCoherence.selectorDegree,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
@@ -1388,7 +1388,7 @@ assert_computable Zcash.Snark.ActionTerminal.action_bundleStatement_or_relation_
   CompElliptic.Fields.Pasta.pallasBase,
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
-  Zcash.Snark.ActionGateCoherence.domainExponent_lt, Zcash.Snark.ActionGateCoherence.gateData_eq,
+  Zcash.Snark.ActionGateCoherence.domainExponent_lt,
   Zcash.Snark.ActionGateCoherence.selectorDegree,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
@@ -1413,7 +1413,7 @@ assert_computable Zcash.Snark.ActionTerminal.actionTerminalWitnessOrRelationFind
   CompElliptic.Fields.Pasta.pallasBase,
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
-  Zcash.Snark.ActionGateCoherence.domainExponent_lt, Zcash.Snark.ActionGateCoherence.gateData_eq,
+  Zcash.Snark.ActionGateCoherence.domainExponent_lt,
   Zcash.Snark.ActionGateCoherence.selectorDegree,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
@@ -1436,7 +1436,7 @@ assert_axioms Zcash.Snark.ActionTerminal.action_bundleStatement_or_relation_of_a
   CompElliptic.Fields.Pasta.pallasBase,
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
-  Zcash.Snark.ActionGateCoherence.domainExponent_lt, Zcash.Snark.ActionGateCoherence.gateData_eq,
+  Zcash.Snark.ActionGateCoherence.domainExponent_lt,
   Zcash.Snark.ActionGateCoherence.selectorDegree,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
@@ -1501,7 +1501,7 @@ assert_computable Zcash.Snark.ActionTerminal.action_bundleStatement_or_relation_
   CompElliptic.Fields.Pasta.pallasBase,
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
-  Zcash.Snark.ActionGateCoherence.domainExponent_lt, Zcash.Snark.ActionGateCoherence.gateData_eq,
+  Zcash.Snark.ActionGateCoherence.domainExponent_lt,
   Zcash.Snark.ActionGateCoherence.selectorDegree,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
@@ -1701,7 +1701,7 @@ assert_computable Zcash.Snark.ActionTerminal.adaptiveActionRelationFinder +choic
   CompElliptic.Fields.Pasta.pallasBase,
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
-  Zcash.Snark.ActionGateCoherence.domainExponent_lt, Zcash.Snark.ActionGateCoherence.gateData_eq,
+  Zcash.Snark.ActionGateCoherence.domainExponent_lt,
   Zcash.Snark.ActionGateCoherence.selectorDegree,
   Zcash.Snark.ActionGateCoherence.adviceQueryColumnsAllocated,
 
@@ -1723,7 +1723,7 @@ assert_computable Zcash.Snark.ActionTerminal.adaptiveActionKnowledgeExtractor +c
   CompElliptic.Fields.Pasta.pallasBase,
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
-  Zcash.Snark.ActionGateCoherence.domainExponent_lt, Zcash.Snark.ActionGateCoherence.gateData_eq,
+  Zcash.Snark.ActionGateCoherence.domainExponent_lt,
   Zcash.Snark.ActionGateCoherence.selectorDegree,
   Zcash.Snark.ActionGateCoherence.adviceQueryColumnsAllocated,
 
@@ -1745,7 +1745,7 @@ assert_computable Zcash.Snark.ActionTerminal.actionTerminalRelationFinder +choic
   CompElliptic.Fields.Pasta.pallasBase,
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
-  Zcash.Snark.ActionGateCoherence.domainExponent_lt, Zcash.Snark.ActionGateCoherence.gateData_eq,
+  Zcash.Snark.ActionGateCoherence.domainExponent_lt,
   Zcash.Snark.ActionGateCoherence.selectorDegree,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
@@ -1766,7 +1766,7 @@ assert_computable Zcash.Snark.ActionTerminal.actionRelationFinder +choice +nativ
   CompElliptic.Fields.Pasta.pallasBase,
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
-  Zcash.Snark.ActionGateCoherence.domainExponent_lt, Zcash.Snark.ActionGateCoherence.gateData_eq,
+  Zcash.Snark.ActionGateCoherence.domainExponent_lt,
   Zcash.Snark.ActionGateCoherence.selectorDegree,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
@@ -1787,7 +1787,7 @@ assert_computable Zcash.Snark.ActionTerminal.actionKnowledgeExtractor +choice +n
   CompElliptic.Fields.Pasta.pallasBase,
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
-  Zcash.Snark.ActionGateCoherence.domainExponent_lt, Zcash.Snark.ActionGateCoherence.gateData_eq,
+  Zcash.Snark.ActionGateCoherence.domainExponent_lt,
   Zcash.Snark.ActionGateCoherence.selectorDegree,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,
@@ -1816,7 +1816,7 @@ assert_axioms Zcash.Snark.ActionTerminal.actionKnowledgeFailure_prob_le_of_base_
   CompElliptic.Fields.Pasta.pallasBase,
   Zcash.Snark.ActionFixedCoherence.queryCoverageFailures_eq_nil,
   Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
-  Zcash.Snark.ActionGateCoherence.domainExponent_lt, Zcash.Snark.ActionGateCoherence.gateData_eq,
+  Zcash.Snark.ActionGateCoherence.domainExponent_lt,
   Zcash.Snark.ActionGateCoherence.selectorDegree,
 
   Zcash.Snark.ActionPermutationDomain.routingFailures_eq_nil,

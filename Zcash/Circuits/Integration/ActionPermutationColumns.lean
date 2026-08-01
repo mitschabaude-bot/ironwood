@@ -312,6 +312,78 @@ local instance eccGrowth
   unfold Zcash.Circuits.Ecc.configure
   infer_instance
 
+local instance actionConfigureAdvicesGrowth :
+    HasPermutationGrowthAtMost
+      Zcash.Circuits.Action.Circuit.configureAdvices 0 := by
+  unfold Zcash.Circuits.Action.Circuit.configureAdvices
+  infer_instance
+
+local instance actionConfigureAdviceEqualitiesLowGrowth
+    (advices : Fin 10 → Column .advice) :
+    HasPermutationGrowthAtMost
+      (Zcash.Circuits.Action.Circuit.configureAdviceEqualitiesLow advices) 5 := by
+  unfold Zcash.Circuits.Action.Circuit.configureAdviceEqualitiesLow
+  infer_instance
+
+local instance actionConfigureAdviceEqualitiesHighGrowth
+    (advices : Fin 10 → Column .advice) :
+    HasPermutationGrowthAtMost
+      (Zcash.Circuits.Action.Circuit.configureAdviceEqualitiesHigh advices) 5 := by
+  unfold Zcash.Circuits.Action.Circuit.configureAdviceEqualitiesHigh
+  infer_instance
+
+local instance actionConfigureEqualitiesGrowth
+    (primary : Column .instance) (advices : Fin 10 → Column .advice) :
+    HasPermutationGrowthAtMost
+      (Zcash.Circuits.Action.Circuit.configureEqualities primary advices) 11 := by
+  unfold Zcash.Circuits.Action.Circuit.configureEqualities
+  infer_instance
+
+local instance actionConfigureEqualitiesNonempty
+    (primary : Column .instance) (advices : Fin 10 → Column .advice) :
+    GuaranteesPermutationNonempty
+      (Zcash.Circuits.Action.Circuit.configureEqualities primary advices) := by
+  unfold Zcash.Circuits.Action.Circuit.configureEqualities
+  infer_instance
+
+local instance actionConfigureLagrangeGrowth :
+    HasPermutationGrowthAtMost
+      Zcash.Circuits.Action.Circuit.configureLagrange 1 := by
+  unfold Zcash.Circuits.Action.Circuit.configureLagrange
+  infer_instance
+
+local instance actionConfigureSharedGrowth :
+    HasPermutationGrowthAtMost
+      Zcash.Circuits.Action.Circuit.configureShared 12 := by
+  unfold Zcash.Circuits.Action.Circuit.configureShared
+  infer_instance
+
+local instance actionConfigureSharedNonempty :
+    GuaranteesPermutationNonempty
+      Zcash.Circuits.Action.Circuit.configureShared := by
+  unfold Zcash.Circuits.Action.Circuit.configureShared
+  infer_instance
+
+local instance actionConfigureBaseGrowth :
+    HasPermutationGrowthAtMost
+      Zcash.Circuits.Action.Circuit.configureBase 13 := by
+  unfold Zcash.Circuits.Action.Circuit.configureBase
+  infer_instance
+
+local instance actionConfigureChipsGrowth
+    (G : Zcash.Circuits.Specs.Sinsemilla.Generators)
+    (base : Zcash.Circuits.Action.Circuit.ConfigureBase) :
+    HasPermutationGrowthAtMost
+      (Zcash.Circuits.Action.Circuit.configureChips G base) 40 := by
+  unfold Zcash.Circuits.Action.Circuit.configureChips
+  infer_instance
+
+local instance actionConfigureBaseNonempty :
+    GuaranteesPermutationNonempty
+      Zcash.Circuits.Action.Circuit.configureBase := by
+  unfold Zcash.Circuits.Action.Circuit.configureBase
+  infer_instance
+
 local instance actionConfigureGrowth
     (G : Zcash.Circuits.Specs.Sinsemilla.Generators) :
     HasPermutationGrowthAtMost
@@ -353,13 +425,9 @@ theorem permutationColumns_eq_configure :
       (Zcash.Circuits.Action.Circuit.configure
         Zcash.Circuits.Specs.Sinsemilla.orchardGenerators
         ({} : ConstraintSystem Fp)).2.permutationColumns := by
-  calc
-    _ =
-        (Zcash.Circuits.Action.actionCircuit.formalCircuit.configure
-          () {}).2.permutationColumns :=
-      Halo2.TopLevelCircuit.constraintSystem_permutationColumns _
-    _ = _ := by
-      rw [actionCircuit_configure]
+  simp only [TopLevelCircuit.constraintSystem,
+    TopLevelCompilation.constraintSystem]
+  rw [actionCircuit_configure]
 
 /-- Action's derived permutation-column family is nonempty because its
 configure program equality-enables the primary column. -/

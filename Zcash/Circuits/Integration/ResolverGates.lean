@@ -297,7 +297,7 @@ def enabledGatePolynomialWitnessOfResolver
       (resolverEnvironment vk poly proofIndex usableRows)
       constraint.poly enabled.gate.selector compressed
       (place enabled.region + enabled.row)
-      (enabled.gate.wellFormed constraint hconstraint)
+      (enabled.gate.wellFormed.compressionSound constraint hconstraint)
       hcompressed hscale
       (by intros; rfl)
       (by intros; rfl)
