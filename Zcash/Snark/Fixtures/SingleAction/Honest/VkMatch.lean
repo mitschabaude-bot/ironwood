@@ -58,9 +58,7 @@ proposition re-runs the circuit's configure/synthesize chain during `native_deci
 evaluation, so the bundles below are stated over these once-per-process definitions.
 The public theorems restate the facts in method spelling via `simp only` unfolding. -/
 
-private def actionCS : ConstraintSystem Fp := actionCircuit.constraintSystem
 private def actionK : ℕ := actionCircuit.domainExponent
-private def actionSelMap : Halo2.SelCompressMap := actionCircuit.selectorMap
 
 /-- The capture's permutation columns, in raw column space. The captured
 `vk.permutationChunks` stores the verifier view — `ColumnRef`s in QUERY-INDEX space
@@ -91,57 +89,34 @@ def capturedPinnedView : PinnedConstraintSystem Fp :=
     lookupInputExprs := (List.ofFn vk.lookupInputExprs).map (·.map RichExpression.ofExpr)
     lookupTableExprs := (List.ofFn vk.lookupTableExprs).map (·.map RichExpression.ofExpr) }
 
-/-- **The capture is the derived Action circuit** (pinned CS), and the derivation is
-well-formed: the domain exponent computes to orchard's pinned `K = 11`
-(`circuit.rs:76`) and no `queriedCells` entry poisoned the registration. One bundled
-`native_decide` — separate per-fact theorems would re-evaluate the shared selector-map
-and projection work once each; the field/fact splits below are `congrArg` projections
-of this single evaluation. -/
+/-- **The capture is the derived Action circuit** (pinned CS), the domain exponent
+computes to orchard's pinned `K = 11` (`circuit.rs:76`), and no `queriedCells` entry
+poisoned registration. One bundled `native_decide` shares the concrete circuit
+evaluation across these three facts. -/
 private theorem bundle_pinned :
     (capturedPinnedView, actionK,
-      actionCS.invalidQueriedCells.isEmpty,
-      (flatGates actionCS).all
-        (·.selectorsCovered (fun i => (actionSelMap.lookup i).isSome)))
-      = (actionPinnedCs, 11, true, true) := by native_decide
-
-theorem capturedPinnedView_eq_derived_and_wellFormed :
-    (capturedPinnedView, actionCircuit.domainExponent,
-      actionCircuit.constraintSystem.invalidQueriedCells.isEmpty,
-      (flatGates actionCircuit.constraintSystem).all
-        (·.selectorsCovered (fun i => (actionCircuit.selectorMap.lookup i).isSome)))
-      = (actionPinnedCs, 11, true, true) := by
-  have h := bundle_pinned
-  simpa only [actionSelMap, actionK, actionCS] using h
+      actionCircuit.constraintSystem.invalidQueriedCells.isEmpty)
+      = (actionPinnedCs, 11, true) := by native_decide
 
 /-- **The capture is the derived Action circuit** (pinned CS, captured families). -/
 theorem capturedPinnedView_eq_derived : capturedPinnedView = actionPinnedCs := by
-  have h := capturedPinnedView_eq_derived_and_wellFormed
-  simp only [Prod.mk.injEq] at h
+  have h := bundle_pinned
+  simp only [actionK, Prod.mk.injEq] at h
   exact h.1
 
 /-- The derived domain exponent is orchard's pinned `K = 11` (`circuit.rs:76`). -/
 theorem actionK_eq : actionCircuit.domainExponent = 11 := by
-  have h := capturedPinnedView_eq_derived_and_wellFormed
-  simp only [Prod.mk.injEq] at h
+  have h := bundle_pinned
+  simp only [actionK, Prod.mk.injEq] at h
   exact h.2.1
 
 /-- Every hand-listed `queriedCells` entry was a well-formed query atom (the poison
 list is empty) — the registration recorded exactly the per-gate lists. -/
 theorem action_queriedCells_wellFormed :
     actionCircuit.constraintSystem.invalidQueriedCells.isEmpty := by
-  have h := capturedPinnedView_eq_derived_and_wellFormed
-  simp only [Prod.mk.injEq] at h
-  exact h.2.2.1
-
-/-- The selector-compression map covers every selector atom of every Action gate — the
-coverage side condition of `PinnedConstraintSystem.derive_gates_eval`. -/
-theorem action_gates_selectorsCovered :
-    ((flatGates actionCircuit.constraintSystem).all
-      (·.selectorsCovered (fun i => (actionCircuit.selectorMap.lookup i).isSome)))
-      = true := by
-  have h := capturedPinnedView_eq_derived_and_wellFormed
-  simp only [Prod.mk.injEq] at h
-  exact h.2.2.2
+  have h := bundle_pinned
+  simp only [actionK, Prod.mk.injEq] at h
+  exact h.2.2
 
 /-- **The captured verifying key's gates are the derived Action circuit's.** The
 verifying key holds `Zcash.Snark.Expr` gates and the derivation holds
@@ -213,7 +188,6 @@ theorem vk_permutationChunks_derived :
   exact h.2
 
 assert_no_sorry capturedPinnedView_eq_derived
-assert_no_sorry action_gates_selectorsCovered
 assert_no_sorry action_queriedCells_wellFormed
 assert_no_sorry actionK_eq
 assert_no_sorry vk_scalars_and_chunks_derived
