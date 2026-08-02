@@ -278,71 +278,6 @@ def topLevelRequiredFixedEntries
     topLevelSingletonLookupSelectorEntries top
 
 /--
-**INTERIM full-circuit fallback.** Columns allocated by the pinned constraint
-system but absent from the final fixed-query layout, followed by queried columns
-outside the allocated range.
-
-This finite diagnostic exists only to unblock concrete circuits while the query
-registration compiler is given a structural coverage theorem.  New generic
-interfaces should consume that theorem, not this computation.
--/
-def interimFixedQueryCoverageFailures
-    (top : TopLevelCircuit Fp Config PublicInput) : List ℕ :=
-  let queried := top.fixedQueryLayout.map Prod.fst
-  (List.range top.fixedColumnCount).filter
-      (fun column => decide (column ∉ queried)) ++
-    queried.filter (fun column => decide (top.fixedColumnCount ≤ column))
-
-/--
-An empty interim query-coverage diagnostic supplies the current
-`TopLevelFixedCoherence` coverage field.
--/
-theorem fixedQueryCoverage_of_interimFailures_eq_nil
-    (top : TopLevelCircuit Fp Config PublicInput)
-    (hfail : interimFixedQueryCoverageFailures top = []) :
-    ∀ column,
-      column < top.fixedColumnCount →
-        ∃ rotation, (column, rotation) ∈ top.fixedQueryLayout := by
-  intro column hcolumn
-  have hnotFailure :
-      column ∉ interimFixedQueryCoverageFailures top := by
-    rw [hfail]
-    simp
-  have hcolumnMem :
-      column ∈ top.fixedQueryLayout.map Prod.fst := by
-    by_contra hmissing
-    apply hnotFailure
-    simp [interimFixedQueryCoverageFailures, hcolumn, hmissing]
-  rw [List.mem_map] at hcolumnMem
-  obtain ⟨entry, hentry, hcolumnEntry⟩ := hcolumnMem
-  rcases entry with ⟨entryColumn, rotation⟩
-  simp only at hcolumnEntry
-  subst entryColumn
-  exact ⟨rotation, hentry⟩
-
-/-- An empty interim query diagnostic also rules out out-of-range layout entries. -/
-theorem fixedQueryBounded_of_interimFailures_eq_nil
-    (top : TopLevelCircuit Fp Config PublicInput)
-    (hfail : interimFixedQueryCoverageFailures top = []) :
-    ∀ column rotation,
-      (column, rotation) ∈ top.fixedQueryLayout →
-        column < top.fixedColumnCount := by
-  intro column rotation hentry
-  have hnotFailure :
-      column ∉ interimFixedQueryCoverageFailures top := by
-    rw [hfail]
-    simp
-  have hqueried :
-      column ∈ top.fixedQueryLayout.map Prod.fst := by
-    exact List.mem_map.mpr ⟨(column, rotation), hentry, rfl⟩
-  by_contra hbound
-  apply hnotFailure
-  simp only [interimFixedQueryCoverageFailures, List.mem_append]
-  apply Or.inr
-  rw [List.mem_filter]
-  exact ⟨hqueried, decide_eq_true (Nat.le_of_not_gt hbound)⟩
-
-/--
 **INTERIM full-circuit fallback.** Required fixed/table/selector writes whose
 final dense keygen cell does not have the required bounds and value.
 
@@ -406,8 +341,9 @@ theorem fixedRowsRealize_of_interimFailures_eq_nil
 /--
 The fixed-row part of a top-level circuit's keygen boundary.
 
-This record contains no proof-dependent data. Its rows, commitments, and query
-coverage are shared by every proof in a bundle. `realizes` is the layout compiler's
+This record contains no proof-dependent data. Its rows and commitments are shared by
+every proof in a bundle. Query coverage and bounds follow from the top-level circuit's
+configure law. `realizes` is the layout compiler's
 sparse-to-dense correctness statement for exactly the entries consumed by Clean
 fixed/table semantics and selector activation.
 -/
@@ -422,15 +358,6 @@ structure TopLevelFixedCoherence
     column < top.fixedColumnCount →
       (top.fixedCommitments urs).getD column 0 =
         key.commitInstance (top.fixedRows.getD column []) 1
-  queryLayout : ∀ column,
-    column < top.fixedColumnCount →
-      ∃ rotation,
-        (column, rotation) ∈
-          top.fixedQueryLayout
-  queryLayoutBounded : ∀ column rotation,
-    (column, rotation) ∈
-        top.fixedQueryLayout →
-      column < top.fixedColumnCount
   realizes : ∀ column row value,
     (column, row, value) ∈
         topLevelRequiredFixedEntries top →
@@ -486,11 +413,9 @@ theorem fixedCommitment_eq_commitInstance
 /--
 Construct fixed coherence from the exact circuit-derived keygen rows.
 
-Dense-row shape, commitment provenance, and the query-count equality are generic.
-The caller supplies only the setup's Lagrange-basis equations plus the two genuinely
-static circuit/layout facts: coverage of every committed fixed column by the final
-query layout, and preservation of the sparse assignments after last-write
-deduplication and dense scattering.
+Dense-row shape, commitment provenance, query coverage, and query bounds are generic.
+The caller supplies only the setup's Lagrange-basis equations plus preservation of the
+sparse assignments after last-write deduplication and dense scattering.
 -/
 def ofKeygen
     {Config : Type} {PublicInput : TypeMap}
@@ -504,15 +429,6 @@ def ofKeygen
         commit urs (polynomialCoefficients (2 ^ urs.k)
           (rowPolynomial top.omega
             (Pi.single i (1 : Fp)))))
-    (queryLayout : ∀ column,
-      column < top.fixedColumnCount →
-        ∃ rotation,
-          (column, rotation) ∈
-            top.fixedQueryLayout)
-    (queryLayoutBounded : ∀ column rotation,
-      (column, rotation) ∈
-          top.fixedQueryLayout →
-        column < top.fixedColumnCount)
     (realizes : ∀ column row value,
       (column, row, value) ∈
         topLevelRequiredFixedEntries top →
@@ -528,8 +444,6 @@ def ofKeygen
   commitment :=
     fixedCommitment_eq_commitInstance
       top urs hk hlen hgenerators
-  queryLayout := queryLayout
-  queryLayoutBounded := queryLayoutBounded
   realizes := realizes
 
 end TopLevelFixedCoherence
@@ -962,7 +876,7 @@ def topLevelFixedColumns_eq_rowPolynomials_or_relation
             hcommitment hrowsVk
             (by
               obtain ⟨rotation, hlayout⟩ :=
-                coherence.queryLayout column hcolumn
+                top.exists_rotation_mem_fixedQueryLayout_of_lt column hcolumn
               exact topLevelFixedQuery_of_layout top urs pp
                 instanceCommitment ps ch column rotation hlayout)
         simpa only [top.toVerifierKey_omega] using source))
@@ -979,7 +893,8 @@ def topLevelFixedColumns_eq_rowPolynomials_or_relation
           topLevelFixedLayout_of_assembledQuery
             top urs pp instanceCommitment ps ch q hq column hqid
         exact hcolumn
-          (coherence.queryLayoutBounded column rotation hlayout)
+          (List.forall_iff_forall_mem.mp
+            top.fixedQueryLayout_columns_lt _ hlayout)
       rw [relation.polynomial_eq_zero_of_not_assembled
         (.fixedCol column) habsent]
       have hrowsDefault : top.fixedRows.getD column [] = [] := by
@@ -1066,7 +981,7 @@ def topLevelFixedConstraints_or_relation
       hcommitment hrows
       (by
         obtain ⟨rotation, hlayout⟩ :=
-          coherence.queryLayout column hcolumn
+          top.exists_rotation_mem_fixedQueryLayout_of_lt column hcolumn
         exact fixedQuery_of_layout
           (shape := top.shape.withProofParams pp)
           (top.toVerifierKey urs) instanceCommitment ps ch
@@ -1146,7 +1061,7 @@ def topLevelFixedEntryRead_or_relation
       hcommitment hrows
       (by
         obtain ⟨rotation, hlayout⟩ :=
-          coherence.queryLayout fixedColumn hcolumn
+          top.exists_rotation_mem_fixedQueryLayout_of_lt fixedColumn hcolumn
         exact fixedQuery_of_layout
           (shape := top.shape.withProofParams pp)
           (top.toVerifierKey urs) instanceCommitment ps ch

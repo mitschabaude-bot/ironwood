@@ -97,7 +97,7 @@ Each obligation receives one primary classification:
 circuit. Laws belong in the formal-circuit package or in the object being constructed,
 and should normally be discharged by default tactics and compositional theorems.
 
-## The 22 capstone-facing computations
+## The original 22 capstone-facing computations
 
 | # | Current computation | Class | Structural replacement | Expected difficulty |
 |---:|---|:---:|---|---|
@@ -147,6 +147,23 @@ The only remaining R/G work is this law-dependent tail of row #18. All listed L 
 
 The subsequent keygen-lawfulness work also closes **#12a**, **#12b**, **#25**, and **#26**. These were L-classified because they required new packaged laws rather than because they required Action-specific proofs: `FormalCircuit.KeygenLawful` and the selector-allocation interface now supply them generically. The former `TopLevelGateCoherence` record has accordingly been reduced to numerical domain and degree facts and renamed `TopLevelConstraintBounds`.
 
+The query-correctness slice closes **#1** and **#24** as well. Gates and lookup
+arguments now carry local query-declaration laws, configure composition preserves
+them, and the read-only pinned-CS projection resolves expressions against the one
+authoritative compiler-derived query state. Generic top-level theorems derive valid
+query atoms, advice/instance layout bounds, and fixed-query bounds. Fixed-column
+coverage is the only circuit-specific remainder: Action proves it compositionally
+from the gates and generator-table lookup that consume its 14 allocated fixed
+columns. The former Action advice-bound, fixed-query-coverage, and queried-cell
+`native_decide` certificates have all been deleted.
+
+The permutation-routing slice closes **#20**. The existing configure query-lawfulness
+package now proves that every `enableEquality` request also registers the column's
+rotation-zero query. A generic top-level theorem transports this through selector
+compression, `findIdx`, global `zipIdx` numbering, and chunking, proving every derived
+permutation reference coherent for every `TopLevelCircuit`. The Action failure list,
+its `native_decide` proof, and the entire obsolete compute module have been deleted.
+
 ## Additional correctness obligations
 
 | # | Current location or hidden behavior | Class | Structural replacement | Expected difficulty |
@@ -159,9 +176,9 @@ Together with rows 12a and 12b, these bring the inventory to 26 atomic obligatio
 The VK bundle's `actionK_eq` is not another item because row 16 already covers it.
 
 The old `invalidQueriedCells = []` check was previously easy to dismiss because it
-was not imported by the capstone. It belongs here nevertheless: this arc is about the
-correctness of the formal-circuit/keygen interface, not only the minimum imports of one
-terminal theorem.
+was not imported by the capstone. It is now a generic theorem of every lawful
+`TopLevelCircuit`, derived from the packaged configure query laws rather than checked
+on Action.
 
 The former `Action/SelectorCoherence.lean` sidecar has been deleted. Its 1,448 lines
 and the duplicate `action_gates_selectorsCovered` computation in the VK-match bundle
@@ -211,7 +228,6 @@ shared concrete-circuit evaluation, and proof checking are included.
 |---|---|---:|---:|
 | Constraint degree and domain | `ActionConstraintBoundsCompute.lean` | 10 s | 7.0 GB |
 | Primary-instance registration | `ActionInstanceCommitmentCompute.lean` | 4 s | 3.8 GB |
-| Domain, chunks, layouts, routing, delta powers | `ActionPermutationDomainCompute.lean` | 1–2 min | 7.4 GB |
 | Copy bounds, addresses, constants | `ActionCopyWitness.lean` | 30–40 s | 7.7 GB |
 | Fixed query coverage and realization | `ActionFixedCoherenceCompute.lean` | 40 s | 7.0 GB |
 
@@ -221,27 +237,22 @@ large circuit evaluation, and moving or bundling a theorem can shift the apparen
 cost. The closure-inertness obligations are also entangled with circuit derivation and
 the VK match rather than timed as a clean standalone group.
 
-## Proposed lawfulness interfaces
+## Query-lawfulness interfaces
 
 ### 1. Exact gate query support
 
 For a gate, the list supplied as `queriedCells` records Rust closure-call order, while
 expression traversal records syntactic use order and may repeat atoms differently.
-The right law is therefore support equality, not list equality:
+The implemented law uses support inclusion rather than list equality:
 
 ```text
-Gate.QueryExact gate :=
-  every entry of gate.queriedCells is an advice/fixed/instance query
-  ∧ constraintQuerySupport gate.constraints
-      = gate.queriedCells.toFinset
-  ∧ constraintSelectorSupport gate.constraints
-      = {gate.selector}
+Gate.WellFormed.constraintQueriesDeclared gate :=
+  every query atom used by gate.constraints occurs in gate.queriedCells
 ```
 
-This captures the user's seed: the cells in the constraints are exactly the declared
-queries, plus the gate selector. If future Halo2 APIs deliberately permit valid but
-unused closure queries, equality can be relaxed to the required subset direction.
-Start with equality because it detects both missing and stale declarations.
+This is the exact direction required by soundness and remains Halo2-faithful when a
+closure queries a cell that its returned constraints do not ultimately use. Selector
+ownership remains the separate `Gate.WellFormed` law.
 
 The existing `Gate.WellFormed` selector discipline and `QueryExact` should become
 parts of a single gate lawfulness interface. Construction should retain current call
@@ -256,18 +267,19 @@ Consequences should include:
 
 ### 2. Lookup query support
 
-Lookups need the analogous law:
+Lookups carry the analogous input/table registration laws:
 
 ```text
-LookupArgument.QueryExact argument declaredQueries :=
-  querySupport (argument.inputs ++ argument.tables)
-    = declaredQueries.toFinset
+LookupQueriesDeclared queriedCells tableMap :=
+  every queriedCells entry is a query atom
+  ∧ every query atom used by the input expressions occurs in queriedCells
 ```
 
 It composes with the existing lookup properties: table expressions are selector-free,
 input selectors are disciplined, tuple arities match, and activation rows are exact.
-The declaration must reflect the actual configure closure-call order when that order
-affects query indices.
+The declaration reflects the actual configure closure-call order when that order
+affects query indices. Configure is append-only, so these local laws compose into the
+top-level layouts without replaying the concrete Action circuit.
 
 ### 3. Configure/synthesis registration
 

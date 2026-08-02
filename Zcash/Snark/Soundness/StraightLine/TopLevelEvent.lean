@@ -16,6 +16,60 @@ open Zcash.Arithmetic (scalarFieldOrder)
 
 local instance topLevelStraightLineEventInhabitedVesta : Inhabited VestaG := ⟨0⟩
 
+/-- The accepted run presented at a top-level circuit's derived verifier artifacts. -/
+def topLevelRunView
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (pp : ProofParams)
+    (family : ComputedStraightLineDeployedFSFamily (top.shape.withProofParams pp))
+    (static : DeployedConstraintStaticChecks family.toRootFamily)
+    (inputs : Fin pp.numProofs → PublicInput Fp)
+    (hvk : ∀ basis, family.vk basis =
+      top.toVerifierKey (ursOfAugmentedBasis top.shape.k basis))
+    (hI : ∀ basis, family.instanceCommitment basis =
+      top.instanceCommitment (ursOfAugmentedBasis top.shape.k basis) inputs)
+    (basis : AugmentedIndex (2 ^ top.shape.k) → VestaG)
+    (O : BTranscript Fp VestaG
+      (preIpaLen (top.shape.withProofParams pp) family.init.length 10
+        + 3 * top.shape.k) → Fp)
+    (h : family.straightLineConstraintDecoded static basis O) :
+    StraightLineAcceptedView family basis O
+      (top.toVerifierKey (ursOfAugmentedBasis top.shape.k basis))
+      (top.instanceCommitment (ursOfAugmentedBasis top.shape.k basis) inputs) where
+  decode := straightLineRunDecodeAt family static basis O
+    (top.toVerifierKey (ursOfAugmentedBasis top.shape.k basis))
+    (top.instanceCommitment (ursOfAugmentedBasis top.shape.k basis) inputs)
+    (hvk basis) (hI basis) h
+  accepts := straightLineRunAcceptsAt family static basis O
+    (top.toVerifierKey (ursOfAugmentedBasis top.shape.k basis))
+    (top.instanceCommitment (ursOfAugmentedBasis top.shape.k basis) inputs)
+    (hvk basis) (hI basis) h
+
+@[simp] theorem topLevelRunView_decode
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (pp : ProofParams)
+    (family : ComputedStraightLineDeployedFSFamily (top.shape.withProofParams pp))
+    (static : DeployedConstraintStaticChecks family.toRootFamily)
+    (inputs : Fin pp.numProofs → PublicInput Fp)
+    (hvk : ∀ basis, family.vk basis =
+      top.toVerifierKey (ursOfAugmentedBasis top.shape.k basis))
+    (hI : ∀ basis, family.instanceCommitment basis =
+      top.instanceCommitment (ursOfAugmentedBasis top.shape.k basis) inputs)
+    (basis : AugmentedIndex (2 ^ top.shape.k) → VestaG)
+    (O : BTranscript Fp VestaG
+      (preIpaLen (top.shape.withProofParams pp) family.init.length 10
+        + 3 * top.shape.k) → Fp)
+    (h : family.straightLineConstraintDecoded static basis O) :
+    (topLevelRunView top pp family static inputs hvk hI basis O h).decode =
+      straightLineRunDecodeAt family static basis O
+        (top.toVerifierKey (ursOfAugmentedBasis top.shape.k basis))
+        (top.instanceCommitment (ursOfAugmentedBasis top.shape.k basis) inputs)
+        (hvk basis) (hI basis) h := by
+  rfl
+
 /-- The canonical constraint model accepted at a straight-line run's own decode. -/
 abbrev topLevelRunModel
     {Config : Type} {PublicInput : TypeMap}
@@ -42,20 +96,10 @@ abbrev topLevelRunModel
       (preIpaLen (top.shape.withProofParams pp) family.init.length 10
         + 3 * top.shape.k) → Fp)
     (h : family.straightLineConstraintDecoded static basis O) :=
-  CanonicalMemberConstraintRelation.acceptedModel
-    (memberDecode := fun i hi =>
-      (straightLineRunDecodeAt (shape := top.shape.withProofParams pp) family static basis O
-        (top.toVerifierKey
-          (ursOfAugmentedBasis top.shape.k basis))
-        (top.instanceCommitment (ursOfAugmentedBasis top.shape.k basis) inputs)
-        (hvk basis) (hI basis) h).toMemberDecode (hchar basis O) i hi)
-    (hblinding := top.toVerifierKey_blindingFactors_lt_n
+  (topLevelRunView top pp family static inputs hvk hI basis O h).model
+    (hchar basis O)
+    (top.toVerifierKey_blindingFactors_lt_n
       (ursOfAugmentedBasis top.shape.k basis))
-    (straightLineRunAcceptsAt (shape := top.shape.withProofParams pp) family static basis O
-      (top.toVerifierKey
-        (ursOfAugmentedBasis top.shape.k basis))
-      (top.instanceCommitment (ursOfAugmentedBasis top.shape.k basis) inputs)
-      (hvk basis) (hI basis) h)
 
 /-- The canonical accepted member polynomial at a straight-line run's own decode. -/
 abbrev topLevelRunPolynomial
@@ -83,18 +127,8 @@ abbrev topLevelRunPolynomial
       (preIpaLen (top.shape.withProofParams pp) family.init.length 10
         + 3 * top.shape.k) → Fp)
     (h : family.straightLineConstraintDecoded static basis O) :=
-  CanonicalMemberConstraintRelation.acceptedPolynomial
-    (memberDecode := fun i hi =>
-      (straightLineRunDecodeAt (shape := top.shape.withProofParams pp) family static basis O
-        (top.toVerifierKey
-          (ursOfAugmentedBasis top.shape.k basis))
-        (top.instanceCommitment (ursOfAugmentedBasis top.shape.k basis) inputs)
-        (hvk basis) (hI basis) h).toMemberDecode (hchar basis O) i hi)
-    (straightLineRunAcceptsAt (shape := top.shape.withProofParams pp) family static basis O
-      (top.toVerifierKey
-        (ursOfAugmentedBasis top.shape.k basis))
-      (top.instanceCommitment (ursOfAugmentedBasis top.shape.k basis) inputs)
-      (hvk basis) (hI basis) h)
+  (topLevelRunView top pp family static inputs hvk hI basis O h).polynomial
+    (hchar basis O)
 
 section ChallengeFailureEvents
 
@@ -119,6 +153,33 @@ variable
       (straightLineRunOutput family basis O).1.proof.1
       (straightLineRunRecord family basis O) < scalarFieldOrder)
 
+/-- The `x` and `y` exclusions needed by the top-level terminal at one decoded run. -/
+def TopLevelXYExclusions
+    (basis : AugmentedIndex (2 ^ top.shape.k) → VestaG)
+    (O : BTranscript Fp VestaG
+      (preIpaLen (top.shape.withProofParams pp) family.init.length 10
+        + 3 * top.shape.k) → Fp)
+    (h : family.straightLineConstraintDecoded static basis O) : Prop :=
+  ((straightLineRunRecord family basis O).x ∉ szBadSet
+        (let model :=
+            topLevelRunModel top pp family static inputs hvk hI hchar basis O h;
+          combineConstraints
+            model.fixedCols model.adviceCols model.instanceCols model.gates
+            model.sets model.chunks model.lookups
+            model.beta model.gamma model.delta model.theta
+            (straightLineRunRecord family basis O).y
+            model.chunkLen model.l0 model.lLast model.lBlind -
+          topLevelRunPolynomial top pp family static inputs hvk hI hchar basis O h
+              CommitmentId.vanishingH *
+            (X ^ (top.toVerifierKey
+              (ursOfAugmentedBasis top.shape.k basis)).n - 1))) ∧
+      ∀ j, (straightLineRunRecord family basis O).y ∉ szBadSet
+        (foldSplitWitness
+          (topLevelRunModel top pp family static inputs hvk hI hchar
+            basis O h).constraints
+          (top.toVerifierKey
+            (ursOfAugmentedBasis top.shape.k basis)).n j)
+
 /-- Runs whose `x` or `y` challenge lands in a top-level terminal exclusion set. -/
 def topLevelXYFailureEvent :
     Set ((AugmentedIndex (2 ^ top.shape.k) → VestaG) ×
@@ -126,25 +187,34 @@ def topLevelXYFailureEvent :
         (preIpaLen (top.shape.withProofParams pp) family.init.length 10
           + 3 * top.shape.k) → Fp)) :=
   {q | ∃ h : family.straightLineConstraintDecoded static q.1 q.2,
-    ¬(((straightLineRunRecord family q.1 q.2).x ∉ szBadSet
-        (let model :=
-            topLevelRunModel top pp family static inputs hvk hI hchar q.1 q.2 h;
-          combineConstraints
-            model.fixedCols model.adviceCols model.instanceCols model.gates
-            model.sets model.chunks model.lookups
-            model.beta model.gamma model.delta model.theta
-            (straightLineRunRecord family q.1 q.2).y
-            model.chunkLen model.l0 model.lLast model.lBlind -
-          topLevelRunPolynomial top pp family static inputs hvk hI hchar q.1 q.2 h
-              CommitmentId.vanishingH *
-            (X ^ (top.toVerifierKey
-              (ursOfAugmentedBasis top.shape.k q.1)).n - 1))) ∧
-      ∀ j, (straightLineRunRecord family q.1 q.2).y ∉ szBadSet
-        (foldSplitWitness
-          (topLevelRunModel top pp family static inputs hvk hI hchar
-            q.1 q.2 h).constraints
+    ¬TopLevelXYExclusions top pp family static inputs hvk hI hchar q.1 q.2 h}
+
+/-- The permutation and lookup exclusions needed for `β` at one decoded run. -/
+def TopLevelBetaExclusions
+    (basis : AugmentedIndex (2 ^ top.shape.k) → VestaG)
+    (O : BTranscript Fp VestaG
+      (preIpaLen (top.shape.withProofParams pp) family.init.length 10
+        + 3 * top.shape.k) → Fp)
+    (h : family.straightLineConstraintDecoded static basis O) : Prop :=
+  ((straightLineRunRecord family basis O).beta ∉
+        allResolverPermutationBetaBadSet
+          pp.numProofs (top.toVerifierKey
+            (ursOfAugmentedBasis top.shape.k basis))
+          (topLevelRunPolynomial top pp family static inputs hvk hI hchar
+            basis O h)
+          (top.usableRowsAt top.domainExponent)) ∧
+      (straightLineRunRecord family basis O).beta ∉
+        allResolverLookupBetaBadSet
+          pp.numProofs
           (top.toVerifierKey
-            (ursOfAugmentedBasis top.shape.k q.1)).n j))}
+            (ursOfAugmentedBasis top.shape.k basis))
+          (straightLineRunRecord family basis O)
+          (topLevelRunPolynomial top pp family static inputs hvk hI hchar
+            basis O h)
+          ((top.toVerifierKey
+              (ursOfAugmentedBasis top.shape.k basis)).n -
+            (top.toVerifierKey
+              (ursOfAugmentedBasis top.shape.k basis)).blindingFactors - 2)
 
 /-- Runs whose `β` challenge lands in a permutation or lookup exclusion set. -/
 def topLevelBetaFailureEvent :
@@ -153,25 +223,35 @@ def topLevelBetaFailureEvent :
         (preIpaLen (top.shape.withProofParams pp) family.init.length 10
           + 3 * top.shape.k) → Fp)) :=
   {q | ∃ h : family.straightLineConstraintDecoded static q.1 q.2,
-    ¬(((straightLineRunRecord family q.1 q.2).beta ∉
-        allResolverPermutationBetaBadSet
+    ¬TopLevelBetaExclusions top pp family static inputs hvk hI hchar q.1 q.2 h}
+
+/-- The permutation and lookup exclusions needed for `γ` at one decoded run. -/
+def TopLevelGammaExclusions
+    (basis : AugmentedIndex (2 ^ top.shape.k) → VestaG)
+    (O : BTranscript Fp VestaG
+      (preIpaLen (top.shape.withProofParams pp) family.init.length 10
+        + 3 * top.shape.k) → Fp)
+    (h : family.straightLineConstraintDecoded static basis O) : Prop :=
+  ((straightLineRunRecord family basis O).gamma ∉
+        allResolverPermutationGammaBadSet
           pp.numProofs (top.toVerifierKey
-            (ursOfAugmentedBasis top.shape.k q.1))
+            (ursOfAugmentedBasis top.shape.k basis))
+          (straightLineRunRecord family basis O)
           (topLevelRunPolynomial top pp family static inputs hvk hI hchar
-            q.1 q.2 h)
+            basis O h)
           (top.usableRowsAt top.domainExponent)) ∧
-      (straightLineRunRecord family q.1 q.2).beta ∉
-        allResolverLookupBetaBadSet
+      (straightLineRunRecord family basis O).gamma ∉
+        allResolverLookupGammaBadSet
           pp.numProofs
           (top.toVerifierKey
-            (ursOfAugmentedBasis top.shape.k q.1))
-          (straightLineRunRecord family q.1 q.2)
+            (ursOfAugmentedBasis top.shape.k basis))
+          (straightLineRunRecord family basis O)
           (topLevelRunPolynomial top pp family static inputs hvk hI hchar
-            q.1 q.2 h)
+            basis O h)
           ((top.toVerifierKey
-              (ursOfAugmentedBasis top.shape.k q.1)).n -
+              (ursOfAugmentedBasis top.shape.k basis)).n -
             (top.toVerifierKey
-              (ursOfAugmentedBasis top.shape.k q.1)).blindingFactors - 2))}
+              (ursOfAugmentedBasis top.shape.k basis)).blindingFactors - 2)
 
 /-- Runs whose `γ` challenge lands in a permutation or lookup exclusion set. -/
 def topLevelGammaFailureEvent :
@@ -180,26 +260,20 @@ def topLevelGammaFailureEvent :
         (preIpaLen (top.shape.withProofParams pp) family.init.length 10
           + 3 * top.shape.k) → Fp)) :=
   {q | ∃ h : family.straightLineConstraintDecoded static q.1 q.2,
-    ¬(((straightLineRunRecord family q.1 q.2).gamma ∉
-        allResolverPermutationGammaBadSet
-          pp.numProofs (top.toVerifierKey
-            (ursOfAugmentedBasis top.shape.k q.1))
-          (straightLineRunRecord family q.1 q.2)
-          (topLevelRunPolynomial top pp family static inputs hvk hI hchar
-            q.1 q.2 h)
-          (top.usableRowsAt top.domainExponent)) ∧
-      (straightLineRunRecord family q.1 q.2).gamma ∉
-        allResolverLookupGammaBadSet
-          pp.numProofs
-          (top.toVerifierKey
-            (ursOfAugmentedBasis top.shape.k q.1))
-          (straightLineRunRecord family q.1 q.2)
-          (topLevelRunPolynomial top pp family static inputs hvk hI hchar
-            q.1 q.2 h)
-          ((top.toVerifierKey
-              (ursOfAugmentedBasis top.shape.k q.1)).n -
-            (top.toVerifierKey
-              (ursOfAugmentedBasis top.shape.k q.1)).blindingFactors - 2))}
+    ¬TopLevelGammaExclusions top pp family static inputs hvk hI hchar q.1 q.2 h}
+
+/-- The lookup exclusion needed for `θ` at one decoded run. -/
+def TopLevelThetaExclusions
+    (basis : AugmentedIndex (2 ^ top.shape.k) → VestaG)
+    (O : BTranscript Fp VestaG
+      (preIpaLen (top.shape.withProofParams pp) family.init.length 10
+        + 3 * top.shape.k) → Fp)
+    (h : family.straightLineConstraintDecoded static basis O) : Prop :=
+  (straightLineRunRecord family basis O).theta ∉
+      TopLevelLookup.thetaBadSet top pp
+        (ursOfAugmentedBasis top.shape.k basis)
+        (topLevelRunPolynomial top pp family static inputs hvk hI hchar
+          basis O h)
 
 /-- Runs whose `θ` challenge lands in a top-level lookup exclusion set. -/
 def topLevelThetaFailureEvent :
@@ -208,11 +282,35 @@ def topLevelThetaFailureEvent :
         (preIpaLen (top.shape.withProofParams pp) family.init.length 10
           + 3 * top.shape.k) → Fp)) :=
   {q | ∃ h : family.straightLineConstraintDecoded static q.1 q.2,
-    ¬((straightLineRunRecord family q.1 q.2).theta ∉
-      TopLevelLookup.thetaBadSet top pp
-        (ursOfAugmentedBasis top.shape.k q.1)
-        (topLevelRunPolynomial top pp family static inputs hvk hI hchar
-          q.1 q.2 h))}
+    ¬TopLevelThetaExclusions top pp family static inputs hvk hI hchar q.1 q.2 h}
+
+theorem topLevelXYExclusions_of_not_mem
+    {basis O} (hdecoded : family.straightLineConstraintDecoded static basis O)
+    (hgood : (basis, O) ∉ topLevelXYFailureEvent top pp family static inputs hvk hI hchar) :
+    TopLevelXYExclusions top pp family static inputs hvk hI hchar basis O hdecoded := by
+  unfold topLevelXYFailureEvent at hgood
+  exact Classical.not_not.mp (not_exists.mp hgood hdecoded)
+
+theorem topLevelBetaExclusions_of_not_mem
+    {basis O} (hdecoded : family.straightLineConstraintDecoded static basis O)
+    (hgood : (basis, O) ∉ topLevelBetaFailureEvent top pp family static inputs hvk hI hchar) :
+    TopLevelBetaExclusions top pp family static inputs hvk hI hchar basis O hdecoded := by
+  unfold topLevelBetaFailureEvent at hgood
+  exact Classical.not_not.mp (not_exists.mp hgood hdecoded)
+
+theorem topLevelGammaExclusions_of_not_mem
+    {basis O} (hdecoded : family.straightLineConstraintDecoded static basis O)
+    (hgood : (basis, O) ∉ topLevelGammaFailureEvent top pp family static inputs hvk hI hchar) :
+    TopLevelGammaExclusions top pp family static inputs hvk hI hchar basis O hdecoded := by
+  unfold topLevelGammaFailureEvent at hgood
+  exact Classical.not_not.mp (not_exists.mp hgood hdecoded)
+
+theorem topLevelThetaExclusions_of_not_mem
+    {basis O} (hdecoded : family.straightLineConstraintDecoded static basis O)
+    (hgood : (basis, O) ∉ topLevelThetaFailureEvent top pp family static inputs hvk hI hchar) :
+    TopLevelThetaExclusions top pp family static inputs hvk hI hchar basis O hdecoded := by
+  unfold topLevelThetaFailureEvent at hgood
+  exact Classical.not_not.mp (not_exists.mp hgood hdecoded)
 
 end ChallengeFailureEvents
 

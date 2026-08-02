@@ -183,7 +183,7 @@ theorem actionRowsInjectiveAtUrs
       (actionCircuit.toVerifierKey urs).omega ^ (i : ℕ) := by
   simpa only [actionCircuit.toVerifierKey_omega] using
     TopLevelAssignment.domainRowsInjective_of_domainExponent_eq
-      (top := actionCircuit) domainExponent_lt hk
+      (top := actionCircuit) ActionConstraintBounds.domainExponent_lt hk
 
 /-- The proof-parameter extension preserves the Action circuit's domain
 exponent. Keeping this equality explicit avoids elaborating the concrete
@@ -243,7 +243,7 @@ def actionResolverPermutationCycle_or_relation
     (actionShape_k_eq_domainExponent pp).symm.trans hk
   have hkUrs : urs.k ≤ 32 := by
     rw [← hdomain]
-    exact Nat.le_of_lt_succ domainExponent_lt
+    exact Nat.le_of_lt_succ ActionConstraintBounds.domainExponent_lt
   let setup := LagrangePrefixSetup.ofDerived urs hkUrs
   -- The successful cycle is returned as data; only its sigma equality is proof-valued.
   refine bindOrRelationWitness

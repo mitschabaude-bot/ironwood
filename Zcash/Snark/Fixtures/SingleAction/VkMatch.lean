@@ -89,14 +89,12 @@ def capturedPinnedView : PinnedConstraintSystem Fp :=
     lookupInputExprs := (List.ofFn vk.lookupInputExprs).map (·.map RichExpression.ofExpr)
     lookupTableExprs := (List.ofFn vk.lookupTableExprs).map (·.map RichExpression.ofExpr) }
 
-/-- **The capture is the derived Action circuit** (pinned CS), the domain exponent
-computes to orchard's pinned `K = 11` (`circuit.rs:76`), and no `queriedCells` entry
-poisoned registration. One bundled `native_decide` shares the concrete circuit
-evaluation across these three facts. -/
+/-- **The capture is the derived Action circuit** (pinned CS), and the domain exponent
+computes to orchard's pinned `K = 11` (`circuit.rs:76`). One bundled `native_decide`
+shares the concrete circuit evaluation across these two fixture comparisons. Query
+registration lawfulness is proved generically by `TopLevelCircuit`. -/
 private theorem bundle_pinned :
-    (capturedPinnedView, actionK,
-      actionCircuit.constraintSystem.invalidQueriedCells.isEmpty)
-      = (actionPinnedCs, 11, true) := by native_decide
+    (capturedPinnedView, actionK) = (actionPinnedCs, 11) := by native_decide
 
 /-- **The capture is the derived Action circuit** (pinned CS, captured families). -/
 theorem capturedPinnedView_eq_derived : capturedPinnedView = actionPinnedCs := by
@@ -108,15 +106,7 @@ theorem capturedPinnedView_eq_derived : capturedPinnedView = actionPinnedCs := b
 theorem actionK_eq : actionCircuit.domainExponent = 11 := by
   have h := bundle_pinned
   simp only [actionK, Prod.mk.injEq] at h
-  exact h.2.1
-
-/-- Every hand-listed `queriedCells` entry was a well-formed query atom (the poison
-list is empty) — the registration recorded exactly the per-gate lists. -/
-theorem action_queriedCells_wellFormed :
-    actionCircuit.constraintSystem.invalidQueriedCells.isEmpty := by
-  have h := bundle_pinned
-  simp only [actionK, Prod.mk.injEq] at h
-  exact h.2.2
+  exact h.2
 
 /-- **The captured verifying key's gates are the derived Action circuit's.** The
 verifying key holds `Zcash.Snark.Expr` gates and the derivation holds
@@ -188,7 +178,6 @@ theorem vk_permutationChunks_derived :
   exact h.2
 
 assert_no_sorry capturedPinnedView_eq_derived
-assert_no_sorry action_queriedCells_wellFormed
 assert_no_sorry actionK_eq
 assert_no_sorry vk_scalars_and_chunks_derived
 

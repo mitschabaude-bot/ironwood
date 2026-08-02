@@ -27,8 +27,6 @@ open Zcash.Circuits Zcash.Circuits.Action
 open Zcash.Arithmetic (scalarFieldOrder URS)
 open scoped ENNReal
 
-section OpaqueAction
-
 attribute [local irreducible] actionCircuit Halo2.TopLevelCircuit.toVerifierKey
   Halo2.TopLevelCircuit.instanceCommitment
 
@@ -195,7 +193,7 @@ private theorem action_domainExponent_eq :
 
 /-- **The captured static checks at the derived key** (issue #128 F3): the five decided facts,
 transferred through the derived key's scalar equalities. -/
-theorem staticChecks_of_derived
+def staticChecks_of_derived
     (family : ComputedStraightLineDeployedFSFamily
       (actionCircuit.shape.withProofParams actionProofParams))
     (hvk : ∀ basis, family.vk basis = actionCircuit.toVerifierKey
@@ -217,11 +215,11 @@ theorem staticChecks_of_derived
     rw [hvk basis, actionCircuit.toVerifierKey_omega,
       actionCircuit.toVerifierKey_n]
     exact TopLevelAssignment.domainRoot
-      ActionPermutationDomain.domainExponent_lt
+      ActionConstraintBounds.domainExponent_lt
   characteristic := fun basis => by
     rw [hvk basis, actionCircuit.toVerifierKey_n]
     exact TopLevelAssignment.domainSizeCastNeZero
-      ActionPermutationDomain.domainExponent_lt
+      ActionConstraintBounds.domainExponent_lt
 
 /-- **The captured `x`-squeeze schedule at the derived key** (issue #128 F3): the degree caps
 transfer through the scalar equalities, and pinning is the family's own derived projection. -/
@@ -295,7 +293,7 @@ private theorem md_counts_for (numProofs : ℕ) :
         congrArg (fun proofShape : Shape => proofShape.numQuotientPieces) h⟩
 
 /-- The captured static checks transported to an arbitrary Action bundle size. -/
-theorem staticChecks_of_derived_for (numProofs : ℕ)
+def staticChecks_of_derived_for (numProofs : ℕ)
     (family : ComputedStraightLineDeployedFSFamily
       (actionCircuit.shape.withProofParams (actionProofParamsFor numProofs)))
     (hvk : ∀ basis, family.vk basis =
@@ -319,11 +317,13 @@ theorem staticChecks_of_derived_for (numProofs : ℕ)
     rw [hvk basis, actionCircuit.toVerifierKey_omega,
       actionCircuit.toVerifierKey_n]
     exact TopLevelAssignment.domainRoot
-      ActionPermutationDomain.domainExponent_lt
+      ActionConstraintBounds.domainExponent_lt
   characteristic := fun basis => by
     rw [hvk basis, actionCircuit.toVerifierKey_n]
     exact TopLevelAssignment.domainSizeCastNeZero
-      ActionPermutationDomain.domainExponent_lt
+      ActionConstraintBounds.domainExponent_lt
+
+attribute [local irreducible] staticChecks_of_derived staticChecks_of_derived_for
 
 /-- The captured `x`-squeeze schedule transported to an arbitrary Action bundle size. -/
 def schedule_of_derived_for (numProofs : ℕ)
@@ -574,146 +574,6 @@ private theorem cap_gamma_for (numProofs : ℕ) :
         Nat.cast_id]
       omega
 
-private theorem cap_theta :
-    ∀ (basis : AugmentedIndex actionCircuit.n → VestaG)
-      (poly : CommitmentId → CPoly),
-      TopLevelLookup.thetaBudget actionCircuit actionProofParams
-        (ursOfAugmentedBasis actionCircuit.domainExponent basis) poly ≤
-        2 ^ 25 := by
-  intro basis poly
-  rw [TopLevelLookup.thetaBudget_eq]
-  calc
-    ∑ index : TopLevelLookup.ActivationIndex
-          actionCircuit actionProofParams,
-        actionCircuit.usableRowsAt actionCircuit.domainExponent *
-          ((operationEnabledLookups actionCircuit.operations 0).get
-            index.2).argument.inputs.length
-      ≤ ∑ _index : TopLevelLookup.ActivationIndex
-          actionCircuit actionProofParams, 2 ^ 11 * 4 := by
-        gcongr with index
-        · change actionActiveRows ≤ 2 ^ 11
-          have hrows : actionActiveRows ≤ actionCircuit.n := by
-            simpa only [actionDomainSize] using actionActiveRows_le_domainSize
-          rw [actionCircuit.n_eq_two_pow_domainExponent,
-            action_domainExponent_eq] at hrows
-          norm_num at hrows ⊢
-          exact hrows
-        · exact actionLookupInputArity_le index.2
-    _ ≤ 2 ^ 25 := by
-        simp only [TopLevelLookup.ActivationIndex,
-          Finset.sum_const, Finset.card_univ, Fintype.card_prod, Fintype.card_fin,
-          nsmul_eq_mul]
-        have hscaled :
-            (operationEnabledLookups actionCircuit.operations 0).length *
-                (2 ^ 11 * 4) ≤ 2 ^ 25 := by
-          calc
-            (operationEnabledLookups actionCircuit.operations 0).length * (2 ^ 11 * 4)
-                ≤ 2 ^ 12 * (2 ^ 11 * 4) :=
-              Nat.mul_le_mul_right _ actionLookupActivationCount_le
-            _ = 2 ^ 25 := by norm_num
-        simpa only [CircuitShape.withProofParams, actionProofParams, actionProofParamsFor,
-          _root_.one_mul, Nat.cast_id] using hscaled
-
-private theorem cap_beta :
-    ∀ (basis : AugmentedIndex actionCircuit.n → VestaG)
-      (poly : CommitmentId → CPoly),
-      (∑ p : Fin actionProofParams.numProofs,
-        (Fintype.card (ResolverPermutationCell (vkAt basis) poly p
-            actionActiveRows) + 1) *
-          Fintype.card (ResolverPermutationCell (vkAt basis) poly p
-            actionActiveRows)) +
-      actionProofParams.numProofs *
-        actionCircuit.lookupCount *
-        ((actionCircuit.n - actionCircuit.blindingFactors -
-              2 + 2) *
-            (actionCircuit.n - actionCircuit.blindingFactors -
-              2 + 1) +
-          (actionCircuit.n - actionCircuit.blindingFactors -
-            2 + 1)) ≤ 2 ^ 35 := by
-  intro basis poly
-  let urs := ursOfAugmentedBasis
-    actionCircuit.domainExponent basis
-  have hcell : ∀ p : Fin actionProofParams.numProofs,
-      Fintype.card (ResolverPermutationCell (vkAt basis) poly p
-        actionActiveRows) ≤ 2 ^ 16 := by
-    intro p
-    exact resolverPermutationCell_card_le actionProofParams urs poly p
-  have hn : actionCircuit.n = 2 ^ 11 := by
-    rw [actionCircuit.n_eq_two_pow_domainExponent,
-      action_domainExponent_eq]
-  have hu : actionCircuit.n -
-      actionCircuit.blindingFactors - 2 ≤ 2 ^ 11 := by
-    omega
-  calc
-    (∑ p : Fin actionProofParams.numProofs,
-        (Fintype.card (ResolverPermutationCell (vkAt basis) poly p
-            actionActiveRows) + 1) *
-          Fintype.card (ResolverPermutationCell (vkAt basis) poly p
-            actionActiveRows)) +
-        actionProofParams.numProofs *
-          actionCircuit.lookupCount *
-          ((actionCircuit.n -
-                actionCircuit.blindingFactors - 2 + 2) *
-              (actionCircuit.n -
-                actionCircuit.blindingFactors - 2 + 1) +
-            (actionCircuit.n -
-              actionCircuit.blindingFactors - 2 + 1))
-        ≤
-      (∑ _p : Fin actionProofParams.numProofs,
-          (2 ^ 16 + 1) * 2 ^ 16) +
-      actionProofParams.numProofs *
-          actionCircuit.lookupCount *
-          ((2 ^ 11 + 2) * (2 ^ 11 + 1) + (2 ^ 11 + 1)) := by
-      gcongr with p
-      all_goals exact hcell p
-    _ ≤ 2 ^ 35 := by
-      rw [action_numLookups_eq]
-      norm_num [actionProofParams, actionProofParamsFor, shape]
-
-private theorem cap_gamma :
-    ∀ (basis : AugmentedIndex actionCircuit.n → VestaG)
-      (poly : CommitmentId → CPoly),
-      (∑ p : Fin actionProofParams.numProofs,
-        2 * Fintype.card (ResolverPermutationCell (vkAt basis) poly p
-          actionActiveRows)) +
-      actionProofParams.numProofs *
-        actionCircuit.lookupCount *
-        (2 * (actionCircuit.n - actionCircuit.blindingFactors -
-          2 + 1)) ≤ 2 ^ 21 := by
-  intro basis poly
-  let urs := ursOfAugmentedBasis
-    actionCircuit.domainExponent basis
-  have hcell : ∀ p : Fin actionProofParams.numProofs,
-      Fintype.card (ResolverPermutationCell (vkAt basis) poly p
-        actionActiveRows) ≤ 2 ^ 16 := by
-    intro p
-    exact resolverPermutationCell_card_le actionProofParams urs poly p
-  have hn : actionCircuit.n = 2 ^ 11 := by
-    rw [actionCircuit.n_eq_two_pow_domainExponent,
-      action_domainExponent_eq]
-  have hu : actionCircuit.n -
-      actionCircuit.blindingFactors - 2 ≤ 2 ^ 11 := by
-    omega
-  calc
-    (∑ p : Fin actionProofParams.numProofs,
-        2 * Fintype.card (ResolverPermutationCell (vkAt basis) poly p
-          actionActiveRows)) +
-        actionProofParams.numProofs *
-          actionCircuit.lookupCount *
-          (2 * (actionCircuit.n -
-            actionCircuit.blindingFactors - 2 + 1))
-        ≤
-      (∑ _p : Fin actionProofParams.numProofs,
-          2 * 2 ^ 16) +
-      actionProofParams.numProofs *
-          actionCircuit.lookupCount *
-          (2 * (2 ^ 11 + 1)) := by
-      gcongr with p
-      all_goals exact hcell p
-    _ ≤ 2 ^ 21 := by
-      rw [action_numLookups_eq]
-      norm_num [actionProofParams, actionProofParamsFor, shape]
-
 private theorem derived_n_ne_zero :
     actionCircuit.n ≠ 0 :=
   actionCircuit.n_ne_zero
@@ -912,7 +772,7 @@ private theorem adaptive_action_x_degree_le_for (numProofs : ℕ)
   have hrows : Function.Injective fun i : Fin actionCircuit.n =>
       actionCircuit.omega ^ (i : ℕ) :=
     TopLevelAssignment.domainRowsInjective
-      ActionPermutationDomain.domainExponent_lt
+      ActionConstraintBounds.domainExponent_lt
   have hblindingVk : avk.blindingFactors < avk.n :=
     actionCircuit.toVerifierKey_blindingFactors_lt_n
       (ursOfAugmentedBasis
@@ -1406,204 +1266,7 @@ theorem action_dlog_groupWork_le_2pow126
     _ ≤ 8 * 2 ^ 123 := by norm_num
     _ = 2 ^ 126 := by norm_num
 
-end OpaqueAction
-
 /-! ## Exact false-Action-statement endpoints -/
-
-/-- **The exact captured Action soundness bound.**  Its left-hand event is literal deployed
-acceptance with a false `BundleStatement`.  The combined profile prices IPA, unbatching, quotient,
-and Action-terminal relation branches once. -/
-theorem orchard_action_acceptFalseStatement_prob_le_captured
-    {T : Type*} [DecidableEq T]
-    (B : VestaG) (hB : B ≠ 0)
-    (query : AugmentedIndex actionCircuit.n → T)
-    (hquery : Function.Injective query)
-    (family : ComputedStraightLineDeployedFSFamily
-      (actionCircuit.shape.withProofParams actionProofParams))
-    (inputs : Fin actionProofParams.numProofs → PublicInputs Fp)
-    (hvk : ∀ basis, family.vk basis = actionCircuit.toVerifierKey
-      (ursOfAugmentedBasis actionCircuit.domainExponent basis))
-    (hI : ∀ basis, family.instanceCommitment basis =
-      actionCircuit.instanceCommitment
-        (ursOfAugmentedBasis actionCircuit.domainExponent basis) inputs)
-    (hchar : ∀ basis O, deployedX4PairCount
-      (actionCircuit.toVerifierKey
-        (ursOfAugmentedBasis actionCircuit.domainExponent basis))
-      (actionCircuit.instanceCommitment
-        (ursOfAugmentedBasis actionCircuit.domainExponent basis) inputs)
-      (straightLineRunOutput family basis O).1.proof.1
-      (straightLineRunRecord family basis O) < scalarFieldOrder)
-    (profile : StraightLineActionDlogProfile actionProofParams family
-      (staticChecks_of_derived family hvk) inputs hvk hI hchar B)
-    {xyBound betaBound gammaBound thetaBound : ENNReal}
-    (hXY : (independentProductPMF (orchardGeneratorROSetup query)
-      (PMF.uniformOfFintype
-        (BTranscript Fp VestaG
-          (preIpaLen (actionCircuit.shape.withProofParams actionProofParams) family.init.length 10
-            + 3 * actionCircuit.domainExponent) → Fp))).toOuterMeasure
-        ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
-          topLevelXYFailureEvent actionCircuit actionProofParams family
-            (staticChecks_of_derived family hvk) inputs hvk hI hchar) ≤ xyBound)
-    (hBeta : (independentProductPMF (orchardGeneratorROSetup query)
-      (PMF.uniformOfFintype
-        (BTranscript Fp VestaG
-          (preIpaLen (actionCircuit.shape.withProofParams actionProofParams) family.init.length 10
-            + 3 * actionCircuit.domainExponent) → Fp))).toOuterMeasure
-        ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
-          topLevelBetaFailureEvent actionCircuit actionProofParams family
-            (staticChecks_of_derived family hvk) inputs hvk hI hchar) ≤ betaBound)
-    (hGamma : (independentProductPMF (orchardGeneratorROSetup query)
-      (PMF.uniformOfFintype
-        (BTranscript Fp VestaG
-          (preIpaLen (actionCircuit.shape.withProofParams actionProofParams) family.init.length 10
-            + 3 * actionCircuit.domainExponent) → Fp))).toOuterMeasure
-        ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
-          topLevelGammaFailureEvent actionCircuit actionProofParams family
-            (staticChecks_of_derived family hvk) inputs hvk hI hchar) ≤ gammaBound)
-    (hTheta : (independentProductPMF (orchardGeneratorROSetup query)
-      (PMF.uniformOfFintype
-        (BTranscript Fp VestaG
-          (preIpaLen (actionCircuit.shape.withProofParams actionProofParams) family.init.length 10
-            + 3 * actionCircuit.domainExponent) → Fp))).toOuterMeasure
-        ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
-          topLevelThetaFailureEvent actionCircuit actionProofParams family
-            (staticChecks_of_derived family hvk) inputs hvk hI hchar) ≤ thetaBound) :
-    (independentProductPMF (orchardGeneratorROSetup query)
-      (PMF.uniformOfFintype
-        (BTranscript Fp VestaG
-          (preIpaLen (actionCircuit.shape.withProofParams actionProofParams) family.init.length 10
-            + 3 * actionCircuit.domainExponent) → Fp))).toOuterMeasure
-        ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
-          actionAcceptFalseStatementEvent family inputs) ≤
-      ((family.Q + 1 : Nat) * (1 / Fintype.card Fp) +
-          (family.Q + 1 : Nat) *
-            (actionCircuit.domainExponent *
-              (2 / (Fintype.card Fp : ENNReal))) +
-          (family.Q + (11 + actionCircuit.domainExponent) + 1 : Nat) *
-            algebraicRootBudget (actionCircuit.shape.withProofParams actionProofParams)
-              actionCircuit.domainExponent +
-          (profile.advantage (actionDlogRandomOracleQueries actionProofParams family)
-              (actionDlogGroupWork profile.proverGroupWork profile.reductionGroupWork) +
-            1 / Fintype.card Fp) +
-          (family.Q + 1 : Nat) * ((20470 : Nat) / (Fintype.card Fp : ENNReal))) +
-        (xyBound + (betaBound + (gammaBound + thetaBound))) :=
-  actionBundleStatementFailure_prob_le_of_base_union_bound actionProofParams family
-    (staticChecks_of_derived family hvk) inputs hvk hI hchar query
-    (actionRelationFinder actionProofParams family (staticChecks_of_derived family hvk)
-      inputs hvk hI hchar)
-    (actionRelationFinder_covers actionProofParams family
-      (staticChecks_of_derived family hvk) inputs hvk hI hchar)
-    (actionBaseUnion_prob_le_of_dlogProfile actionProofParams family
-      (staticChecks_of_derived family hvk) inputs hvk hI hchar B hB query hquery
-      (schedule_of_derived family hvk) profile)
-    hXY hBeta hGamma hTheta
-
-/-- The exact captured Action reduction at an arbitrary bundle size.  The captured certificate
-supplies only circuit-owned data; `numProofs` remains visible in the statement and in all four
-semantic budgets. -/
-theorem orchard_action_acceptFalseStatement_prob_le_captured_for
-    (numProofs : ℕ) {T : Type*} [DecidableEq T]
-    (B : VestaG) (hB : B ≠ 0)
-    (query : AugmentedIndex
-      actionCircuit.n → T)
-    (hquery : Function.Injective query)
-    (family : ComputedStraightLineDeployedFSFamily
-      (actionCircuit.shape.withProofParams (actionProofParamsFor numProofs)))
-    (inputs : Fin (actionProofParamsFor numProofs).numProofs →
-      PublicInputs Fp)
-    (hvk : ∀ basis, family.vk basis =
-      actionCircuit.toVerifierKey
-        (ursOfAugmentedBasis
-          actionCircuit.domainExponent basis))
-    (hI : ∀ basis, family.instanceCommitment basis =
-      actionCircuit.instanceCommitment (ursOfAugmentedBasis
-          actionCircuit.domainExponent basis) inputs)
-    (hchar : ∀ basis O, deployedX4PairCount
-      (actionCircuit.toVerifierKey
-        (ursOfAugmentedBasis
-          actionCircuit.domainExponent basis))
-      (actionCircuit.instanceCommitment (ursOfAugmentedBasis
-          actionCircuit.domainExponent basis) inputs)
-      (straightLineRunOutput family basis O).1.proof.1
-      (straightLineRunRecord family basis O) < scalarFieldOrder)
-    (profile : StraightLineActionDlogProfile (actionProofParamsFor numProofs) family
-      (staticChecks_of_derived_for numProofs family hvk) inputs hvk hI hchar B)
-    {xyBound betaBound gammaBound thetaBound : ENNReal}
-    (hXY : (independentProductPMF (orchardGeneratorROSetup query)
-      (PMF.uniformOfFintype
-        (BTranscript Fp VestaG
-          (preIpaLen (actionCircuit.shape.withProofParams (actionProofParamsFor numProofs))
-            family.init.length 10 +
-            3 * actionCircuit.domainExponent) → Fp))).toOuterMeasure
-        ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
-          topLevelXYFailureEvent actionCircuit (actionProofParamsFor numProofs) family
-            (staticChecks_of_derived_for numProofs family hvk) inputs hvk hI hchar) ≤ xyBound)
-    (hBeta : (independentProductPMF (orchardGeneratorROSetup query)
-      (PMF.uniformOfFintype
-        (BTranscript Fp VestaG
-          (preIpaLen (actionCircuit.shape.withProofParams (actionProofParamsFor numProofs))
-            family.init.length 10 +
-            3 * actionCircuit.domainExponent) → Fp))).toOuterMeasure
-        ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
-          topLevelBetaFailureEvent actionCircuit (actionProofParamsFor numProofs) family
-            (staticChecks_of_derived_for numProofs family hvk) inputs hvk hI hchar) ≤ betaBound)
-    (hGamma : (independentProductPMF (orchardGeneratorROSetup query)
-      (PMF.uniformOfFintype
-        (BTranscript Fp VestaG
-          (preIpaLen (actionCircuit.shape.withProofParams (actionProofParamsFor numProofs))
-            family.init.length 10 +
-            3 * actionCircuit.domainExponent) → Fp))).toOuterMeasure
-        ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
-          topLevelGammaFailureEvent actionCircuit (actionProofParamsFor numProofs) family
-            (staticChecks_of_derived_for numProofs family hvk) inputs hvk hI hchar) ≤ gammaBound)
-    (hTheta : (independentProductPMF (orchardGeneratorROSetup query)
-      (PMF.uniformOfFintype
-        (BTranscript Fp VestaG
-          (preIpaLen (actionCircuit.shape.withProofParams (actionProofParamsFor numProofs))
-            family.init.length 10 +
-            3 * actionCircuit.domainExponent) → Fp))).toOuterMeasure
-        ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
-          topLevelThetaFailureEvent actionCircuit (actionProofParamsFor numProofs) family
-            (staticChecks_of_derived_for numProofs family hvk) inputs hvk hI hchar) ≤ thetaBound) :
-    (independentProductPMF (orchardGeneratorROSetup query)
-      (PMF.uniformOfFintype
-        (BTranscript Fp VestaG
-          (preIpaLen (actionCircuit.shape.withProofParams (actionProofParamsFor numProofs))
-            family.init.length 10 +
-            3 * actionCircuit.domainExponent) → Fp))).toOuterMeasure
-        ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
-          actionAcceptFalseStatementEventFor numProofs family inputs) ≤
-      ((family.Q + 1 : Nat) * (1 / Fintype.card Fp) +
-          (family.Q + 1 : Nat) *
-            (actionCircuit.domainExponent *
-              (2 / (Fintype.card Fp : ENNReal))) +
-          (family.Q +
-              (11 + actionCircuit.domainExponent) + 1 : Nat) *
-            algebraicRootBudget
-              (actionCircuit.shape.withProofParams (actionProofParamsFor numProofs))
-              actionCircuit.domainExponent +
-          (profile.advantage
-              (actionDlogRandomOracleQueries (actionProofParamsFor numProofs) family)
-              (actionDlogGroupWork profile.proverGroupWork profile.reductionGroupWork) +
-            1 / Fintype.card Fp) +
-          (family.Q + 1 : Nat) * ((20470 : Nat) / (Fintype.card Fp : ENNReal))) +
-        (xyBound + (betaBound + (gammaBound + thetaBound))) :=
-  actionBundleStatementFailure_prob_le_of_base_union_bound
-    (actionProofParamsFor numProofs) family
-    (staticChecks_of_derived_for numProofs family hvk) inputs hvk hI hchar query
-    (actionRelationFinder (actionProofParamsFor numProofs) family
-      (staticChecks_of_derived_for numProofs family hvk) inputs hvk hI hchar)
-    (actionRelationFinder_covers (actionProofParamsFor numProofs) family
-      (staticChecks_of_derived_for numProofs family hvk) inputs hvk hI hchar)
-    (actionBaseUnion_prob_le_of_dlogProfile (actionProofParamsFor numProofs) family
-      (staticChecks_of_derived_for numProofs family hvk) inputs hvk hI hchar B hB query hquery
-      (schedule_of_derived_for numProofs family hvk) profile)
-    hXY hBeta hGamma hTheta
-
-section OpaqueAdaptive
-
-attribute [local irreducible] actionCircuit Halo2.TopLevelCircuit.toVerifierKey
-  Halo2.TopLevelCircuit.instanceCommitment
 
 /-- Captured false-statement bound for a bare adaptive online-AGM family, with one profiled finder
 and five annotation-aware semantic surfaces. -/
@@ -1667,9 +1330,11 @@ theorem orchard_action_acceptFalseStatement_prob_le_adaptive
         (adaptiveActionThetaSurface_measure_le actionProofParams basis inputs ps source earlier) ?_
       dsimp only [epsilon]
       gcongr
-      exact_mod_cast cap_theta basis
+      have hcap := cap_theta_for 1 basis
         (adaptiveActionCommitmentPolynomial actionProofParams basis inputs ps source
           (chRecord (fun _ => 0) (fun _ => 0)))
+      exact_mod_cast (by
+        simpa only [actionProofParams, actionProofParamsFor, _root_.one_mul] using hcap)
     · have h := adaptiveActionBetaSurface_measure_le
         actionProofParams basis inputs ps source earlier
       dsimp only at h
@@ -1677,10 +1342,13 @@ theorem orchard_action_acceptFalseStatement_prob_le_adaptive
       dsimp only [epsilon]
       rw [ENNReal.div_add_div_same]
       gcongr
-      exact_mod_cast cap_beta basis
+      have hcap := cap_beta_for 1 basis
         (adaptiveActionCommitmentPolynomial actionProofParams basis inputs ps source
           (chRecord (fun i => if h : (i : Nat) < 1 then earlier ⟨i, h⟩ else 0)
             (fun _ => 0)))
+      exact_mod_cast (le_trans (by
+        simpa only [actionProofParams, actionProofParamsFor, _root_.one_mul] using hcap)
+        (by norm_num : 950835027 ≤ 2 ^ 35))
     · have h := adaptiveActionGammaSurface_measure_le
         actionProofParams basis inputs ps source earlier
       dsimp only at h
@@ -1688,10 +1356,13 @@ theorem orchard_action_acceptFalseStatement_prob_le_adaptive
       dsimp only [epsilon]
       rw [ENNReal.div_add_div_same]
       gcongr
-      exact_mod_cast cap_gamma basis
+      have hcap := cap_gamma_for 1 basis
         (adaptiveActionCommitmentPolynomial actionProofParams basis inputs ps source
           (chRecord (fun i => if h : (i : Nat) < 2 then earlier ⟨i, h⟩ else 0)
             (fun _ => 0)))
+      exact_mod_cast (le_trans (by
+        simpa only [actionProofParams, actionProofParamsFor, _root_.one_mul] using hcap)
+        (by norm_num : 73554 ≤ 2 ^ 21))
     · have h := adaptiveActionYSurface_measure_le
         actionProofParams basis inputs ps source earlier derived_n_ne_zero
       dsimp only at h
@@ -2384,21 +2055,39 @@ theorem orchard_action_acceptFalseStatement_prob_le_sequential
             ((prover.toFamily.Q + 1 : Nat) * (((2 ^ 21 : Nat) : ENNReal) /
                 (Fintype.card Fp : ENNReal)) +
               (prover.toFamily.Q + 1 : Nat) * (((2 ^ 25 : Nat) : ENNReal) /
-                (Fintype.card Fp : ENNReal))))) :=
-  orchard_action_acceptFalseStatement_prob_le_captured B hB query hquery prover.toFamily inputs hvk hI
-    hchar profile
-    (execution.toCuts.xy_prob_le actionProofParams prover.toFamily
-      (staticChecks_of_derived prover.toFamily hvk) inputs
-      hvk hI hchar query derived_n_ne_zero (derived_n_yn hL))
-    (execution.toCuts.beta_prob_le actionProofParams prover.toFamily
-      (staticChecks_of_derived prover.toFamily hvk) inputs
-      hvk hI hchar query cap_beta)
-    (execution.toCuts.gamma_prob_le actionProofParams prover.toFamily
-      (staticChecks_of_derived prover.toFamily hvk) inputs
-      hvk hI hchar query cap_gamma)
-    (execution.toCuts.theta_prob_le actionProofParams prover.toFamily
-      (staticChecks_of_derived prover.toFamily hvk) inputs
-      hvk hI hchar query cap_theta)
+                (Fintype.card Fp : ENNReal))))) := by
+  let static := staticChecks_of_derived prover.toFamily hvk
+  set finder := actionRelationFinder actionProofParams prover.toFamily
+    static inputs hvk hI hchar with hfinder
+  have hcovers : topLevelTerminalRelationFinderCovers actionCircuit actionProofParams prover.toFamily
+      static inputs hvk hI hchar finder := by
+    simpa only [finder] using actionRelationFinder_covers actionProofParams prover.toFamily
+      static inputs hvk hI hchar
+  have hbase := actionBaseUnion_prob_le_of_dlogProfile actionProofParams prover.toFamily
+    static inputs hvk hI hchar B hB query hquery (schedule_of_derived prover.toFamily hvk) profile
+  rw [← hfinder] at hbase
+  have hXY := execution.toCuts.xy_prob_le actionProofParams prover.toFamily static inputs
+    hvk hI hchar query derived_n_ne_zero (derived_n_yn hL)
+  have hBeta := execution.toCuts.beta_prob_le actionProofParams prover.toFamily static inputs
+    hvk hI hchar query (Nbeta := 2 ^ 35) (fun basis poly => by
+      have hcap := cap_beta_for 1 basis poly
+      exact le_trans (by
+        simpa only [actionProofParams, actionProofParamsFor, _root_.one_mul] using hcap)
+        (by norm_num))
+  have hGamma := execution.toCuts.gamma_prob_le actionProofParams prover.toFamily static inputs
+    hvk hI hchar query (Ngamma := 2 ^ 21) (fun basis poly => by
+      have hcap := cap_gamma_for 1 basis poly
+      exact le_trans (by
+        simpa only [actionProofParams, actionProofParamsFor, _root_.one_mul] using hcap)
+        (by norm_num))
+  have hTheta := execution.toCuts.theta_prob_le actionProofParams prover.toFamily static inputs
+    hvk hI hchar query (Ntheta := 2 ^ 25) (fun basis poly => by
+      have hcap := cap_theta_for 1 basis poly
+      simpa only [actionProofParams, actionProofParamsFor, _root_.one_mul] using hcap)
+  have hbound := actionBundleStatementFailure_prob_le_of_base_union_bound actionProofParams
+    prover.toFamily static inputs hvk hI hchar query finder hcovers hbase
+    hXY hBeta hGamma hTheta
+  simpa only [actionCircuit.shape_k, CircuitShape.withProofParams_k] using hbound
 
 /-- Sequential exact-Action capstone for every bundle size.  All semantic surfaces are discharged
 with tight linear caps, and the result is packaged as one DLOG advantage plus the complete
@@ -2446,37 +2135,50 @@ theorem orchard_action_acceptFalseStatement_prob_le_sequential_for
           (actionDlogGroupWork profile.proverGroupWork profile.reductionGroupWork) +
         actionStatisticalModelFor numProofs prover.toFamily.Q := by
   let static := staticChecks_of_derived_for numProofs prover.toFamily hvk
-  refine le_trans
-    (orchard_action_acceptFalseStatement_prob_le_captured_for numProofs B hB query hquery
-      prover.toFamily inputs hvk hI hchar profile
-      (xyBound :=
+  set finder := actionRelationFinder (actionProofParamsFor numProofs) prover.toFamily
+    static inputs hvk hI hchar with hfinder
+  have hcovers : topLevelTerminalRelationFinderCovers actionCircuit (actionProofParamsFor numProofs)
+      prover.toFamily static inputs hvk hI hchar finder := by
+    simpa only [finder] using actionRelationFinder_covers (actionProofParamsFor numProofs)
+      prover.toFamily static inputs hvk hI hchar
+  have hbase := actionBaseUnion_prob_le_of_dlogProfile (actionProofParamsFor numProofs)
+    prover.toFamily static inputs hvk hI hchar B hB query hquery
+    (schedule_of_derived_for numProofs prover.toFamily hvk) profile
+  rw [← hfinder] at hbase
+  have hXY := execution.toCuts.xy_prob_le (actionProofParamsFor numProofs) prover.toFamily
+    static inputs hvk hI hchar query derived_n_ne_zero (derived_n_yn_for numProofs hL)
+  have hBeta := execution.toCuts.beta_prob_le (actionProofParamsFor numProofs) prover.toFamily
+    static inputs hvk hI hchar query (Nbeta := numProofs * 950835027)
+      (cap_beta_for numProofs)
+  have hGamma := execution.toCuts.gamma_prob_le (actionProofParamsFor numProofs) prover.toFamily
+    static inputs hvk hI hchar query (Ngamma := numProofs * 73554)
+      (cap_gamma_for numProofs)
+  have hTheta := execution.toCuts.theta_prob_le (actionProofParamsFor numProofs) prover.toFamily
+    static inputs hvk hI hchar query (Ntheta := numProofs * 2 ^ 25)
+      (cap_theta_for numProofs)
+  have hcaptured := actionBundleStatementFailure_prob_le_of_base_union_bound
+    (actionProofParamsFor numProofs) prover.toFamily static inputs hvk hI hchar
+    query finder hcovers hbase
+    (xyBound :=
         (prover.toFamily.Q + 1 : ℕ) *
-            ((20470 : ℕ) / (Fintype.card Fp : ENNReal)) +
-          (prover.toFamily.Q + 1 : ℕ) *
-            ((numProofs * 2 ^ 23 : ℕ) / (Fintype.card Fp : ENNReal)))
-      (betaBound := (prover.toFamily.Q + 1 : ℕ) *
-        ((numProofs * 950835027 : ℕ) / (Fintype.card Fp : ENNReal)))
-      (gammaBound := (prover.toFamily.Q + 1 : ℕ) *
-        ((numProofs * 73554 : ℕ) / (Fintype.card Fp : ENNReal)))
-      (thetaBound := (prover.toFamily.Q + 1 : ℕ) *
-        ((numProofs * 2 ^ 25 : ℕ) / (Fintype.card Fp : ENNReal)))
-      ?_ ?_ ?_ ?_) ?_
-  · exact execution.toCuts.xy_prob_le (actionProofParamsFor numProofs) prover.toFamily
-      static inputs hvk hI hchar query derived_n_ne_zero
-      (derived_n_yn_for numProofs hL)
-  · exact execution.toCuts.beta_prob_le (actionProofParamsFor numProofs) prover.toFamily
-      static inputs hvk hI hchar query (cap_beta_for numProofs)
-  · exact execution.toCuts.gamma_prob_le (actionProofParamsFor numProofs) prover.toFamily
-      static inputs hvk hI hchar query (cap_gamma_for numProofs)
-  · exact execution.toCuts.theta_prob_le (actionProofParamsFor numProofs) prover.toFamily
-      static inputs hvk hI hchar query (cap_theta_for numProofs)
-  · unfold actionStatisticalModelFor actionCompressedStatisticalModelFor
-      actionSemanticModelFor
-    dsimp only
-    push_cast
-    simp only [div_eq_mul_inv]
-    ring_nf
-    apply le_rfl
+          ((20470 : ℕ) / (Fintype.card Fp : ENNReal)) +
+        (prover.toFamily.Q + 1 : ℕ) *
+          ((numProofs * 2 ^ 23 : ℕ) / (Fintype.card Fp : ENNReal)))
+    (betaBound := (prover.toFamily.Q + 1 : ℕ) *
+      ((numProofs * 950835027 : ℕ) / (Fintype.card Fp : ENNReal)))
+    (gammaBound := (prover.toFamily.Q + 1 : ℕ) *
+      ((numProofs * 73554 : ℕ) / (Fintype.card Fp : ENNReal)))
+    (thetaBound := (prover.toFamily.Q + 1 : ℕ) *
+      ((numProofs * 2 ^ 25 : ℕ) / (Fintype.card Fp : ENNReal)))
+    hXY hBeta hGamma hTheta
+  refine le_trans hcaptured ?_
+  unfold actionStatisticalModelFor actionCompressedStatisticalModelFor
+    actionSemanticModelFor
+  dsimp only
+  push_cast
+  simp only [actionCircuit.shape_k, div_eq_mul_inv]
+  ring_nf
+  apply le_rfl
 
 /-- **Concrete exact-Action work-factor endpoint.**  The query ceiling is carried by the direct
 profile, all six prover runs and terminal postprocessing are charged once to the combined DLOG
@@ -2665,7 +2367,5 @@ theorem orchard_action_acceptFalseStatement_2pow123_workFactor_generatorRO_for
   refine ⟨hprob, hqueries, hgroup, hcost.2.2, ?_⟩
   intro actual εBias hbias
   exact event_measure_le_of_bias hbias _ hprob
-
-end OpaqueAdaptive
 
 end Zcash.Snark.Fixture

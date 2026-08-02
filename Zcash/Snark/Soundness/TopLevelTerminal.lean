@@ -6,8 +6,6 @@ import Zcash.Snark.Soundness.Canonical.Terminal
 import Zcash.Snark.Soundness.Multiopen.CanonicalRelation
 import Mathlib.Util.AssertNoSorry
 
-set_option maxHeartbeats 20000
-
 /-!
 # Generic top-level circuit soundness terminal
 
@@ -233,10 +231,10 @@ variable
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
     (pp : ProofParams) (urs : URS G)
-    (hk : top.shape.k = urs.k)
+    (hk : (top.shape.withProofParams pp).k = urs.k)
     (inputs : Fin pp.numProofs → PublicInput Fp)
     (ps : ProofString (top.shape.withProofParams pp) Fp G)
-    (ch : Challenges top.shape.k Fp)
+    (ch : Challenges (top.shape.withProofParams pp).k Fp)
     (pU pW : Fp) (a : Fin (2 ^ urs.k) → Fp)
     (batchOpenings :
       OpenedBatchOpenings urs (evalVector urs.k ch.x3)
@@ -534,8 +532,6 @@ def topLevelStatements_or_relation_of_decodedMemberPolynomial_eq
             (top.toVerifierKey urs) ps ch slot point ⊕'
         NontrivialRelation (F := Fp) urs.g urs.u urs.w)
     (domainExponent_lt : top.domainExponent < 33)
-    (permutationRouting :
-      PermutationChunkRoutingCoherent (top.toVerifierKey urs))
     (hxgood :
       let model :=
         CanonicalMemberConstraintRelation.acceptedModel
@@ -604,7 +600,8 @@ def topLevelStatements_or_relation_of_decodedMemberPolynomial_eq
         (top.toVerifierKey_fixedQueryCount urs)
         (top.toVerifierKey_adviceQueryCount urs)
         (top.toVerifierKey_instanceQueryCount urs)
-        hbind permutationRouting hrows hroot hnFp hxgood with
+        hbind (top.permutationChunkRoutingCoherent urs)
+        hrows hroot hnFp hxgood with
     hsatisfied | relation
   · exact topLevelStatements_or_relation_of_circuitSat
       top pp urs hk inputs ps ch pU pW a

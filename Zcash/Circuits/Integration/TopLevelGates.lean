@@ -23,21 +23,6 @@ open Zcash.Arithmetic (omegaOf scalarFieldOrder)
 
 open Halo2 CompPoly.CPolynomial Keygen
 
-/-- A top-level circuit's intrinsic selector guarantees cover every selector atom
-in every configured gate. -/
-theorem _root_.Halo2.TopLevelCircuit.gateSelectorsAllocatedForCompression
-    {Config : Type} {PublicInput : TypeMap}
-    [ProvableType PublicInput]
-    (top : TopLevelCircuit Fp Config PublicInput) :
-    top.constraintSystem.GateSelectorsAllocated := by
-  rw [ConstraintSystem.GateSelectorsAllocated,
-    List.forall_iff_forall_mem]
-  intro gate hgate
-  exact Gate.SelectorsAllocated.of_owned
-    gate.wellFormed.selectorsOwned
-    (List.forall_iff_forall_mem.mp top.gateSelectorsAllocated
-      gate hgate)
-
 /-- Numerical bounds required by the polynomial bridge. Gate and lookup registration
 and selector allocation follow generically from the top-level circuit's packaged
 lawfulness; no placement, operation stream, selector map, or pinned constraint system
@@ -107,8 +92,8 @@ theorem resolverInterpretsGates
     (top.toVerifierKey_adviceQueryCount urs)
     (top.toVerifierKey_fixedQueryCount urs)
     (top.toVerifierKey_instanceQueryCount urs)
-  apply hfinal.mono
-  exact top.pinnedQueryState_extends_gates
+  rw [top.pinnedQueryState_eq_gateQueryState] at hfinal
+  exact hfinal
 
 /-- The circuit-derived selector map has the roots required by gate scaling. -/
 theorem selectorRootsWellFormed
@@ -131,7 +116,7 @@ theorem gateSelectorsCovered :
       top.constraintSystem
       top.n
       top.selectorActivations
-      top.gateSelectorsAllocatedForCompression
+      top.gateSelectorsAllocated
 
 /--
 Every enabled constraint in the top-level operation stream has the corresponding
@@ -175,7 +160,8 @@ opaque polynomialWitness
   have hselector :
       enabled.gate.selector.index <
         top.selectorCount :=
-    top.gateSelectorsAllocatedForCompression.gate hgate
+    List.forall_iff_forall_mem.mp top.gateSelectorsAllocated
+      enabled.gate hgate
   have hlookupSome :
       (top.selectorMap.lookup
         enabled.gate.selector.index).isSome = true := by

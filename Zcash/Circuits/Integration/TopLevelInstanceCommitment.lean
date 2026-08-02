@@ -181,8 +181,11 @@ def acceptedColumn_eq_rowPolynomial_or_relation
         (top.toVerifierKey urs) (top.instanceCommitment urs inputs) ps ch
         proofIndex column.index instanceRotation
         (top.toVerifierKey_instanceQueryCount urs)
-        (top.mem_instanceQueryLayout_of_mem_constraintSystem
-          column instanceRotation hregistered)
+        (by
+          rw [top.toVerifierKey_instanceQueryLayout]
+          rw [top.instanceQueryLayout_eq_constraintSystem]
+          exact List.mem_map.mpr
+            ⟨(column, instanceRotation), hregistered, by simp⟩)
   have hbound :=
     CanonicalMemberConstraintRelation.acceptedInstanceColumn_eq_rowPolynomial_or_relation
       (shape := top.shape.withProofParams pp)

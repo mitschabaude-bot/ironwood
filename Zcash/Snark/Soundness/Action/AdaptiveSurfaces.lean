@@ -1,4 +1,3 @@
-import Zcash.Circuits.Integration.ActionAdviceQueries
 import Zcash.Snark.Soundness.Action.AdaptiveTerminal
 import Zcash.Snark.Soundness.Action.StraightLineBudgets
 import Zcash.Snark.Soundness.AGM.AdaptiveSurfaces
@@ -474,7 +473,8 @@ theorem adaptiveActionAdviceLayout_column_lt
     (column : ℕ) (rotation : ℤ)
     (hmem : (column, rotation) ∈ (ActionTerminal.vkAt basis).adviceQueryLayout) :
     column < actionCircuit.adviceColumnCount := by
-  apply ActionAdviceQueries.columnsAllocated (column, rotation)
+  apply List.forall_iff_forall_mem.mp
+    actionCircuit.adviceQueryLayout_columns_lt (column, rotation)
   simpa only [ActionTerminal.vkAt,
     actionCircuit.toVerifierKey_adviceQueryLayout] using hmem
 
@@ -2164,6 +2164,64 @@ theorem acceptedModel_transport
   subst vk₂
   rfl
 
+/-- The polynomial resolver is invariant under the named artifact transport operation. -/
+theorem acceptedPolynomial_transportArtifacts
+    {shape : Shape}
+    {basis : AugmentedIndex (2 ^ shape.k) → VestaG}
+    {vk₁ vk₂ : VerifyingKey shape Fp VestaG}
+    {ic₁ ic₂ : Fin shape.numProofs → Nat → VestaG}
+    (hI : ic₁ = ic₂) (hvk : vk₁ = vk₂)
+    {ps : ProofString shape Fp VestaG} {ch : Challenges shape.k Fp}
+    {a : Fin (2 ^ shape.k) → Fp} {aU aW : Fp}
+    (decode : DeployedAlgebraicDecode shape (ursOfAugmentedBasis shape.k basis) rfl
+      vk₁ ic₁ ps ch a aU aW)
+    (hchar : deployedX4PairCount vk₁ ic₁ ps ch <
+      Zcash.Arithmetic.scalarFieldOrder)
+    (haccepts : DeployedAccepts shape (ursOfAugmentedBasis shape.k basis) rfl
+      vk₁ ic₁ ps ch) :
+    let decode' := decode.transportArtifacts hvk hI
+    let hchar' : deployedX4PairCount vk₂ ic₂ ps ch <
+      Zcash.Arithmetic.scalarFieldOrder := hI ▸ hvk ▸ hchar
+    let haccepts' := deployedAccepts_transportArtifacts haccepts hvk hI
+    CanonicalMemberConstraintRelation.acceptedPolynomial
+        (memberDecode := fun i hi => decode.toMemberDecode hchar i hi) haccepts =
+      CanonicalMemberConstraintRelation.acceptedPolynomial
+        (memberDecode := fun i hi => decode'.toMemberDecode hchar' i hi) haccepts' := by
+  subst ic₂
+  subst vk₂
+  rfl
+
+/-- The canonical constraint model is invariant under the named artifact transport operation. -/
+theorem acceptedModel_transportArtifacts
+    {shape : Shape}
+    {basis : AugmentedIndex (2 ^ shape.k) → VestaG}
+    {vk₁ vk₂ : VerifyingKey shape Fp VestaG}
+    {ic₁ ic₂ : Fin shape.numProofs → Nat → VestaG}
+    (hI : ic₁ = ic₂) (hvk : vk₁ = vk₂)
+    {ps : ProofString shape Fp VestaG} {ch : Challenges shape.k Fp}
+    {a : Fin (2 ^ shape.k) → Fp} {aU aW : Fp}
+    (decode : DeployedAlgebraicDecode shape (ursOfAugmentedBasis shape.k basis) rfl
+      vk₁ ic₁ ps ch a aU aW)
+    (hchar : deployedX4PairCount vk₁ ic₁ ps ch <
+      Zcash.Arithmetic.scalarFieldOrder)
+    (haccepts : DeployedAccepts shape (ursOfAugmentedBasis shape.k basis) rfl
+      vk₁ ic₁ ps ch)
+    (hblinding : vk₁.blindingFactors < vk₁.n) :
+    let decode' := decode.transportArtifacts hvk hI
+    let hchar' : deployedX4PairCount vk₂ ic₂ ps ch <
+      Zcash.Arithmetic.scalarFieldOrder := hI ▸ hvk ▸ hchar
+    let haccepts' := deployedAccepts_transportArtifacts haccepts hvk hI
+    let hblinding' : vk₂.blindingFactors < vk₂.n := hvk ▸ hblinding
+    CanonicalMemberConstraintRelation.acceptedModel
+        (memberDecode := fun i hi => decode.toMemberDecode hchar i hi)
+        (hblinding := hblinding) haccepts =
+      CanonicalMemberConstraintRelation.acceptedModel
+        (memberDecode := fun i hi => decode'.toMemberDecode hchar' i hi)
+        (hblinding := hblinding') haccepts' := by
+  subst ic₂
+  subst vk₂
+  rfl
+
 /-- Every plain member decoded from the successful adaptive batch witness is the polynomial of
 the first matching representation in the run's complete pre-`x` online source. -/
 theorem adaptiveDecodedMemberPoly_eq_online
@@ -2616,8 +2674,8 @@ theorem adaptiveActionExclusions_of_no_surface
     let ch := ActionTerminal.adaptiveActionRunRecord family basis O
     let data := (family.adversary basis).run O
     let source := data.algebraicProof.preX1AssemblySource (family.fixedRepresentations basis)
-    let decode := hI basis ▸ hvk basis ▸
-      rawDecode.reRound (runRounds family.toFamily basis O)
+    let decode := (rawDecode.reRound (runRounds family.toFamily basis O)).transportArtifacts
+      (hvk basis) (hI basis)
     let hacceptsAction := ActionTerminal.adaptiveActionRunAccepts
       pp family basis O inputs hvk hI haccepts
     let actionModel := CanonicalMemberConstraintRelation.acceptedModel
@@ -2644,8 +2702,8 @@ theorem adaptiveActionExclusions_of_no_surface
   let source := data.algebraicProof.preX1AssemblySource (family.fixedRepresentations basis)
   let pointPoly := onlinePointPolynomial source
   let piecePoly := fun i => onlinePointPolynomial source (data.algebraicProof.hPieces i).point
-  let decode := hI basis ▸ hvk basis ▸
-    rawDecode.reRound (runRounds family.toFamily basis O)
+  let decode := (rawDecode.reRound (runRounds family.toFamily basis O)).transportArtifacts
+    (hvk basis) (hI basis)
   let hacceptsAction := ActionTerminal.adaptiveActionRunAccepts
     pp family basis O inputs hvk hI haccepts
   let actionModel := CanonicalMemberConstraintRelation.acceptedModel
@@ -2694,7 +2752,7 @@ theorem adaptiveActionExclusions_of_no_surface
     have hraw := adaptiveAcceptedPolynomial_eq_actionStage_nonterminal pp family basis O
       inputs hvk hI hprovenance n id havailable hterminal pnu rfl witness hsrc rawDecode
       hbatches haccepts hcharRaw
-    have htransport := acceptedPolynomial_transport (hI basis) (hvk basis)
+    have htransport := acceptedPolynomial_transportArtifacts (hI basis) (hvk basis)
       (rawDecode.reRound (runRounds family.toFamily basis O)) hcharRaw haccepts
     have hcombined := (congrFun htransport id).symm.trans hraw
     simpa only [actionPoly, decode, hacceptsAction, pnu, ch, data, stageSource,
@@ -3045,8 +3103,8 @@ theorem adaptiveActionAcceptedDifference_eval_eq_preX
     let data := (family.adversary basis).run O
     let source := data.algebraicProof.preX1AssemblySource (family.fixedRepresentations basis)
     let _piecePoly := fun i => onlinePointPolynomial source (data.algebraicProof.hPieces i).point
-    let decode := hI basis ▸ hvk basis ▸
-      rawDecode.reRound (runRounds family.toFamily basis O)
+    let decode := (rawDecode.reRound (runRounds family.toFamily basis O)).transportArtifacts
+      (hvk basis) (hI basis)
     let hacceptsAction := ActionTerminal.adaptiveActionRunAccepts
       pp family basis O inputs hvk hI haccepts
     let actionModel := CanonicalMemberConstraintRelation.acceptedModel
@@ -3068,8 +3126,8 @@ theorem adaptiveActionAcceptedDifference_eval_eq_preX
   let data := (family.adversary basis).run O
   let source := data.algebraicProof.preX1AssemblySource (family.fixedRepresentations basis)
   let piecePoly := fun i => onlinePointPolynomial source (data.algebraicProof.hPieces i).point
-  let decode := hI basis ▸ hvk basis ▸
-    rawDecode.reRound (runRounds family.toFamily basis O)
+  let decode := (rawDecode.reRound (runRounds family.toFamily basis O)).transportArtifacts
+    (hvk basis) (hI basis)
   let hacceptsAction := ActionTerminal.adaptiveActionRunAccepts
     pp family basis O inputs hvk hI haccepts
   let actionModel := CanonicalMemberConstraintRelation.acceptedModel
@@ -3115,7 +3173,7 @@ theorem adaptiveActionAcceptedDifference_eval_eq_preX
               ch.x := by
           exact congrArg
             (fun vk => (committedPreXQuotient vk piecePoly).eval ch.x) (hvk basis)
-    have htransport := acceptedPolynomial_transport (hI basis) (hvk basis)
+    have htransport := acceptedPolynomial_transportArtifacts (hI basis) (hvk basis)
       (rawDecode.reRound (runRounds family.toFamily basis O)) hcharRaw hacceptsFull
     have htransportEval := congrArg
       (fun polynomial : CommitmentId → CPoly =>
@@ -3141,7 +3199,7 @@ theorem adaptiveActionAcceptedDifference_eval_eq_preX
       pnu rfl witness hsrc rawDecode hbatches (by
         simpa only [ActionTerminal.adaptiveActionAccepts, pnu, ch,
           ActionTerminal.adaptiveActionRunRecord] using haccepts) hcharRaw
-    have htransport := acceptedPolynomial_transport (hI basis) (hvk basis)
+    have htransport := acceptedPolynomial_transportArtifacts (hI basis) (hvk basis)
       (rawDecode.reRound (runRounds family.toFamily basis O)) hcharRaw (by
         simpa only [ActionTerminal.adaptiveActionAccepts, pnu, ch,
           ActionTerminal.adaptiveActionRunRecord] using haccepts)

@@ -19,35 +19,7 @@ open Zcash.Arithmetic (scalarFieldOrder)
 
 local instance vestaInhabitedAdaptiveActionTerminal : Inhabited VestaG := ⟨0⟩
 
-/-- Package a URS relation as the relation branch over the augmented basis. -/
-private def relationResultAtBasis
-    {A : Type} {k : ℕ}
-    (basis : AugmentedIndex (2 ^ k) → VestaG)
-    (relation : AugmentedRelationWitness (F := Fp)
-      (ursOfAugmentedBasis k basis).g
-      (ursOfAugmentedBasis k basis).u
-      (ursOfAugmentedBasis k basis).w) :
-    Option (A ⊕ AlgebraicRelationWitness (F := Fp) basis) :=
-  some (Sum.inr (AugmentedRelationWitness.toBasisRelation basis relation))
-
-/-- Package a relation without changing its URS presentation. -/
-private def ursRelationResult
-    {A : Type} {G : Type} [AddCommGroup G] [Module Fp G] {urs : URS G}
-    (relation : NontrivialRelation (F := Fp) urs.g urs.u urs.w) :
-    Option (A ⊕ NontrivialRelation (F := Fp) urs.g urs.u urs.w) :=
-  some (Sum.inr relation)
-
-/-- Continue a circuit-satisfaction-or-relation result without exposing its relation branch to a
-concrete circuit expression. -/
-private def continueCircuitSatOrRelation
-    {A : Prop} {B : Type} {G : Type} [AddCommGroup G] [Module Fp G]
-    {urs : URS G}
-    (result : A ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w)
-    (onSat : A → Option (B ⊕ NontrivialRelation (F := Fp) urs.g urs.u urs.w)) :
-    Option (B ⊕ NontrivialRelation (F := Fp) urs.g urs.u urs.w) :=
-  match result with
-  | .inl hsatisfied => onSat hsatisfied
-  | .inr relation => ursRelationResult relation
+section OpaqueAdaptiveActionTerminal
 
 attribute [local irreducible] actionCircuit TopLevelCircuit.toVerifierKey
   TopLevelCircuit.instanceCommitment
@@ -80,7 +52,14 @@ abbrev adaptiveActionRunRecord
   chRecord (wrappedPreIpaReads (adaptiveActionRunOutput family basis O))
     (runRounds family.toFamily basis O)
 
-/-- The decode type attached to one adaptive Action run. -/
+/-- The URS reconstructed from an adaptive Action run's augmented basis. -/
+abbrev adaptiveActionURS
+    (pp : ProofParams)
+    (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG) :
+    URS VestaG :=
+  ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis
+
+/-- The deployed decode type attached to one adaptive Action run. -/
 abbrev AdaptiveActionDecode
     (pp : ProofParams)
     (family : ComputedAdaptiveOnlineAGMFSFamily (actionCircuit.shape.withProofParams pp))
@@ -90,12 +69,10 @@ abbrev AdaptiveActionDecode
         + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp)
     (inputs : Fin pp.numProofs → PublicInputs Fp) :=
   DeployedAlgebraicDecode
-    (actionCircuit.shape.withProofParams pp)
-    (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis)
+    (actionCircuit.shape.withProofParams pp) (adaptiveActionURS pp basis)
     (actionUrsOfAugmentedBasis_k pp basis)
-    (actionCircuit.toVerifierKey (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
-    (actionCircuit.instanceCommitment
-      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
+    (actionCircuit.toVerifierKey (adaptiveActionURS pp basis))
+    (actionCircuit.instanceCommitment (adaptiveActionURS pp basis) inputs)
     (adaptiveActionRunOutput family basis O).1.proof.1
     (adaptiveActionRunRecord family basis O)
     ((adaptiveActionRunOutput family basis O).1.aMulti
@@ -105,8 +82,8 @@ abbrev AdaptiveActionDecode
     ((adaptiveActionRunOutput family basis O).1.multiBlind
       (wrappedPreIpaReads (adaptiveActionRunOutput family basis O)))
 
-/-- The acceptance proposition attached to one adaptive Action run. -/
-abbrev AdaptiveActionAccepts
+/-- The deployed acceptance type attached to one adaptive Action run. -/
+abbrev AdaptiveActionDeployedAccepts
     (pp : ProofParams)
     (family : ComputedAdaptiveOnlineAGMFSFamily (actionCircuit.shape.withProofParams pp))
     (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG)
@@ -115,16 +92,14 @@ abbrev AdaptiveActionAccepts
         + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp)
     (inputs : Fin pp.numProofs → PublicInputs Fp) :=
   DeployedAccepts
-    (actionCircuit.shape.withProofParams pp)
-    (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis)
+    (actionCircuit.shape.withProofParams pp) (adaptiveActionURS pp basis)
     (actionUrsOfAugmentedBasis_k pp basis)
-    (actionCircuit.toVerifierKey (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
-    (actionCircuit.instanceCommitment
-      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
+    (actionCircuit.toVerifierKey (adaptiveActionURS pp basis))
+    (actionCircuit.instanceCommitment (adaptiveActionURS pp basis) inputs)
     (adaptiveActionRunOutput family basis O).1.proof.1
     (adaptiveActionRunRecord family basis O)
 
-/-- The decoder's scalar-characteristic side condition for one adaptive Action run. -/
+/-- The scalar-characteristic bound required by the deployed decoder for one Action run. -/
 abbrev AdaptiveActionX4CountLt
     (pp : ProofParams)
     (family : ComputedAdaptiveOnlineAGMFSFamily (actionCircuit.shape.withProofParams pp))
@@ -134,11 +109,42 @@ abbrev AdaptiveActionX4CountLt
         + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp)
     (inputs : Fin pp.numProofs → PublicInputs Fp) : Prop :=
   deployedX4PairCount
-    (actionCircuit.toVerifierKey (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
-    (actionCircuit.instanceCommitment
-      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
+    (actionCircuit.toVerifierKey (adaptiveActionURS pp basis))
+    (actionCircuit.instanceCommitment (adaptiveActionURS pp basis) inputs)
     (adaptiveActionRunOutput family basis O).1.proof.1
     (adaptiveActionRunRecord family basis O) < scalarFieldOrder
+
+/-- The canonical constraint model selected by one accepted adaptive Action run. -/
+abbrev adaptiveActionAcceptedModel
+    (pp : ProofParams)
+    (family : ComputedAdaptiveOnlineAGMFSFamily (actionCircuit.shape.withProofParams pp))
+    (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG)
+    (O : BTranscript Fp VestaG
+      (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+        + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp)
+    (inputs : Fin pp.numProofs → PublicInputs Fp)
+    (hchar : AdaptiveActionX4CountLt pp family basis O inputs)
+    (decode : AdaptiveActionDecode pp family basis O inputs)
+    (haccepts : AdaptiveActionDeployedAccepts pp family basis O inputs) :=
+  CanonicalMemberConstraintRelation.acceptedModel
+    (memberDecode := fun i hi => decode.toMemberDecode hchar i hi)
+    (hblinding := actionCircuit.toVerifierKey_blindingFactors_lt_n
+      (adaptiveActionURS pp basis)) haccepts
+
+/-- The accepted commitment polynomial selected by one adaptive Action run. -/
+abbrev adaptiveActionAcceptedPolynomial
+    (pp : ProofParams)
+    (family : ComputedAdaptiveOnlineAGMFSFamily (actionCircuit.shape.withProofParams pp))
+    (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG)
+    (O : BTranscript Fp VestaG
+      (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+        + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp)
+    (inputs : Fin pp.numProofs → PublicInputs Fp)
+    (hchar : AdaptiveActionX4CountLt pp family basis O inputs)
+    (decode : AdaptiveActionDecode pp family basis O inputs)
+    (haccepts : AdaptiveActionDeployedAccepts pp family basis O inputs) :=
+  CanonicalMemberConstraintRelation.acceptedPolynomial
+    (memberDecode := fun i hi => decode.toMemberDecode hchar i hi) haccepts
 
 /-- Deployed acceptance of the adaptive adversary's actual proof and challenge record. -/
 def adaptiveActionAccepts
@@ -196,26 +202,30 @@ theorem adaptiveActionAccepts?_isSome_of
     rw [hassemble] at haccepts
     simp [haccepts]
 
-/-- Transport an adaptive run's decode to identified verifier artifacts before specializing the
-circuit that supplied those artifacts. -/
-def adaptiveRunDecodeAt
-    {shape : Shape}
-    (family : ComputedAdaptiveOnlineAGMFSFamily shape)
-    (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
+/-- A deployed-good-roots decode, re-rounded and transported to the Action circuit artifacts. -/
+def adaptiveActionDeployedRunDecode
+    (pp : ProofParams)
+    (family : ComputedAdaptiveOnlineAGMFSFamily (actionCircuit.shape.withProofParams pp))
+    (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG)
     (O : BTranscript Fp VestaG
-      (preIpaLen shape family.init.length 10 + 3 * shape.k) → Fp)
-    (vk : VerifyingKey shape Fp VestaG)
-    (instanceCommitment : Fin shape.numProofs → ℕ → VestaG)
-    (hvk : family.vk basis = vk)
-    (hI : family.instanceCommitment basis = instanceCommitment)
+      (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
+        + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp)
+    (inputs : Fin pp.numProofs → PublicInputs Fp)
+    (hvk : ∀ basis, family.vk basis = actionCircuit.toVerifierKey
+      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
+    (hI : ∀ basis, family.instanceCommitment basis =
+      actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
     (witness : DeployedBatchWitness family.toFamily basis
       (adaptiveActionRunOutput family basis O))
-    (hout : deployedRootOutcomeOfCovered family.toOnlineMemberFamily basis O =
-      PSum.inl witness)
-    (hroots : family.AdaptiveAllRootGood basis O)
+    (hroots : family.AdaptiveDeployedGoodRoots basis O witness)
     (hshifted : family.AdaptiveShiftedValue basis O) :
-    DeployedAlgebraicDecode shape (ursOfAugmentedBasis shape.k basis) rfl
-      vk instanceCommitment
+    DeployedAlgebraicDecode
+      (actionCircuit.shape.withProofParams pp)
+      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis)
+      (actionUrsOfAugmentedBasis_k pp basis)
+      (actionCircuit.toVerifierKey
+        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
+      (actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
       (adaptiveActionRunOutput family basis O).1.proof.1
       (adaptiveActionRunRecord family basis O)
       ((adaptiveActionRunOutput family basis O).1.aMulti
@@ -224,27 +234,8 @@ def adaptiveRunDecodeAt
         (wrappedPreIpaReads (adaptiveActionRunOutput family basis O)))
       ((adaptiveActionRunOutput family basis O).1.multiBlind
         (wrappedPreIpaReads (adaptiveActionRunOutput family basis O))) :=
-  hI ▸ hvk ▸
-    (family.adaptiveAlgebraicDecode_of_goodRoots basis O witness hout hroots hshifted).reRound
-      (runRounds family.toFamily basis O)
-
-/-- Transport an adaptive run's acceptance to identified verifier artifacts. -/
-def adaptiveRunAcceptsAt
-    {shape : Shape}
-    (family : ComputedAdaptiveOnlineAGMFSFamily shape)
-    (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
-    (O : BTranscript Fp VestaG
-      (preIpaLen shape family.init.length 10 + 3 * shape.k) → Fp)
-    (vk : VerifyingKey shape Fp VestaG)
-    (instanceCommitment : Fin shape.numProofs → ℕ → VestaG)
-    (hvk : family.vk basis = vk)
-    (hI : family.instanceCommitment basis = instanceCommitment)
-    (haccepts : adaptiveActionAccepts family basis O) :
-    DeployedAccepts shape (ursOfAugmentedBasis shape.k basis) rfl
-      vk instanceCommitment
-      (adaptiveActionRunOutput family basis O).1.proof.1
-      (adaptiveActionRunRecord family basis O) :=
-  hI ▸ hvk ▸ haccepts
+  ((family.adaptiveAlgebraicDecode_of_deployedGoodRoots basis O witness hroots hshifted).reRound
+    (runRounds family.toFamily basis O)).transportArtifacts (hvk basis) (hI basis)
 
 /-- The adaptive root decoder, re-rounded and transported to the Action circuit artifacts. -/
 def adaptiveActionRunDecode
@@ -280,12 +271,8 @@ def adaptiveActionRunDecode
         (wrappedPreIpaReads (adaptiveActionRunOutput family basis O)))
       ((adaptiveActionRunOutput family basis O).1.multiBlind
         (wrappedPreIpaReads (adaptiveActionRunOutput family basis O))) :=
-  adaptiveRunDecodeAt (shape := actionCircuit.shape.withProofParams pp)
-    family basis O
-    (actionCircuit.toVerifierKey (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
-    (actionCircuit.instanceCommitment
-      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
-    (hvk basis) (hI basis) witness hout hroots hshifted
+  ((family.adaptiveAlgebraicDecode_of_goodRoots basis O witness hout hroots hshifted).reRound
+    (runRounds family.toFamily basis O)).transportArtifacts (hvk basis) (hI basis)
 
 /-- Transport the run's deployed acceptance to the Action key and instance commitment. -/
 theorem adaptiveActionRunAccepts
@@ -309,12 +296,7 @@ theorem adaptiveActionRunAccepts
       (actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
       (adaptiveActionRunOutput family basis O).1.proof.1
       (adaptiveActionRunRecord family basis O) :=
-  adaptiveRunAcceptsAt (shape := actionCircuit.shape.withProofParams pp)
-    family basis O
-    (actionCircuit.toVerifierKey (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
-    (actionCircuit.instanceCommitment
-      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
-    (hvk basis) (hI basis) haccepts
+  deployedAccepts_transportArtifacts haccepts (hvk basis) (hI basis)
 
 /-- On an accepted nonzero-`z` adaptive run, absence of the IPA binding attack gives the exact
 shifted aggregate equality consumed by the executable deployed decoder. -/
@@ -354,27 +336,10 @@ theorem adaptiveShiftedValue_of_accept_not_attack
   · simpa only [ComputedAdaptiveOnlineAGMFSFamily.AdaptiveShiftedValue, pnu, nu,
       wrappedPreIpaRecord, commitGen, innerProduct] using heq
 
-/-- Explicit-shape spelling of `adaptiveShiftedValue_of_accept_not_attack`, used when a concrete
-circuit supplies the shape. -/
-private def adaptiveShiftedValueAt
-    (shape : Shape)
-    (family : ComputedAdaptiveOnlineAGMFSFamily shape)
-    (basis : AugmentedIndex (2 ^ shape.k) → VestaG)
-    (O : BTranscript Fp VestaG
-      (preIpaLen shape family.init.length 10 + 3 * shape.k) → Fp)
-    (haccept : adaptiveActionAccepts family basis O)
-    (hz : wrappedPreIpaReads (adaptiveActionRunOutput family basis O) 10 ≠ 0)
-    (hnot : ¬fullAlgebraicBindingAttackZ basis (family.vk basis)
-      (family.instanceCommitment basis) (adaptiveActionRunOutput family basis O).1
-      (wrappedPreIpaReads (adaptiveActionRunOutput family basis O))
-      (runRounds family.toFamily basis O)) :
-    family.AdaptiveShiftedValue basis O :=
-  adaptiveShiftedValue_of_accept_not_attack family basis O haccept hz hnot
-
 set_option maxRecDepth 10000 in
 /-- Execute the Action terminal checks while retaining either the extracted private witnesses or
 the explicit relation data.  The successful branch is data, not an existential `Prop`. -/
-private def adaptiveActionWitnessOrUrsRelationOfDecode?
+def adaptiveActionWitnessOrRelationOfDecode?
     (pp : ProofParams)
     (family : ComputedAdaptiveOnlineAGMFSFamily (actionCircuit.shape.withProofParams pp))
     (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG)
@@ -384,12 +349,9 @@ private def adaptiveActionWitnessOrUrsRelationOfDecode?
     (inputs : Fin pp.numProofs → PublicInputs Fp)
     (hchar : AdaptiveActionX4CountLt pp family basis O inputs)
     (decode : AdaptiveActionDecode pp family basis O inputs)
-    (haccepts : AdaptiveActionAccepts pp family basis O inputs) :
+    (haccepts : AdaptiveActionDeployedAccepts pp family basis O inputs) :
     Option (ActionBundleWitness inputs ⊕
-      NontrivialRelation (F := Fp)
-        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis).g
-        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis).u
-        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis).w) :=
+      AlgebraicRelationWitness (F := Fp) basis) :=
   let pnu := adaptiveActionRunOutput family basis O
   let urs := ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis
   let ch := adaptiveActionRunRecord family basis O
@@ -419,49 +381,57 @@ private def adaptiveActionWitnessOrUrsRelationOfDecode?
                   actionCircuit pp urs ch polynomial with
               | none => none
               | some hlookupProof =>
-                  continueCircuitSatOrRelation
-                    (topLevelCircuitSat_or_relation_of_decodedMemberPolynomial_eq
-                      actionCircuit pp urs (actionUrsOfAugmentedBasis_k pp basis)
-                      inputs pnu.1.proof.1 ch
-                      (fun i hi => decode.toMemberDecode hchar i hi) haccepts
+                  let hblinding := actionCircuit.toVerifierKey_blindingFactors_lt_n urs
+                  let hnFp : (actionCircuit.n : Fp) ≠ 0 :=
+                    TopLevelAssignment.domainSizeCastNeZero
+                      ActionConstraintBounds.domainExponent_lt
+                  match acceptedModel_circuitSat_or_relation_of_decodedMemberPolynomial_eq
+                      urs rfl (actionCircuit.toVerifierKey urs)
+                      (actionCircuit.instanceCommitment urs inputs) pnu.1.proof.1 ch
+                      (fun i hi => decode.toMemberDecode hchar i hi) haccepts hblinding
                       (polynomial .vanishingH) rfl
+                      (actionCircuit.toVerifierKey_fixedQueryCount urs)
+                      (actionCircuit.toVerifierKey_adviceQueryCount urs)
+                      (actionCircuit.toVerifierKey_instanceQueryCount urs)
                       (fun slot point hpoint =>
                         PSum.inl (decode.memberBinding hchar slot point hpoint))
-                      ActionPermutationDomain.domainExponent_lt
-                      (ActionPermutationDomain.routingCoherent_of_derived urs)
-                      (by exact hxgoodProof.down)) fun hsatisfied =>
-                      match action_bundleWitness_or_relation_of_decode_circuitSat pp urs
-                          (actionUrsOfAugmentedBasis_k pp basis)
+                      (actionCircuit.permutationChunkRoutingCoherent urs)
+                      (TopLevelAssignment.toVerifierKey_domainRowsInjective
+                        urs ActionConstraintBounds.domainExponent_lt)
+                      (TopLevelAssignment.toVerifierKey_domainRoot
+                        urs ActionConstraintBounds.domainExponent_lt)
+                      (by simpa only [actionCircuit.toVerifierKey_n] using hnFp)
+                      (by
+                        simpa only [actionCircuit.toVerifierKey_n] using
+                          hxgoodProof.down) with
+                  | PSum.inr relation =>
+                      some (Sum.inr (augmentedBasis_ursOfAugmentedBasis
+                        (actionCircuit.shape.withProofParams pp).k basis ▸
+                          AugmentedRelationWitness.toAlgebraicRelationWitness relation))
+                  | PSum.inl hsatisfied =>
+                      match action_bundleWitness_or_relation_of_decode_circuitSat pp urs rfl
                           inputs pnu.1.proof.1 ch
-                          (pnu.1.multiU (wrappedPreIpaReads pnu))
-                          (pnu.1.multiBlind (wrappedPreIpaReads pnu))
-                          (pnu.1.aMulti (wrappedPreIpaReads pnu)) decode hchar haccepts
-                          (polynomial .vanishingH) hsatisfied hgoodYProof.down
-                          hpermutationProof.down
-                          hlookupProof.down with
+                          (pU := pnu.1.multiU (wrappedPreIpaReads pnu))
+                          (pW := pnu.1.multiBlind (wrappedPreIpaReads pnu))
+                          (a := pnu.1.aMulti (wrappedPreIpaReads pnu))
+                          decode hchar haccepts
+                          (polynomial .vanishingH)
+                          (by
+                            simpa only [actionCircuit.toVerifierKey_n] using hsatisfied)
+                          hgoodYProof.down
+                          hpermutationProof.down hlookupProof.down with
                       | PSum.inl witness => some (Sum.inl witness)
                       | PSum.inr relation =>
-                          ursRelationResult relation
+                          some (Sum.inr (augmentedBasis_ursOfAugmentedBasis
+                            (actionCircuit.shape.withProofParams pp).k basis ▸
+                              AugmentedRelationWitness.toAlgebraicRelationWitness relation))
 
-/-- Execute the adaptive terminal and present any URS relation over the original augmented basis. -/
-def adaptiveActionWitnessOrRelationOfDecode?
-    (pp : ProofParams)
-    (family : ComputedAdaptiveOnlineAGMFSFamily (actionCircuit.shape.withProofParams pp))
-    (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG)
-    (O : BTranscript Fp VestaG
-      (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
-        + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp)
-    (inputs : Fin pp.numProofs → PublicInputs Fp)
-    (hchar : AdaptiveActionX4CountLt pp family basis O inputs)
-    (decode : AdaptiveActionDecode pp family basis O inputs)
-    (haccepts : AdaptiveActionAccepts pp family basis O inputs) :
-    Option (ActionBundleWitness inputs ⊕
-      AlgebraicRelationWitness (F := Fp) basis) :=
-  match adaptiveActionWitnessOrUrsRelationOfDecode?
-      pp family basis O inputs hchar decode haccepts with
-  | some (Sum.inl witness) => some (Sum.inl witness)
-  | some (Sum.inr relation) => relationResultAtBasis basis relation
-  | none => none
+end OpaqueAdaptiveActionTerminal
+
+section OpaqueAdaptiveActionConsequences
+
+attribute [local irreducible] actionCircuit TopLevelCircuit.toVerifierKey
+  TopLevelCircuit.instanceCommitment
 
 /-- Relation-only projection retained for the ordinary-soundness reduction. -/
 def adaptiveActionRelationOfDecode?
@@ -474,7 +444,7 @@ def adaptiveActionRelationOfDecode?
     (inputs : Fin pp.numProofs → PublicInputs Fp)
     (hchar : AdaptiveActionX4CountLt pp family basis O inputs)
     (decode : AdaptiveActionDecode pp family basis O inputs)
-    (haccepts : AdaptiveActionAccepts pp family basis O inputs) :
+    (haccepts : AdaptiveActionDeployedAccepts pp family basis O inputs) :
     Option (AlgebraicRelationWitness (F := Fp) basis) :=
   match adaptiveActionWitnessOrRelationOfDecode?
       pp family basis O inputs hchar decode haccepts with
@@ -516,41 +486,13 @@ theorem adaptiveActionWitnessOrRelationOfDecode?_isSome_of
       (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
         + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp)
     (inputs : Fin pp.numProofs → PublicInputs Fp)
-    (hchar : deployedX4PairCount
-      (actionCircuit.toVerifierKey
-        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
-      (actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
-      (adaptiveActionRunOutput family basis O).1.proof.1
-      (adaptiveActionRunRecord family basis O) < scalarFieldOrder)
-    (decode : DeployedAlgebraicDecode
-      (actionCircuit.shape.withProofParams pp)
-      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) rfl
-      (actionCircuit.toVerifierKey
-        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
-      (actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
-      (adaptiveActionRunOutput family basis O).1.proof.1
-      (adaptiveActionRunRecord family basis O)
-      ((adaptiveActionRunOutput family basis O).1.aMulti
-        (wrappedPreIpaReads (adaptiveActionRunOutput family basis O)))
-      ((adaptiveActionRunOutput family basis O).1.multiU
-        (wrappedPreIpaReads (adaptiveActionRunOutput family basis O)))
-      ((adaptiveActionRunOutput family basis O).1.multiBlind
-        (wrappedPreIpaReads (adaptiveActionRunOutput family basis O))))
-    (haccepts : DeployedAccepts
-      (actionCircuit.shape.withProofParams pp)
-      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) rfl
-      (actionCircuit.toVerifierKey
-        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
-      (actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
-      (adaptiveActionRunOutput family basis O).1.proof.1
-      (adaptiveActionRunRecord family basis O))
+    (hchar : AdaptiveActionX4CountLt pp family basis O inputs)
+    (decode : AdaptiveActionDecode pp family basis O inputs)
+    (haccepts : AdaptiveActionDeployedAccepts pp family basis O inputs)
     (hxgood :
-      let model := CanonicalMemberConstraintRelation.acceptedModel
-          (memberDecode := fun i hi => decode.toMemberDecode hchar i hi)
-          (hblinding := actionCircuit.toVerifierKey_blindingFactors_lt_n
-            (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis)) haccepts
-      let polynomial := CanonicalMemberConstraintRelation.acceptedPolynomial
-          (memberDecode := fun i hi => decode.toMemberDecode hchar i hi) haccepts
+      let model := adaptiveActionAcceptedModel pp family basis O inputs hchar decode haccepts
+      let polynomial :=
+        adaptiveActionAcceptedPolynomial pp family basis O inputs hchar decode haccepts
       (adaptiveActionRunRecord family basis O).x ∉ szBadSet
         (combineConstraints model.fixedCols model.adviceCols model.instanceCols model.gates
           model.sets model.chunks model.lookups model.beta model.gamma model.delta model.theta
@@ -558,31 +500,22 @@ theorem adaptiveActionWitnessOrRelationOfDecode?_isSome_of
           model.lBlind - polynomial .vanishingH *
             (X ^ actionCircuit.n - 1)))
     (hgoodY :
-      let model := CanonicalMemberConstraintRelation.acceptedModel
-          (memberDecode := fun i hi => decode.toMemberDecode hchar i hi)
-          (hblinding := actionCircuit.toVerifierKey_blindingFactors_lt_n
-            (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis)) haccepts
+      let model := adaptiveActionAcceptedModel pp family basis O inputs hchar decode haccepts
       ∀ j, (adaptiveActionRunRecord family basis O).y ∉
         szBadSet (foldSplitWitness model.constraints
           actionCircuit.n j))
     (hpermutation : ResolverPermutationChallengeExclusions
-      pp.numProofs (actionCircuit.toVerifierKey
-        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
+      pp.numProofs (actionCircuit.toVerifierKey (adaptiveActionURS pp basis))
       (adaptiveActionRunRecord family basis O)
-      (CanonicalMemberConstraintRelation.acceptedPolynomial
-        (memberDecode := fun i hi => decode.toMemberDecode hchar i hi) haccepts)
+      (adaptiveActionAcceptedPolynomial pp family basis O inputs hchar decode haccepts)
       actionActiveRows)
     (hlookup : TopLevelLookup.ChallengeExclusions actionCircuit pp
-      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis)
+      (adaptiveActionURS pp basis)
       (adaptiveActionRunRecord family basis O)
-      (CanonicalMemberConstraintRelation.acceptedPolynomial
-        (memberDecode := fun i hi => decode.toMemberDecode hchar i hi) haccepts)) :
+      (adaptiveActionAcceptedPolynomial pp family basis O inputs hchar decode haccepts)) :
     (adaptiveActionWitnessOrRelationOfDecode?
       pp family basis O inputs hchar decode haccepts).isSome := by
-  let model := CanonicalMemberConstraintRelation.acceptedModel
-    (memberDecode := fun i hi => decode.toMemberDecode hchar i hi)
-    (hblinding := actionCircuit.toVerifierKey_blindingFactors_lt_n
-      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis)) haccepts
+  let model := adaptiveActionAcceptedModel pp family basis O inputs hchar decode haccepts
   dsimp only at hxgood hgoodY
   have hxSome := (szBadSetAvoidance?_isSome_iff _ _).2 hxgood
   have hn : actionCircuit.n ≠ 0 := actionCircuit.n_ne_zero
@@ -596,21 +529,13 @@ theorem adaptiveActionWitnessOrRelationOfDecode?_isSome_of
   obtain ⟨hyProof, hyEq⟩ := Option.isSome_iff_exists.mp hySome
   obtain ⟨hpProof, hpEq⟩ := Option.isSome_iff_exists.mp hpSome
   obtain ⟨hlProof, hlEq⟩ := Option.isSome_iff_exists.mp hlSome
-  have hraw : (adaptiveActionWitnessOrUrsRelationOfDecode?
-      pp family basis O inputs hchar decode haccepts).isSome := by
-    unfold adaptiveActionWitnessOrUrsRelationOfDecode?
-    simp only
-    rw [hxEq, hyEq, hpEq, hlEq]
-    dsimp only
-    unfold continueCircuitSatOrRelation
-    split
-    · dsimp only
-      split <;> rfl
-    · rfl
-  obtain ⟨outcome, houtcome⟩ := Option.isSome_iff_exists.mp hraw
   unfold adaptiveActionWitnessOrRelationOfDecode?
-  rw [houtcome]
-  cases outcome <;> simp [relationResultAtBasis]
+  simp only
+  rw [hxEq, hyEq, hpEq, hlEq]
+  dsimp only
+  split
+  · rfl
+  · split <;> rfl
 
 set_option maxRecDepth 10000 in
 theorem adaptiveActionRelationOfDecode?_isSome_of
@@ -621,41 +546,13 @@ theorem adaptiveActionRelationOfDecode?_isSome_of
       (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
         + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp)
     (inputs : Fin pp.numProofs → PublicInputs Fp)
-    (hchar : deployedX4PairCount
-      (actionCircuit.toVerifierKey
-        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
-      (actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
-      (adaptiveActionRunOutput family basis O).1.proof.1
-      (adaptiveActionRunRecord family basis O) < scalarFieldOrder)
-    (decode : DeployedAlgebraicDecode
-      (actionCircuit.shape.withProofParams pp)
-      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) rfl
-      (actionCircuit.toVerifierKey
-        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
-      (actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
-      (adaptiveActionRunOutput family basis O).1.proof.1
-      (adaptiveActionRunRecord family basis O)
-      ((adaptiveActionRunOutput family basis O).1.aMulti
-        (wrappedPreIpaReads (adaptiveActionRunOutput family basis O)))
-      ((adaptiveActionRunOutput family basis O).1.multiU
-        (wrappedPreIpaReads (adaptiveActionRunOutput family basis O)))
-      ((adaptiveActionRunOutput family basis O).1.multiBlind
-        (wrappedPreIpaReads (adaptiveActionRunOutput family basis O))))
-    (haccepts : DeployedAccepts
-      (actionCircuit.shape.withProofParams pp)
-      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) rfl
-      (actionCircuit.toVerifierKey
-        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
-      (actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
-      (adaptiveActionRunOutput family basis O).1.proof.1
-      (adaptiveActionRunRecord family basis O))
+    (hchar : AdaptiveActionX4CountLt pp family basis O inputs)
+    (decode : AdaptiveActionDecode pp family basis O inputs)
+    (haccepts : AdaptiveActionDeployedAccepts pp family basis O inputs)
     (hxgood :
-      let model := CanonicalMemberConstraintRelation.acceptedModel
-          (memberDecode := fun i hi => decode.toMemberDecode hchar i hi)
-          (hblinding := actionCircuit.toVerifierKey_blindingFactors_lt_n
-            (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis)) haccepts
-      let polynomial := CanonicalMemberConstraintRelation.acceptedPolynomial
-          (memberDecode := fun i hi => decode.toMemberDecode hchar i hi) haccepts
+      let model := adaptiveActionAcceptedModel pp family basis O inputs hchar decode haccepts
+      let polynomial :=
+        adaptiveActionAcceptedPolynomial pp family basis O inputs hchar decode haccepts
       (adaptiveActionRunRecord family basis O).x ∉ szBadSet
         (combineConstraints model.fixedCols model.adviceCols model.instanceCols model.gates
           model.sets model.chunks model.lookups model.beta model.gamma model.delta model.theta
@@ -663,25 +560,19 @@ theorem adaptiveActionRelationOfDecode?_isSome_of
           model.lBlind - polynomial .vanishingH *
             (X ^ actionCircuit.n - 1)))
     (hgoodY :
-      let model := CanonicalMemberConstraintRelation.acceptedModel
-          (memberDecode := fun i hi => decode.toMemberDecode hchar i hi)
-          (hblinding := actionCircuit.toVerifierKey_blindingFactors_lt_n
-            (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis)) haccepts
+      let model := adaptiveActionAcceptedModel pp family basis O inputs hchar decode haccepts
       ∀ j, (adaptiveActionRunRecord family basis O).y ∉
         szBadSet (foldSplitWitness model.constraints
           actionCircuit.n j))
     (hpermutation : ResolverPermutationChallengeExclusions
-      pp.numProofs (actionCircuit.toVerifierKey
-        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
+      pp.numProofs (actionCircuit.toVerifierKey (adaptiveActionURS pp basis))
       (adaptiveActionRunRecord family basis O)
-      (CanonicalMemberConstraintRelation.acceptedPolynomial
-        (memberDecode := fun i hi => decode.toMemberDecode hchar i hi) haccepts)
+      (adaptiveActionAcceptedPolynomial pp family basis O inputs hchar decode haccepts)
       actionActiveRows)
     (hlookup : TopLevelLookup.ChallengeExclusions actionCircuit pp
-      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis)
+      (adaptiveActionURS pp basis)
       (adaptiveActionRunRecord family basis O)
-      (CanonicalMemberConstraintRelation.acceptedPolynomial
-        (memberDecode := fun i hi => decode.toMemberDecode hchar i hi) haccepts))
+      (adaptiveActionAcceptedPolynomial pp family basis O inputs hchar decode haccepts))
     (hfalse : ¬BundleStatement inputs) :
     (adaptiveActionRelationOfDecode? pp family basis O inputs hchar decode haccepts).isSome := by
   refine adaptiveActionRelationOfDecode?_isSome_of_witnessOrRelation
@@ -700,12 +591,7 @@ def adaptiveActionTerminalRelationFinder
       (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
     (hI : ∀ basis, family.instanceCommitment basis =
       actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
-    (hchar : ∀ basis O, deployedX4PairCount
-      (actionCircuit.toVerifierKey
-        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
-      (actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
-      (adaptiveActionRunOutput family basis O).1.proof.1
-      (adaptiveActionRunRecord family basis O) < scalarFieldOrder) :
+    (hchar : ∀ basis O, AdaptiveActionX4CountLt pp family basis O inputs) :
     (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG) →
     (BTranscript Fp VestaG
       (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
@@ -732,27 +618,14 @@ def adaptiveActionTerminalRelationFinder
               match family.adaptiveDeployedGoodRoots? basis O witness with
               | none => none
               | some hroots =>
-                  let hshifted : family.AdaptiveShiftedValue basis O :=
-                    adaptiveShiftedValueAt (actionCircuit.shape.withProofParams pp)
-                      family basis O haccepts hz hattack
-                  let decode : DeployedAlgebraicDecode
-                      (actionCircuit.shape.withProofParams pp)
-                      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) rfl
-                      (actionCircuit.toVerifierKey
-                        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
-                      (actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
-                      pnu.1.proof.1 (chRecord nu rounds)
-                      (pnu.1.aMulti nu) (pnu.1.multiU nu) (pnu.1.multiBlind nu) :=
-                    hI basis ▸ hvk basis ▸
-                      (family.adaptiveAlgebraicDecode_of_deployedGoodRoots
-                        basis O witness hroots.down hshifted).reRound rounds
-                  let hacceptsAction : DeployedAccepts
-                      (actionCircuit.shape.withProofParams pp)
-                      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) rfl
-                      (actionCircuit.toVerifierKey
-                        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
-                      (actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
-                      pnu.1.proof.1 (chRecord nu rounds) :=
+                  let hshifted := adaptiveShiftedValue_of_accept_not_attack
+                    family basis O haccepts hz hattack
+                  let decode : AdaptiveActionDecode pp family basis O inputs :=
+                    ((family.adaptiveAlgebraicDecode_of_deployedGoodRoots
+                      basis O witness hroots.down hshifted).reRound rounds).transportArtifacts
+                        (hvk basis) (hI basis)
+                  let hacceptsAction :
+                      AdaptiveActionDeployedAccepts pp family basis O inputs :=
                     adaptiveActionRunAccepts pp family basis O inputs hvk hI haccepts
                   adaptiveActionRelationOfDecode? pp family basis O inputs
                     (hchar basis O) decode hacceptsAction
@@ -780,14 +653,10 @@ def action_bundleStatement_or_relation_of_adaptiveDecode
     (hroots : family.AdaptiveAllRootGood basis O)
     (hshifted : family.AdaptiveShiftedValue basis O)
     (haccepts : adaptiveActionAccepts family basis O)
-    (hchar : deployedX4PairCount
-      (actionCircuit.toVerifierKey
-        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
-      (actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
-      (adaptiveActionRunOutput family basis O).1.proof.1
-      (adaptiveActionRunRecord family basis O) < scalarFieldOrder) :=
+    (hchar : AdaptiveActionX4CountLt pp family basis O inputs) :=
   action_bundleStatement_or_relation_of_decode pp
-    (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) rfl inputs
+    (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis)
+    (actionUrsOfAugmentedBasis_k pp basis) inputs
     (adaptiveActionRunOutput family basis O).1.proof.1
     (adaptiveActionRunRecord family basis O)
     ((adaptiveActionRunOutput family basis O).1.multiU
@@ -798,6 +667,8 @@ def action_bundleStatement_or_relation_of_adaptiveDecode
       (wrappedPreIpaReads (adaptiveActionRunOutput family basis O)))
     (adaptiveActionRunDecode pp family basis O inputs hvk hI witness hout hroots hshifted)
     hchar (adaptiveActionRunAccepts pp family basis O inputs hvk hI haccepts)
+
+end OpaqueAdaptiveActionConsequences
 
 end ActionTerminal
 
