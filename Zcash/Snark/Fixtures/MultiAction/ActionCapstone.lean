@@ -182,6 +182,10 @@ private theorem md_counts :
       congrArg (fun proofShape : Shape => proofShape.numQuotientPieces)
         actionShape_eq_fixtureShape⟩
 
+private theorem action_domainExponent_eq :
+    actionCircuit.domainExponent = 11 := by
+  simpa [shape] using md_counts.1
+
 /-- **The captured static checks at the derived key** (issue #128 F3): the five decided facts,
 transferred through the derived key's scalar equalities. -/
 theorem staticChecks_of_derived
@@ -432,7 +436,7 @@ private theorem cap_theta_for (numProofs : ℕ) :
           have hrows : actionActiveRows ≤ actionCircuit.n := by
             simpa only [actionDomainSize] using actionActiveRows_le_domainSize
           rw [actionCircuit.n_eq_two_pow_domainExponent,
-            (show actionCircuit.domainExponent = 11 by simpa [shape] using md_counts.1)] at hrows
+            action_domainExponent_eq] at hrows
           norm_num at hrows ⊢
           exact hrows
         · exact actionLookupInputArity_le index.2
@@ -481,8 +485,7 @@ private theorem cap_beta_for (numProofs : ℕ) :
     exact resolverPermutationCell_card_eq pp urs poly p
   have hn : actionCircuit.n = 2 ^ 11 := by
     rw [actionCircuit.n_eq_two_pow_domainExponent,
-      (show actionCircuit.domainExponent = 11 by
-        simpa [shape] using md_counts.1)]
+      action_domainExponent_eq]
   have hu : actionCircuit.n - actionCircuit.blindingFactors - 2 ≤ 2 ^ 11 := by
     omega
   change
@@ -537,8 +540,7 @@ private theorem cap_gamma_for (numProofs : ℕ) :
     exact resolverPermutationCell_card_eq pp urs poly p
   have hn : actionCircuit.n = 2 ^ 11 := by
     rw [actionCircuit.n_eq_two_pow_domainExponent,
-      (show actionCircuit.domainExponent = 11 by
-        simpa [shape] using md_counts.1)]
+      action_domainExponent_eq]
   have hu : actionCircuit.n - actionCircuit.blindingFactors - 2 ≤ 2 ^ 11 := by
     omega
   change
@@ -586,7 +588,7 @@ private theorem cap_theta :
           have hrows : actionActiveRows ≤ actionCircuit.n := by
             simpa only [actionDomainSize] using actionActiveRows_le_domainSize
           rw [actionCircuit.n_eq_two_pow_domainExponent,
-            (show actionCircuit.domainExponent = 11 by simpa [shape] using md_counts.1)] at hrows
+            action_domainExponent_eq] at hrows
           norm_num at hrows ⊢
           exact hrows
         · exact actionLookupInputArity_le index.2
@@ -631,7 +633,7 @@ private theorem cap_beta :
     exact resolverPermutationCell_card_le actionProofParams urs poly p
   have hn : actionCircuit.n = 2 ^ 11 := by
     rw [actionCircuit.n_eq_two_pow_domainExponent,
-      (show actionCircuit.domainExponent = 11 by simpa [shape] using md_counts.1)]
+      action_domainExponent_eq]
   have hu : actionCircuit.n -
       actionCircuit.blindingFactors - 2 ≤ 2 ^ 11 := by
     omega
@@ -681,7 +683,7 @@ private theorem cap_gamma :
     exact resolverPermutationCell_card_le actionProofParams urs poly p
   have hn : actionCircuit.n = 2 ^ 11 := by
     rw [actionCircuit.n_eq_two_pow_domainExponent,
-      (show actionCircuit.domainExponent = 11 by simpa [shape] using md_counts.1)]
+      action_domainExponent_eq]
   have hu : actionCircuit.n -
       actionCircuit.blindingFactors - 2 ≤ 2 ^ 11 := by
     omega
@@ -713,8 +715,7 @@ private theorem derived_n_yn {L : ℕ} (hL : L ≤ 2 ^ 12) :
     actionCircuit.n * L ≤ 2 ^ 23 := by
   have hn : actionCircuit.n = 2 ^ 11 := by
     rw [actionCircuit.n_eq_two_pow_domainExponent,
-      (show actionCircuit.domainExponent = 11 by
-        simpa [shape] using md_counts.1)]
+      action_domainExponent_eq]
   rw [hn]
   calc 2 ^ 11 * L ≤ 2 ^ 11 * 2 ^ 12 := Nat.mul_le_mul_left _ hL
     _ = 2 ^ 23 := by norm_num
@@ -726,8 +727,7 @@ private theorem derived_n_yn_for (numProofs : ℕ) {L : ℕ}
       numProofs * 2 ^ 23 := by
   have hn : actionCircuit.n = 2 ^ 11 := by
     rw [actionCircuit.n_eq_two_pow_domainExponent,
-      (show actionCircuit.domainExponent = 11 by
-        simpa [shape] using md_counts.1)]
+      action_domainExponent_eq]
   rw [hn]
   calc
     2 ^ 11 * L ≤ 2 ^ 11 * (numProofs * 2 ^ 12) := Nat.mul_le_mul_left _ hL
@@ -840,7 +840,7 @@ private theorem adaptive_action_x_degree_le_for (numProofs : ℕ)
     (actionProofParamsFor numProofs) basis inputs ps source ch
   have hk : actionCircuit.n - 1 = 2047 := by
     rw [actionCircuit.n_eq_two_pow_domainExponent,
-      (show actionCircuit.domainExponent = 11 by simpa [shape] using md_counts.1)]
+      action_domainExponent_eq]
     norm_num
   have hpoint : ∀ g : VestaG,
       (onlinePointPolynomial
@@ -856,8 +856,7 @@ private theorem adaptive_action_x_degree_le_for (numProofs : ℕ)
         source g).1
     have hsize :
         2 ^ actionCircuit.domainExponent = 2048 := by
-      rw [(show actionCircuit.domainExponent = 11 by
-        simpa [shape] using md_counts.1)]
+      rw [action_domainExponent_eq]
       norm_num
     calc
       (onlinePointPolynomial
@@ -1137,7 +1136,7 @@ private theorem actionCompressedStatisticalModelFor_le_consensus
     actionCompressedStatisticalModelFor numProofs Q ≤
       Zcash.Snark.FixtureMax.consensusStraightLineStatisticalModel (2 ^ 123) := by
   have hk : actionCircuit.domainExponent = 11 := by
-    exact (show actionCircuit.domainExponent = 11 by simpa [shape] using md_counts.1)
+    exact action_domainExponent_eq
   have hroot :
       algebraicRootBudget
           (actionCircuit.shape.withProofParams (actionProofParamsFor numProofs)) 11 ≤
@@ -1215,7 +1214,7 @@ theorem action_algebraicRootBudget_eq :
         actionCircuit.domainExponent =
       (48808 : ENNReal) / Fintype.card Fp := by
   rw [actionShape_eq_fixtureShape]
-  rw [(show actionCircuit.domainExponent = 11 by simpa [shape] using md_counts.1)]
+  rw [action_domainExponent_eq]
   norm_num [algebraicRootBudget, queryBudget, shape]
 
 /-- All non-DLOG terms in the exact Action endpoint, including the five semantic tails. -/
@@ -1277,7 +1276,7 @@ theorem adaptiveActionStatisticalModel_le_action (Q : Nat) :
     adaptiveActionStatisticalModel Q ≤ actionStatisticalModel Q := by
   have hk : actionCircuit.domainExponent = 11 := by
     change actionCircuit.domainExponent = 11
-    exact (show actionCircuit.domainExponent = 11 by simpa [shape] using md_counts.1)
+    exact action_domainExponent_eq
   have hsplit : actionStatisticalModel Q =
       adaptiveActionStatisticalModel Q +
         22 * algebraicRootBudget (actionCircuit.shape.withProofParams actionProofParams) 11 +
@@ -1314,7 +1313,7 @@ theorem actionStatisticalModel_at_2pow123 {Q : Nat} (hQ : Q <= 2 ^ 123) :
     rw [actionStatisticalModel, action_algebraicRootBudget_eq]
     have hk : actionCircuit.domainExponent = 11 := by
       change actionCircuit.domainExponent = 11
-      exact (show actionCircuit.domainExponent = 11 by simpa [shape] using md_counts.1)
+      exact action_domainExponent_eq
     rw [hk]
     calc
       ((Q + 1 : Nat) : ENNReal) * (1 / (Fintype.card Fp : ENNReal)) +
@@ -1380,7 +1379,7 @@ theorem action_dlog_queries_le_2pow126
     actionDlogRandomOracleQueries actionProofParams family ≤ 2 ^ 126 := by
   unfold actionDlogRandomOracleQueries
   have hk : actionCircuit.domainExponent = 11 := by
-    exact (show actionCircuit.domainExponent = 11 by simpa [shape] using md_counts.1)
+    exact action_domainExponent_eq
   rw [hk]
   calc
     6 * family.Q + 6 * (11 + 11) ≤ 6 * 2 ^ 123 + 6 * (11 + 11) := by omega
