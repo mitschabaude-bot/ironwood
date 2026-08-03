@@ -276,8 +276,14 @@ def actionRunDecode
         (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
     (hI : family.instanceCommitment basis =
       actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
-    (hdecoded : family.straightLineConstraintDecoded static basis O) :=
-  straightLineRunDecodeAt family static basis O
+    (hdecoded : family.straightLineConstraintDecoded static basis O) :
+    StraightLineRunDecode family basis O
+      (actionCircuit.toVerifierKey
+        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
+      (actionCircuit.instanceCommitment
+        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs) :=
+  straightLineRunDecodeAt (shape := actionCircuit.shape.withProofParams pp)
+    family static basis O
     (actionCircuit.toVerifierKey
       (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
     (actionCircuit.instanceCommitment
@@ -285,7 +291,7 @@ def actionRunDecode
     hvk hI hdecoded
 
 /-- The run's acceptance at the Action circuit's artifacts. -/
-theorem actionRunAccepts
+def actionRunAccepts
     (pp : ProofParams)
     (family : ComputedStraightLineDeployedFSFamily (actionCircuit.shape.withProofParams pp))
     (static : DeployedConstraintStaticChecks family.toRootFamily)
@@ -299,59 +305,19 @@ theorem actionRunAccepts
         (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
     (hI : family.instanceCommitment basis =
       actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
-    (hdecoded : family.straightLineConstraintDecoded static basis O) :=
-  straightLineRunAcceptsAt family static basis O
+    (hdecoded : family.straightLineConstraintDecoded static basis O) :
+    StraightLineRunAccepts family basis O
+      (actionCircuit.toVerifierKey
+        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
+      (actionCircuit.instanceCommitment
+        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs) :=
+  straightLineRunAcceptsAt (shape := actionCircuit.shape.withProofParams pp)
+    family static basis O
     (actionCircuit.toVerifierKey
       (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
     (actionCircuit.instanceCommitment
       (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
     hvk hI hdecoded
-
-/-- **The Action terminal reached from the straight-line constraint event.**  A family at the
-Action shape supplies the decode and the acceptance from its own accepting run, so the terminal
-is reached without a rewind.
-
-`hvk` and `hI` identify the family's verifying key and instance commitment with the Action
-circuit's, and the run data is transported along them.  Everything is stated at the run's
-complete challenge record — acceptance reads the IPA rounds, so the root layer's zero-round
-record cannot carry it.  The challenge exclusions are still open, exactly as in
-`action_bundleStatement_or_relation_of_decode`. -/
-def action_bundleStatement_or_relation_of_straightLineDecoded
-    (pp : ProofParams)
-    (family : ComputedStraightLineDeployedFSFamily (actionCircuit.shape.withProofParams pp))
-    (static : DeployedConstraintStaticChecks family.toRootFamily)
-    (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG)
-    (O : BTranscript Fp VestaG
-      (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
-        + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp)
-    (inputs : Fin pp.numProofs → PublicInputs Fp)
-    (hvk : family.vk basis =
-      actionCircuit.toVerifierKey
-        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
-    (hI : family.instanceCommitment basis =
-      actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
-    (hdecoded : family.straightLineConstraintDecoded static basis O)
-    (hchar : deployedX4PairCount
-      (shape := actionCircuit.shape.withProofParams pp)
-      (actionCircuit.toVerifierKey
-        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
-      (actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
-      (straightLineRunOutput family basis O).1.proof.1
-      (straightLineRunRecord family basis O) < scalarFieldOrder) :=
-  action_bundleStatement_or_relation_of_decode pp
-    (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis)
-    (ursOfAugmentedBasis_k _ _).symm inputs
-    (straightLineRunOutput family basis O).1.proof.1
-    (straightLineRunRecord family basis O)
-    ((straightLineRunOutput family basis O).1.multiU
-      (wrappedPreIpaReads (straightLineRunOutput family basis O)))
-    ((straightLineRunOutput family basis O).1.multiBlind
-      (wrappedPreIpaReads (straightLineRunOutput family basis O)))
-    ((straightLineRunOutput family basis O).1.aMulti
-      (wrappedPreIpaReads (straightLineRunOutput family basis O)))
-    (actionRunDecode pp family static basis O inputs hvk hI hdecoded)
-    hchar
-    (actionRunAccepts pp family static basis O inputs hvk hI hdecoded)
 
 /-- Checks terminal exclusions and returns private witnesses or explicit relation coefficients
 from the reconstructed run. -/
@@ -389,17 +355,10 @@ def actionTerminalWitnessOrRelationFinder
     | some (PSum.inr relation) =>
         some (Sum.inr (relation.toBasisRelation basis))
     | some (PSum.inl success) =>
-        let decode : DeployedAlgebraicDecode (actionCircuit.shape.withProofParams pp) urs rfl
-            (actionCircuit.toVerifierKey urs)
-            (actionCircuit.instanceCommitment urs inputs) pnu.1.proof.1 ch
-            (pnu.1.aMulti (wrappedPreIpaReads pnu))
-            (pnu.1.multiU (wrappedPreIpaReads pnu))
-            (pnu.1.multiBlind (wrappedPreIpaReads pnu)) := hI basis ▸ hvk basis ▸
-          success.witness.decode.reRound (runRounds family.toFamily basis O)
-        let haccepts : DeployedAccepts (actionCircuit.shape.withProofParams pp) urs rfl
-            (actionCircuit.toVerifierKey urs)
-            (actionCircuit.instanceCommitment urs inputs) pnu.1.proof.1 ch :=
-          hI basis ▸ hvk basis ▸ success.accepts
+        let run := success.artifactsAt (actionCircuit.toVerifierKey urs)
+          (actionCircuit.instanceCommitment urs inputs) (hvk basis) (hI basis)
+        let decode := run.decode
+        let haccepts := run.accepts
         let model := CanonicalMemberConstraintRelation.acceptedModel
           (memberDecode := fun i hi => decode.toMemberDecode (hchar basis O) i hi)
           (hblinding := actionCircuit.toVerifierKey_blindingFactors_lt_n urs) haccepts
@@ -422,40 +381,28 @@ def actionTerminalWitnessOrRelationFinder
               match hlookup : TopLevelLookup.topLevelLookupChallengeExclusions?
                 actionCircuit pp urs ch polynomial with
               | some hlookupProof =>
-                let hblinding := actionCircuit.toVerifierKey_blindingFactors_lt_n urs
-                let hnFp : (actionCircuit.n : Fp) ≠ 0 :=
-                  TopLevelAssignment.domainSizeCastNeZero
-                    ActionPermutationDomain.domainExponent_lt
-                match acceptedModel_circuitSat_or_relation_of_decodedMemberPolynomial_eq
-                    urs rfl (actionCircuit.toVerifierKey urs)
-                    (actionCircuit.instanceCommitment urs inputs) pnu.1.proof.1 ch
-                    (fun i hi => decode.toMemberDecode (hchar basis O) i hi) haccepts hblinding
+                match topLevelCircuitSat_or_relation_of_decodedMemberPolynomial_eq
+                    actionCircuit pp urs run.hk inputs run.ps run.ch
+                    (fun i hi => decode.toMemberDecode (hchar basis O) i hi) haccepts
                     (polynomial .vanishingH) rfl
-                    (actionCircuit.toVerifierKey_fixedQueryCount urs)
-                    (actionCircuit.toVerifierKey_adviceQueryCount urs)
-                    (actionCircuit.toVerifierKey_instanceQueryCount urs)
                     (fun slot point hpoint =>
                       PSum.inl (decode.memberBinding (hchar basis O) slot point hpoint))
+                    ActionPermutationDomain.domainExponent_lt
                     (ActionPermutationDomain.routingCoherent_of_derived urs)
-                    (TopLevelAssignment.toVerifierKey_domainRowsInjective
-                      urs ActionPermutationDomain.domainExponent_lt)
-                    (TopLevelAssignment.toVerifierKey_domainRoot
-                      urs ActionPermutationDomain.domainExponent_lt)
-                    hnFp
                     (by exact hxgoodProof.down) with
                 | PSum.inr relation =>
-                    some (Sum.inr (relation.toBasisRelation basis))
+                    some (Sum.inr
+                      (AugmentedRelationWitness.toBasisRelation basis relation))
                 | PSum.inl hsatisfied =>
-                    match action_bundleWitness_or_relation_of_decode_circuitSat pp urs rfl
-                        inputs pnu.1.proof.1 ch
-                        (pnu.1.multiU (wrappedPreIpaReads pnu))
-                        (pnu.1.multiBlind (wrappedPreIpaReads pnu))
-                        (pnu.1.aMulti (wrappedPreIpaReads pnu)) decode (hchar basis O) haccepts
+                    match action_bundleWitness_or_relation_of_decode_circuitSat pp urs run.hk
+                        inputs run.ps run.ch run.pU run.pW run.a run.decode
+                        (hchar basis O) run.accepts
                         (polynomial .vanishingH) hsatisfied hgoodYProof.down
                         hpermutationProof.down hlookupProof.down with
                     | PSum.inl witness => some (Sum.inl witness)
                     | PSum.inr relation =>
-                        some (Sum.inr (relation.toBasisRelation basis))
+                        some (Sum.inr
+                          (AugmentedRelationWitness.toBasisRelation basis relation))
               | none => none
             | none => none
           | none => none

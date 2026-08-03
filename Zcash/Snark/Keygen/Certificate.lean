@@ -274,8 +274,9 @@ theorem actionShapeFor_eq_fixtureShape (numProofs : ℕ) :
 /-- The circuit-owned portion of the captured fixture shape is exactly the Action circuit's
 derived shape. -/
 theorem actionCircuitShape_eq_fixtureCircuitShape :
-    actionCircuit.shape = shape.toCircuitShape :=
-  congrArg Shape.toCircuitShape actionShape_eq_fixtureShape
+    actionCircuit.shape = shape.toCircuitShape := by
+  have h := congrArg Shape.toCircuitShape actionShape_eq_fixtureShape
+  simpa only [CircuitShape.withProofParams_toCircuitShape] using h
 
 /-- The keygen domain exponent the columns are built at IS the captured URS's `k`, so the
 column length the commitment families produce is the domain the committer's inverse DFT runs

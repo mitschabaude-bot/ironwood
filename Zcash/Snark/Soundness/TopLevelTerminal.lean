@@ -370,6 +370,99 @@ def topLevelStatements_or_relation_of_circuitSat
 
 assert_no_sorry topLevelStatements_or_relation_of_circuitSat
 
+/-- The verifier-native quotient terminal specialized to a circuit-derived key. -/
+def topLevelCircuitSat_or_relation_of_decodedMemberPolynomial_eq
+    {G : Type} [AddCommGroup G] [Module Fp G]
+    [DecidableEq G] [Inhabited G]
+    {Config : Type} {PublicInput : TypeMap}
+    [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (pp : ProofParams) (urs : URS G)
+    (hk : (top.shape.withProofParams pp).k = urs.k)
+    (inputs : Fin pp.numProofs → PublicInput Fp)
+    (ps : ProofString (top.shape.withProofParams pp) Fp G)
+    (ch : Challenges (top.shape.withProofParams pp).k Fp)
+    {pU pW : Fp} {a : Fin (2 ^ urs.k) → Fp}
+    {batchOpenings :
+      OpenedBatchOpenings urs (evalVector urs.k ch.x3)
+        (x4BatchCommitments
+          (shape := top.shape.withProofParams pp)
+          (instanceCommitment := top.instanceCommitment urs inputs)
+          urs hk (top.toVerifierKey urs) ps ch)
+        (x4BatchEvals
+          (shape := top.shape.withProofParams pp)
+          (instanceCommitment := top.instanceCommitment urs inputs)
+          (top.toVerifierKey urs) ps ch)
+        a pU pW}
+    (memberDecode : ∀ i (hi : i < deployedX4PairCount
+        (shape := top.shape.withProofParams pp)
+        (instanceCommitment := top.instanceCommitment urs inputs)
+        (top.toVerifierKey urs) ps ch),
+      OpenedMemberDecode
+        (shape := top.shape.withProofParams pp)
+        (instanceCommitment := top.instanceCommitment urs inputs)
+        urs hk (top.toVerifierKey urs) ps ch batchOpenings i hi)
+    (haccepts : DeployedAccepts (top.shape.withProofParams pp) urs hk
+      (top.toVerifierKey urs) (top.instanceCommitment urs inputs) ps ch)
+    (hpoly : CPoly)
+    (hquot : hpoly = CanonicalMemberConstraintRelation.acceptedPolynomial
+      (shape := top.shape.withProofParams pp)
+      (memberDecode := memberDecode) haccepts .vanishingH)
+    (hbind : ∀
+      (slot : DeployedMemberSlot
+        (shape := top.shape.withProofParams pp)
+        (instanceCommitment := top.instanceCommitment urs inputs)
+        (top.toVerifierKey urs) ps ch)
+      (point : Fp),
+      point ∈ deployedSetPts
+          (shape := top.shape.withProofParams pp)
+          (instanceCommitment := top.instanceCommitment urs inputs)
+          (top.toVerifierKey urs) ps ch slot.setIndex →
+      (decodedMemberPolynomial
+        (shape := top.shape.withProofParams pp)
+        (instanceCommitment := top.instanceCommitment urs inputs)
+        urs hk (top.toVerifierKey urs) ps ch memberDecode slot).eval point =
+          deployedMemberClaim
+            (shape := top.shape.withProofParams pp)
+            (instanceCommitment := top.instanceCommitment urs inputs)
+            (top.toVerifierKey urs) ps ch slot point ⊕'
+        NontrivialRelation (F := Fp) urs.g urs.u urs.w)
+    (domainExponent_lt : top.domainExponent < 33)
+    (permutationRouting : PermutationChunkRoutingCoherent (top.toVerifierKey urs))
+    (hxgood :
+      let model := CanonicalMemberConstraintRelation.acceptedModel
+        (shape := top.shape.withProofParams pp)
+        (memberDecode := memberDecode)
+        (hblinding := top.toVerifierKey_blindingFactors_lt_n urs) haccepts
+      ch.x ∉ szBadSet
+        (combineConstraints model.fixedCols model.adviceCols model.instanceCols model.gates
+          model.sets model.chunks model.lookups model.beta model.gamma model.delta model.theta ch.y
+          model.chunkLen model.l0 model.lLast model.lBlind - hpoly * (X ^ top.n - 1))) :
+    (CanonicalMemberConstraintRelation.acceptedModel
+      (shape := top.shape.withProofParams pp)
+      (memberDecode := memberDecode)
+      (hblinding := top.toVerifierKey_blindingFactors_lt_n urs) haccepts).CircuitSat
+        ch.y hpoly top.n a ⊕'
+      NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
+  have hrows : Function.Injective (fun row : Fin top.n => top.omega ^ (row : ℕ)) := by
+    simpa only [top.toVerifierKey_n, top.toVerifierKey_omega] using
+      (TopLevelAssignment.domainRowsInjective (top := top) domainExponent_lt)
+  have hroot : top.omega ^ top.n = 1 := by
+    simpa only [top.toVerifierKey_n, top.toVerifierKey_omega] using
+      (TopLevelAssignment.domainRoot (top := top) domainExponent_lt)
+  have hnFp : (top.n : Fp) ≠ 0 := by
+    simpa only [top.toVerifierKey_n] using
+      (TopLevelAssignment.domainSizeCastNeZero (top := top) domainExponent_lt)
+  simpa only [top.toVerifierKey_n] using
+    acceptedModel_circuitSat_or_relation_of_decodedMemberPolynomial_eq
+      urs hk (top.toVerifierKey urs) (top.instanceCommitment urs inputs) ps ch
+      memberDecode haccepts (top.toVerifierKey_blindingFactors_lt_n urs)
+      hpoly hquot
+      (top.toVerifierKey_fixedQueryCount urs)
+      (top.toVerifierKey_adviceQueryCount urs)
+      (top.toVerifierKey_instanceQueryCount urs)
+      hbind permutationRouting hrows hroot hnFp hxgood
+
 /--
 Accepted decoded-member binding reaches the statement of any top-level circuit.
 

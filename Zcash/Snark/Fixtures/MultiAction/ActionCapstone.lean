@@ -16,6 +16,8 @@ consensus-valid Action bundle size.
 
 namespace Zcash.Snark.Fixture
 
+set_option maxRecDepth 10000
+
 open Zcash.Snark CompPoly.CPolynomial
 open Zcash.Snark.ActionTerminal
 open Zcash.Snark.Keygen (actionProofParams actionProofParamsFor
@@ -24,6 +26,11 @@ open Zcash.Snark.Keygen (actionProofParams actionProofParamsFor
 open Zcash.Circuits Zcash.Circuits.Action
 open Zcash.Arithmetic (scalarFieldOrder URS)
 open scoped ENNReal
+
+section OpaqueAction
+
+attribute [local irreducible] actionCircuit Halo2.TopLevelCircuit.toVerifierKey
+  Halo2.TopLevelCircuit.instanceCommitment
 
 private theorem actionProofShape_eq_maxShape (numProofs : ℕ) :
     actionCircuit.shape.withProofParams (actionProofParamsFor numProofs) =
@@ -752,8 +759,8 @@ theorem adaptive_action_constraint_count_le
     ConstraintPolyModel.lookupConstraints
   simp only [List.length_flatten, permutationExpressions, lookupExpressions,
     permutationChunksOfResolver_length, lookupEntriesOfResolver]
-  rw [actionCircuit.toVerifierKey_gates,
-    actionCircuit.toVerifierKey_permutationChunks,
+  rw [ActionTerminal.vkAt_gates,
+    ActionTerminal.vkAt_permutationChunks,
     derived_scalars.2.2.1, derived_scalars.2.2.2.2.2.2]
   have hproofs := congrArg Shape.numProofs actionShape_eq_fixtureShape
   have hsets := congrArg (fun proofShape : Shape => proofShape.numPermutationSets)
@@ -803,8 +810,8 @@ theorem adaptive_action_constraint_count_le_for (numProofs : ℕ)
     ConstraintPolyModel.lookupConstraints
   simp only [permutationExpressions, lookupExpressions,
     permutationChunksOfResolver_length, lookupEntriesOfResolver]
-  rw [actionCircuit.toVerifierKey_gates,
-    actionCircuit.toVerifierKey_permutationChunks,
+  rw [ActionTerminal.vkAt_gates,
+    ActionTerminal.vkAt_permutationChunks,
     derived_scalars.2.2.1, derived_scalars.2.2.2.2.2.2]
   have hsets := congrArg (fun proofShape : Shape => proofShape.numPermutationSets)
     (actionShapeFor_eq_fixtureShape numProofs)
@@ -1399,6 +1406,8 @@ theorem action_dlog_groupWork_le_2pow126
     _ ≤ 8 * 2 ^ 123 := by norm_num
     _ = 2 ^ 126 := by norm_num
 
+end OpaqueAction
+
 /-! ## Exact false-Action-statement endpoints -/
 
 /-- **The exact captured Action soundness bound.**  Its left-hand event is literal deployed
@@ -1590,6 +1599,11 @@ theorem orchard_action_acceptFalseStatement_prob_le_captured_for
       (staticChecks_of_derived_for numProofs family hvk) inputs hvk hI hchar B hB query hquery
       (schedule_of_derived_for numProofs family hvk) profile)
     hXY hBeta hGamma hTheta
+
+section OpaqueAdaptive
+
+attribute [local irreducible] actionCircuit Halo2.TopLevelCircuit.toVerifierKey
+  Halo2.TopLevelCircuit.instanceCommitment
 
 /-- Captured false-statement bound for a bare adaptive online-AGM family, with one profiled finder
 and five annotation-aware semantic surfaces. -/
@@ -2651,5 +2665,7 @@ theorem orchard_action_acceptFalseStatement_2pow123_workFactor_generatorRO_for
   refine ⟨hprob, hqueries, hgroup, hcost.2.2, ?_⟩
   intro actual εBias hbias
   exact event_measure_le_of_bias hbias _ hprob
+
+end OpaqueAdaptive
 
 end Zcash.Snark.Fixture

@@ -47,6 +47,9 @@ open scoped ENNReal
 
 local instance vestaInhabitedStraightLineActionBudgets : Inhabited VestaG := ⟨0⟩
 
+attribute [local irreducible] actionCircuit TopLevelCircuit.toVerifierKey
+  TopLevelCircuit.instanceCommitment
+
 variable (pp : ProofParams)
   (family : ComputedStraightLineDeployedFSFamily (actionCircuit.shape.withProofParams pp))
   (static : DeployedConstraintStaticChecks family.toRootFamily)
@@ -63,11 +66,32 @@ variable (pp : ProofParams)
     (straightLineRunOutput family basis O).1.proof.1
     (straightLineRunRecord family basis O) < scalarFieldOrder)
 
-/-- The deployed Action key at one basis. -/
-abbrev vkAt
+/-- The deployed Action key at one basis. Kept opaque so types that mention the key do not
+normalize the concrete Action circuit merely to compare dependent indices. -/
+def vkAt
     (basis : AugmentedIndex (2 ^ actionCircuit.shape.k) → VestaG) :
     VerifyingKey actionCircuit.shape Fp VestaG :=
   actionCircuit.toVerifierKey (ursOfAugmentedBasis actionCircuit.shape.k basis)
+
+@[simp] theorem vkAt_n
+    (basis : AugmentedIndex (2 ^ actionCircuit.shape.k) → VestaG) :
+    (vkAt basis).n = actionCircuit.n := by
+  simp only [vkAt, actionCircuit.toVerifierKey_n]
+
+@[simp] theorem vkAt_blindingFactors
+    (basis : AugmentedIndex (2 ^ actionCircuit.shape.k) → VestaG) :
+    (vkAt basis).blindingFactors = actionCircuit.blindingFactors := by
+  simp only [vkAt, actionCircuit.toVerifierKey_blindingFactors]
+
+@[simp] theorem vkAt_gates
+    (basis : AugmentedIndex (2 ^ actionCircuit.shape.k) → VestaG) :
+    (vkAt basis).gates = actionCircuit.verifierCS.gates := by
+  simp only [vkAt, actionCircuit.toVerifierKey_gates]
+
+@[simp] theorem vkAt_permutationChunks
+    (basis : AugmentedIndex (2 ^ actionCircuit.shape.k) → VestaG) :
+    (vkAt basis).permutationChunks = actionCircuit.verifierCS.permutationChunks := by
+  simp only [vkAt, actionCircuit.toVerifierKey_permutationChunks]
 
 /-- A challenge record carrying only `θ` and `β` — the fields a pre-`x` exclusion set reads. -/
 def semanticChRecord (theta beta : Fp) {k : ℕ} : Challenges k Fp :=
@@ -172,13 +196,15 @@ theorem actionBetaFailureEvent_subset
     straightLineRunRecord_read pp family basis O 1
   rcases not_and_or.mp hmem with hperm | hlook
   · have hin := not_not.mp hperm
+    rw [← vkAt] at hin
     rw [allResolverPermutationBetaBadSet_congr pp.numProofs (vkAt basis)
       (actionCircuit.usableRowsAt actionCircuit.domainExponent)
       (fun id hid => hview basis O h id (Or.inl hid)), hproj] at hin
-    exact Set.mem_union_left _ (Finset.mem_coe.mpr hin)
+    exact Set.mem_union_left _ (Finset.mem_coe.mpr (by
+      simpa only [actionCircuit.toVerifierKey_n] using hin))
   · have hin := not_not.mp hlook
-    simp only [actionCircuit.toVerifierKey_n,
-      actionCircuit.toVerifierKey_blindingFactors] at hin
+    rw [← vkAt] at hin
+    simp only [vkAt_n, vkAt_blindingFactors] at hin
     rw [allResolverLookupBetaBadSet_congr pp.numProofs (vkAt basis)
       (actionCircuit.n - actionCircuit.blindingFactors - 2)
       ((htheta basis O).trans (semanticChRecord_theta _ _).symm)
@@ -250,14 +276,16 @@ theorem actionGammaFailureEvent_subset
     straightLineRunRecord_read pp family basis O 2
   rcases not_and_or.mp hmem with hperm | hlook
   · have hin := not_not.mp hperm
+    rw [← vkAt] at hin
     rw [allResolverPermutationGammaBadSet_congr pp.numProofs (vkAt basis)
       (actionCircuit.usableRowsAt actionCircuit.domainExponent)
       ((hbeta basis O).trans (semanticChRecord_beta _ _).symm)
       (fun id hid => hview basis O h id (Or.inl hid)), hproj] at hin
-    exact Set.mem_union_left _ (Finset.mem_coe.mpr hin)
+    exact Set.mem_union_left _ (Finset.mem_coe.mpr (by
+      simpa only [actionCircuit.toVerifierKey_n] using hin))
   · have hin := not_not.mp hlook
-    simp only [actionCircuit.toVerifierKey_n,
-      actionCircuit.toVerifierKey_blindingFactors] at hin
+    rw [← vkAt] at hin
+    simp only [vkAt_n, vkAt_blindingFactors] at hin
     rw [allResolverLookupGammaBadSet_congr pp.numProofs (vkAt basis)
       (actionCircuit.n - actionCircuit.blindingFactors - 2)
       ((htheta basis O).trans (semanticChRecord_theta _ _).symm)
@@ -346,12 +374,14 @@ theorem actionXYFailureEvent_subset
   rcases not_and_or.mp hmem with hx | hy'
   · have hin := not_not.mp hx
     rw [hmodelX basis O h, hy basis O, hvanishing basis O h, hprojX] at hin
-    exact Set.mem_union_left _ (Finset.mem_coe.mpr hin)
+    exact Set.mem_union_left _ (Finset.mem_coe.mpr (by
+      simpa only [actionCircuit.toVerifierKey_n] using hin))
   · rw [not_forall] at hy'
     obtain ⟨j, hj⟩ := hy'
     have hin := not_not.mp hj
     rw [hmodelY basis O h, hprojY] at hin
-    exact Set.mem_union_right _ (Set.mem_iUnion.mpr ⟨j, Finset.mem_coe.mpr hin⟩)
+    exact Set.mem_union_right _ (Set.mem_iUnion.mpr ⟨j, Finset.mem_coe.mpr (by
+      simpa only [actionCircuit.toVerifierKey_n] using hin)⟩)
 
 /-- The fused `x`/`y` failure probability: each half pays its own state surface price. -/
 theorem actionXYFailureEvent_prob_le {T : Type*} [DecidableEq T]
@@ -461,7 +491,7 @@ theorem actionGammaBadSets_measure_le
     (theta beta : Fp) (poly : CommitmentId → CPoly) :
     (PMF.uniformOfFintype Fp).toOuterMeasure
       (↑(allResolverPermutationGammaBadSet pp.numProofs (vkAt basis)
-          (semanticChRecord theta beta (k := actionCircuit.domainExponent)) poly
+          (semanticChRecord theta beta (k := actionCircuit.shape.k)) poly
           (actionCircuit.usableRowsAt actionCircuit.domainExponent)) ∪
         ↑(allResolverLookupGammaBadSet pp.numProofs (vkAt basis)
           (semanticChRecord theta beta

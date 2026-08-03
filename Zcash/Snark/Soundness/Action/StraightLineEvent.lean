@@ -21,6 +21,9 @@ open scoped ENNReal
 
 local instance vestaInhabitedStraightLineActionEvent : Inhabited VestaG := ⟨0⟩
 
+attribute [local irreducible] actionCircuit TopLevelCircuit.toVerifierKey
+  TopLevelCircuit.instanceCommitment
+
 variable (pp : ProofParams)
   (family : ComputedStraightLineDeployedFSFamily (actionCircuit.shape.withProofParams pp))
   (static : DeployedConstraintStaticChecks family.toRootFamily)
@@ -195,36 +198,6 @@ def actionThetaFailureEvent :
         (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k q.1)
         (actionRunPolynomial pp family static inputs hvk hI hchar q.1 q.2 h))}
 
-/-- The Action terminal on a decoded run outside all four challenge-failure events.  This is a
-specification object: the DLOG reduction must not project its relation branch noncomputably, but
-must cover that branch with `actionTerminalRelationFinderCovers` below. -/
-def actionTerminalOutcomeOfGood
-    (basis : AugmentedIndex (2 ^ (actionCircuit.shape.withProofParams pp).k) → VestaG)
-    (O : BTranscript Fp VestaG
-      (preIpaLen (actionCircuit.shape.withProofParams pp) family.init.length 10
-        + 3 * (actionCircuit.shape.withProofParams pp).k) → Fp)
-    (hdecoded : family.straightLineConstraintDecoded static basis O)
-    (hXY : (basis, O) ∉ actionXYFailureEvent pp family static inputs hvk hI hchar)
-    (hBeta : (basis, O) ∉ actionBetaFailureEvent pp family static inputs hvk hI hchar)
-    (hGamma : (basis, O) ∉ actionGammaFailureEvent pp family static inputs hvk hI hchar)
-    (hTheta : (basis, O) ∉ actionThetaFailureEvent pp family static inputs hvk hI hchar) :
-    BundleStatement inputs ⊕'
-      NontrivialRelation (F := Fp)
-        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis).g
-        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis).u
-        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis).w := by
-  have hxy := not_exists.mp hXY hdecoded
-  rw [not_not] at hxy
-  have hbeta := not_exists.mp hBeta hdecoded
-  rw [not_not] at hbeta
-  have hgamma := not_exists.mp hGamma hdecoded
-  rw [not_not] at hgamma
-  have htheta := not_exists.mp hTheta hdecoded
-  rw [not_not] at htheta
-  exact action_bundleStatement_or_relation_of_straightLineDecoded pp family static
-    basis O inputs (hvk basis) (hI basis) hdecoded (hchar basis O)
-    hxy.1 hxy.2 ⟨hgamma.1, hbeta.1⟩ ⟨hgamma.2, hbeta.2, htheta⟩
-
 /-- Coverage requires every decoded good false-statement run to return explicit relation data. -/
 def actionTerminalRelationFinderCovers
     (finder :
@@ -242,7 +215,6 @@ def actionTerminalRelationFinderCovers
     ¬BundleStatement inputs →
     (finder basis O).isSome
 
-set_option maxHeartbeats 800000 in
 /-- Outside the four semantic challenge surfaces, a decoded run computes either all private
 witnesses or explicit relation data. -/
 theorem actionKnowledgeOutcome_isSome_of_good
@@ -258,8 +230,6 @@ theorem actionKnowledgeOutcome_isSome_of_good
     (actionKnowledgeOutcome pp family static inputs hvk hI hchar basis O).isSome := by
   obtain ⟨success, hout⟩ :=
     family.straightLineConstraintOutcome?_eq_some_of_decoded static basis O hdecoded
-  have hsuccess := family.straightLineConstraintSuccess_eq_of_outcome
-    static basis O hdecoded success hout
   have hxy := not_exists.mp hXY hdecoded
   rw [not_not] at hxy
   have hbeta := not_exists.mp hBeta hdecoded
@@ -268,43 +238,22 @@ theorem actionKnowledgeOutcome_isSome_of_good
   rw [not_not] at hgamma
   have htheta := not_exists.mp hTheta hdecoded
   rw [not_not] at htheta
-  have hdecode : actionRunDecode pp family static basis O inputs (hvk basis) (hI basis) hdecoded =
-      hI basis ▸ hvk basis ▸
-        success.witness.decode.reRound (runRounds family.toFamily basis O) := by
-    simp only [actionRunDecode, straightLineDecode, straightLineConstraintWitness, hsuccess]
-  have haccepts := actionRunAccepts pp family static basis O inputs
-    (hvk basis) (hI basis) hdecoded
-  have hacceptsEq : actionRunAccepts pp family static basis O inputs
-      (hvk basis) (hI basis) hdecoded =
-      hI basis ▸ hvk basis ▸ success.accepts :=
-    Subsingleton.elim _ _
-  let successDecode : DeployedAlgebraicDecode
-      (actionCircuit.shape.withProofParams pp)
-      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) rfl
-      (actionCircuit.toVerifierKey
-        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
-      (actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
-      (straightLineRunOutput family basis O).1.proof.1
-      (straightLineRunRecord family basis O)
-      ((straightLineRunOutput family basis O).1.aMulti
-        (wrappedPreIpaReads (straightLineRunOutput family basis O)))
-      ((straightLineRunOutput family basis O).1.multiU
-        (wrappedPreIpaReads (straightLineRunOutput family basis O)))
-      ((straightLineRunOutput family basis O).1.multiBlind
-        (wrappedPreIpaReads (straightLineRunOutput family basis O))) :=
-    hI basis ▸ hvk basis ▸
-      success.witness.decode.reRound (runRounds family.toFamily basis O)
-  let successAccepts : DeployedAccepts
-      (actionCircuit.shape.withProofParams pp)
-      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) rfl
-      (actionCircuit.toVerifierKey
-        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
-      (actionCircuit.instanceCommitment (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
-      (straightLineRunOutput family basis O).1.proof.1
-      (straightLineRunRecord family basis O) :=
-    hI basis ▸ hvk basis ▸ success.accepts
+  let run := success.artifactsAt
+    (actionCircuit.toVerifierKey (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
+    (actionCircuit.instanceCommitment
+      (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
+    (hvk basis) (hI basis)
+  let successDecode := run.decode
+  let successAccepts := run.accepts
   have hdecodeEq : actionRunDecode pp family static basis O inputs
-      (hvk basis) (hI basis) hdecoded = successDecode := hdecode
+      (hvk basis) (hI basis) hdecoded = successDecode := by
+    unfold actionRunDecode
+    exact straightLineRunDecodeAt_eq_successDecodeAt
+      family static basis O
+      (actionCircuit.toVerifierKey (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
+      (actionCircuit.instanceCommitment
+        (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis) inputs)
+      (hvk basis) (hI basis) hdecoded success hout
   have hacceptsEq' : actionRunAccepts pp family static basis O inputs
       (hvk basis) (hI basis) hdecoded = successAccepts :=
     Subsingleton.elim _ _
@@ -315,15 +264,21 @@ theorem actionKnowledgeOutcome_isSome_of_good
         (hblinding := actionCircuit.toVerifierKey_blindingFactors_lt_n
           (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
         successAccepts := by
-    unfold actionRunModel
-    rw [hdecodeEq]
+    simpa only [actionRunModel] using congrArg
+      (fun decode => CanonicalMemberConstraintRelation.acceptedModel
+        (memberDecode := fun i hi => decode.toMemberDecode (hchar basis O) i hi)
+        (hblinding := actionCircuit.toVerifierKey_blindingFactors_lt_n
+          (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
+        successAccepts) hdecodeEq
   have hpolyEq : actionRunPolynomial pp family static inputs hvk hI hchar basis O hdecoded =
       CanonicalMemberConstraintRelation.acceptedPolynomial
         (memberDecode := fun i hi =>
           successDecode.toMemberDecode (hchar basis O) i hi)
         successAccepts := by
-    unfold actionRunPolynomial
-    rw [hdecodeEq]
+    simpa only [actionRunPolynomial] using congrArg
+      (fun decode => CanonicalMemberConstraintRelation.acceptedPolynomial
+        (memberDecode := fun i hi => decode.toMemberDecode (hchar basis O) i hi)
+        successAccepts) hdecodeEq
   unfold actionKnowledgeOutcome
   split
   · rfl
@@ -364,21 +319,21 @@ theorem actionKnowledgeOutcome_isSome_of_good
       split
       · rename_i hgoodYProof _
         have hpermutation' : ResolverPermutationChallengeExclusions
-                pp.numProofs (actionCircuit.toVerifierKey
-                  (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
-                (straightLineRunRecord family basis O)
-                (actionRunPolynomial pp family static inputs hvk hI hchar
-                  basis O hdecoded) actionActiveRows := ⟨hgamma.1, hbeta.1⟩
+            pp.numProofs (actionCircuit.toVerifierKey
+              (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis))
+            (straightLineRunRecord family basis O)
+            (actionRunPolynomial pp family static inputs hvk hI hchar
+              basis O hdecoded) actionActiveRows := ⟨hgamma.1, hbeta.1⟩
         rw [hpolyEq] at hpermutation'
         have hpermutationSome := resolverPermutationChallengeExclusions?_isSome_of
           pp.numProofs _ _ _ _ hpermutation'
         split
         · have hlookup' : TopLevelLookup.ChallengeExclusions
-                  actionCircuit pp
-                  (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis)
-                  (straightLineRunRecord family basis O)
-                  (actionRunPolynomial pp family static inputs hvk hI hchar
-                    basis O hdecoded) := ⟨hgamma.2, hbeta.2, htheta⟩
+              actionCircuit pp
+              (ursOfAugmentedBasis (actionCircuit.shape.withProofParams pp).k basis)
+              (straightLineRunRecord family basis O)
+              (actionRunPolynomial pp family static inputs hvk hI hchar
+                basis O hdecoded) := ⟨hgamma.2, hbeta.2, htheta⟩
           rw [hpolyEq] at hlookup'
           have hlookupSome :=
             TopLevelLookup.topLevelLookupChallengeExclusions?_isSome_of
@@ -413,7 +368,6 @@ theorem actionRelationFinder_covers :
       rw [houtcome]
       rfl
 
-set_option maxHeartbeats 800000 in
 /-- Straight-line knowledge failure is covered by the same compressed failure, computed DLOG
 relation, and four semantic challenge surfaces as ordinary Action soundness. -/
 theorem actionKnowledgeFailure_subset_union :

@@ -21,6 +21,11 @@ open scoped ENNReal
 
 local instance vestaInhabitedAdaptiveActionEvent : Inhabited VestaG := ⟨0⟩
 
+set_option maxRecDepth 10000
+
+attribute [local irreducible] actionCircuit TopLevelCircuit.toVerifierKey
+  TopLevelCircuit.instanceCommitment
+
 variable (pp : ProofParams)
   (family : ComputedAdaptiveOnlineAGMFSFamily (actionCircuit.shape.withProofParams pp))
   (inputs : Fin pp.numProofs → PublicInputs Fp)
@@ -156,8 +161,7 @@ def adaptiveActionPreXIdentityWitnessOrRelationFinder
       exact hidentity
     let hn : (family.vk basis).n ≠ 0 := by
       rw [hvk basis]
-      change 2 ^ actionCircuit.domainExponent ≠ 0
-      positivity
+      simpa only [actionCircuit.toVerifierKey_n] using actionCircuit.n_ne_zero
     exact match hgoodY : foldSplitAvoidance? rawModel.constraints
         (family.vk basis).n hn ch.y with
     | none => none
@@ -378,8 +382,7 @@ theorem adaptiveActionPreXIdentityWitnessOrRelationFinder_isSome_of
     exact hlookup
   have hn : (family.vk basis).n ≠ 0 := by
     rw [hvk basis]
-    change 2 ^ actionCircuit.domainExponent ≠ 0
-    positivity
+    simpa only [actionCircuit.toVerifierKey_n] using actionCircuit.n_ne_zero
   have hySome := foldSplitAvoidance?_isSome_of rawModel.constraints _ hn _ hgoodYRaw
   have hpSome := resolverPermutationChallengeExclusions?_isSome_of
     pp.numProofs _ _ _ _ hpermutationRaw

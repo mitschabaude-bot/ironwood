@@ -25,6 +25,9 @@ local instance vestaInhabitedAdaptiveActionSurfaces : Inhabited VestaG := ‚ü®0‚ü
 
 set_option maxRecDepth 10000
 
+attribute [local irreducible] actionCircuit TopLevelCircuit.toVerifierKey
+  TopLevelCircuit.instanceCommitment
+
 /-- Prover-emitted AGM representations available at one of the five Action semantic squeezes.
 The definition follows the deployed transcript order literally. -/
 def AlgebraicProofString.actionRepresentationsBefore

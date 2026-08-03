@@ -30,6 +30,9 @@ namespace Zcash.Snark.Fixture2
 open Zcash.Snark
 open Zcash.Circuits.Action (actionCircuit)
 
+attribute [local irreducible] Zcash.Circuits.Action.actionCircuit
+  Halo2.TopLevelCircuit.toVerifierKey
+
 /-- Permutation-chunk projection commutes with transport between circuit shapes. -/
 private theorem castVk_permutationChunks
     {s₁ s₂ : CircuitShape} (h : s₁ = s₂)
