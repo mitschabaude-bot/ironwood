@@ -30,6 +30,8 @@ open Zcash.Circuits
 open Zcash.Circuits.Action
 open Keygen
 
+set_option maxHeartbeats 20000
+
 variable {G : Type} [AddCommGroup G] [Module Fp G]
   [DecidableEq G] [Inhabited G]
 
@@ -44,14 +46,14 @@ presentation.
 def actionTopLevelCircuitCorrectness
     (pp : ProofParams) (urs : URS G)
     (hk :
-      (actionCircuit.shape.withProofParams pp).k = urs.k)
+      actionCircuit.shape.k = urs.k)
     (instanceCommitment :
       Fin pp.numProofs →
         ℕ → G)
     (ps : ProofString
       (actionCircuit.shape.withProofParams pp) Fp G)
     (ch : Challenges
-      (actionCircuit.shape.withProofParams pp).k Fp)
+      actionCircuit.shape.k Fp)
     (pU pW : Fp) (a : Fin (2 ^ urs.k) → Fp)
     (batchOpenings :
       OpenedBatchOpenings urs (evalVector urs.k ch.x3)
@@ -101,8 +103,7 @@ def actionTopLevelCircuitCorrectness
   classical
   have hdomainExponent :
       actionCircuit.domainExponent = urs.k := by
-    simpa only [CircuitShape.withProofParams_k,
-      actionCircuit.shape_k] using hk
+    exact actionCircuit.shape_k.symm.trans hk
   have fixedCoherence :
       TopLevelFixedCoherence actionCircuit urs :=
     ActionFixedCoherence.ofDerived urs hdomainExponent

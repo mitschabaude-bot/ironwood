@@ -34,14 +34,14 @@ statement.
 def ofAcceptedCircuitSat
     (pp : ProofParams) (urs : URS G)
     (hk :
-      (actionCircuit.shape.withProofParams pp).k = urs.k)
+      actionCircuit.domainExponent = urs.k)
     (inputs :
       Fin pp.numProofs →
         PublicInputs Fp)
     (ps : ProofString
       (actionCircuit.shape.withProofParams pp) Fp G)
     (ch : Challenges
-      (actionCircuit.shape.withProofParams pp).k Fp)
+      actionCircuit.domainExponent Fp)
     (pU pW : Fp) (a : Fin (2 ^ urs.k) → Fp)
     (batchOpenings :
       OpenedBatchOpenings urs (evalVector urs.k ch.x3)

@@ -207,7 +207,6 @@ def actionChunkFlatten
         actionPermutationChunks_cover)
     (actionResolverChunkWidth pp urs poly proofIndex)
 
-@[simp]
 theorem actionChunkFlatten_apply_column
     {G : Type} [AddCommGroup G] [Inhabited G]
     (pp : ProofParams) (urs : URS G)
@@ -224,7 +223,6 @@ theorem actionChunkFlatten_apply_column
           actionPermutationChunks_cover)
       (actionResolverChunkWidth pp urs poly proofIndex) cell
 
-@[simp]
 theorem actionChunkFlatten_symm_apply_row
     {G : Type} [AddCommGroup G] [Inhabited G]
     (pp : ProofParams) (urs : URS G)
@@ -239,7 +237,6 @@ theorem actionChunkFlatten_symm_apply_row
           actionPermutationChunks_cover)
       (actionResolverChunkWidth pp urs poly proofIndex) cell
 
-@[simp]
 theorem actionChunkFlatten_symm_apply_column
     {G : Type} [AddCommGroup G] [Inhabited G]
     (pp : ProofParams) (urs : URS G)

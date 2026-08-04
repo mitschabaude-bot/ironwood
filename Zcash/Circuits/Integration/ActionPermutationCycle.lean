@@ -185,22 +185,14 @@ theorem actionRowsInjectiveAtUrs
     TopLevelAssignment.domainRowsInjective_of_domainExponent_eq
       (top := actionCircuit) domainExponent_lt hk
 
-/-- The proof-parameter extension preserves the Action circuit's domain
-exponent. Keeping this equality explicit avoids elaborating the concrete
-circuit through a definitional-equality bridge. -/
-theorem actionShape_k_eq_domainExponent (pp : ProofParams) :
-    (actionShape pp).k = actionCircuit.domainExponent := by
-  simp only [actionShape, CircuitShape.withProofParams_k,
-    actionCircuit.shape_k]
-
 set_option maxRecDepth 100000 in
 def actionResolverPermutationCycle_or_relation
     (pp : ProofParams) (urs : URS G)
-    (hk : (actionShape pp).k = urs.k)
+    (hk : actionCircuit.domainExponent = urs.k)
     {instanceCommitment :
       Fin pp.numProofs → ℕ → G}
     {ps : ProofString (actionShape pp) Fp G}
-    {ch : Challenges actionCircuit.shape.k Fp}
+    {ch : Challenges actionCircuit.domainExponent Fp}
     {pU pW : Fp} {a : Fin (2 ^ urs.k) → Fp}
     {batchOpenings :
       OpenedBatchOpenings urs (evalVector urs.k ch.x3)
@@ -239,10 +231,8 @@ def actionResolverPermutationCycle_or_relation
         (actionActiveSigma pp urs relation.polynomial proofIndex)
       ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
   classical
-  have hdomain : actionCircuit.domainExponent = urs.k :=
-    (actionShape_k_eq_domainExponent pp).symm.trans hk
   have hkUrs : urs.k ≤ 32 := by
-    rw [← hdomain]
+    rw [← hk]
     exact Nat.le_of_lt_succ domainExponent_lt
   let setup := LagrangePrefixSetup.ofDerived urs hkUrs
   -- The successful cycle is returned as data; only its sigma equality is proof-valued.
@@ -278,7 +268,7 @@ def actionResolverPermutationCycle_or_relation
   have homega :
       vk.omega = omegaOf urs.k := by
     simpa only [vk, actionCircuit.toVerifierKey_omega,
-      TopLevelCircuit.omega] using congrArg omegaOf hdomain
+      TopLevelCircuit.omega] using congrArg omegaOf hk
   let key : LagrangeCommitmentKey urs vk.omega := by
     let sourceKey :=
       LagrangeCommitmentKey.ofPrefix urs
@@ -299,7 +289,7 @@ def actionResolverPermutationCycle_or_relation
     rw [actionCircuit.toVerifierKey_permutationCommonCommitment]
     have source :=
       PermutationCommitmentCoherence.commitment_ofKeygen
-        actionCircuit urs hdomain setup common
+        actionCircuit urs hk setup common
         common.isLt
     simpa only [topLevelPermutationCommitment, key,
       LagrangeCommitmentKey.commitInstance,
@@ -359,10 +349,10 @@ def actionResolverPermutationCycle_or_relation
       proofIndex chunk column hj common hidx key
       (topLevelPermutationRows
         actionCircuit common)
-      hcommit (actionRowsInjectiveAtUrs urs hdomain)
+      hcommit (actionRowsInjectiveAtUrs urs hk)
       (by
         simpa only [Zcash.Snark.actionDomainSize] using
-          congrArg (2 ^ ·) hdomain)
+          congrArg (2 ^ ·) hk)
       (Zcash.Snark.actionFullSigma
         pp urs relation.polynomial proofIndex)
       chunk column hval

@@ -28,11 +28,11 @@ canonical relation, or retain the shared augmented-commitment relation branch.
 -/
 def actionCopyReplayWitness_or_relation
     (pp : ProofParams) (urs : URS G)
-    (hk : (actionShape pp).k = urs.k)
+    (hk : actionCircuit.domainExponent = urs.k)
     {instanceCommitment :
       Fin pp.numProofs → ℕ → G}
     {ps : ProofString (actionShape pp) Fp G}
-    {ch : Challenges actionCircuit.shape.k Fp}
+    {ch : Challenges actionCircuit.domainExponent Fp}
     {pU pW : Fp} {a : Fin (2 ^ urs.k) → Fp}
     {batchOpenings :
       OpenedBatchOpenings urs (evalVector urs.k ch.x3)
@@ -78,9 +78,6 @@ def actionCopyReplayWitness_or_relation
         (FlatCell actionNumPermCols actionDomainSize)
         (NontrivialRelation (F := Fp) urs.g urs.u urs.w) ⊕'
       NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
-  have hdomainExponent : actionCircuit.domainExponent = urs.k := by
-    simpa only [actionShape, CircuitShape.withProofParams_k,
-      actionCircuit.shape_k] using hk
   have hn : actionCircuit.n ≠ 0 :=
     actionCircuit.n_ne_zero
   have hsatisfaction :=
@@ -117,7 +114,7 @@ def actionCopyReplayWitness_or_relation
         (exclusions.good proofIndex)
     have hdomainSize :
         actionCircuit.n = 2 ^ urs.k := by
-      rw [actionCircuit.n_eq_two_pow_domainExponent, hdomainExponent]
+      rw [actionCircuit.n_eq_two_pow_domainExponent, hk]
     have hfixedRead : ∀ {column row value : ℕ},
         (column, row, value) ∈
             topLevelRequiredFixedEntries actionCircuit →
@@ -132,7 +129,7 @@ def actionCopyReplayWitness_or_relation
           (top := actionCircuit) (pp := pp) (urs := urs)
           fixedCoherence
           (TopLevelAssignment.domainRowsInjective_of_domainExponent_eq
-            ActionPermutationDomain.domainExponent_lt hdomainExponent)
+            ActionPermutationDomain.domainExponent_lt hk)
           hdomainSize proofIndex hentry
       simpa only [actionActiveRows] using source
     exact
