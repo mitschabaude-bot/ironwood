@@ -37,6 +37,13 @@ def actionConsts : List (ℕ × ℕ × ℕ) :=
   constantCopyEntries actionCircuit.constraintSystem
     (actionCircuit.operations)
 
+/-- V1 allocates at least one fixed cell for every Action constant site. -/
+theorem actionConstantSites_fit :
+    (operationConstSites
+        (actionCircuit.operations)).length ≤
+      actionConsts.length := by
+  native_decide
+
 /-- The keygen copy list of the Action operation stream. -/
 def actionCopyRaw : List (ℕ × ℕ × ℕ × ℕ) :=
   Halo2.Layout.V1.copyList actionPermCols
@@ -72,11 +79,51 @@ theorem actionActiveRows_le_domainSize :
   unfold actionActiveRows TopLevelCircuit.usableRowsAt
   exact le_trans (Nat.sub_le _ _) (Nat.sub_le _ _)
 
-/-- Every keygen copy tuple is in range: 15 permutation columns, `2^11` rows. -/
+/-- Every keygen copy tuple names two Action permutation columns. Row bounds are
+proved generically from the compiler below. -/
+theorem actionCopyColumnBounds : ∀ t ∈ actionCopyRaw,
+    t.1 < actionNumPermCols ∧ t.2.2.1 < actionNumPermCols := by
+  native_decide
+
+/-- Every V1 Action constant allocation lies below the compiler-derived operation
+footprint. -/
+theorem actionConst_row_lt_usedRows
+    (entry : ℕ × ℕ × ℕ) (hentry : entry ∈ actionConsts) :
+    entry.2.2 < Halo2.usedRows actionCircuit.operations := by
+  rw [actionConsts, Keygen.constantCopyEntries, List.mem_map] at hentry
+  obtain ⟨⟨value, column, row⟩, hassignment, rfl⟩ := hentry
+  exact V1_constantAssignments_row_lt_usedRows
+    actionCircuit.operations
+    (actionCircuit.constraintSystem.constants.map (·.index))
+    hassignment
+
+/-- Every raw Action keygen copy endpoint lies below the compiler-derived operation
+footprint. -/
+theorem actionCopyRaw_rows_lt_usedRows
+    (tuple : ℕ × ℕ × ℕ × ℕ) (htuple : tuple ∈ actionCopyRaw) :
+    tuple.2.1 < Halo2.usedRows actionCircuit.operations ∧
+      tuple.2.2.2 < Halo2.usedRows actionCircuit.operations := by
+  apply V1_copyList_rows_lt_usedRows actionCircuit.operations
+    actionPermCols actionConsts actionConstantSites_fit
+    actionConst_row_lt_usedRows tuple
+  simpa only [actionCopyRaw, TopLevelCircuit.regionStarts,
+    TopLevelCompilation.regionStarts] using htuple
+
+/-- Every keygen copy tuple is in range. Only column membership remains
+Action-specific; row bounds follow from the generic compiler footprint. -/
 theorem actionCopyBounds : ∀ t ∈ actionCopyRaw, t.1 < actionNumPermCols ∧
     t.2.1 < actionDomainSize ∧ t.2.2.1 < actionNumPermCols ∧
     t.2.2.2 < actionDomainSize := by
-  native_decide
+  intro tuple htuple
+  have hcolumns := actionCopyColumnBounds tuple htuple
+  have hrows := actionCopyRaw_rows_lt_usedRows tuple htuple
+  have husedRows :
+      Halo2.usedRows actionCircuit.operations ≤ actionDomainSize :=
+    actionCircuit.operations_usedRows_le_usedRows.trans
+      (actionCircuit.usedRows_le_usableRowsAt_domainExponent.trans
+        actionActiveRows_le_domainSize)
+  exact ⟨hcolumns.1, hrows.1.trans_le husedRows,
+    hcolumns.2, hrows.2.trans_le husedRows⟩
 
 /-- The decoded Action copy list. -/
 def actionCopies :
@@ -84,33 +131,26 @@ def actionCopies :
       FlatCell actionNumPermCols actionDomainSize) :=
   decodeCopies actionNumPermCols actionDomainSize actionCopyRaw actionCopyBounds
 
-/-- Decoded copy pairs whose endpoints escape the usable-row prefix. -/
-def actionCopyActiveRowFailures :
-    List (FlatCell actionNumPermCols actionDomainSize ×
-      FlatCell actionNumPermCols actionDomainSize) :=
-  actionCopies.filter fun pair =>
-    decide (¬ (
-      (pair.1.2 : ℕ) < actionActiveRows ∧
-        (pair.2.2 : ℕ) < actionActiveRows))
-
-/-- Every Action keygen copy endpoint lies in the usable-row prefix. -/
-theorem actionCopyActiveRowFailures_eq_nil :
-    actionCopyActiveRowFailures = [] := by
-  native_decide
-
-/-- Pointwise usable-row bounds extracted from the finite copy diagnostic. -/
+/-- Every decoded copy pair lies in the compiler-derived usable-row prefix. -/
 theorem actionCopyRowsActive
     (pair : FlatCell actionNumPermCols actionDomainSize ×
       FlatCell actionNumPermCols actionDomainSize)
     (hpair : pair ∈ actionCopies) :
     (pair.1.2 : ℕ) < actionActiveRows ∧
       (pair.2.2 : ℕ) < actionActiveRows := by
-  by_contra hnot
-  have hfailure : pair ∈ actionCopyActiveRowFailures := by
-    rw [actionCopyActiveRowFailures, List.mem_filter]
-    exact ⟨hpair, decide_eq_true hnot⟩
-  rw [actionCopyActiveRowFailures_eq_nil] at hfailure
-  simp at hfailure
+  have hrawMap := decodeCopies_map actionNumPermCols actionDomainSize
+    actionCopyRaw actionCopyBounds
+  have hraw :
+      (pair.1.pair.1, pair.1.pair.2,
+        pair.2.pair.1, pair.2.pair.2) ∈ actionCopyRaw := by
+    rw [← hrawMap]
+    exact List.mem_map.mpr ⟨pair, hpair, rfl⟩
+  have hrows := actionCopyRaw_rows_lt_usedRows _ hraw
+  have husedRows :
+      Halo2.usedRows actionCircuit.operations ≤ actionActiveRows :=
+    actionCircuit.operations_usedRows_le_usedRows.trans
+      actionCircuit.usedRows_le_usableRowsAt_domainExponent
+  exact ⟨hrows.1.trans_le husedRows, hrows.2.trans_le husedRows⟩
 
 /-- Action keygen replays preserve the usable-row prefix. -/
 theorem actionReplayPreservesActive
@@ -838,13 +878,6 @@ theorem actionCopyAddressFailures_eq_nil :
 /-- Every declared Action constant endpoint has a V1 constants allocation. -/
 theorem actionMissingConstantAllocations_eq_nil :
     actionMissingConstantAllocations = [] := by
-  native_decide
-
-/-- V1 allocates at least one fixed cell for every Action constant site. -/
-theorem actionConstantSites_fit :
-    (operationConstSites
-        (actionCircuit.operations)).length ≤
-      actionConsts.length := by
   native_decide
 
 /-- Every allocated Action constant cell survives permutation-coordinate encoding. -/

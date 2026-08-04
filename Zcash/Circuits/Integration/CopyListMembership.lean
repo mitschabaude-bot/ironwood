@@ -127,6 +127,92 @@ theorem mem_V1_copyList_of_declared
           have := ih consts hmem
           rwa [hgo] at this
 
+/-- The equality/instance half of one region's keygen copy stream stays within the
+complete operation footprint. -/
+theorem regionCopiesSplit_fst_rows_lt_usedRows
+    (root : Operations Fp) (name : String) (body : RegionOperations Fp)
+    (hregion : Operation.region name body ∈ root)
+    (permCols : List ColRef) (consts : List (ℕ × ℕ × ℕ))
+    (tuple : ℕ × ℕ × ℕ × ℕ)
+    (htuple : tuple ∈
+      (regionCopiesSplit permCols (FloorPlanner.V1.starts root)
+        body consts).1) :
+    tuple.2.1 < Halo2.usedRows root ∧
+      tuple.2.2.2 < Halo2.usedRows root := by
+  simp only [regionCopiesSplit] at htuple
+  rw [List.mem_filterMap] at htuple
+  obtain ⟨operation, hoperation, htuple⟩ := htuple
+  cases operation with
+  | constrainEqual left right =>
+      simp only at htuple
+      obtain rfl := Option.some.inj htuple
+      simpa only [resolveCell, place] using
+        cells_row_lt_usedRows_of_constrainEqual_mem
+          root name body hregion left right hoperation
+  | constrainInstance cell column row =>
+      simp only at htuple
+      obtain rfl := Option.some.inj htuple
+      simpa only [resolveCell, place] using
+        rows_lt_usedRows_of_region_constrainInstance_mem
+          root name body hregion cell column row hoperation
+  | constrainConstant cell value => simp at htuple
+  | assignAdvice column row value => simp at htuple
+  | assignFixed column row value => simp at htuple
+  | enableGate gate row => simp at htuple
+  | enableLookup argument enabled row => simp at htuple
+
+/-- Every tuple in V1's equality/instance stream stays within the complete operation
+footprint. This is structural: the stream contains only the corresponding declared
+copy operations. -/
+theorem V1_go_fst_rows_lt_usedRows
+    (root current : Operations Fp)
+    (hcurrent : ∀ operation ∈ current, operation ∈ root)
+    (permCols : List ColRef) (consts : List (ℕ × ℕ × ℕ))
+    (tuple : ℕ × ℕ × ℕ × ℕ)
+    (htuple : tuple ∈
+      (V1.go permCols (FloorPlanner.V1.starts root) current consts).1.1) :
+    tuple.2.1 < Halo2.usedRows root ∧
+      tuple.2.2.2 < Halo2.usedRows root := by
+  induction current generalizing consts with
+  | nil => simp [V1.go] at htuple
+  | cons operation rest inductionHypothesis =>
+      have hrest : ∀ next ∈ rest, next ∈ root := by
+        intro next hnext
+        exact hcurrent next (List.mem_cons_of_mem operation hnext)
+      cases operation with
+      | region name body =>
+          rcases hsplit : regionCopiesSplit permCols
+              (FloorPlanner.V1.starts root) body consts with
+            ⟨equalities, constants, remainingConstants⟩
+          rcases hgo : V1.go permCols (FloorPlanner.V1.starts root)
+              rest remainingConstants with
+            ⟨⟨restEqualities, restConstants⟩, finalConstants⟩
+          simp only [V1.go, hsplit, hgo] at htuple
+          rcases List.mem_append.mp htuple with htuple | htuple
+          · apply regionCopiesSplit_fst_rows_lt_usedRows
+              root name body (hcurrent (.region name body) (by simp))
+              permCols consts tuple
+            rwa [hsplit]
+          · exact inductionHypothesis hrest remainingConstants (by
+              rwa [hgo])
+      | constrainInstance cell column row =>
+          rcases hgo : V1.go permCols (FloorPlanner.V1.starts root)
+              rest consts with
+            ⟨⟨restEqualities, restConstants⟩, finalConstants⟩
+          simp only [V1.go, hgo, List.mem_cons] at htuple
+          rcases htuple with rfl | htuple
+          · simpa only [resolveCell, place] using
+              rows_lt_usedRows_of_constrainInstance_mem
+                root cell column row
+                (hcurrent (.constrainInstance cell column row) (by simp))
+          · exact inductionHypothesis hrest consts (by rwa [hgo])
+      | loadTable table values =>
+          rcases hgo : V1.go permCols (FloorPlanner.V1.starts root)
+              rest consts with
+            ⟨⟨restEqualities, restConstants⟩, finalConstants⟩
+          exact inductionHypothesis hrest consts (by
+            simpa only [V1.go, hgo] using htuple)
+
 /-- Decode raw copy tuples into typed cells under a bounds certificate. -/
 def decodeCopies (numCols n : ℕ) (raw : List (ℕ × ℕ × ℕ × ℕ))
     (h : ∀ t ∈ raw, t.1 < numCols ∧ t.2.1 < n ∧ t.2.2.1 < numCols ∧ t.2.2.2 < n) :
@@ -234,6 +320,71 @@ def operationConstSites : Operations Fp → List (Cell × Fp)
   | .region _ body :: rest => constSites body ++ operationConstSites rest
   | .constrainInstance _ _ _ :: rest => operationConstSites rest
   | .loadTable _ _ :: rest => operationConstSites rest
+
+/-- A region constant site comes from the corresponding `constrainConstant`
+operation. -/
+theorem constrainConstant_mem_of_mem_constSites
+    (body : RegionOperations Fp) (cell : Cell) (value : Fp)
+    (hsite : (cell, value) ∈ constSites body) :
+    RegionOperation.constrainConstant cell value ∈ body := by
+  induction body with
+  | nil => simp [constSites] at hsite
+  | cons operation rest inductionHypothesis =>
+      cases operation with
+      | constrainConstant foundCell foundValue =>
+          simp only [constSites, List.mem_cons] at hsite ⊢
+          rcases hsite with hsite | hsite
+          · obtain ⟨rfl, rfl⟩ := hsite
+            exact Or.inl rfl
+          · exact Or.inr (inductionHypothesis hsite)
+      | constrainEqual
+      | constrainInstance
+      | assignAdvice
+      | assignFixed
+      | enableGate
+      | enableLookup =>
+          exact List.mem_cons_of_mem _
+            (inductionHypothesis (by simpa [constSites] using hsite))
+
+/-- A whole-stream constant site lies below the compiler-derived operation
+footprint. -/
+theorem constantSite_row_lt_usedRows
+    (operations : Operations Fp) (cell : Cell) (value : Fp)
+    (hsite : (cell, value) ∈ operationConstSites operations) :
+    (FloorPlanner.V1.starts operations).getD cell.regionIndex 0 +
+        cell.rowOffset <
+      Halo2.usedRows operations := by
+  have auxiliary :
+      ∀ current : Operations Fp,
+        (∀ operation ∈ current, operation ∈ operations) →
+        (cell, value) ∈ operationConstSites current →
+        (FloorPlanner.V1.starts operations).getD cell.regionIndex 0 +
+            cell.rowOffset <
+          Halo2.usedRows operations := by
+    intro current hcurrent hcurrentSite
+    induction current with
+    | nil => simp [operationConstSites] at hcurrentSite
+    | cons operation rest inductionHypothesis =>
+        have hrest : ∀ next ∈ rest, next ∈ operations := by
+          intro next hnext
+          exact hcurrent next (List.mem_cons_of_mem operation hnext)
+        cases operation with
+        | region name body =>
+            rw [operationConstSites, List.mem_append] at hcurrentSite
+            rcases hcurrentSite with hbody | hrestSite
+            · apply cell_row_lt_usedRows_of_constrainConstant_mem
+                operations name body
+                (hcurrent (.region name body) (by simp)) cell value
+              exact constrainConstant_mem_of_mem_constSites
+                body cell value hbody
+            · exact inductionHypothesis hrest hrestSite
+        | constrainInstance copyCell column row =>
+            exact inductionHypothesis hrest (by
+              simpa [operationConstSites] using hcurrentSite)
+        | loadTable table values =>
+            exact inductionHypothesis hrest (by
+              simpa [operationConstSites] using hcurrentSite)
+  exact auxiliary operations (fun _ hoperation => hoperation) hsite
 
 /-- The values retained by `constSites` are exactly the region operations'
 `constrainConstant` values, in the same order. -/
@@ -551,6 +702,39 @@ theorem V1_go_snd_eq (permCols : List ColRef) (starts : List ℕ)
           rw [hgoEq] at ih1 ih2
           exact ⟨by simp only [V1.go, hgoEq]; exact ih1,
             by simp only [V1.go, hgoEq]; exact ih2⟩
+
+/-- Every tuple in the V1 copy list lies below the compiler-derived operation
+footprint. Constant allocations need only be present positionally and carry their
+generic planner row bound; no concrete circuit computation is involved. -/
+theorem V1_copyList_rows_lt_usedRows
+    (operations : Operations Fp) (permCols : List ColRef)
+    (constants : List (ℕ × ℕ × ℕ))
+    (hfit :
+      (operationConstSites operations).length ≤ constants.length)
+    (hconstantRows :
+      ∀ entry ∈ constants, entry.2.2 < Halo2.usedRows operations)
+    (tuple : ℕ × ℕ × ℕ × ℕ)
+    (htuple : tuple ∈
+      V1.copyList permCols (FloorPlanner.V1.starts operations)
+        operations constants) :
+    tuple.2.1 < Halo2.usedRows operations ∧
+      tuple.2.2.2 < Halo2.usedRows operations := by
+  rw [V1.copyList, List.mem_append] at htuple
+  rcases htuple with hequality | hconstant
+  · exact V1_go_fst_rows_lt_usedRows operations operations
+      (fun _ hoperation => hoperation) permCols constants tuple hequality
+  · have hconstants :=
+      (V1_go_snd_eq permCols (FloorPlanner.V1.starts operations)
+        operations constants hfit).1
+    rw [hconstants, List.mem_map] at hconstant
+    obtain ⟨⟨⟨cell, value⟩, entry⟩, hallocation, htuple⟩ := hconstant
+    have hsite : (cell, value) ∈ operationConstSites operations :=
+      (List.of_mem_zip hallocation).1
+    have hentry : entry ∈ constants :=
+      (List.of_mem_zip hallocation).2
+    obtain rfl := htuple
+    exact ⟨hconstantRows entry hentry,
+      constantSite_row_lt_usedRows operations cell value hsite⟩
 
 /-- Every declared copy has a `Cell` left endpoint, and its right endpoint is a cell,
 an instance read, or a constant — so every declared copy either resolves or is a
