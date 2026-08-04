@@ -24,6 +24,8 @@ extend-exclude = [
 extend-ignore-identifiers-re = [
   "^[A-Za-z0-9_]{1,3}$",
   "^H[A-Za-z0-9]{3}$",
+  # Git revisions are opaque hexadecimal identifiers, not prose.
+  "^[0-9a-f]{8,40}$",
 ]
 
 [default.extend-words]
