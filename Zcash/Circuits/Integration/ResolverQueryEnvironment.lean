@@ -99,46 +99,6 @@ theorem chunkRowValue_eq_resolverEnvironment
     vk poly proofIndex usableRows row
       ((vk.permutationChunks.getD chunk [])[column]).1 hcoherent
 
-/-- Erasing one lookup only extends the incoming query state. -/
-theorem eraseLookup_extends
-    {F : Type} [Field F] [DecidableEq F]
-    (argument : LookupArgument F) (state : QueryState) :
-    (eraseLookup argument state).2.Extends state := by
-  unfold eraseLookup
-  generalize hinputs :
-    eraseGates argument.inputs state = inputResult
-  rcases inputResult with ⟨inputs, inputState⟩
-  generalize htables :
-    eraseGates argument.tables inputState = tableResult
-  rcases tableResult with ⟨tables, tableState⟩
-  have hinputExtends := eraseGates_extends argument.inputs state
-  rw [hinputs] at hinputExtends
-  have htableExtends :=
-    eraseGates_extends argument.tables inputState
-  rw [htables] at htableExtends
-  simpa only [htables] using
-    QueryState.Extends.trans hinputExtends htableExtends
-
-/-- Erasing the complete lookup list only extends its incoming query state. -/
-theorem eraseLookups_extends
-    {F : Type} [Field F] [DecidableEq F]
-    (arguments : List (LookupArgument F)) (state : QueryState) :
-    (eraseLookups arguments state).2.Extends state := by
-  induction arguments generalizing state with
-  | nil =>
-      exact QueryState.Extends.refl state
-  | cons argument rest ih =>
-      generalize hlookup :
-        eraseLookup argument state = lookupResult
-      rcases lookupResult with ⟨lookup, lookupState⟩
-      rw [eraseLookups, hlookup]
-      exact QueryState.Extends.trans
-        (by
-          have h := eraseLookup_extends argument state
-          rw [hlookup] at h
-          exact h)
-        (ih lookupState)
-
 /-- Repackage a pinned constraint system's three query layouts as a query state. -/
 def pinnedQueryState
     {F : Type} (pinned : PinnedConstraintSystem F) : QueryState where
@@ -147,102 +107,23 @@ def pinnedQueryState
   inst := pinned.instanceQueryLayout.toArray
 
 /--
-The final pinned query layouts extend the intermediate state after gate erasure.
-Lookup projection may append queries, but cannot change any gate query index.
+The pinned query layouts are exactly the authoritative query state used by the
+read-only expression projection.
 -/
-theorem PinnedConstraintSystem.derive_queryState_extends_gates
+theorem PinnedConstraintSystem.derive_queryState_eq
     {F : Type} [Field F] [DecidableEq F]
     (cs : ConstraintSystem F) (map : SelCompressMap) :
-    (pinnedQueryState
-      (PinnedConstraintSystem.derive cs map)).Extends
-      (eraseGates
-        ((flatGates cs).map (substSelectorMap map.lookup))
-        (queryWalkInit map cs)).2 := by
-  unfold pinnedQueryState
-  simp only [PinnedConstraintSystem.derive, projectCS]
-  exact eraseLookups_extends
-    (cs.lookups.map fun argument =>
-      { inputs :=
-          argument.inputs.map (substSelectorMap map.lookup)
-        tables :=
-          argument.tables.map (substSelectorMap map.lookup)
-        tablesFree := by
-          intro table htable
-          rw [List.mem_map] at htable
-          obtain ⟨source, hsource, rfl⟩ := htable
-          rw [substSelectorMap_eq_of_selectorFree map.lookup source
-            (argument.tablesFree source hsource)]
-          exact argument.tablesFree source hsource
-        arity := by simp [argument.arity] })
-    (eraseGates
-      ((flatGates cs).map (substSelectorMap map.lookup))
-      (queryWalkInit map cs)).2
+    pinnedQueryState (PinnedConstraintSystem.derive cs map) =
+      queryWalkInit map cs := by
+  apply QueryState.ext
+  · apply Array.toList_inj.mp
+    simp [pinnedQueryState, PinnedConstraintSystem.derive, projectCS]
+  · apply Array.toList_inj.mp
+    simp [pinnedQueryState, PinnedConstraintSystem.derive, projectCS]
+  · apply Array.toList_inj.mp
+    simp [pinnedQueryState, PinnedConstraintSystem.derive, projectCS]
 
-/-- The circuit-owned pinned query state extends its gate-erasure state. -/
-theorem _root_.Halo2.TopLevelCircuit.pinnedQueryState_extends_gates
-    {F : Type} [FiniteField F]
-    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
-    (top : TopLevelCircuit F Config PublicInput) :
-    (pinnedQueryState top.pinnedCS).Extends
-      top.gateQueryState := by
-  simpa only [TopLevelCircuit.pinnedCS, TopLevelCircuit.gateQueryState] using
-    PinnedConstraintSystem.derive_queryState_extends_gates
-      top.constraintSystem top.selectorMap
-
-/-- Prepending packed fixed-selector queries leaves every configure-recorded query
-at the same index. -/
-theorem queryWalkInit_extends_recorded
-    {F : Type} [Field F] [DecidableEq F]
-    (map : SelCompressMap) (cs : ConstraintSystem F) :
-    (queryWalkInit map cs).Extends (recordedQueries cs) := by
-  have fixIdxExtends (state : QueryState) (column : ℕ) :
-      ((state.fixIdx column 0).2).Extends state := by
-    unfold QueryState.fixIdx
-    cases findQuery state.fixed column 0 with
-    | some index =>
-        exact QueryState.Extends.refl state
-    | none =>
-        exact
-          ⟨List.prefix_refl _,
-            by
-              simp only [Array.toList_push]
-              exact List.prefix_append _ _,
-            List.prefix_refl _⟩
-  have foldExtends (columns : List ℕ) (state : QueryState) :
-      (columns.foldl
-        (fun current column =>
-          (current.fixIdx (cs.numFixedColumns + column) 0).2)
-        state).Extends state := by
-    induction columns generalizing state with
-    | nil =>
-        exact QueryState.Extends.refl state
-    | cons column columns ih =>
-        rw [List.foldl_cons]
-        exact QueryState.Extends.trans
-          (fixIdxExtends state (cs.numFixedColumns + column))
-          (ih _)
-  unfold queryWalkInit
-  exact foldExtends (List.range map.newFixedCols) (recordedQueries cs)
-
-/-- The complete pinned query walk preserves the configure-recorded layouts as
-prefixes. -/
-theorem PinnedConstraintSystem.derive_queryState_extends_recorded
-    {F : Type} [Field F] [DecidableEq F]
-    (cs : ConstraintSystem F) (map : SelCompressMap) :
-    (pinnedQueryState
-      (PinnedConstraintSystem.derive cs map)).Extends
-      (recordedQueries cs) := by
-  have hinit := queryWalkInit_extends_recorded map cs
-  have hgates :=
-    eraseGates_extends
-      ((flatGates cs).map (substSelectorMap map.lookup))
-      (queryWalkInit map cs)
-  have hfinal :=
-    PinnedConstraintSystem.derive_queryState_extends_gates cs map
-  exact QueryState.Extends.trans
-    (QueryState.Extends.trans hinit hgates) hfinal
-
-/-- Every configure-registered fixed query remains present in the final pinned
+/-- Every configure-registered fixed query remains present in the derived pinned
 fixed-query layout. -/
 theorem PinnedConstraintSystem.mem_fixedQueryLayout_derive_of_mem
     {F : Type} [Field F] [DecidableEq F]
@@ -251,16 +132,12 @@ theorem PinnedConstraintSystem.mem_fixedQueryLayout_derive_of_mem
     (hquery : (column, rotation) ∈ cs.fixedQueries) :
     (column.index, rotation) ∈
       (PinnedConstraintSystem.derive cs map).fixedQueryLayout := by
-  have hrecorded :
-      (column.index, rotation) ∈
-        (recordedQueries cs).fixed.toList := by
-    exact List.mem_map.mpr ⟨(column, rotation), hquery, rfl⟩
-  have hext :=
-    PinnedConstraintSystem.derive_queryState_extends_recorded cs map
-  have hfinal := hext.2.1.subset hrecorded
-  simpa [pinnedQueryState] using hfinal
+  have hresolved := queryWalkInit_resolves_fixed_of_mem map hquery
+  have hstate := PinnedConstraintSystem.derive_queryState_eq cs map
+  rw [← hstate] at hresolved
+  simpa [QueryState.ResolvesQuery, pinnedQueryState] using hresolved
 
-/-- Every configure-registered instance query remains present in the final pinned
+/-- Every configure-registered instance query remains present in the derived pinned
 instance-query layout. -/
 theorem PinnedConstraintSystem.mem_instanceQueryLayout_derive_of_mem
     {F : Type} [Field F] [DecidableEq F]
@@ -269,14 +146,24 @@ theorem PinnedConstraintSystem.mem_instanceQueryLayout_derive_of_mem
     (hquery : (column, rotation) ∈ cs.instanceQueries) :
     (column.index, rotation) ∈
       (PinnedConstraintSystem.derive cs map).instanceQueryLayout := by
-  have hrecorded :
+  have hregistered :
       (column.index, rotation) ∈
-        (recordedQueries cs).inst.toList := by
-    exact List.mem_map.mpr ⟨(column, rotation), hquery, rfl⟩
-  have hext :=
-    PinnedConstraintSystem.derive_queryState_extends_recorded cs map
-  have hfinal := hext.2.2.subset hrecorded
-  simpa [pinnedQueryState] using hfinal
+        cs.instanceQueries.map fun query => (query.1.index, query.2) :=
+    List.mem_map.mpr ⟨(column, rotation), hquery, by simp⟩
+  rw [← queryWalkInit_instance cs map] at hregistered
+  have hstate := PinnedConstraintSystem.derive_queryState_eq cs map
+  rw [← hstate] at hregistered
+  simpa [pinnedQueryState] using hregistered
+
+/-- The circuit-owned pinned layouts are its authoritative query state. -/
+theorem _root_.Halo2.TopLevelCircuit.pinnedQueryState_eq_gateQueryState
+    {F : Type} [FiniteField F]
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit F Config PublicInput) :
+    pinnedQueryState top.pinnedCS = top.gateQueryState := by
+  simpa only [TopLevelCircuit.pinnedCS, TopLevelCircuit.gateQueryState] using
+    PinnedConstraintSystem.derive_queryState_eq
+      top.constraintSystem top.selectorMap
 
 /-- Every top-level configured instance query remains in its circuit-owned layout. -/
 theorem _root_.Halo2.TopLevelCircuit.mem_instanceQueryLayout_of_mem_constraintSystem

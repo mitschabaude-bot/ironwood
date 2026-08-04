@@ -120,6 +120,8 @@ theorem verifierCS_gates_eval
     PinnedConstraintSystem.derive_gates_eval
       top.constraintSystem top.selectorMap fixed advice instanceFeed valuation
       hcoverage (by
+        exact top.gateQueriesResolved)
+      (by
         simpa only [TopLevelCircuit.gateQueryState] using hinterprets)
       index hderived hsource
   rw [List.getElem_of_eq top.verifierCS_gates hverifier,

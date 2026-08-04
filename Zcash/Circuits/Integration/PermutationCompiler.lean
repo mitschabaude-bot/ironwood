@@ -138,6 +138,88 @@ theorem verifierCS_permutationChunks_flatten
   rcases column with ⟨kind, index⟩
   cases kind <;> rfl
 
+/-- The query reference compiled from an equality-enabled column is in range and
+selects that column at rotation zero. -/
+theorem permutationQueryReference_coherent
+    {G : Type} [AddCommGroup G] [Inhabited G]
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (urs : URS G) {column : AnyColumn}
+    (hcolumn : column ∈ top.permutationColumns) :
+    PermutationColumnRef.Coherent (top.toVerifierKey urs)
+      (permutationQueryReference top.adviceQueryLayout
+        top.fixedQueryLayout top.instanceQueryLayout column) := by
+  have hquery := top.permutationColumn_mem_queryLayout hcolumn
+  rcases column with ⟨kind, index⟩
+  cases kind with
+  | advice =>
+      have hin :
+          top.adviceQueryLayout.findIdx (· = (index, 0)) <
+            top.adviceQueryLayout.length :=
+        List.findIdx_lt_length_of_exists ⟨(index, 0), hquery, by simp⟩
+      simp only [permutationQueryReference,
+        PermutationColumnRef.Coherent]
+      refine ⟨?_, ?_, ?_⟩
+      · simpa only [top.shape_numAdviceQueries,
+          TopLevelCircuit.adviceQueryCount] using hin
+      · simpa only [top.toVerifierKey_adviceQueryLayout] using hin
+      · rw [top.toVerifierKey_adviceQueryLayout,
+          getD_findIdx_eq_target top.adviceQueryLayout
+            (index, 0) (0, 0) hin]
+  | fixed =>
+      have hin :
+          top.fixedQueryLayout.findIdx (· = (index, 0)) <
+            top.fixedQueryLayout.length :=
+        List.findIdx_lt_length_of_exists ⟨(index, 0), hquery, by simp⟩
+      simp only [permutationQueryReference,
+        PermutationColumnRef.Coherent]
+      refine ⟨?_, ?_, ?_⟩
+      · simpa only [top.shape_numFixedQueries,
+          TopLevelCircuit.fixedQueryCount] using hin
+      · simpa only [top.toVerifierKey_fixedQueryLayout] using hin
+      · rw [top.toVerifierKey_fixedQueryLayout,
+          getD_findIdx_eq_target top.fixedQueryLayout
+            (index, 0) (0, 0) hin]
+  | «instance» =>
+      have hin :
+          top.instanceQueryLayout.findIdx (· = (index, 0)) <
+            top.instanceQueryLayout.length :=
+        List.findIdx_lt_length_of_exists ⟨(index, 0), hquery, by simp⟩
+      simp only [permutationQueryReference,
+        PermutationColumnRef.Coherent]
+      refine ⟨?_, ?_, ?_⟩
+      · simpa only [top.shape_numInstanceQueries,
+          TopLevelCircuit.instanceQueryCount] using hin
+      · simpa only [top.toVerifierKey_instanceQueryLayout] using hin
+      · rw [top.toVerifierKey_instanceQueryLayout,
+          getD_findIdx_eq_target top.instanceQueryLayout
+            (index, 0) (0, 0) hin]
+
+/-- Every permutation reference produced by a top-level circuit's compiler is
+well-routed. No concrete-circuit certificate is required. -/
+theorem _root_.Halo2.TopLevelCircuit.permutationChunkRoutingCoherent
+    {G : Type} [AddCommGroup G] [Inhabited G]
+    {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
+    (top : TopLevelCircuit Fp Config PublicInput)
+    (urs : URS G) :
+    PermutationChunkRoutingCoherent (top.toVerifierKey urs) := by
+  intro chunk hchunk ref href
+  have hchunkCS : chunk ∈ top.verifierCS.permutationChunks := by
+    simpa only [top.toVerifierKey_permutationChunks] using hchunk
+  have hflat : ref ∈ top.verifierCS.permutationChunks.flatten :=
+    List.mem_flatten.mpr ⟨chunk, hchunkCS, href⟩
+  rw [verifierCS_permutationChunks_flatten] at hflat
+  obtain ⟨i, hi, hreference⟩ := List.mem_iff_getElem.mp hflat
+  have hcolumnIndex : i < top.permutationColumns.length := by
+    simpa only [List.length_zipIdx, List.length_map] using hi
+  rw [← hreference]
+  simp only [List.getElem_zipIdx, Nat.zero_add, List.getElem_map]
+  constructor
+  · exact permutationQueryReference_coherent top urs
+      (List.getElem_mem hcolumnIndex)
+  · simpa only [top.shape_numPermutationColumns,
+      TopLevelCircuit.permutationColumnCount] using hcolumnIndex
+
 /-- Halo2's permutation chunk width is positive for every constraint system:
 `csDegree` is at least the permutation argument's baseline degree three. -/
 theorem constraintSystem_chunkLen_pos (cs : ConstraintSystem Fp) :
@@ -313,16 +395,14 @@ theorem permutationColumnAddress_queryReference
         (index, 0) (0, 0) hin]
 
 /--
-For every closed top-level circuit, coherent routing makes the permutation
-compiler's column encoding a round trip.
+For every closed top-level circuit, the permutation compiler's column encoding
+is a round trip.
 -/
 theorem topLevelPermutationColumnAddresses_eq
     {G : Type} [AddCommGroup G] [Inhabited G]
     {Config : Type} {PublicInput : TypeMap} [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
-    (urs : URS G)
-    (hcoherent :
-      PermutationChunkRoutingCoherent (top.toVerifierKey urs)) :
+    (urs : URS G) :
     top.verifierCS.permutationChunks.flatten.map
           (fun reference =>
             permutationColumnAddress (top.toVerifierKey urs) reference.1) =
@@ -369,7 +449,7 @@ theorem topLevelPermutationColumnAddresses_eq
     simpa only [referenceOf] using hindexed
   obtain ⟨chunk, hchunk, hindexedChunk⟩ :=
     List.mem_flatten.mp hindexedFlat
-  have hrouted := hcoherent chunk (by
+  have hrouted := top.permutationChunkRoutingCoherent urs chunk (by
     simpa only [top.toVerifierKey_permutationChunks] using hchunk)
     indexed hindexedChunk
   have hreferenceCoherent :

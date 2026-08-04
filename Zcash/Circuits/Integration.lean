@@ -1,4 +1,3 @@
-import Zcash.Circuits.Integration.ActionAdviceQueries
 import Zcash.Circuits.Integration.ActionCopyWitness
 import Zcash.Circuits.Integration.ActionEncoding
 import Zcash.Circuits.Integration.ActionFixedCoherenceCompute

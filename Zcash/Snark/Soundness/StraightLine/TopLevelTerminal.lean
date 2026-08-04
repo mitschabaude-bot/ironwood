@@ -67,8 +67,6 @@ def topLevelStatements_or_relation_of_decode
         (top.toVerifierKey urs)
         (top.instanceCommitment urs inputs) ps ch)
     (domainExponent_lt : top.domainExponent < 33)
-    (permutationRouting :
-      PermutationChunkRoutingCoherent (top.toVerifierKey urs))
     (hxgood :
       let memberDecode := fun i hi => decode.toMemberDecode hchar i hi
       let model :=
@@ -124,7 +122,7 @@ def topLevelStatements_or_relation_of_decode
     rfl
     (fun slot point hpoint =>
       PSum.inl (decode.memberBinding hchar slot point hpoint))
-    domainExponent_lt permutationRouting hxgood hgoodY correctness
+    domainExponent_lt hxgood hgoodY correctness
 
 /-- Transport the run's decode to any identified verifier artifacts. -/
 def straightLineRunDecodeAt

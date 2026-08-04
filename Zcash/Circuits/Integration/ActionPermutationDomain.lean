@@ -91,61 +91,6 @@ theorem resolverPairsLength_eq_min
     exact chunk.isLt
   exact verifierCS_permutationChunks_getD_length actionCircuit chunk hi
 
-set_option maxRecDepth 100000 in
-/-- Every chunk value reference selects an in-range rotation-zero query-layout
-entry, and every common-permutation index is in range. -/
-theorem routingCoherent_of_derived
-    (urs : URS G) :
-    PermutationChunkRoutingCoherent (actionCircuit.toVerifierKey urs) := by
-  have hadviceLayout :
-      (actionCircuit.toVerifierKey urs).adviceQueryLayout =
-        actionCircuit.adviceQueryLayout :=
-    actionCircuit.toVerifierKey_adviceQueryLayout urs
-  have hfixedLayout :
-      (actionCircuit.toVerifierKey urs).fixedQueryLayout =
-        actionCircuit.fixedQueryLayout :=
-    actionCircuit.toVerifierKey_fixedQueryLayout urs
-  have hinstanceLayout :
-      (actionCircuit.toVerifierKey urs).instanceQueryLayout =
-        actionCircuit.instanceQueryLayout :=
-    actionCircuit.toVerifierKey_instanceQueryLayout urs
-  rintro chunk hchunk ⟨ref, common⟩ href
-  have hroute := routingCoherent chunk hchunk (ref, common) href
-  rcases hroute with ⟨hrefCoherent, hcommon⟩
-  constructor
-  · cases ref with
-    | advice i =>
-        rcases hrefCoherent with ⟨hi, hrotation⟩
-        change PermutationColumnRef.Coherent
-          (actionCircuit.toVerifierKey urs) (.advice i)
-        simp only [PermutationColumnRef.Coherent]
-        refine ⟨?_, ?_, ?_⟩
-        · simpa only [actionCircuit.shape_numAdviceQueries,
-            TopLevelCircuit.adviceQueryCount] using hi
-        · simpa only [hadviceLayout] using hi
-        · simpa only [hadviceLayout] using hrotation
-    | fixed i =>
-        rcases hrefCoherent with ⟨hi, hrotation⟩
-        change PermutationColumnRef.Coherent
-          (actionCircuit.toVerifierKey urs) (.fixed i)
-        simp only [PermutationColumnRef.Coherent]
-        refine ⟨?_, ?_, ?_⟩
-        · simpa only [actionCircuit.shape_numFixedQueries,
-            TopLevelCircuit.fixedQueryCount] using hi
-        · simpa only [hfixedLayout] using hi
-        · simpa only [hfixedLayout] using hrotation
-    | «instance» i =>
-        rcases hrefCoherent with ⟨hi, hrotation⟩
-        change PermutationColumnRef.Coherent
-          (actionCircuit.toVerifierKey urs) (.instance i)
-        simp only [PermutationColumnRef.Coherent]
-        refine ⟨?_, ?_, ?_⟩
-        · simpa only [actionCircuit.shape_numInstanceQueries,
-            TopLevelCircuit.instanceQueryCount] using hi
-        · simpa only [hinstanceLayout] using hi
-        · simpa only [hinstanceLayout] using hrotation
-  · simpa only [actionCircuit.shape_numPermutationColumns] using hcommon
-
 /--
 Flattening the derived verifier chunks and decoding their query references
 recovers the compiler's original permutation-column order.
@@ -159,9 +104,7 @@ theorem permutationColumnAddresses_eq
         actionCircuit.constraintSystem).map
           Halo2.Layout.ColRef.toAny := by
   simpa only [actionCircuit.toVerifierKey_permutationChunks] using
-    topLevelPermutationColumnAddresses_eq
-      actionCircuit urs
-        (routingCoherent_of_derived urs)
+    topLevelPermutationColumnAddresses_eq actionCircuit urs
 
 /-! ## Pasta permutation-name cosets -/
 
@@ -472,7 +415,6 @@ def cycleOfKeygenColumns
   cycleOfKeygenColumnsAt pp urs poly p activeRows_le
     fullSigma sigma hcolumns hrestrict
 
-assert_no_sorry routingCoherent_of_derived
 assert_no_sorry deltaFp_domainCosets
 assert_no_sorry namesInjective
 assert_no_sorry cycleOfKeygenColumnsAt

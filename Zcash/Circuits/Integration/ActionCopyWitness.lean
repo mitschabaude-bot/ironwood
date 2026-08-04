@@ -546,7 +546,7 @@ theorem actionCopyValue_eq_activeChunkRowValue
       PermutationColumnRef.Coherent vk
         ((vk.permutationChunks.getD chunk []).getD
           column ((.advice 0), 0)).1 :=
-    (ActionPermutationDomain.routingCoherent_of_derived urs
+    (actionCircuit.permutationChunkRoutingCoherent urs
       _ hchunkMem _ hreferenceMem).1
   generalize hreference :
     ((vk.permutationChunks.getD chunk []).getD

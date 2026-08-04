@@ -276,7 +276,7 @@ def adaptiveActionWitnessOrRelationOfDecode?
                       (actionCircuit.toVerifierKey_instanceQueryCount urs)
                       (fun slot point hpoint =>
                         PSum.inl (decode.memberBinding hchar slot point hpoint))
-                      (ActionPermutationDomain.routingCoherent_of_derived urs)
+                      (actionCircuit.permutationChunkRoutingCoherent urs)
                       (TopLevelAssignment.toVerifierKey_domainRowsInjective
                         urs ActionPermutationDomain.domainExponent_lt)
                       (TopLevelAssignment.toVerifierKey_domainRoot

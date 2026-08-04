@@ -73,13 +73,13 @@ structure Config where
 
 /-- `window_pow[k] = (0..k).fold(Const 1, |acc,_| acc * window)` — the exact Rust AST: `1`,
 `1·w`, `(1·w)·w`, …. -/
-@[selector_free]
+@[selector_free, query_correct]
 def windowPow (word : Expression Fp Query) (k : ℕ) : Expression Fp Query :=
   (List.range k).foldl (fun acc _ => acc * word) (Expression.const 1)
 
 /-- The interpolated `x_p`: fold from `Const 0`, `acc + window_pow[k] · lagrange_coeffs[k]` — the
 8-iteration fold written out (identical AST; keeps the eval bridge fold-free). -/
-@[selector_free]
+@[selector_free, query_correct]
 def interpolatedX (cfg : Config) (word : Expression Fp Query) : Expression Fp Query :=
   Expression.const 0
     + windowPow word 0 * queryFixed (cfg.lagrangeCoeffs 0)
@@ -95,7 +95,7 @@ def interpolatedX (cfg : Config) (word : Expression Fp Query) : Expression Fp Qu
 `x_p`/`y_p` on the add config's columns at `cur`, `u` at `cur`, `fixed_z` and the 8 Lagrange
 columns as rotation-0 fixed queries. Used by BOTH the running-sum coords gate (word = `z_cur −
 z_next·8`) and the full-width gate (word = the raw `window` query). -/
-@[selector_free]
+@[selector_free, query_correct]
 def coordsCheck (cfg : Config) (word : Expression Fp Query) :
     List (String × Expression Fp Query) :=
   let yP : Expression Fp Query := queryAdvice cfg.addConfig.yP 0
@@ -173,6 +173,21 @@ instance (window : Column .advice) (qRunningSum : Selector) :
   unfold configureProgram
   infer_instance
 
+@[simp] theorem configureProgram_output
+    (window : Column .advice) (qRunningSum : Selector)
+    (counts : ConfigureCounts) :
+    (configureProgram window qRunningSum).output counts =
+      ({ qRangeCheck := qRunningSum, z := window },
+        ⟨counts.numFixedColumns⟩) := by
+  simp [configureProgram, DecomposeRunningSum.configure]
+
+@[simp] theorem configureProgram_finalCounts
+    (window : Column .advice) (qRunningSum : Selector)
+    (counts : ConfigureCounts) :
+    (configureProgram window qRunningSum).finalCounts counts =
+      { counts with numFixedColumns := counts.numFixedColumns + 1 } := by
+  simp [configureProgram, DecomposeRunningSum.configure]
+
 def configureResult
     (lagrangeCoeffs : Fin 8 → Column .fixed)
     (window u : Column .advice)
@@ -219,6 +234,31 @@ instance (lagrangeCoeffs : Fin 8 → Column .fixed)
       (configureTail lagrangeCoeffs window u addConfig addIncompleteConfig) := by
   unfold configureTail
   infer_instance
+
+@[simp] theorem configureTail_output
+    (lagrangeCoeffs : Fin 8 → Column .fixed)
+    (window u : Column .advice) (addConfig : Add.Config)
+    (addIncompleteConfig : AddIncomplete.Config)
+    (counts : ConfigureCounts) :
+    (configureTail lagrangeCoeffs window u addConfig
+      addIncompleteConfig).output counts =
+      configureResult lagrangeCoeffs window u addConfig addIncompleteConfig
+        ⟨counts.numSelectors, true⟩
+        ((configureProgram window ⟨counts.numSelectors, true⟩).output
+          { counts with numSelectors := counts.numSelectors + 1 }) := by
+  simp [configureTail]
+
+@[simp] theorem configureTail_finalCounts
+    (lagrangeCoeffs : Fin 8 → Column .fixed)
+    (window u : Column .advice) (addConfig : Add.Config)
+    (addIncompleteConfig : AddIncomplete.Config)
+    (counts : ConfigureCounts) :
+    (configureTail lagrangeCoeffs window u addConfig
+      addIncompleteConfig).finalCounts counts =
+      { counts with
+        numFixedColumns := counts.numFixedColumns + 1
+        numSelectors := counts.numSelectors + 1 } := by
+  simp [configureTail]
 
 /-- Equality on `window` and `u`, a fresh selector for the running-sum config (whose `configure`
 registers the "range check" gate and re-enables equality on `window` — a dedup no-op), a fresh

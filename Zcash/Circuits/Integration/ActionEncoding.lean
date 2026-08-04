@@ -202,7 +202,8 @@ def actionTopLevelCircuitCorrectness
                 hfixedRows
                 (by
                   obtain ⟨rotation, hlayout⟩ :=
-                    fixedCoherence.queryLayout column hcolumn
+                    actionCircuit.exists_rotation_mem_fixedQueryLayout_of_lt
+                      column hcolumn
                   exact topLevelFixedQuery_of_layout
                     actionCircuit urs pp instanceCommitment ps ch
                     column rotation hlayout))

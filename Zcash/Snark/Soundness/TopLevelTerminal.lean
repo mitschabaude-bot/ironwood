@@ -441,8 +441,6 @@ def topLevelStatements_or_relation_of_decodedMemberPolynomial_eq
             (top.toVerifierKey urs) ps ch slot point ⊕'
         NontrivialRelation (F := Fp) urs.g urs.u urs.w)
     (domainExponent_lt : top.domainExponent < 33)
-    (permutationRouting :
-      PermutationChunkRoutingCoherent (top.toVerifierKey urs))
     (hxgood :
       let model :=
         CanonicalMemberConstraintRelation.acceptedModel
@@ -488,30 +486,37 @@ def topLevelStatements_or_relation_of_decodedMemberPolynomial_eq
   have hrows :
       Function.Injective
         (fun row : Fin top.n =>
-          top.omega ^ (row : ℕ)) := by
-    simpa only [top.toVerifierKey_n, top.toVerifierKey_omega] using
-      (TopLevelAssignment.domainRowsInjective
-        (top := top) domainExponent_lt)
+          top.omega ^ (row : ℕ)) :=
+    TopLevelAssignment.domainRowsInjective
+      (top := top) domainExponent_lt
   have hroot :
-      top.omega ^
-        top.n = 1 := by
-    simpa only [top.toVerifierKey_n, top.toVerifierKey_omega] using
-      (TopLevelAssignment.domainRoot
-        (top := top) domainExponent_lt)
-  have hnFp : (top.n : Fp) ≠ 0 := by
-    simpa only [top.toVerifierKey_n] using
-      (TopLevelAssignment.domainSizeCastNeZero
-        (top := top) domainExponent_lt)
+      top.omega ^ top.n = 1 :=
+    TopLevelAssignment.domainRoot
+      (top := top) domainExponent_lt
+  have hnFp : (top.n : Fp) ≠ 0 :=
+    TopLevelAssignment.domainSizeCastNeZero
+      (top := top) domainExponent_lt
   rcases
       acceptedModel_circuitSat_or_relation_of_decodedMemberPolynomial_eq
         urs hk (top.toVerifierKey urs)
         (top.instanceCommitment urs inputs) ps ch memberDecode
         haccepts (top.toVerifierKey_blindingFactors_lt_n urs)
         hpoly hquot
-        (top.toVerifierKey_fixedQueryCount urs)
-        (top.toVerifierKey_adviceQueryCount urs)
-        (top.toVerifierKey_instanceQueryCount urs)
-        hbind permutationRouting hrows hroot hnFp hxgood with
+        (by simpa only [CircuitShape.withProofParams_numFixedQueries,
+            top.shape_numFixedQueries] using
+          top.toVerifierKey_fixedQueryCount urs)
+        (by simpa only [CircuitShape.withProofParams_numAdviceQueries,
+            top.shape_numAdviceQueries] using
+          top.toVerifierKey_adviceQueryCount urs)
+        (by simpa only [CircuitShape.withProofParams_numInstanceQueries,
+            top.shape_numInstanceQueries] using
+          top.toVerifierKey_instanceQueryCount urs)
+        hbind
+        (top.permutationChunkRoutingCoherent urs)
+        (by simpa only [top.toVerifierKey_n, top.toVerifierKey_omega] using hrows)
+        (by simpa only [top.toVerifierKey_n, top.toVerifierKey_omega] using hroot)
+        (by simpa only [top.toVerifierKey_n] using hnFp)
+        hxgood with
     hsatisfied | relation
   · exact topLevelStatements_or_relation_of_circuitSat
       top pp urs hk inputs ps ch pU pW a

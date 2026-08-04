@@ -136,7 +136,6 @@ def action_bundleStatement_or_relation_of_decode
   exact topLevelStatements_or_relation_of_decode
     actionCircuit pp urs hk inputs ps ch pU pW a decode hchar haccepts
     ActionPermutationDomain.domainExponent_lt
-    (ActionPermutationDomain.routingCoherent_of_derived urs)
     hxgood hgoodY
     (fun hsatisfied =>
       ActionCorrectness.ofAcceptedCircuitSat
@@ -449,7 +448,7 @@ def actionTerminalWitnessOrRelationFinder
                     (actionCircuit.toVerifierKey_instanceQueryCount urs)
                     (fun slot point hpoint =>
                       PSum.inl (decode.memberBinding (hchar basis O) slot point hpoint))
-                    (ActionPermutationDomain.routingCoherent_of_derived urs)
+                    (actionCircuit.permutationChunkRoutingCoherent urs)
                     (TopLevelAssignment.toVerifierKey_domainRowsInjective
                       urs ActionPermutationDomain.domainExponent_lt)
                     (TopLevelAssignment.toVerifierKey_domainRoot

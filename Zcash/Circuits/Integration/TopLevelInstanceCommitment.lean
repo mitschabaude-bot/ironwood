@@ -176,13 +176,20 @@ def acceptedColumn_eq_rowPolynomial_or_relation
       q.commId = .instanceCol proofIndex column.index := by
     obtain ⟨instanceRotation, hregistered⟩ :=
       top.exists_rotation_mem_instanceQueries_of_publicInputLayout_cell index
+    have hlayout :
+        (column.index, instanceRotation) ∈ top.instanceQueryLayout :=
+      top.mem_instanceQueryLayout_of_mem_constraintSystem
+        column instanceRotation hregistered
+    have hvkLayout :
+        (column.index, instanceRotation) ∈
+          (top.toVerifierKey urs).instanceQueryLayout := by
+      simpa only [top.toVerifierKey_instanceQueryLayout] using hlayout
     exact instanceQuery_of_layout
         (shape := top.shape.withProofParams pp)
         (top.toVerifierKey urs) (top.instanceCommitment urs inputs) ps ch
         proofIndex column.index instanceRotation
         (top.toVerifierKey_instanceQueryCount urs)
-        (top.mem_instanceQueryLayout_of_mem_constraintSystem
-          column instanceRotation hregistered)
+        hvkLayout
   have hbound :=
     CanonicalMemberConstraintRelation.acceptedInstanceColumn_eq_rowPolynomial_or_relation
       (shape := top.shape.withProofParams pp)
