@@ -64,10 +64,42 @@ theorem readCellWit_eval (a : AssignedCell Fp) (env : Placed ProverEnvironment F
   simp only [readCellWit, Witgen.WitgenIROver.eval_native_apply]
   rfl
 
+/-- Reduced synthesis footprint of the initial-state region. -/
+def initRegionSynthesisSummary (cfg : Config) (offset : ℕ) :
+    FloorPlanner.RegionSynthesisSummary :=
+  .ofColumns
+    [.column .advice (cfg.state 0).index,
+      .column .advice (cfg.state 1).index,
+      .column .advice (cfg.state 2).index]
+    (offset + 1) 3
+
 /-- Rust `Pow5Chip::initial_state`'s region body (`pow5.rs:277-308`): the domain's
 initial state from constrained constants. -/
 def initRegion (capacity : Fp) : FormalRegionCircuit Fp Config Config unit State where
   configure := pure
+  elaborated :=
+    { keygenRequirements :=
+        { permutationColumns cfg _ :=
+            [cfg.state 0, cfg.state 1, cfg.state 2] }
+      output cfg offset _ self :=
+        { x0 := .of self offset (cfg.state 0)
+          x1 := .of self offset (cfg.state 1)
+          x2 := .of self offset (cfg.state 2) }
+      synthesisSummary cfg offset _ _ :=
+        initRegionSynthesisSummary cfg offset
+      synthesisSummary_eq := by
+        intro _ _ _ _
+        apply FloorPlanner.RegionSynthesisSummary.ext
+        · simp only [initRegionSynthesisSummary, circuit_norm,
+            synthesis_summary_norm]
+        · simp only [initRegionSynthesisSummary, circuit_norm,
+            synthesis_summary_norm]
+          omega
+        · simp only [initRegionSynthesisSummary, circuit_norm,
+            synthesis_summary_norm]
+      output_eq := by
+        intro cfg _ _ _
+        rfl }
 
   synthesize cfg offset _ := do
     let x0 ← assignAdvice (cfg.state 0) offset (constWit 0)
@@ -89,6 +121,23 @@ def initRegion (capacity : Fp) : FormalRegionCircuit Fp Config Config unit State
     simp_all only [circuit_norm]
     rw [← h_output.1, ← h_output.2.1]
 
+/-- The initial-state bundle exposes its already-reduced synthesis footprint. -/
+@[synthesis_summary_norm]
+theorem initRegion_synthesisSummary (capacity : Fp) (cfg : Config)
+    (offset : ℕ) (input : Var unit Fp) (self : RegionIndex) :
+    (initRegion capacity).elaborated.synthesisSummary cfg offset input self =
+      initRegionSynthesisSummary cfg offset := rfl
+
+/-- Reduced synthesis footprint of the pad-and-add region. -/
+def addInputRegionSynthesisSummary (cfg : Config) (offset : ℕ) :
+    FloorPlanner.RegionSynthesisSummary :=
+  .ofColumns
+    [.selector cfg.sPadAndAdd.index,
+      .column .advice (cfg.state 0).index,
+      .column .advice (cfg.state 1).index,
+      .column .advice (cfg.state 2).index]
+    (offset + 3) 0
+
 /-- Rust `Pow5Chip::add_input`'s region body (`pow5.rs:310-396`), `ConstantLength<2>`
 shape (both rate words are `Message` cells): `s_pad_and_add` at row 1, the initial state
 copied at row 0, the input words copied at row 1, the summed output at row 2. `Spec` is
@@ -96,7 +145,48 @@ the donor `Sponge.AddInput.value`. -/
 def addInputRegion : FormalRegionCircuit Fp Config Config Sponge.AddInputInput State where
   configure := pure
   elaborated :=
-    { keygenRequirements := { gates cfg _ := [padAndAddGate cfg] } }
+    { keygenRequirements :=
+        { gates cfg _ := [padAndAddGate cfg]
+          permutationColumns cfg _ :=
+            [cfg.state 0, cfg.state 1, cfg.state 2]
+          inputPermutationColumns _ _ input :=
+            [input.initialState.x0.cell.column,
+              input.initialState.x1.cell.column,
+              input.initialState.x2.cell.column,
+              input.input.x0.cell.column,
+              input.input.x1.cell.column] }
+      output cfg offset _ self :=
+        { x0 := .of self (offset + 2) (cfg.state 0)
+          x1 := .of self (offset + 2) (cfg.state 1)
+          x2 := .of self (offset + 2) (cfg.state 2) }
+      synthesisSummary cfg offset _ _ :=
+        addInputRegionSynthesisSummary cfg offset
+      synthesisSummary_eq := by
+        intro cfg _ _ _
+        apply FloorPlanner.RegionSynthesisSummary.ext
+        · simp only [addInputRegionSynthesisSummary, circuit_norm,
+            synthesis_summary_norm, configure_selector_norm]
+          refine (FloorPlanner.unionColumns_normalize_append_redundant
+            [.selector cfg.sPadAndAdd.index,
+              .column .advice (cfg.state 0).index,
+              .column .advice (cfg.state 1).index,
+              .column .advice (cfg.state 2).index]
+            [.column .advice (cfg.state 0).index,
+              .column .advice (cfg.state 1).index,
+              .column .advice (cfg.state 0).index,
+              .column .advice (cfg.state 1).index,
+              .column .advice (cfg.state 2).index] ?_).symm
+          intro column hcolumn
+          simp only [List.mem_cons, List.not_mem_nil, or_false] at hcolumn ⊢
+          tauto
+        · simp only [addInputRegionSynthesisSummary, circuit_norm,
+            synthesis_summary_norm, configure_selector_norm]
+          omega
+        · simp only [addInputRegionSynthesisSummary, circuit_norm,
+            synthesis_summary_norm, configure_selector_norm]
+      output_eq := by
+        intro _ _ _ _
+        rfl }
 
   synthesize cfg offset (input : Var Sponge.AddInputInput Fp) := do
     (padAndAddGate cfg).enable (offset + 1)
@@ -129,6 +219,13 @@ def addInputRegion : FormalRegionCircuit Fp Config Config Sponge.AddInputInput S
     exact ⟨⟨by ring, by ring, by ring⟩,
       h_output.1.symm, h_output.2.1.symm, h_output.2.2.symm⟩
 
+/-- The pad-and-add bundle exposes its already-reduced synthesis footprint. -/
+@[synthesis_summary_norm]
+theorem addInputRegion_synthesisSummary (cfg : Config) (offset : ℕ)
+    (input : Var Sponge.AddInputInput Fp) (self : RegionIndex) :
+    addInputRegion.elaborated.synthesisSummary cfg offset input self =
+      addInputRegionSynthesisSummary cfg offset := rfl
+
 derive_contract_bridges initRegion (capacity : Fp) := initRegion capacity
 
 derive_contract_bridges addInputRegion := addInputRegion
@@ -149,15 +246,9 @@ private theorem hash_regionCount (capacity : Fp) (cfg : Config)
   simp only [Circuit.operations_bind, Circuit.operations_pure, operations_assignRegion,
     Operations.regionCount_append, Operations.regionCount]
 
-/-- Rust `Hash::<ConstantLength<2>>::hash` (`poseidon.rs:269-286`) on the Pow5 chip:
-initial state, pad-and-add, one permutation; the digest is `state[0]`. `Spec` is the
-donor one-block hash value `HashPaddedBlock.value`. -/
-def hash (capacity : Fp) :
-    FormalCircuit Fp Config Config Sponge.Rate2 field where
-  name := "poseidon hash ConstantLength<2>"
-  configure := pure
-
-  synthesize cfg input := do
+/-- The three layouter regions of the one-block Poseidon hash. -/
+def synthesize (capacity : Fp) (cfg : Config)
+    (input : Var Sponge.Rate2 Fp) : Circuit Fp (AssignedCell Fp) := do
     let init ← assignRegion "initial state for domain ConstantLength<2>"
       ((initRegion capacity).call cfg 0 ())
     let absorbed ← assignRegion "add input for domain ConstantLength<2>"
@@ -166,22 +257,46 @@ def hash (capacity : Fp) :
       (permuteRegion.call cfg 0 absorbed)
     pure permuted.x0
 
+/-- Reduced layouter-level synthesis footprint of the three hash regions. -/
+def hashSynthesisSummary (cfg : Config) :
+    FloorPlanner.SynthesisSummary :=
+  (FloorPlanner.SynthesisSummary.ofRegion
+      (initRegionSynthesisSummary cfg 0)).combine
+    ((FloorPlanner.SynthesisSummary.ofRegion
+        (addInputRegionSynthesisSummary cfg 0)).combine
+      (FloorPlanner.SynthesisSummary.ofRegion
+        (permuteSynthesisSummary cfg 0)))
+
+/-- Rust `Hash::<ConstantLength<2>>::hash` (`poseidon.rs:269-286`) on the Pow5 chip:
+initial state, pad-and-add, one permutation; the digest is `state[0]`. `Spec` is the
+donor one-block hash value `HashPaddedBlock.value`. -/
+def hash (capacity : Fp) :
+    FormalCircuit Fp Config Config Sponge.Rate2 field where
+  name := "poseidon hash ConstantLength<2>"
+  configure := pure
+
+  synthesize := synthesize capacity
+
   elaborated :=
     { keygenRequirements :=
         { gates cfg _ :=
-            [padAndAddGate cfg, fullRoundGate cfg, partialRoundsGate cfg] }
-      output cfg input i :=
-        ((do
-          let init ← assignRegion "initial state for domain ConstantLength<2>"
-            ((initRegion capacity).call cfg 0 ())
-          let absorbed ← assignRegion "add input for domain ConstantLength<2>"
-            (addInputRegion.call cfg 0 { initialState := init, input := input })
-          let permuted ← assignRegion "permute state"
-            (permuteRegion.call cfg 0 absorbed)
-          pure permuted.x0) : Circuit Fp (Var field Fp)).output i
+            [padAndAddGate cfg, fullRoundGate cfg, partialRoundsGate cfg]
+          permutationColumns cfg _ :=
+            [cfg.state 0, cfg.state 1, cfg.state 2]
+          inputPermutationColumns _ _ input :=
+            [input.x0.cell.column, input.x1.cell.column] }
+      output cfg _ i := .of (i + 2) 36 (cfg.state 0)
       regionCount _ := 3
-      output_eq := by intro _ _ _; rfl
-      regionCount_eq := fun cfg input i => (hash_regionCount capacity cfg input i).symm }
+      synthesisSummary cfg _ _ := hashSynthesisSummary cfg
+      registered := by keygen_registration [synthesize]
+      output_eq := by
+        intro _ _ _
+        simp only [synthesize, circuit_norm, keygen_output_norm, stateRow]
+      regionCount_eq := fun cfg input i => (hash_regionCount capacity cfg input i).symm
+      synthesisSummary_eq := by
+        intro _ _ _
+        simp only [hashSynthesisSummary, synthesize, circuit_norm,
+          synthesis_summary_norm] }
 
   Spec input output _ :=
     output = Hash.HashPaddedBlock.value roundConstants capacity input
@@ -201,9 +316,10 @@ def hash (capacity : Fp) :
     rw [h0] at h1
     rw [h1] at h2
     rw [← h_output]
-    rw [show AssignedCell.eval place env x_gen_out_2.x0
-      = (ProvableStruct.Halo2.eval place env x_gen_out_2 : State Fp).x0 from by
-        provable_type_simp]
+    rw [show env.advice (cfg.state 0) ((place (i₀ + 2) + 36 : ℕ) : ℤ) =
+      (ProvableStruct.Halo2.eval place env
+        (permuteRegion.output cfg 0 x_gen_out_1 (i₀ + 2)) : State Fp).x0 from by
+        simp only [keygen_output_norm, stateRow, circuit_norm]]
     rw [h2]
     rfl
 
@@ -220,12 +336,20 @@ def hash (capacity : Fp) :
     refine ⟨⟨⟨trivial, trivial, trivial⟩, ⟨trivial, trivial, trivial⟩,
       trivial, trivial, trivial⟩, ?_⟩
     rw [← h_output]
-    rw [show AssignedCell.eval place env.toEnvironment x_gen_out_2.x0
-      = (ProvableStruct.Halo2.eval place env.toEnvironment x_gen_out_2
-          : State Fp).x0 from by provable_type_simp]
+    rw [show env.advice (cfg.state 0) ((place (i₀ + 2) + 36 : ℕ) : ℤ) =
+      (ProvableStruct.Halo2.eval place env.toEnvironment
+        (permuteRegion.output cfg 0 x_gen_out_1 (i₀ + 2)) : State Fp).x0 from by
+        simp only [keygen_output_norm, stateRow, circuit_norm]]
     rw [h2]
     rw [h_input.1, h_input.2]
     rfl
+
+/-- The hash circuit exposes its reduced three-region footprint directly. -/
+@[synthesis_summary_norm]
+theorem hash_synthesisSummary_eq (capacity : Fp) (cfg : Config)
+    (input : Var Sponge.Rate2 Fp) (region : RegionIndex) :
+    (hash capacity).elaborated.synthesisSummary cfg input region =
+      hashSynthesisSummary cfg := rfl
 
 /-- The hash capability exported by one aggregate Poseidon configure run. -/
 def hashConfigureCertificate (capacity : Fp)
@@ -234,7 +358,9 @@ def hashConfigureCertificate (capacity : Fp)
     (hash capacity).ConfigurationCertificate
       ((configure state partialSbox rcA rcB).output counts)
       { gates := ((configure state partialSbox rcA rcB).delta counts).gates
-        lookups := ((configure state partialSbox rcA rcB).delta counts).lookups } := by
+        lookups := ((configure state partialSbox rcA rcB).delta counts).lookups
+        permutationColumns :=
+          ((configure state partialSbox rcA rcB).delta counts).permutationRequests } := by
   let cfg := (configure state partialSbox rcA rcB).output counts
   apply ((hash capacity).configureCertificate cfg {} ()).mono
   · intro gate hgate
@@ -247,6 +373,17 @@ def hashConfigureCertificate (capacity : Fp)
       ElaboratedCircuit.keygenRequirements, Configure.delta_pure,
       List.append_nil] at hargument
     exact False.elim (List.not_mem_nil hargument)
+  · intro column hcolumn
+    simp only [hash, FormalCircuit.keygenRequirements,
+      ElaboratedCircuit.keygenRequirements, Configure.delta_pure,
+      List.append_nil, List.mem_cons, List.not_mem_nil, or_false] at hcolumn
+    rcases hcolumn with rfl | rfl | rfl
+    · exact state_mem_configure_permutationRequests
+        state partialSbox rcA rcB counts 0
+    · exact state_mem_configure_permutationRequests
+        state partialSbox rcA rcB counts 1
+    · exact state_mem_configure_permutationRequests
+        state partialSbox rcA rcB counts 2
 
 derive_contract_bridges hash (capacity : Fp) := hash capacity
 

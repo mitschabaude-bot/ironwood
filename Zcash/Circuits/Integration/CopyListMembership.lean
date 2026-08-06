@@ -390,18 +390,19 @@ theorem constantSite_row_lt_usedRows
 `constrainConstant` values, in the same order. -/
 theorem constSites_map_snd (body : RegionOperations Fp) :
     (constSites body).map Prod.snd =
-      body.filterMap regionConstantValue? := by
+      FloorPlanner.V1.regionConstantValues body := by
   induction body with
   | nil => rfl
   | cons operation rest ih =>
-      cases operation <;> simp [constSites, regionConstantValue?, ih]
+      cases operation <;>
+        simp [constSites, FloorPlanner.V1.regionConstantValues, ih]
 
 /-- Walking indexed regions and walking the operation stream directly collect the
 same constant values in the same order. Region indices do not affect this stream. -/
 theorem indexedRegions_constantValues
     (ops : Operations Fp) (nextRegion : ℕ) :
     ((indexedRegions ops nextRegion).1.flatMap fun (_, body) =>
-      body.filterMap regionConstantValue?) =
+      FloorPlanner.V1.regionConstantValues body) =
       (operationConstSites ops).map Prod.snd := by
   induction ops generalizing nextRegion with
   | nil => rfl
@@ -423,44 +424,12 @@ theorem operationConstSites_map_snd (ops : Operations Fp) :
       FloorPlanner.V1.constantValues ops := by
   unfold FloorPlanner.V1.constantValues
   symm
-  trans
-    ((indexedRegions ops 0).1.flatMap fun (_, body) =>
-      body.filterMap regionConstantValue?)
-  · apply List.flatMap_congr
-    intro indexed hindexed
-    rcases indexed with ⟨region, body⟩
-    apply List.filterMap_congr
-    intro operation hoperation
-    cases operation <;> rfl
-  · exact indexedRegions_constantValues ops 0
+  exact indexedRegions_constantValues ops 0
 
-/-- If V1 found enough positions for every collected value, projecting the value
-field from its allocation output recovers the original value stream. -/
-theorem V1_constantAssignments_map_fst
-    (ops : Operations Fp) (constantColumns : List ℕ)
-    (hfull :
-      (FloorPlanner.V1.constantValues ops).length ≤
-        (FloorPlanner.V1.constantAssignments ops constantColumns).length) :
-    (FloorPlanner.V1.constantAssignments ops constantColumns).map Prod.fst =
-      FloorPlanner.V1.constantValues ops := by
-  let allocations := (FloorPlanner.V1.planOperations ops).2
-  let endRow := FloorPlanner.V1.firstUnassignedRow allocations
-  let positions : List (ℕ × ℕ) := constantColumns.flatMap fun column =>
-    (FloorPlanner.V1.freeRows allocations column endRow).map fun row =>
-      (column, row)
-  have hpositions :
-      (FloorPlanner.V1.constantValues ops).length ≤ positions.length := by
-    have hlength :
-        (FloorPlanner.V1.constantValues ops).length ≤
-          min positions.length
-            (FloorPlanner.V1.constantValues ops).length := by
-      simpa only [FloorPlanner.V1.constantAssignments,
-        List.length_map, List.length_zip] using hfull
-    omega
-  unfold FloorPlanner.V1.constantAssignments
-  simp only [List.map_map]
-  simpa only [Function.comp_apply] using
-    List.map_snd_zip hpositions
+theorem operationConstSites_length (ops : Operations Fp) :
+    (operationConstSites ops).length =
+      (FloorPlanner.V1.constantValues ops).length := by
+  rw [← operationConstSites_map_snd, List.length_map]
 
 /-- Positional V1 allocation preserves each constant site's value. The only premise
 is allocation completeness; no concrete circuit computation is involved. -/
@@ -483,7 +452,7 @@ theorem constantAllocation_value
     rw [← hvalues]
     simpa only [List.length_map] using hfit
   have hallocations :=
-    V1_constantAssignments_map_fst ops constantColumns hfull
+    FloorPlanner.V1.constantAssignments_map_fst ops constantColumns hfull
   have hallocationValues :
       ((FloorPlanner.V1.constantAssignments ops constantColumns).map
         fun (value, column, row) => (value.val, column, row)).map Prod.fst =

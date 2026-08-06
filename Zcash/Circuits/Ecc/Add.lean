@@ -326,6 +326,32 @@ def rYProgram (px py qx qy : FExpr Fp) : FExpr Fp :=
     ((qy - py) * (qx - px)⁻¹ *
       (px - ((qy - py) * (qx - px)⁻¹ * ((qy - py) * (qx - px)⁻¹) - px - qx)) - py)
 
+/-- The point-coordinate columns registered for equality by `add.configure`. -/
+@[keygen_norm]
+def permutationColumns (config : Config) : List AnyColumn :=
+  [config.xP, config.yP, config.xQR, config.yQR]
+
+def synthesisSummary (config : Config) (offset : ℕ) :
+    FloorPlanner.RegionSynthesisSummary :=
+  .ofColumns
+    [.selector config.qAdd.index,
+      .column .advice config.xP.index,
+      .column .advice config.yP.index,
+      .column .advice config.xQR.index,
+      .column .advice config.yQR.index,
+      .column .advice config.alpha.index,
+      .column .advice config.beta.index,
+      .column .advice config.gamma.index,
+      .column .advice config.delta.index,
+      .column .advice config.lambda.index,
+      .column .advice config.xQR.index,
+      .column .advice config.yQR.index]
+    (offset + 2) 0
+
+@[synthesis_summary_norm]
+theorem synthesisSummary_constantSiteCount (config : Config) (offset : ℕ) :
+    (synthesisSummary config offset).constantSiteCount = 0 := rfl
+
 def add : FormalRegionCircuit Fp
     (Column .advice × Column .advice × Column .advice × Column .advice ×
       Column .advice × Column .advice × Column .advice × Column .advice × Column .advice)
@@ -341,6 +367,30 @@ def add : FormalRegionCircuit Fp
     let qAdd ← selector
     createGate (gate qAdd lambda xP yP xQR yQR alpha beta gamma delta)
     return { qAdd, lambda, xP, yP, xQR, yQR, alpha, beta, gamma, delta }
+
+  elaborated :=
+    { keygenRequirements :=
+        { inputPermutationColumns _ _ input :=
+            [input.p.x.cell.column, input.p.y.cell.column,
+              input.q.x.cell.column, input.q.y.cell.column] }
+      output config offset _ self :=
+        { x := .of self (offset + 1) config.xQR,
+          y := .of self (offset + 1) config.yQR }
+      synthesisSummary config offset _ _ := synthesisSummary config offset
+      output_eq := by
+        intro _ _ _ _
+        rfl
+      synthesisSummary_eq := by
+        intro _ _ _ _
+        apply FloorPlanner.RegionSynthesisSummary.ext
+        · simp only [synthesisSummary]
+          rw [FloorPlanner.regionSynthesisSummary_columns_eq_unionColumns]
+          simp only [circuit_norm, gate, List.flatMap_cons,
+            List.flatMap_nil, FloorPlanner.regionOperationShapeColumns,
+            List.append_nil, List.nil_append, List.singleton_append]
+        · simp only [synthesisSummary, circuit_norm, gate]
+          omega
+        · simp only [synthesisSummary, circuit_norm, gate] }
 
   synthesize config offset (input : Inputs (AssignedCell Fp)) := do
     -- enable `q_add` selector at `offset`
@@ -367,7 +417,7 @@ def add : FormalRegionCircuit Fp
     -- witness the result R at `offset + 1` on `(x_qr, y_qr)`
     let xR ← assignAdvice config.xQR (offset + 1) (.ofFExpr (rXProgram px py qx qy))
     let yR ← assignAdvice config.yQR (offset + 1) (.ofFExpr (rYProgram px py qx qy))
-    return ⟨ xR, yR ⟩
+    return ⟨xR, yR⟩
 
   -- P, Q are valid Pallas points (complete addition has no exceptional cases).
   Assumptions input := input.p.Valid ∧ input.q.Valid
@@ -396,10 +446,102 @@ def add : FormalRegionCircuit Fp
       ite_rXProgram_eq, ite_rYProgram_eq, ite_lambdaProgram_eq]
     exact polysZero_of_spec (spec_of_valid hpValid hqValid)
 
+@[keygen_norm]
+theorem Configured.permutationColumns_eq {config : Config}
+    (configured : add.Configured config) :
+    configured.permutationColumns = permutationColumns config := by
+  rcases configured with ⟨configInput, counts, hconfig, outputEq⟩
+  cases outputEq
+  simp only [keygen_norm, FormalRegionCircuit.Configured.permutationColumns,
+    FormalRegionCircuit.keygenRequirements, ElaboratedRegionCircuit.keygenRequirements,
+    add, permutationColumns, List.singleton_append]
+
+@[keygen_norm]
+theorem Configured.inputPermutationColumns_eq {config : Config}
+    (configured : add.Configured config) (input : Var Inputs Fp) :
+    configured.inputPermutationColumns input =
+      [input.p.x.cell.column, input.p.y.cell.column,
+        input.q.x.cell.column, input.q.y.cell.column] := by
+  rfl
+
+@[keygen_norm]
+theorem configure_output_permutationColumns
+    (xP yP xQR yQR lambda alpha beta gamma delta : Column .advice)
+    (counts : ConfigureCounts) :
+    permutationColumns
+        ((add.configure
+          (xP, yP, xQR, yQR, lambda, alpha, beta, gamma, delta)).output counts) =
+      [xP, yP, xQR, yQR] := by
+  simp [add, permutationColumns]
+
 /-- The layouter-level complete addition: `add` in its own region, named once here as
 in the Rust chip (`ecc/chip.rs`: `assign_region(|| "complete point addition", …)`). -/
 def addFormal :=
   add.toFormal "complete point addition"
+
+@[synthesis_summary_norm]
+theorem addFormal_synthesisSummary_eq
+    (config : Config) (input : Var Inputs Fp) (region : RegionIndex) :
+    addFormal.elaborated.synthesisSummary config input region =
+      FloorPlanner.SynthesisSummary.ofRegion (synthesisSummary config 0) := rfl
+
+/-- Complete addition requests no deferred constant allocations inside its region. -/
+@[synthesis_summary_norm]
+theorem add_synthesisSummary_eq
+    (config : Config) (offset : ℕ) (input : Var Inputs Fp)
+    (region : RegionIndex) :
+    add.elaborated.synthesisSummary config offset input region =
+      synthesisSummary config offset := rfl
+
+/-- Complete addition requests no deferred constant allocations inside its region. -/
+@[synthesis_summary_norm]
+theorem add_synthesisSummary_constantSiteCount
+    (config : Config) (offset : ℕ) (input : Var Inputs Fp)
+    (region : RegionIndex) :
+    (add.elaborated.synthesisSummary
+      config offset input region).constantSiteCount = 0 := by
+  rw [add_synthesisSummary_eq]
+  simp only [synthesisSummary, circuit_norm]
+
+/-- Complete addition requests no deferred constant allocations. -/
+@[synthesis_summary_norm]
+theorem addFormal_synthesisSummary_constantSiteCount
+    (config : Config) (input : Var Inputs Fp) (region : RegionIndex) :
+    (addFormal.elaborated.synthesisSummary
+      config input region).constantSiteCount = 0 := by
+  unfold addFormal
+  rw [FormalRegionCircuit.toFormal_synthesisSummary_constantSiteCount]
+  exact add_synthesisSummary_constantSiteCount config 0 input region
+
+/-- The layouter-level complete addition has the same positional output as its single
+region. -/
+@[keygen_norm]
+theorem addFormal_output_cells (config : Config) (input : Var Inputs Fp)
+    (self : RegionIndex) :
+    addFormal.output config input self =
+      { x := .of self 1 config.xQR,
+        y := .of self 1 config.yQR } := by
+  rfl
+
+/-- The complete-addition region's positional output cells. -/
+theorem add_output_cells (config : Config) (offset : ℕ) (input : Var Inputs Fp)
+    (self : RegionIndex) :
+    add.output config offset input self =
+      { x := .of self (offset + 1) config.xQR,
+        y := .of self (offset + 1) config.yQR } := rfl
+
+/-- The layouter-level complete addition returns its coordinates in `xQR` and `yQR`. -/
+@[keygen_norm]
+theorem addFormal_output_x_column (config : Config) (input : Var Inputs Fp)
+    (self : RegionIndex) :
+    (addFormal.output config input self).x.cell.column = config.xQR := by
+  rfl
+
+@[keygen_norm]
+theorem addFormal_output_y_column (config : Config) (input : Var Inputs Fp)
+    (self : RegionIndex) :
+    (addFormal.output config input self).y.cell.column = config.yQR := by
+  rfl
 
 derive_contract_bridges addFormal := addFormal
 

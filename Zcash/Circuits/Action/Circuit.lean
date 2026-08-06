@@ -137,6 +137,25 @@ private instance (primary : Column .instance) (advices : Fin 10 → Column .advi
   unfold configureEqualities
   infer_instance
 
+private theorem configureEqualities_advicePermutationColumn
+    (primary : Column .instance) (advices : Fin 10 → Column .advice)
+    (counts : ConfigureCounts) (index : Fin 10) :
+    (advices index).toAny ∈
+      ((configureEqualities primary advices).delta counts).permutationRequests := by
+  fin_cases index <;>
+    simp only [configureEqualities, configureAdviceEqualitiesLow,
+      configureAdviceEqualitiesHigh, keygen_norm] <;>
+    simp
+
+private theorem configureEqualities_primaryPermutationColumn
+    (primary : Column .instance) (advices : Fin 10 → Column .advice)
+    (counts : ConfigureCounts) :
+    primary.toAny ∈
+      ((configureEqualities primary advices).delta counts).permutationRequests := by
+  unfold configureEqualities
+  apply Configure.mem_permutationRequests_delta_bind_left
+  exact Configure.mem_permutationRequests_delta_enableEquality primary counts
+
 /-- The eight Lagrange columns and their constant-enabled first column. -/
 def configureLagrange : Configure Fp (Fin 8 → Column .fixed) := do
   let l0 ← fixedColumn; let l1 ← fixedColumn; let l2 ← fixedColumn
@@ -176,6 +195,62 @@ private instance : ElaboratedConfigure configureShared := by
   unfold configureShared
   infer_instance
 
+/-- Every advice column allocated by the shared Action prefix is registered for equality. -/
+private theorem configureShared_advicePermutationColumn
+    (counts : ConfigureCounts) (index : Fin 10) :
+    ((configureShared.output counts).advices index).toAny ∈
+      (configureShared.delta counts).permutationRequests := by
+  unfold configureShared
+  apply Configure.mem_permutationRequests_delta_bind_right
+  apply Configure.mem_permutationRequests_delta_bind_right
+  apply Configure.mem_permutationRequests_delta_bind_right
+  apply Configure.mem_permutationRequests_delta_bind_right
+  apply Configure.mem_permutationRequests_delta_bind_right
+  apply Configure.mem_permutationRequests_delta_bind_right
+  apply Configure.mem_permutationRequests_delta_bind_right
+  apply Configure.mem_permutationRequests_delta_bind_right
+  apply Configure.mem_permutationRequests_delta_bind_left
+  exact configureEqualities_advicePermutationColumn _ _ _ index
+
+/-- The public-input column allocated by the shared Action prefix is registered for equality. -/
+private theorem configureShared_primaryPermutationColumn
+    (counts : ConfigureCounts) :
+    (configureShared.output counts).primary.toAny ∈
+      (configureShared.delta counts).permutationRequests := by
+  unfold configureShared
+  apply Configure.mem_permutationRequests_delta_bind_right
+  apply Configure.mem_permutationRequests_delta_bind_right
+  apply Configure.mem_permutationRequests_delta_bind_right
+  apply Configure.mem_permutationRequests_delta_bind_right
+  apply Configure.mem_permutationRequests_delta_bind_right
+  apply Configure.mem_permutationRequests_delta_bind_right
+  apply Configure.mem_permutationRequests_delta_bind_right
+  apply Configure.mem_permutationRequests_delta_bind_right
+  apply Configure.mem_permutationRequests_delta_bind_left
+  exact configureEqualities_primaryPermutationColumn _ _ _
+
+/-- The AddChip gate created by the shared prefix is present in that prefix's gate log. -/
+private theorem configureShared_addChipGate (counts : ConfigureCounts) :
+    AddChip.addGate (configureShared.output counts).addChipConfig ∈
+      (configureShared.delta counts).gates := by
+  unfold configureShared
+  apply Configure.mem_gates_delta_bind_right
+  apply Configure.mem_gates_delta_bind_right
+  apply Configure.mem_gates_delta_bind_right
+  apply Configure.mem_gates_delta_bind_left
+  simp [AddChip.configure]
+
+/-- The top-level Orchard gate created by the shared prefix is present in its gate log. -/
+private theorem configureShared_orchardGate (counts : ConfigureCounts) :
+    orchardGate (configureShared.output counts).qOrchard
+      (configureShared.output counts).advices ∈
+        (configureShared.delta counts).gates := by
+  unfold configureShared
+  apply Configure.mem_gates_delta_bind_right
+  apply Configure.mem_gates_delta_bind_right
+  apply Configure.mem_gates_delta_bind_left
+  exact Configure.mem_gates_delta_createGate _ _
+
 /-- The allocation prefix of Rust `Circuit::configure`, through the shared range check. -/
 def configureBase : Configure Fp ConfigureBase := do
   let shared ← configureShared
@@ -187,6 +262,41 @@ def configureBase : Configure Fp ConfigureBase := do
 private instance : ElaboratedConfigure configureBase := by
   unfold configureBase
   infer_instance
+
+/-- Equality registration from the shared prefix survives the range-check suffix. -/
+private theorem configureBase_advicePermutationColumn
+    (counts : ConfigureCounts) (index : Fin 10) :
+    ((configureBase.output counts).advices index).toAny ∈
+      (configureBase.delta counts).permutationRequests := by
+  unfold configureBase
+  apply Configure.mem_permutationRequests_delta_bind_left
+  exact configureShared_advicePermutationColumn counts index
+
+/-- The shared public-input equality registration survives the range-check suffix. -/
+private theorem configureBase_primaryPermutationColumn
+    (counts : ConfigureCounts) :
+    (configureBase.output counts).primary.toAny ∈
+      (configureBase.delta counts).permutationRequests := by
+  unfold configureBase
+  apply Configure.mem_permutationRequests_delta_bind_left
+  exact configureShared_primaryPermutationColumn counts
+
+/-- The shared AddChip gate survives the range-check suffix. -/
+private theorem configureBase_addChipGate (counts : ConfigureCounts) :
+    AddChip.addGate (configureBase.output counts).addChipConfig ∈
+      (configureBase.delta counts).gates := by
+  unfold configureBase
+  apply Configure.mem_gates_delta_bind_left
+  exact configureShared_addChipGate counts
+
+/-- The shared top-level Orchard gate survives the range-check suffix. -/
+private theorem configureBase_orchardGate (counts : ConfigureCounts) :
+    orchardGate (configureBase.output counts).qOrchard
+      (configureBase.output counts).advices ∈
+        (configureBase.delta counts).gates := by
+  unfold configureBase
+  apply Configure.mem_gates_delta_bind_left
+  exact configureShared_orchardGate counts
 
 /-- The keygen capabilities exported by Action's shared configuration prefix. -/
 structure ConfigureBaseCertificate (counts : ConfigureCounts)
@@ -202,6 +312,10 @@ structure ConfigureBaseCertificate (counts : ConfigureCounts)
     (configureBase.output counts).lookupConfig ∈ context.gates
   rangeLookup : LookupRangeCheck.rangeCheckLookup 10
     (configureBase.output counts).lookupConfig ∈ context.lookups
+  advicePermutationColumn : ∀ index,
+    ((configureBase.output counts).advices index).toAny ∈ context.permutationColumns
+  primaryPermutationColumn :
+    (configureBase.output counts).primary.toAny ∈ context.permutationColumns
 
 namespace ConfigureBaseCertificate
 
@@ -209,13 +323,20 @@ namespace ConfigureBaseCertificate
 def mono {counts : ConfigureCounts} {source target : KeygenContext Fp}
     (certificate : ConfigureBaseCertificate counts source)
     (gates : ∀ gate, gate ∈ source.gates → gate ∈ target.gates)
-    (lookups : ∀ argument, argument ∈ source.lookups → argument ∈ target.lookups) :
+    (lookups : ∀ argument, argument ∈ source.lookups → argument ∈ target.lookups)
+    (permutationColumns : ∀ column,
+      column ∈ source.permutationColumns → column ∈ target.permutationColumns) :
     ConfigureBaseCertificate counts target where
   orchardGate := gates _ certificate.orchardGate
-  addChip := certificate.addChip.mono gates lookups
-  shortRange numBits := (certificate.shortRange numBits).mono gates lookups
+  addChip := certificate.addChip.mono gates lookups permutationColumns
+  shortRange numBits :=
+    (certificate.shortRange numBits).mono gates lookups permutationColumns
   bitshiftGate := gates _ certificate.bitshiftGate
   rangeLookup := lookups _ certificate.rangeLookup
+  advicePermutationColumn index :=
+    permutationColumns _ (certificate.advicePermutationColumn index)
+  primaryPermutationColumn :=
+    permutationColumns _ certificate.primaryPermutationColumn
 
 end ConfigureBaseCertificate
 
@@ -223,7 +344,8 @@ end ConfigureBaseCertificate
 def configureBaseCertificate (counts : ConfigureCounts) :
     ConfigureBaseCertificate counts
       { gates := (configureBase.delta counts).gates
-        lookups := (configureBase.delta counts).lookups } := by
+        lookups := (configureBase.delta counts).lookups
+        permutationColumns := (configureBase.delta counts).permutationRequests } := by
   let base := configureBase.output counts
   let shared := configureShared.output counts
   let addCounts : ConfigureCounts :=
@@ -235,20 +357,27 @@ def configureBaseCertificate (counts : ConfigureCounts) :
       addChip := ?_
       shortRange := ?_
       bitshiftGate := ?_
-      rangeLookup := ?_ }
-  · simp [configureBase, configureShared, configureAdvices,
-      configureEqualities, configureAdviceEqualitiesLow,
-      configureAdviceEqualitiesHigh, configureLagrange]
+      rangeLookup := ?_
+      advicePermutationColumn := ?_
+      primaryPermutationColumn := ?_ }
+  · exact configureBase_orchardGate counts
   · apply (AddChip.addFormalConfigureCertificate
       (base.advices 7) (base.advices 8) (base.advices 6) addCounts).mono
     · intro gate hgate
-      simp [base, configureBase, configureShared, configureAdvices,
-        configureEqualities, configureAdviceEqualitiesLow,
-        configureAdviceEqualitiesHigh, configureLagrange, AddChip.configure,
-        addCounts] at hgate ⊢
-      aesop
+      simp [AddChip.configure] at hgate
+      subst gate
+      exact configureBase_addChipGate counts
     · intro argument hargument
       simp [AddChip.configure] at hargument
+    · intro column hcolumn
+      simp only [List.mem_append, List.mem_cons, List.not_mem_nil,
+        or_false] at hcolumn
+      rcases hcolumn with (hcolumn | hcolumn) | hcolumn
+      · subst column
+        exact configureBase_advicePermutationColumn counts 7
+      · subst column
+        exact configureBase_advicePermutationColumn counts 8
+      · simp only [AddChip.configure, keygen_norm] at hcolumn
   · intro numBits
     apply (LookupRangeCheck.shortRangeConfigureCertificate 10 numBits
       (shared.advices 9) shared.genTable.tableIdx
@@ -263,6 +392,11 @@ def configureBaseCertificate (counts : ConfigureCounts) :
       unfold configureBase
       apply Configure.mem_lookups_delta_bind_right
       exact hargument
+    · intro column hcolumn
+      simp only
+      unfold configureBase
+      apply Configure.mem_permutationRequests_delta_bind_right
+      exact hcolumn
   · simp only
     unfold configureBase
     apply Configure.mem_gates_delta_bind_right
@@ -274,6 +408,9 @@ def configureBaseCertificate (counts : ConfigureCounts) :
     apply Configure.mem_lookups_delta_bind_right
     apply Configure.mem_lookups_delta_bind_left
     simp
+  · intro index
+    exact configureBase_advicePermutationColumn counts index
+  · exact configureBase_primaryPermutationColumn counts
 
 /-- The composite-chip suffix of Rust `Circuit::configure`. -/
 def configureChips (G : Generators) (base : ConfigureBase) :
@@ -694,6 +831,44 @@ structure NoteCells where
   gdNew : Var Point Fp
   pkdNew : Var Point Fp
 
+def synthOrchardChecks (cfg : Config) (witnessCells : WitnessCells)
+    (checkCells : CheckCells) : RegionCircuit Fp Unit := do
+  let _ ← copyAdvice witnessCells.vOld (cfg.advices 0) 0
+  let _ ← copyAdvice witnessCells.vNew (cfg.advices 1) 0
+  let _ ← copyAdvice checkCells.magnitude (cfg.advices 2) 0
+  let _ ← copyAdvice checkCells.sign (cfg.advices 3) 0
+  let _ ← copyAdvice checkCells.root (cfg.advices 4) 0
+  let _ ← assignAdviceFromInstance cfg.primary ANCHOR (cfg.advices 5) 0
+  let _ ← assignAdviceFromInstance cfg.primary ENABLE_SPEND (cfg.advices 6) 0
+  let _ ← assignAdviceFromInstance cfg.primary ENABLE_OUTPUT (cfg.advices 7) 0
+  (orchardGate cfg.qOrchard cfg.advices).enable 0
+
+def orchardChecksRegionSynthesisSummary (cfg : Config) :
+    FloorPlanner.RegionSynthesisSummary :=
+  FloorPlanner.RegionSynthesisSummary.ofColumns
+    [.column .advice (cfg.advices 0).index,
+      .column .advice (cfg.advices 1).index,
+      .column .advice (cfg.advices 2).index,
+      .column .advice (cfg.advices 3).index,
+      .column .advice (cfg.advices 4).index,
+      .column .advice (cfg.advices 5).index,
+      .column .advice (cfg.advices 6).index,
+      .column .advice (cfg.advices 7).index,
+      .selector cfg.qOrchard.index]
+    1 0
+
+@[synthesis_summary_norm]
+theorem orchardChecksRegion_synthesisSummary_eq (cfg : Config)
+    (witnessCells : WitnessCells) (checkCells : CheckCells)
+    (region : RegionIndex) :
+    FloorPlanner.regionSynthesisSummary
+        ((synthOrchardChecks cfg witnessCells checkCells).operations region) =
+      orchardChecksRegionSynthesisSummary cfg := by
+  apply FloorPlanner.RegionSynthesisSummary.ext <;>
+    simp only [synthOrchardChecks, orchardChecksRegionSynthesisSummary,
+      orchardGate, circuit_norm, synthesis_summary_norm]
+  all_goals simp only [Nat.max_self]
+
 /-- Stage C (91 regions): old/new note-commitment integrity and the final
 `"Orchard circuit checks"` region (`circuit.rs:696-826`). -/
 def synthNotes (G : Generators) (B : Bases) (W : Witnesses Fp) (cfg : Config)
@@ -724,17 +899,132 @@ def synthNotes (G : Generators) (B : Bases) (W : Witnesses Fp) (cfg : Config)
       value := wc.vNew, rho := cc.nfOld, psi := psiNew, rcm := W.rcmNew }
   constrainInstance cmNew.x cfg.primary CMX
   -- circuit.rs:781-826 — the final `"Orchard circuit checks"` region
-  assignRegion "Orchard circuit checks" (do
-    let _ ← copyAdvice wc.vOld (cfg.advices 0) 0
-    let _ ← copyAdvice wc.vNew (cfg.advices 1) 0
-    let _ ← copyAdvice cc.magnitude (cfg.advices 2) 0
-    let _ ← copyAdvice cc.sign (cfg.advices 3) 0
-    let _ ← copyAdvice cc.root (cfg.advices 4) 0
-    let _ ← assignAdviceFromInstance cfg.primary ANCHOR (cfg.advices 5) 0
-    let _ ← assignAdviceFromInstance cfg.primary ENABLE_SPEND (cfg.advices 6) 0
-    let _ ← assignAdviceFromInstance cfg.primary ENABLE_OUTPUT (cfg.advices 7) 0
-    (orchardGate cfg.qOrchard cfg.advices).enable 0)
+  assignRegion "Orchard circuit checks" (synthOrchardChecks cfg wc cc)
   pure { gdNew, pkdNew }
+
+/-! ## Reduced synthesis summaries -/
+
+/-- Exact footprint of one `load private` region. -/
+def loadPrivateSynthesisSummary (column : Column .advice) :
+    FloorPlanner.SynthesisSummary :=
+  FloorPlanner.SynthesisSummary.ofRegion
+    (FloorPlanner.RegionSynthesisSummary.ofColumns
+      [.column .advice column.index] 1 0)
+
+@[synthesis_summary_norm]
+theorem loadPrivate_synthesisSummary_eq (column : Column .advice)
+    (witness : WitgenIR Fp 1) (region : RegionIndex) :
+    FloorPlanner.synthesisSummary
+        ((loadPrivate column witness).operations region) =
+      loadPrivateSynthesisSummary column := by
+  simp only [loadPrivate, loadPrivateSynthesisSummary, circuit_norm,
+    synthesis_summary_norm]
+
+/-- Exact reduced footprint of the Action witness-loading stage. -/
+def synthWitnessSynthesisSummary (cfg : Config) :
+    FloorPlanner.SynthesisSummary :=
+  let load := loadPrivateSynthesisSummary (cfg.advices 0)
+  let point := FloorPlanner.SynthesisSummary.ofRegion
+    (Ecc.WitnessPoint.pointSynthesisSummary cfg.eccConfig.witnessPoint 0)
+  let nonId := FloorPlanner.SynthesisSummary.ofRegion
+    (Ecc.WitnessPoint.pointNonIdSynthesisSummary cfg.eccConfig.witnessPoint 0)
+  [Sinsemilla.loadSynthesisSummary,
+    load, load, point, nonId, nonId, load, load, load].foldr
+    FloorPlanner.SynthesisSummary.combine {}
+
+@[synthesis_summary_norm]
+theorem synthWitness_synthesisSummary_eq (G : Generators)
+    (W : Witnesses Fp) (cfg : Config) (region : RegionIndex) :
+    FloorPlanner.synthesisSummary
+        ((synthWitness G W cfg).operations region) =
+      synthWitnessSynthesisSummary cfg := by
+  simp only [synthWitness, synthWitnessSynthesisSummary, circuit_norm,
+    synthesis_summary_norm, List.foldr_cons, List.foldr_nil,
+    FloorPlanner.SynthesisSummary.combine_empty]
+
+/-- Exact reduced footprint of the Action integrity-check stage. -/
+def synthChecksSynthesisSummary (cfg : Config) :
+    FloorPlanner.SynthesisSummary :=
+  let merkle1 := Sinsemilla.Merkle.CalculateRoot.synthesisSummary 16
+    (cfg.merkle1.condSwap, cfg.merkle1, cfg.lookupConfig)
+  let merkle2 := Sinsemilla.Merkle.CalculateRoot.synthesisSummary 16
+    (cfg.merkle2.condSwap, cfg.merkle2, cfg.lookupConfig)
+  [merkle1, merkle2,
+    loadPrivateSynthesisSummary (cfg.advices 9),
+    loadPrivateSynthesisSummary (cfg.advices 9),
+    ValueCommit.synthesisSummary
+      (cfg.eccConfig.mulFixedShort, cfg.eccConfig.mulFixedFull,
+        cfg.eccConfig.add),
+    DeriveNullifier.synthesisSummary
+      (cfg.poseidonConfig, cfg.addChipConfig,
+        cfg.eccConfig.mulFixedBaseField, cfg.eccConfig.add),
+    SpendAuthority.synthesisSummary
+      (cfg.eccConfig.mulFixedFull, cfg.eccConfig.add),
+    CommitIvk.Main.synthesisSummary
+      { gate := cfg.commitIvkConfig, hashConfig := cfg.sinsemilla1,
+        lookupConfig := cfg.lookupConfig,
+        mulConfig := cfg.eccConfig.mulFixedFull,
+        addConfig := cfg.eccConfig.add },
+    AddressIntegrity.synthesisSummary
+      (cfg.eccConfig.mul, cfg.eccConfig.witnessPoint)].foldr
+        FloorPlanner.SynthesisSummary.combine {}
+
+@[synthesis_summary_norm]
+theorem synthChecks_synthesisSummary_eq (G : Generators) (B : Bases)
+    (W : Witnesses Fp) (cfg : Config) (cells : WitnessCells)
+    (region : RegionIndex) :
+    FloorPlanner.synthesisSummary
+        ((synthChecks G B W cfg cells).operations region) =
+      synthChecksSynthesisSummary cfg := by
+  simp only [synthChecks, synthChecksSynthesisSummary, circuit_norm,
+    synthesis_summary_norm, List.foldr_cons, List.foldr_nil,
+    FloorPlanner.SynthesisSummary.combine_empty]
+
+/-- Exact footprint of the final Orchard gate region. -/
+def orchardChecksSynthesisSummary (cfg : Config) :
+    FloorPlanner.SynthesisSummary :=
+  FloorPlanner.SynthesisSummary.ofRegion
+    (orchardChecksRegionSynthesisSummary cfg)
+
+/-- Exact reduced footprint of the Action note-commitment stage. -/
+def synthNotesSynthesisSummary (cfg : Config) :
+    FloorPlanner.SynthesisSummary :=
+  let noteOld := NoteCommit.Main.synthesisSummary
+    { gates := cfg.noteCommitOld, hashConfig := cfg.sinsemilla1,
+      lookupConfig := cfg.lookupConfig,
+      mulConfig := cfg.eccConfig.mulFixedFull,
+      addConfig := cfg.eccConfig.add }
+  let nonId := FloorPlanner.SynthesisSummary.ofRegion
+    (Ecc.WitnessPoint.pointNonIdSynthesisSummary cfg.eccConfig.witnessPoint 0)
+  let noteNew := NoteCommit.Main.synthesisSummary
+    { gates := cfg.noteCommitNew, hashConfig := cfg.sinsemilla2,
+      lookupConfig := cfg.lookupConfig,
+      mulConfig := cfg.eccConfig.mulFixedFull,
+      addConfig := cfg.eccConfig.add }
+  [noteOld, nonId, nonId,
+    loadPrivateSynthesisSummary (cfg.advices 0), noteNew,
+    orchardChecksSynthesisSummary cfg].foldr
+      FloorPlanner.SynthesisSummary.combine {}
+
+@[synthesis_summary_norm]
+theorem synthNotes_synthesisSummary_eq (G : Generators) (B : Bases)
+    (W : Witnesses Fp) (cfg : Config) (witnessCells : WitnessCells)
+    (checkCells : CheckCells) (region : RegionIndex) :
+    FloorPlanner.synthesisSummary
+        ((synthNotes G B W cfg witnessCells checkCells).operations region) =
+      synthNotesSynthesisSummary cfg := by
+  simp only [synthNotes, synthNotesSynthesisSummary,
+    orchardChecksSynthesisSummary, circuit_norm, synthesis_summary_norm,
+    List.foldr_cons, List.foldr_nil,
+    FloorPlanner.SynthesisSummary.combine_empty]
+  rw [FloorPlanner.SynthesisSummary.empty_combine]
+  simp only [FloorPlanner.SynthesisSummary.combine_columns,
+    FloorPlanner.SynthesisSummary.ofRegion_columns,
+    Ecc.WitnessPoint.pointNonIdSynthesisSummary,
+    FloorPlanner.RegionSynthesisSummary.ofColumns_columns]
+  apply FloorPlanner.unionColumns_nodup
+  apply FloorPlanner.unionColumns_nodup
+  exact List.nodup_nil
 
 /-- Rust `AddressPoints` (ironwood `circuit.rs`): the old/new-note diversified-address
 points the cross-address stage compares — the base circuit's output. -/
@@ -745,11 +1035,54 @@ structure AddressPoints (F : Type) where
   pkdNew : Point F
 deriving ProvableStruct
 
+/-- Columns occupied by each cross-address row. -/
+def crossAddressColumns (cfg : Config) :
+    List FloorPlanner.RegionColumn :=
+  [.column .advice (cfg.advices 0).index,
+    .column .advice (cfg.advices 1).index,
+    .column .advice (cfg.advices 2).index,
+    .column .advice (cfg.advices 3).index,
+    .column .advice (cfg.advices 4).index,
+    .column .advice (cfg.advices 5).index,
+    .column .advice (cfg.advices 6).index,
+    .column .advice (cfg.advices 7).index,
+    .column .advice (cfg.advices 8).index,
+    .column .advice (cfg.advices 9).index,
+    .selector cfg.qOrchard.index]
+
+def synthCrossAddressRow (cfg : Config) (oldCell newCell : AssignedCell Fp)
+    (row : ℕ) : RegionCircuit Fp Unit := do
+  let dca ← assignAdviceFromInstance cfg.primary DISABLE_CROSS_ADDRESS
+    (cfg.advices 0) row
+  let z ← assignAdvice (cfg.advices 1) row (Poseidon.constWit 0)
+  constrainConstant z 0
+  let _ ← copyAdvice dca (cfg.advices 2) row
+  let o3 ← assignAdvice (cfg.advices 3) row (Poseidon.constWit 1)
+  constrainConstant o3 1
+  let _ ← copyAdvice oldCell (cfg.advices 4) row
+  let _ ← copyAdvice newCell (cfg.advices 5) row
+  let o6 ← assignAdvice (cfg.advices 6) row (Poseidon.constWit 1)
+  constrainConstant o6 1
+  let o7 ← assignAdvice (cfg.advices 7) row (Poseidon.constWit 1)
+  constrainConstant o7 1
+  let _ ← copyAdvice dca (cfg.advices 8) row
+  let _ ← copyAdvice dca (cfg.advices 9) row
+  (orchardGate cfg.qOrchard cfg.advices).enable row
+
+@[synthesis_summary_norm]
+theorem crossAddressRow_synthesisSummary_eq (cfg : Config)
+    (oldCell newCell : AssignedCell Fp) (row : ℕ) (region : RegionIndex) :
+    FloorPlanner.regionSynthesisSummary
+        ((synthCrossAddressRow cfg oldCell newCell row).operations region) =
+      FloorPlanner.RegionSynthesisSummary.ofColumns
+        (crossAddressColumns cfg) (row + 1) 4 := by
+  apply FloorPlanner.RegionSynthesisSummary.ext <;>
+    simp only [synthCrossAddressRow, crossAddressColumns, orchardGate, circuit_norm,
+      synthesis_summary_norm]
+  all_goals simp only [Nat.max_self]
+
 /-- Ironwood `Circuit::synthesize_cross_address_checks` (`circuit.rs:920-1035`): the
-`"post-NU 6.3 cross-address checks"` region — one row per address coordinate, reusing
-the `q_orchard` gate as `disableCrossAddress − 0 = disableCrossAddress · 1` (value
-row), `disableCrossAddress · (old − new) = 0` (root/anchor row), with both enable
-checks neutralized and the rightmost columns occupied against foreign gate rows. -/
+`"post-NU 6.3 cross-address checks"` region — one row per address coordinate. -/
 def synthCrossAddressChecks (cfg : Config) (pts : Var AddressPoints Fp) :
     Circuit Fp Unit :=
   assignRegion "post-NU 6.3 cross-address checks"
@@ -757,22 +1090,106 @@ def synthCrossAddressChecks (cfg : Config) (pts : Var AddressPoints Fp) :
       let coords := [(pts.gdOld.x, pts.gdNew.x), (pts.gdOld.y, pts.gdNew.y),
                      (pts.pkdOld.x, pts.pkdNew.x), (pts.pkdOld.y, pts.pkdNew.y)]
       let (oldC, newC) := coords[row]!
-      let dca ← assignAdviceFromInstance cfg.primary DISABLE_CROSS_ADDRESS
-        (cfg.advices 0) row
-      let z ← assignAdvice (cfg.advices 1) row (Poseidon.constWit 0)
-      constrainConstant z 0
-      let _ ← copyAdvice dca (cfg.advices 2) row
-      let o3 ← assignAdvice (cfg.advices 3) row (Poseidon.constWit 1)
-      constrainConstant o3 1
-      let _ ← copyAdvice oldC (cfg.advices 4) row
-      let _ ← copyAdvice newC (cfg.advices 5) row
-      let o6 ← assignAdvice (cfg.advices 6) row (Poseidon.constWit 1)
-      constrainConstant o6 1
-      let o7 ← assignAdvice (cfg.advices 7) row (Poseidon.constWit 1)
-      constrainConstant o7 1
-      let _ ← copyAdvice dca (cfg.advices 8) row
-      let _ ← copyAdvice dca (cfg.advices 9) row
-      (orchardGate cfg.qOrchard cfg.advices).enable row)
+      synthCrossAddressRow cfg oldC newC row)
+
+def synthCrossAddressChecksSynthesisSummary (cfg : Config) :
+    FloorPlanner.SynthesisSummary :=
+  FloorPlanner.SynthesisSummary.ofRegion
+    (FloorPlanner.RegionSynthesisSummary.repeatColumns
+      (crossAddressColumns cfg) 0 1 1 4 4)
+
+@[synthesis_summary_norm]
+theorem synthCrossAddressChecks_synthesisSummary_eq
+    (cfg : Config) (pts : Var AddressPoints Fp) (region : RegionIndex) :
+    FloorPlanner.synthesisSummary
+        ((synthCrossAddressChecks cfg pts).operations region) =
+      synthCrossAddressChecksSynthesisSummary cfg := by
+  have hregion :
+      FloorPlanner.regionSynthesisSummary
+          ((RegionCircuit.forRange' 0 1 4 fun _ row =>
+            let coords := [(pts.gdOld.x, pts.gdNew.x),
+              (pts.gdOld.y, pts.gdNew.y),
+              (pts.pkdOld.x, pts.pkdNew.x),
+              (pts.pkdOld.y, pts.pkdNew.y)]
+            let (oldCell, newCell) := coords[row]!
+            synthCrossAddressRow cfg oldCell newCell row).operations region) =
+        FloorPlanner.RegionSynthesisSummary.repeatColumns
+          (crossAddressColumns cfg) 0 1 1 4 4 := by
+    rw [RegionCircuit.forRange'_regionSynthesisSummary]
+    simp only [crossAddressRow_synthesisSummary_eq]
+    simpa only [Nat.zero_add, Nat.one_mul] using
+      (FloorPlanner.RegionSynthesisSummary.foldr_ofColumns_eq_repeatColumns
+        (crossAddressColumns cfg) 0 1 1 4 4)
+  rw [synthCrossAddressChecks, operations_assignRegion,
+    FloorPlanner.synthesisSummary_region_cons,
+    FloorPlanner.synthesisSummary_nil,
+    FloorPlanner.SynthesisSummary.combine_empty,
+    synthCrossAddressChecksSynthesisSummary]
+  rw [hregion]
+
+/-- The four cross-address rows request four deferred constants each. -/
+@[synthesis_summary_norm]
+theorem synthCrossAddressChecks_synthesisSummary_constantSiteCount
+    (config : Config) (points : Var AddressPoints Fp)
+    (region : RegionIndex) :
+    (FloorPlanner.synthesisSummary
+      ((synthCrossAddressChecks config points).operations
+        region)).constantSiteCount = 16 := by
+  rw [synthCrossAddressChecks_synthesisSummary_eq]
+  simp only [synthCrossAddressChecksSynthesisSummary,
+    synthesis_summary_norm]
+
+/-- Every cross-address row occupies the first advice column. -/
+@[synthesis_summary_norm]
+theorem synthCrossAddressChecks_synthesisSummary_adviceZeroOccupancy
+    (config : Config) (points : Var AddressPoints Fp)
+    (region : RegionIndex) :
+    (FloorPlanner.synthesisSummary
+      ((synthCrossAddressChecks config points).operations region)).columnOccupancy
+        (.column .advice (config.advices 0).index) = 4 := by
+  rw [synthCrossAddressChecks_synthesisSummary_eq]
+  simp only [synthCrossAddressChecksSynthesisSummary,
+    crossAddressColumns, synthesis_summary_norm]
+  simp [FloorPlanner.mem_unionColumns_iff]
+
+/-- Cross-address checks occupy no fixed columns. -/
+@[synthesis_summary_norm]
+theorem synthCrossAddressChecks_synthesisSummary_fixedOccupancy
+    (config : Config) (points : Var AddressPoints Fp)
+    (column : Column .fixed) (region : RegionIndex) :
+    (FloorPlanner.synthesisSummary
+      ((synthCrossAddressChecks config points).operations region)).columnOccupancy
+        (.column .fixed column.index) = 0 := by
+  rw [synthCrossAddressChecks_synthesisSummary_eq]
+  simp only [synthCrossAddressChecksSynthesisSummary,
+    crossAddressColumns, synthesis_summary_norm]
+  simp [FloorPlanner.mem_unionColumns_iff]
+
+@[keygen_helper]
+theorem synthCrossAddressChecks_keygenRegistered
+    (cfg : Config) (pts : Var AddressPoints Fp)
+    (gates : List (Gate Fp)) (lookups : List (LookupArgument Fp))
+    (permutationColumns : List AnyColumn) (i : RegionIndex)
+    (hadvice : ∀ index, (cfg.advices index).toAny ∈ permutationColumns)
+    (hprimary : cfg.primary.toAny ∈ permutationColumns)
+    (hgdOldX : pts.gdOld.x.cell.column ∈ permutationColumns)
+    (hgdOldY : pts.gdOld.y.cell.column ∈ permutationColumns)
+    (hpkdOldX : pts.pkdOld.x.cell.column ∈ permutationColumns)
+    (hpkdOldY : pts.pkdOld.y.cell.column ∈ permutationColumns)
+    (hgdNewX : pts.gdNew.x.cell.column ∈ permutationColumns)
+    (hgdNewY : pts.gdNew.y.cell.column ∈ permutationColumns)
+    (hpkdNewX : pts.pkdNew.x.cell.column ∈ permutationColumns)
+    (hpkdNewY : pts.pkdNew.y.cell.column ∈ permutationColumns)
+    (horchard : orchardGate cfg.qOrchard cfg.advices ∈ gates) :
+    ((synthCrossAddressChecks cfg pts).operations i).KeygenRegistered
+      gates lookups permutationColumns := by
+  simp only [synthCrossAddressChecks, keygen_spine]
+  keygen_registration
+  all_goals
+    first
+    | simpa only [keygen_output_norm] using hadvice 0
+    | rename_i row
+      fin_cases row <;> simp_all
 
 /-- Rust `Circuit::synthesize_base` (`circuit.rs:461-828`): the staged witness /
 integrity-check / note-commitment composition, returning the `AddressPoints` the
@@ -784,6 +1201,22 @@ def synthesizeBase (G : Generators) (B : Bases) (W : Witnesses Fp) (cfg : Config
   let cc ← synthChecks G B W cfg wc
   let nc ← synthNotes G B W cfg wc cc
   pure { gdOld := wc.gdOld, pkdOld := cc.pkdOld, gdNew := nc.gdNew, pkdNew := nc.pkdNew }
+
+/-- Exact reduced footprint of the 394-region pre-Ironwood Action circuit. -/
+def synthesizeBaseSynthesisSummary (cfg : Config) :
+    FloorPlanner.SynthesisSummary :=
+  (synthWitnessSynthesisSummary cfg).combine
+    ((synthChecksSynthesisSummary cfg).combine
+      (synthNotesSynthesisSummary cfg))
+
+@[synthesis_summary_norm]
+theorem synthesizeBase_synthesisSummary_eq (G : Generators) (B : Bases)
+    (W : Witnesses Fp) (cfg : Config) (region : RegionIndex) :
+    FloorPlanner.synthesisSummary
+        ((synthesizeBase G B W cfg).operations region) =
+      synthesizeBaseSynthesisSummary cfg := by
+  simp only [synthesizeBase, synthesizeBaseSynthesisSummary, circuit_norm,
+    synthesis_summary_norm]
 
 /-- The ironwood (post-NU 6.3) `Circuit::synthesize` — THE top-level circuit this repo
 targets: the base stages plus the cross-address checks region. -/

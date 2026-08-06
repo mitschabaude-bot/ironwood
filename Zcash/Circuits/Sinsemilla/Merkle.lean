@@ -220,6 +220,74 @@ def GateSpec (l : Fp) (input : Inputs Fp) : Prop :=
   Spec input.aWhole input.bWhole input.cWhole input.leftNode input.rightNode
     input.z1A input.z1B input.b1 input.b2 l
 
+abbrev ConfigInput :=
+  Column .advice × Column .advice × Column .advice × Column .advice ×
+    Column .advice × Column .advice × Column .advice × Column .advice ×
+    Column .advice × Column .advice
+
+def permutationColumns (input : ConfigInput) : List AnyColumn :=
+  let (a, b, c, left, right, z1A, z1B, b1, b2, lw) := input
+  [a, b, c, left, right, z1A, z1B, b1, b2, lw]
+
+/-- In the Merkle gate's symmetric use, its ten copy columns reduce to five columns. -/
+theorem mem_equalityColumns_of_mem_permutationColumns
+    (xA xP bits lambda1 lambda2 : Column .advice) (column : AnyColumn)
+    (hcolumn : column ∈ permutationColumns
+      (xA, xP, bits, lambda1, lambda2, xA, xP, bits, lambda1, lambda2)) :
+    column ∈ ([xA, xP, bits, lambda1, lambda2] : List AnyColumn) := by
+  simp only [permutationColumns, List.mem_cons, List.not_mem_nil, or_false] at hcolumn ⊢
+  grind
+
+/-- Reduced two-row footprint of the decomposition gate. -/
+def synthesisSummary (cfg : Config) (offset : ℕ) :
+    FloorPlanner.RegionSynthesisSummary :=
+  FloorPlanner.RegionSynthesisSummary.ofColumns
+    [.selector cfg.qDecompose.index,
+      .column .advice cfg.lWhole.index,
+      .column .advice cfg.aWhole.index,
+      .column .advice cfg.bWhole.index,
+      .column .advice cfg.cWhole.index,
+      .column .advice cfg.leftNode.index,
+      .column .advice cfg.rightNode.index,
+      .column .advice cfg.z1A.index,
+      .column .advice cfg.z1B.index,
+      .column .advice cfg.b1.index,
+      .column .advice cfg.b2.index]
+    (offset + 2) 1
+
+theorem synthesisSummary_eq (cfg : Config) (l : Fp)
+    (input : Var Inputs Fp) (offset : ℕ) (self : RegionIndex) :
+    synthesisSummary cfg offset =
+      FloorPlanner.regionSynthesisSummary
+        ((body cfg l input offset).operations self) := by
+  rw [synthesisSummary]
+  apply FloorPlanner.RegionSynthesisSummary.ext
+  · simp only [body, circuit_norm, synthesis_summary_norm,
+      FloorPlanner.RegionSynthesisSummary.ofColumns_columns]
+  · simp only [body, circuit_norm, synthesis_summary_norm,
+      FloorPlanner.RegionSynthesisSummary.ofColumns_rowCount]
+    omega
+  · simp only [body, circuit_norm, synthesis_summary_norm,
+      FloorPlanner.RegionSynthesisSummary.ofColumns_constantSiteCount]
+
+@[implicit_reducible]
+def elaborated (l : Fp) :
+    ElaboratedRegionCircuit Fp ConfigInput Config Inputs unit
+      (fun (a, b, c, left, right, z1A, z1B, b1, b2, lw) =>
+        configure a b c left right z1A z1B b1 b2 lw)
+      (fun cfg offset input => body cfg l input offset) :=
+  { keygenRequirements :=
+      { permutationColumns input _ := permutationColumns input
+        inputPermutationColumns _ _ input :=
+          [input.aWhole.cell.column, input.bWhole.cell.column,
+            input.cWhole.cell.column, input.leftNode.cell.column,
+            input.rightNode.cell.column, input.z1A.cell.column,
+            input.z1B.cell.column, input.b1.cell.column, input.b2.cell.column] }
+    synthesisSummary cfg offset _ _ := synthesisSummary cfg offset
+    synthesisSummary_eq := fun cfg offset input self =>
+      synthesisSummary_eq cfg l input offset self
+    registered := by keygen_registration [body, permutationColumns] }
+
 /-- The decomposition-gate gadget. Pure assertion (`unit` output). Soundness: the four polys imply
 `GateSpec`; completeness: `GateSpec` (the honest-caller precondition, like `MulOverflow`) implies
 the polys.
@@ -228,13 +296,11 @@ STRUCTURE-COMPLETE-WITH-STATED-SORRIES: both directions reduce to `spec_of_polys
 `polysZero_of_spec` after peeling the ten copies + the gate via `circuit_norm` (the
 `MulOverflow.circuit` pattern); the copies chain each gate-window cell to its input component. -/
 def circuit (l : Fp) :
-    FormalRegionCircuit Fp
-      (Column .advice × Column .advice × Column .advice × Column .advice × Column .advice ×
-        Column .advice × Column .advice × Column .advice × Column .advice × Column .advice)
-      Config Inputs unit where
+    FormalRegionCircuit Fp ConfigInput Config Inputs unit where
   name := "Check piece decomposition"
   configure := fun (a, b, c, left, right, z1A, z1B, b1, b2, lw) =>
     configure a b c left right z1A z1B b1 b2 lw
+  elaborated := elaborated l
   synthesize cfg offset input := body cfg l input offset
   Assumptions _ := True
   Spec input _ _ := GateSpec l input
@@ -255,6 +321,12 @@ def circuit (l : Fp) :
     exact ⟨h, trivial, trivial, trivial, trivial, trivial, trivial, trivial, trivial,
       trivial, trivial⟩
 
+@[synthesis_summary_norm]
+theorem circuit_synthesisSummary (l : Fp) (cfg : Config) (offset : ℕ)
+    (input : Var Inputs Fp) (region : RegionIndex) :
+    (circuit l).elaborated.synthesisSummary cfg offset input region =
+      synthesisSummary cfg offset := rfl
+
 @[keygen_configured]
 def circuit_configured (l : Fp) (cfg : Config)
     (hsimple : cfg.qDecompose.simple = true) :
@@ -267,6 +339,17 @@ def circuit_configured (l : Fp) (cfg : Config)
   simp only at hsimple
   subst simple
   rfl
+
+/-- The decomposition gate requests one deferred constant cell for its layer
+index. -/
+@[synthesis_summary_norm]
+theorem circuit_synthesisSummary_constantSiteCount
+    (l : Fp) (config : Config) (input : Var Inputs Fp)
+    (region : RegionIndex) :
+    ((circuit l).elaborated.synthesisSummary
+      config 0 input region).constantSiteCount = 1 := by
+  rw [ElaboratedRegionCircuit.synthesisSummary_constantSiteCount_eq]
+  simp only [circuit, body, circuit_norm]
 
 end Gate
 
@@ -315,10 +398,12 @@ def mono {scfg : HashPiece.Config} {counts : ConfigureCounts}
     {source target : KeygenContext Fp}
     (certificate : ConfigureCertificate scfg counts source)
     (gates : ∀ gate, gate ∈ source.gates → gate ∈ target.gates)
-    (lookups : ∀ argument, argument ∈ source.lookups → argument ∈ target.lookups) :
+    (lookups : ∀ argument, argument ∈ source.lookups → argument ∈ target.lookups)
+    (permutationColumns : ∀ column,
+      column ∈ source.permutationColumns → column ∈ target.permutationColumns) :
     ConfigureCertificate scfg counts target where
-  condSwap wb wswap := (certificate.condSwap wb wswap).mono gates lookups
-  gate l := (certificate.gate l).mono gates lookups
+  condSwap wb wswap := (certificate.condSwap wb wswap).mono gates lookups permutationColumns
+  gate l := (certificate.gate l).mono gates lookups permutationColumns
 
 end ConfigureCertificate
 
@@ -326,7 +411,12 @@ end ConfigureCertificate
 def configureCertificate (scfg : HashPiece.Config) (counts : ConfigureCounts) :
     ConfigureCertificate scfg counts
       { gates := (configure scfg |>.delta counts).gates
-        lookups := (configure scfg |>.delta counts).lookups } := by
+        lookups := (configure scfg |>.delta counts).lookups
+        permutationColumns :=
+          Gate.permutationColumns
+            (scfg.xA, scfg.xP, scfg.bits, scfg.lambda1, scfg.lambda2,
+              scfg.xA, scfg.xP, scfg.bits, scfg.lambda1, scfg.lambda2) ++
+            (configure scfg |>.delta counts).permutationRequests } := by
   let swapProgram := CondSwap.configure scfg.xA scfg.xP scfg.bits
     scfg.lambda1 scfg.lambda2
   let gateInput := (scfg.xA, scfg.xP, scfg.bits, scfg.lambda1, scfg.lambda2,
@@ -345,6 +435,18 @@ def configureCertificate (scfg : HashPiece.Config) (counts : ConfigureCounts) :
       unfold configure
       apply Configure.mem_lookups_delta_bind_left
       exact hargument
+    · intro column hcolumn
+      simp only [List.mem_append, List.mem_cons, List.not_mem_nil, or_false] at hcolumn
+      rcases hcolumn with (hcolumn | hcolumn) | hcolumn
+      · subst column
+        apply List.mem_append_left
+        simp [Gate.permutationColumns]
+      · subst column
+        apply List.mem_append_left
+        simp [Gate.permutationColumns]
+      · apply List.mem_append_right
+        unfold configure
+        exact Configure.mem_permutationRequests_delta_bind_left _ _ _ _ hcolumn
   · intro l
     apply ((Gate.circuit l).configureCertificate gateInput
       (swapProgram.finalCounts counts) ()).mono
@@ -366,6 +468,15 @@ def configureCertificate (scfg : HashPiece.Config) (counts : ConfigureCounts) :
       rcases hargument with hargument | hargument
       · exact False.elim (List.not_mem_nil hargument)
       · simpa [gateInput, swapProgram] using hargument
+    · intro column hcolumn
+      simp only [Gate.circuit, FormalRegionCircuit.keygenRequirements,
+        ElaboratedRegionCircuit.keygenRequirements, List.mem_append] at hcolumn
+      rcases hcolumn with hcolumn | hcolumn
+      · exact List.mem_append_left _ (by simpa [gateInput] using hcolumn)
+      · apply List.mem_append_right
+        unfold configure
+        apply Configure.mem_permutationRequests_delta_bind_right
+        simpa [gateInput, swapProgram] using hcolumn
 
 /-! ### Digit toolkit
 
@@ -1056,10 +1167,23 @@ private theorem hashLayer_regionCount (G : Generators) (cfg : Config)
     rfl]
   simp only [Circuit.operations_pure, Operations.regionCount]
 
+@[keygen_output_norm]
+theorem HashLayer.synthesize_output (G : Generators) (cfg : Config)
+    (lcfg : LookupRangeCheck.Config 10) (Q : Point Fp) (hQ : Q.OnCurve)
+    (l : ℕ) (input : Var HashLayer.Input Fp) (i : RegionIndex) :
+    (HashLayer.synthesize G cfg lcfg Q hQ l input).output i =
+      AssignedCell.of (i + 5)
+        (Sinsemilla.Chain.prefixRows HashLayer.merkleNs HashLayer.merkleNs.length)
+        cfg.sinsemilla.xA := by
+  simp only [HashLayer.synthesize, HashToPoint.witnessMessagePiece,
+    LookupRangeCheck.witnessShortCheck, HashToPoint.hashMessage, circuit_norm,
+    HashToPoint.hashCircuit_output_point_x, Nat.add_assoc, Nat.reduceAdd]
+
 @[keygen_norm]
 def HashLayer.keygenRequirements (G : Generators) (Q : Point Fp)
     (hQ : Q.OnCurve) (l : ℕ) :
-    KeygenRequirements Fp (Config × LookupRangeCheck.Config 10) where
+    KeygenRequirements Fp (Config × LookupRangeCheck.Config 10)
+      (Var HashLayer.Input Fp) where
   configLawful cfg :=
     (LookupRangeCheck.shortRangeCheck 10 5).Configured cfg.2 ×
       (HashToPoint.hashCircuit G HashLayer.merkleNs Q hQ (by decide)).Configured
@@ -1069,25 +1193,117 @@ def HashLayer.keygenRequirements (G : Generators) (Q : Point Fp)
     configured.1.gates ++ configured.2.1.gates ++ configured.2.2.gates
   lookups _ configured :=
     configured.1.lookups ++ configured.2.1.lookups ++ configured.2.2.lookups
+  permutationColumns cfg configured :=
+    configured.1.permutationColumns ++ configured.2.1.permutationColumns ++
+      configured.2.2.permutationColumns ++ [cfg.1.sinsemilla.witnessPieces.toAny]
+  inputPermutationColumns _ _ input :=
+    [input.left.cell.column, input.right.cell.column]
 
-private theorem HashLayer.keygenRegistered
-    (G : Generators) (Q : Point Fp) (hQ : Q.OnCurve) (l : ℕ) :
-    ∀ (configInput : Config × LookupRangeCheck.Config 10)
-      (counts : ConfigureCounts)
-      (hconfig : (HashLayer.keygenRequirements G Q hQ l).configLawful configInput)
-      (input : Var HashLayer.Input Fp) (i : RegionIndex),
-    let program : Configure Fp (Config × LookupRangeCheck.Config 10) := pure configInput
-    ((HashLayer.synthesize G (program.output counts).1 (program.output counts).2
-      Q hQ l input).operations i).KeygenRegistered
+private theorem HashLayer.hashMessage_keygenRegistered
+    (G : Generators) (Q : Point Fp) (hQ : Q.OnCurve) (l : ℕ)
+    (configInput : Config × LookupRangeCheck.Config 10)
+    (counts : ConfigureCounts)
+    (hconfig : (HashLayer.keygenRequirements G Q hQ l).configLawful configInput)
+    (input : Var HashLayer.Input Fp)
+    (pieces : Var (Sinsemilla.Chain.Inputs HashLayer.merkleNs.length) Fp)
+    (i : RegionIndex)
+    (hpieces : ∀ column,
+      column ∈ hconfig.2.1.inputPermutationColumns pieces →
+      column ∈
+        (HashLayer.keygenRequirements G Q hQ l).permutationColumns
+            configInput hconfig ++
+          ((pure configInput : Configure Fp _).delta counts).permutationRequests ++
+          (HashLayer.keygenRequirements G Q hQ l).inputPermutationColumns
+            configInput hconfig input) :
+    ((HashToPoint.hashMessage G HashLayer.merkleNs configInput.1.sinsemilla
+      Q hQ (by decide) pieces).operations i).KeygenRegistered
       ((HashLayer.keygenRequirements G Q hQ l).gates configInput hconfig ++
-        (program.delta counts).gates)
+        ((pure configInput : Configure Fp _).delta counts).gates)
       ((HashLayer.keygenRequirements G Q hQ l).lookups configInput hconfig ++
-        (program.delta counts).lookups) := by
-  keygen_registration [
-    HashLayer.synthesize,
-    HashToPoint.witnessMessagePiece,
-    LookupRangeCheck.witnessShortCheck,
-    HashToPoint.hashMessage]
+        ((pure configInput : Configure Fp _).delta counts).lookups)
+      ((HashLayer.keygenRequirements G Q hQ l).permutationColumns
+          configInput hconfig ++
+        ((pure configInput : Configure Fp _).delta counts).permutationRequests ++
+        (HashLayer.keygenRequirements G Q hQ l).inputPermutationColumns
+          configInput hconfig input) := by
+  unfold HashToPoint.hashMessage
+  apply FormalCircuit.call_keygenRegistered _ _ hconfig.2.1
+  all_goals simp only [HashLayer.keygenRequirements, Configure.delta_pure,
+    List.append_nil, List.mem_append, List.mem_cons, List.not_mem_nil,
+    or_false] at *
+  all_goals grind
+
+private theorem HashLayer.gate_keygenRegistered
+    (G : Generators) (Q : Point Fp) (hQ : Q.OnCurve) (l : ℕ)
+    (configInput : Config × LookupRangeCheck.Config 10)
+    (counts : ConfigureCounts)
+    (hconfig : (HashLayer.keygenRequirements G Q hQ l).configLawful configInput)
+    (input : Var HashLayer.Input Fp) (gateInput : Var Gate.Inputs Fp)
+    (i : RegionIndex)
+    (hgateInput : ∀ column,
+      column ∈ hconfig.2.2.inputPermutationColumns gateInput →
+      column ∈
+        (HashLayer.keygenRequirements G Q hQ l).permutationColumns
+            configInput hconfig ++
+          ((pure configInput : Configure Fp _).delta counts).permutationRequests ++
+          (HashLayer.keygenRequirements G Q hQ l).inputPermutationColumns
+            configInput hconfig input) :
+    ((assignRegion "Check piece decomposition"
+      ((Gate.circuit (l : Fp)).call configInput.1.gate 0 gateInput)).operations i).KeygenRegistered
+      ((HashLayer.keygenRequirements G Q hQ l).gates configInput hconfig ++
+        ((pure configInput : Configure Fp _).delta counts).gates)
+      ((HashLayer.keygenRequirements G Q hQ l).lookups configInput hconfig ++
+        ((pure configInput : Configure Fp _).delta counts).lookups)
+      ((HashLayer.keygenRequirements G Q hQ l).permutationColumns
+          configInput hconfig ++
+        ((pure configInput : Configure Fp _).delta counts).permutationRequests ++
+        (HashLayer.keygenRequirements G Q hQ l).inputPermutationColumns
+          configInput hconfig input) := by
+  rw [operations_assignRegion, Operations.KeygenRegistered.region_cons]
+  constructor
+  · apply FormalRegionCircuit.call_keygenRegistered
+      (Gate.circuit (l : Fp)) configInput.1.gate hconfig.2.2
+      0 gateInput i
+    all_goals simp only [HashLayer.keygenRequirements, Configure.delta_pure,
+      List.append_nil, List.mem_append, List.mem_cons, List.not_mem_nil,
+      or_false] at *
+    all_goals grind
+  · exact Operations.KeygenRegistered.nil _ _ _
+
+/-- Reduced layouter footprint of one Merkle hash layer. -/
+def HashLayer.synthesisSummary (cfg : Config)
+    (lookupCfg : LookupRangeCheck.Config 10) : FloorPlanner.SynthesisSummary :=
+  (HashToPoint.witnessMessagePieceSynthesisSummary cfg.sinsemilla).combine
+    ((LookupRangeCheck.witnessShortCheckSynthesisSummary 10 lookupCfg).combine
+      ((LookupRangeCheck.witnessShortCheckSynthesisSummary 10 lookupCfg).combine
+        ((HashToPoint.witnessMessagePieceSynthesisSummary cfg.sinsemilla).combine
+          ((HashToPoint.witnessMessagePieceSynthesisSummary cfg.sinsemilla).combine
+            ((HashToPoint.hashCircuitSynthesisSummary
+                HashLayer.merkleNs cfg.sinsemilla).combine
+              (FloorPlanner.SynthesisSummary.ofRegion
+                (Gate.synthesisSummary cfg.gate 0)))))))
+
+theorem HashLayer.synthesisSummary_eq (G : Generators) (Q : Point Fp)
+    (hQ : Q.OnCurve) (l : ℕ) (cfg : Config)
+    (lookupCfg : LookupRangeCheck.Config 10) (input : Var HashLayer.Input Fp)
+    (region : RegionIndex) :
+    HashLayer.synthesisSummary cfg lookupCfg =
+      FloorPlanner.synthesisSummary
+        ((HashLayer.synthesize G cfg lookupCfg Q hQ l input).operations region) := by
+  rw [HashLayer.synthesisSummary]
+  simp only [HashLayer.synthesize, Circuit.operations_bind,
+    FloorPlanner.synthesisSummary_append]
+  repeat' first
+    | rw [HashToPoint.witnessMessagePiece_synthesisSummary]
+    | rw [LookupRangeCheck.witnessShortCheck_synthesisSummary]
+  rw [HashToPoint.hashMessage_synthesisSummary]
+  simp only [HashToPoint.witnessMessagePiece_nextRegionIndex,
+    LookupRangeCheck.witnessShortCheck_nextRegionIndex,
+    operations_assignRegion,
+    FloorPlanner.synthesisSummary_region_cons,
+    FloorPlanner.synthesisSummary_nil,
+    Gate.circuit_synthesisSummary, circuit_norm, synthesis_summary_norm,
+    Nat.add_assoc]
 
 /-- One Merkle layer hash as a layouter-level formal circuit (`MerkleInstructions::hash_layer`),
 on the proven children (`witnessShortCheck` ×2, the `hash_to_point` bundle, the decomposition
@@ -1103,11 +1319,75 @@ def HashLayer.circuit (G : Generators) (Q : Point Fp) (hQ : Q.OnCurve) (l : ℕ)
 
   elaborated :=
     { keygenRequirements := HashLayer.keygenRequirements G Q hQ l
-      registered := HashLayer.keygenRegistered G Q hQ l
-      output := fun (cfg, lcfg) input i =>
-        (HashLayer.synthesize G cfg lcfg Q hQ l input).output i
+      synthesisSummary cfg _ _ := HashLayer.synthesisSummary cfg.1 cfg.2
+      synthesisSummary_eq := by
+        intro cfg input region
+        exact HashLayer.synthesisSummary_eq G Q hQ l cfg.1 cfg.2 input region
+      registered := by
+        intro configInput counts hconfig input i
+        unfold HashLayer.synthesize
+        simp only [Configure.output_pure, Circuit.operations_bind,
+          Operations.KeygenRegistered.append, Circuit.operations_pure,
+          Operations.KeygenRegistered.nil]
+        constructor
+        · keygen_registration [HashToPoint.witnessMessagePiece]
+        constructor
+        · keygen_registration [LookupRangeCheck.witnessShortCheck]
+        constructor
+        · keygen_registration [LookupRangeCheck.witnessShortCheck]
+        constructor
+        · keygen_registration [HashToPoint.witnessMessagePiece]
+        constructor
+        · keygen_registration [HashToPoint.witnessMessagePiece]
+        constructor
+        · apply HashLayer.hashMessage_keygenRegistered
+          intro column hcolumn
+          simp only [FormalCircuit.Configured.inputPermutationColumns,
+            FormalCircuit.keygenRequirements,
+            ElaboratedCircuit.keygenRequirements,
+            HashToPoint.hashCircuit, FormalRegionCircuit.toFormal,
+            ElaboratedRegionCircuit.keygenRequirements,
+            HashToPoint.hashRegion] at hcolumn
+          simp only [HashToPoint.witnessMessagePiece, Circuit.output,
+            assignRegion, assignAdvice] at hcolumn
+          rw [List.mem_map] at hcolumn
+          obtain ⟨found, hfound, rfl⟩ := hcolumn
+          have hfoundColumn : found.cell.column =
+              configInput.1.sinsemilla.witnessPieces.toAny := by
+            rw [List.mem_iff_getElem] at hfound
+            obtain ⟨j, hj, hvalue⟩ := hfound
+            have hj' : j < 3 := by simpa using hj
+            have hjcases : j = 0 ∨ j = 1 ∨ j = 2 := by omega
+            rcases hjcases with rfl | rfl | rfl <;>
+              simp at hvalue <;> subst found <;> rfl
+          rw [hfoundColumn]
+          simp [HashLayer.keygenRequirements]
+        · constructor
+          · apply HashLayer.gate_keygenRegistered
+            intro column hcolumn
+            simp only [FormalRegionCircuit.Configured.inputPermutationColumns,
+              FormalRegionCircuit.keygenRequirements,
+              ElaboratedRegionCircuit.keygenRequirements, Gate.circuit, Gate.elaborated,
+              HashToPoint.hashMessage, FormalCircuit.output_call,
+              HashToPoint.witnessMessagePiece_output_column,
+              LookupRangeCheck.witnessShortCheck_output_column,
+              List.mem_cons, List.not_mem_nil, or_false] at hcolumn
+            simp only [HashLayer.keygenRequirements, Configure.delta_pure,
+              List.append_nil]
+            rcases hcolumn with hcolumn | hcolumn | hcolumn | hcolumn | hcolumn |
+                hcolumn | hcolumn | hcolumn | hcolumn
+            all_goals subst column
+            all_goals simp [AssignedCell.of_cell, Cell.of_column,
+              HashToPoint.Configured.permutationColumns_eq,
+              LookupRangeCheck.shortRangeCheck_configured_permutationColumns_eq]
+          · trivial
+      output := fun (cfg, _) _ i =>
+        AssignedCell.of (i + 5)
+          (Sinsemilla.Chain.prefixRows HashLayer.merkleNs HashLayer.merkleNs.length)
+          cfg.sinsemilla.xA
       regionCount _ := 7
-      output_eq := by intro _ _ _; rfl
+      output_eq := fun (cfg, lcfg) input i =>
+        (HashLayer.synthesize_output G cfg lcfg Q hQ l input i).symm
       regionCount_eq := fun (cfg, lcfg) input i =>
         (hashLayer_regionCount G cfg lcfg Q hQ l input i).symm }
 
@@ -1276,17 +1556,8 @@ def HashLayer.circuit (G : Generators) (Q : Point Fp) (hQ : Q.OnCurve) (l : ℕ)
     · intro B hB
       have hres := hContract B (by rw [hchunksIs]; exact hB)
       dsimp only [] at hres
-      rw [show ((HashLayer.synthesize G cfg.1 cfg.2 Q hQ l
-          { left := input_var_left, right := input_var_right }).output i₀)
-        = AssignedCell.of (i₀ + 3 + 2)
-            (0 + Sinsemilla.Chain.prefixRows HashLayer.merkleNs HashLayer.merkleNs.length)
-            cfg.1.sinsemilla.xA from by
-        show (((HashToPoint.hashCircuit G HashLayer.merkleNs Q hQ (by decide)).call
-            cfg.1.sinsemilla _).output (i₀ + 3 + 2)).point.x = _
-        rw [FormalCircuit.output_call, HashToPoint.hashCircuit_output_point_x]] at h_output
-      simp only [AssignedCell.eval_of_advice] at h_output
       rw [← h_output]
-      exact hres.1
+      simpa only [Nat.add_assoc, Nat.reduceAdd, Nat.zero_add] using hres.1
 
   completeness := by
     circuit_proof_start
@@ -1578,17 +1849,17 @@ def HashLayer.circuit (G : Generators) (Q : Point Fp) (hQ : Q.OnCurve) (l : ℕ)
         exact hB)
       rw [HashToPoint.hashCircuit_output_eval_prover] at hPSH'
       obtain ⟨hpx, -⟩ := hPSH'
-      rw [show ((HashLayer.synthesize G cfg.1 cfg.2 Q hQ l
-          { left := input_var_left, right := input_var_right }).output i₀)
-        = AssignedCell.of (i₀ + 3 + 2)
-            (0 + Sinsemilla.Chain.prefixRows HashLayer.merkleNs HashLayer.merkleNs.length)
-            cfg.1.sinsemilla.xA from by
-        show (((HashToPoint.hashCircuit G HashLayer.merkleNs Q hQ (by decide)).call
-            cfg.1.sinsemilla _).output (i₀ + 3 + 2)).point.x = _
-        rw [FormalCircuit.output_call, HashToPoint.hashCircuit_output_point_x]] at h_output
-      simp only [AssignedCell.eval_of_advice] at h_output
       rw [← h_output]
-      exact hpx
+      simpa only [Nat.add_assoc, Nat.reduceAdd, Nat.zero_add] using hpx
+
+@[synthesis_summary_norm]
+theorem HashLayer.circuit_synthesisSummary_eq
+    (G : Generators) (Q : Point Fp) (hQ : Q.OnCurve)
+    (l : ℕ) (hl : l < 2 ^ 10)
+    (cfg : Config × LookupRangeCheck.Config 10)
+    (input : Var HashLayer.Input Fp) (region : RegionIndex) :
+    (HashLayer.circuit G Q hQ l hl).elaborated.synthesisSummary
+      cfg input region = HashLayer.synthesisSummary cfg.1 cfg.2 := rfl
 
 /-! ### Merkle path (`MerkleStep`, lifted verbatim) -/
 
@@ -1753,6 +2024,53 @@ theorem ExactMerklePathData.congr (G : Generators) (Q : Point Fp) (l d : ℕ)
 derive_contract_bridges HashLayer.circuit (G : Generators) (Q : Point Fp)
   (hQ : Q.OnCurve) (l : ℕ) (hl : l < 2 ^ 10) := HashLayer.circuit G Q hQ l hl
 
+/-- A Merkle hash layer requests four deferred constant cells: two short-range
+inverses, the public Sinsemilla initial x-coordinate, and the layer index. -/
+@[synthesis_summary_norm]
+theorem HashLayer.circuit_synthesisSummary_constantSiteCount
+    (G : Generators) (Q : Point Fp) (hQ : Q.OnCurve)
+    (l : ℕ) (hl : l < 2 ^ 10)
+    (config : Config × LookupRangeCheck.Config 10)
+    (input : Var HashLayer.Input Fp) (region : RegionIndex) :
+    ((HashLayer.circuit G Q hQ l hl).elaborated.synthesisSummary
+      config input region).constantSiteCount = 4 := by
+  rw [ElaboratedCircuit.synthesisSummary_constantSiteCount_eq]
+  simp only [HashLayer.circuit, HashLayer.synthesize,
+    Circuit.operations_bind, Circuit.operations_pure,
+    FloorPlanner.synthesisSummary_append,
+    FloorPlanner.SynthesisSummary.combine_constantSiteCount,
+    operations_assignRegion,
+    FloorPlanner.synthesisSummary_region_cons_constantSiteCount,
+    FloorPlanner.synthesisSummary_nil_constantSiteCount, Nat.add_zero]
+  repeat' first
+    | rw [HashToPoint.witnessMessagePiece_synthesisSummary_constantSiteCount]
+    | rw [LookupRangeCheck.witnessShortCheck_synthesisSummary_constantSiteCount]
+    | rw [HashToPoint.hashMessage_synthesisSummary_constantSiteCount]
+  rw [FormalRegionCircuit.call_synthesisSummary,
+    Gate.circuit_synthesisSummary_constantSiteCount]
+
+/-- The column carrying a hash-layer output is included in its equality-column summary. -/
+@[keygen_norm]
+theorem HashLayer.Configured.outputColumn_mem_permutationColumns
+    (G : Generators) (Q : Point Fp) (hQ : Q.OnCurve)
+    (l : ℕ) (hl : l < 2 ^ 10)
+    {cfg : Config × LookupRangeCheck.Config 10}
+    (configured : (HashLayer.circuit G Q hQ l hl).Configured cfg) :
+    cfg.1.sinsemilla.xA.toAny ∈ configured.permutationColumns := by
+  rcases configured with ⟨configInput, counts, lawful, output_eq⟩
+  simp only [HashLayer.circuit, Configure.output_pure] at output_eq
+  subst cfg
+  have hxA : configInput.1.sinsemilla.xA.toAny ∈
+      lawful.2.1.permutationColumns := by
+    rw [HashToPoint.Configured.permutationColumns_eq G HashLayer.merkleNs Q]
+    simp
+  simp only [FormalCircuit.Configured.permutationColumns, List.mem_append] at hxA
+  simp only [FormalCircuit.Configured.permutationColumns,
+    HashLayer.circuit, FormalCircuit.keygenRequirements,
+    ElaboratedCircuit.keygenRequirements, HashLayer.keygenRequirements,
+    Configure.delta_pure, List.append_nil, List.mem_append]
+  exact Or.inl (Or.inl (Or.inr hxA))
+
 /-- Assemble a hash-layer capability from its three direct child capabilities. -/
 def HashLayer.configurationCertificate (G : Generators) (Q : Point Fp)
     (hQ : Q.OnCurve) (l : ℕ) (hl : l < 2 ^ 10)
@@ -1762,7 +2080,8 @@ def HashLayer.configurationCertificate (G : Generators) (Q : Point Fp)
       lcfg context)
     (hash : (HashToPoint.hashCircuit G HashLayer.merkleNs Q hQ
       (by decide)).ConfigurationCertificate cfg.sinsemilla context)
-    (gate : (Gate.circuit (l : Fp)).ConfigurationCertificate cfg.gate context) :
+    (gate : (Gate.circuit (l : Fp)).ConfigurationCertificate cfg.gate context)
+    (hwitnessPieces : cfg.sinsemilla.witnessPieces.toAny ∈ context.permutationColumns) :
     (HashLayer.circuit G Q hQ l hl).ConfigurationCertificate (cfg, lcfg) context := by
   let lawful : (HashLayer.keygenRequirements G Q hQ l).configLawful (cfg, lcfg) :=
     ⟨range.configured, hash.configured, gate.configured⟩
@@ -1784,6 +2103,17 @@ def HashLayer.configurationCertificate (G : Generators) (Q : Point Fp)
     · exact range.lookups_of_configured required hrequired
     · exact hash.lookups_of_configured required hrequired
     · exact gate.lookups_of_configured required hrequired
+  · intro required hrequired
+    simp only [HashLayer.circuit, FormalCircuit.keygenRequirements,
+      ElaboratedCircuit.keygenRequirements, HashLayer.keygenRequirements,
+      Configure.delta_pure, List.append_nil, List.mem_append, List.mem_cons,
+      List.not_mem_nil, or_false] at hrequired
+    rcases hrequired with ((hrequired | hrequired) | hrequired) | hrequired
+    · exact range.permutationColumns_of_configured required hrequired
+    · exact hash.permutationColumns_of_configured required hrequired
+    · exact gate.permutationColumns_of_configured required hrequired
+    · subst required
+      exact hwitnessPieces
 
 /-- The region count of the layer: the swap region + the hash layer's 7. -/
 private theorem layer_regionCount (G : Generators) (Q : Point Fp) (hQ : Q.OnCurve)
@@ -1807,18 +2137,76 @@ private theorem layer_regionCount (G : Generators) (Q : Point Fp) (hQ : Q.OnCurv
       rw [FormalCircuit.call_regionCount]
       rfl]
 
+private theorem layer_output (G : Generators) (Q : Point Fp) (hQ : Q.OnCurve)
+    (l : ℕ) (hl : l < 2 ^ 10) (wsib : WitgenIR Fp 1)
+    (wswap : Placed ProverEnvironment Fp → Bool)
+    (ccfg : CondSwap.Config) (cfg : Config)
+    (lcfg : LookupRangeCheck.Config 10)
+    (input : Var Layer.Input Fp) (i : RegionIndex) :
+    ((do
+      let pair ← assignRegion "swap"
+        ((CondSwap.swap wsib wswap).call ccfg 0 { a := input.node })
+      (HashLayer.circuit G Q hQ l hl).call (cfg, lcfg)
+        { left := pair.aSwapped, right := pair.bSwapped }) :
+      Circuit Fp (Var field Fp)).output i =
+        AssignedCell.of (i + 6)
+          (Sinsemilla.Chain.prefixRows HashLayer.merkleNs HashLayer.merkleNs.length)
+          cfg.sinsemilla.xA := by
+  simp only [Circuit.output_bind, output_assignRegion,
+    nextRegionIndex_assignRegion, FormalCircuit.output_call',
+    HashLayer.circuit_output, Nat.add_assoc, Nat.reduceAdd]
+
 @[keygen_norm]
 def Layer.keygenRequirements (G : Generators) (Q : Point Fp)
     (hQ : Q.OnCurve) (l : ℕ) (hl : l < 2 ^ 10)
     (wsib : WitgenIR Fp 1)
     (wswap : Placed ProverEnvironment Fp → Bool) :
     KeygenRequirements Fp
-      (CondSwap.Config × Config × LookupRangeCheck.Config 10) where
+      (CondSwap.Config × Config × LookupRangeCheck.Config 10)
+      (Var Layer.Input Fp) where
   configLawful cfg :=
     (CondSwap.swap wsib wswap).Configured cfg.1 ×
       (HashLayer.circuit G Q hQ l hl).Configured (cfg.2.1, cfg.2.2)
   gates _ configured := configured.1.gates ++ configured.2.gates
   lookups _ configured := configured.1.lookups ++ configured.2.lookups
+  permutationColumns _ configured :=
+    configured.1.permutationColumns ++ configured.2.permutationColumns
+  inputPermutationColumns _ _ input := [input.node.cell.column]
+
+/-- Reduced footprint of one conditional-swap and hash layer. -/
+def Layer.synthesisSummary (ccfg : CondSwap.Config) (cfg : Config)
+    (lookupCfg : LookupRangeCheck.Config 10) : FloorPlanner.SynthesisSummary :=
+  (FloorPlanner.SynthesisSummary.ofRegion
+      (FloorPlanner.RegionSynthesisSummary.ofColumns
+        [.selector ccfg.qSwap.index,
+          .column .advice ccfg.a.index,
+          .column .advice ccfg.b.index,
+          .column .advice ccfg.swap.index,
+          .column .advice ccfg.aSwapped.index,
+          .column .advice ccfg.bSwapped.index]
+        1 0)).combine
+    (HashLayer.synthesisSummary cfg lookupCfg)
+
+theorem Layer.synthesisSummary_eq (G : Generators) (Q : Point Fp)
+    (hQ : Q.OnCurve) (l : ℕ) (hl : l < 2 ^ 10)
+    (wsib : WitgenIR Fp 1) (wswap : Placed ProverEnvironment Fp → Bool)
+    (ccfg : CondSwap.Config) (cfg : Config)
+    (lookupCfg : LookupRangeCheck.Config 10) (input : Var Layer.Input Fp)
+    (region : RegionIndex) :
+    Layer.synthesisSummary ccfg cfg lookupCfg =
+      FloorPlanner.synthesisSummary
+        (((do
+          let pair ← assignRegion "swap"
+            ((CondSwap.swap wsib wswap).call ccfg 0 { a := input.node })
+          (HashLayer.circuit G Q hQ l hl).call (cfg, lookupCfg)
+            { left := pair.aSwapped, right := pair.bSwapped }) :
+          Circuit Fp (Var field Fp)).operations region) := by
+  rw [Layer.synthesisSummary]
+  simp only [Circuit.operations_bind,
+    operations_assignRegion, FloorPlanner.synthesisSummary_region_cons,
+    CondSwap.swap_synthesisSummary_eq,
+    HashLayer.circuit_synthesisSummary_eq, circuit_norm,
+    synthesis_summary_norm]
 
 /-- One Merkle path layer (the `MerklePath::calculate_root` loop body): conditionally swap
 `(node, sibling)` by the position bit — sibling and bit are prover witness programs — then
@@ -1841,16 +2229,19 @@ def Layer.circuit (G : Generators) (Q : Point Fp) (hQ : Q.OnCurve) (l : ℕ)
 
   elaborated :=
     { keygenRequirements := Layer.keygenRequirements G Q hQ l hl wsib wswap
+      synthesisSummary cfg _ _ := Layer.synthesisSummary cfg.1 cfg.2.1 cfg.2.2
+      synthesisSummary_eq := by
+        intro cfg input region
+        exact Layer.synthesisSummary_eq G Q hQ l hl wsib wswap
+          cfg.1 cfg.2.1 cfg.2.2 input region
       registered := by keygen_registration
-      output := fun (ccfg, cfg, lcfg) input i =>
-        ((do
-          let pair ← assignRegion "swap"
-            ((CondSwap.swap wsib wswap).call ccfg 0 { a := input.node })
-          (HashLayer.circuit G Q hQ l hl).call (cfg, lcfg)
-            { left := pair.aSwapped, right := pair.bSwapped }
-          : Circuit Fp (Var field Fp)).output i)
+      output := fun (_, cfg, _) _ i =>
+        AssignedCell.of (i + 6)
+          (Sinsemilla.Chain.prefixRows HashLayer.merkleNs HashLayer.merkleNs.length)
+          cfg.sinsemilla.xA
       regionCount _ := 8
-      output_eq := by intro _ _ _; rfl
+      output_eq := fun (ccfg, cfg, lcfg) input i =>
+        (layer_output G Q hQ l hl wsib wswap ccfg cfg lcfg input i).symm
       regionCount_eq := fun (ccfg, cfg, lcfg) input i =>
         (layer_regionCount G Q hQ l hl wsib wswap ccfg cfg lcfg input i).symm }
 
@@ -1909,12 +2300,16 @@ def Layer.circuit (G : Generators) (Q : Point Fp) (hQ : Q.OnCurve) (l : ℕ)
       = AssignedCell.eval place env x_gen_out_0.bSwapped from rfl,
       hBread, hBSw] at hrightEq
     have hOld : MerkleStep G Q l input_node output := by
-      refine ⟨lv, rv, hlv, hrv, ?_, hcontract⟩
+      refine ⟨lv, rv, hlv, hrv, ?_, ?_⟩
       rcases hbool with h0 | h1
       · rw [if_neg (show ¬ _ = (1 : Fp) from by rw [h0]; decide)] at hleftEq
         exact Or.inl hleftEq
       · rw [if_pos h1] at hrightEq
         exact Or.inr hrightEq
+      intro B hB
+      rw [← h_output]
+      simpa only [HashLayer.circuit_output, AssignedCell.eval_of_advice,
+        Nat.add_assoc, Nat.reduceAdd] using hcontract B hB
     refine ⟨hOld, ?_⟩
     let zExact : Layer.Witness :=
       { sibling := eval (⟨place, env⟩ : Placed Environment Fp)
@@ -1954,10 +2349,11 @@ def Layer.circuit (G : Generators) (Q : Point Fp) (hQ : Q.OnCurve) (l : ℕ)
       change hashToPoint G.S Q
         (merkleChunks l (HashLayer.leftEncoding zExact.encoding)
           (HashLayer.rightEncoding zExact.encoding)) = some B at hB
-      apply hcontract
       rw [hEnc] at hB
       rw [← hleftEnc, ← hrightEnc] at hB
-      exact hB
+      rw [← h_output]
+      simpa only [HashLayer.circuit_output, AssignedCell.eval_of_advice,
+        Nat.add_assoc, Nat.reduceAdd] using hcontract B hB
 
   completeness := by
     circuit_proof_start
@@ -2025,6 +2421,64 @@ def Layer.circuit (G : Generators) (Q : Point Fp) (hQ : Q.OnCurve) (l : ℕ)
     rw [← h_output]
     exact hres
 
+derive_contract_bridges Layer.circuit (G : Generators) (Q : Point Fp)
+  (hQ : Q.OnCurve) (l : ℕ) (hl : l < 2 ^ 10)
+  (wsib : WitgenIR Fp 1) (wswap : Placed ProverEnvironment Fp → Bool) :=
+    Layer.circuit G Q hQ l hl wsib wswap
+
+/-- Conditional swapping adds no deferred constants, so a complete Merkle
+layer has the same four requests as its hash layer. -/
+@[synthesis_summary_norm]
+theorem Layer.circuit_synthesisSummary_constantSiteCount
+    (G : Generators) (Q : Point Fp) (hQ : Q.OnCurve)
+    (l : ℕ) (hl : l < 2 ^ 10) (wsib : WitgenIR Fp 1)
+    (wswap : Placed ProverEnvironment Fp → Bool)
+    (config : CondSwap.Config × Config × LookupRangeCheck.Config 10)
+    (input : Var Layer.Input Fp) (region : RegionIndex) :
+    ((Layer.circuit G Q hQ l hl wsib wswap).elaborated.synthesisSummary
+      config input region).constantSiteCount = 4 := by
+  rw [ElaboratedCircuit.synthesisSummary_constantSiteCount_eq]
+  simp only [Layer.circuit, Circuit.operations_bind,
+    FloorPlanner.synthesisSummary_append,
+    FloorPlanner.SynthesisSummary.combine_constantSiteCount,
+    operations_assignRegion,
+    FloorPlanner.synthesisSummary_region_cons_constantSiteCount,
+    FloorPlanner.synthesisSummary_nil_constantSiteCount, Nat.add_zero]
+  rw [FormalRegionCircuit.call_synthesisSummary,
+    CondSwap.swap_synthesisSummary_constantSiteCount,
+    FormalCircuit.call_synthesisSummary,
+    HashLayer.circuit_synthesisSummary_constantSiteCount]
+
+/-- A Merkle-layer output stays in the hash chip's `xA` column. -/
+@[keygen_norm]
+theorem Layer.circuit_output_column (G : Generators) (Q : Point Fp)
+    (hQ : Q.OnCurve) (l : ℕ) (hl : l < 2 ^ 10)
+    (wsib : WitgenIR Fp 1) (wswap : Placed ProverEnvironment Fp → Bool)
+    (cfg : CondSwap.Config × Config × LookupRangeCheck.Config 10)
+    (input : Var Layer.Input Fp) (i : RegionIndex) :
+    ((Layer.circuit G Q hQ l hl wsib wswap).output cfg input i).cell.column =
+      cfg.2.1.sinsemilla.xA := by
+  simp only [Layer.circuit_output, AssignedCell.of_cell, Cell.of_column]
+
+/-- The column carrying a layer's output is included in its equality-column summary. -/
+@[keygen_norm]
+theorem Layer.Configured.outputColumn_mem_permutationColumns
+    (G : Generators) (Q : Point Fp) (hQ : Q.OnCurve)
+    (l : ℕ) (hl : l < 2 ^ 10)
+    (wsib : WitgenIR Fp 1) (wswap : Placed ProverEnvironment Fp → Bool)
+    {cfg : CondSwap.Config × Config × LookupRangeCheck.Config 10}
+    (configured : (Layer.circuit G Q hQ l hl wsib wswap).Configured cfg) :
+    cfg.2.1.sinsemilla.xA.toAny ∈ configured.permutationColumns := by
+  rcases configured with ⟨configInput, counts, lawful, output_eq⟩
+  simp only [Layer.circuit, Configure.output_pure] at output_eq
+  subst cfg
+  simp only [FormalCircuit.Configured.permutationColumns,
+    Layer.circuit, FormalCircuit.keygenRequirements,
+    Layer.keygenRequirements, Configure.delta_pure, List.append_nil]
+  apply List.mem_append_right
+  exact HashLayer.Configured.outputColumn_mem_permutationColumns
+    G Q hQ l hl lawful.2
+
 /-- Assemble one Merkle-layer capability from its two direct children. -/
 def Layer.configurationCertificate (G : Generators) (Q : Point Fp)
     (hQ : Q.OnCurve) (l : ℕ) (hl : l < 2 ^ 10)
@@ -2054,6 +2508,13 @@ def Layer.configurationCertificate (G : Generators) (Q : Point Fp)
     rcases hrequired with hrequired | hrequired
     · exact swap.lookups_of_configured required hrequired
     · exact hash.lookups_of_configured required hrequired
+  · intro required hrequired
+    simp only [Layer.circuit, FormalCircuit.keygenRequirements,
+      ElaboratedCircuit.keygenRequirements, Layer.keygenRequirements,
+      Configure.delta_pure, List.append_nil, List.mem_append] at hrequired
+    rcases hrequired with hrequired | hrequired
+    · exact swap.permutationColumns_of_configured required hrequired
+    · exact hash.permutationColumns_of_configured required hrequired
 
 /-! ### `CalculateRoot` (32-layer fold, structure) -/
 
@@ -2106,6 +2567,17 @@ def layerAt (G : Generators) (Q : Point Fp) (hQ : Q.OnCurve) (l₀ : ℕ)
       (CondSwap.Config × Config × LookupRangeCheck.Config 10)
       Layer.Input field :=
   Layer.circuit G Q hQ ((l₀ + i) % 2 ^ 10) (Nat.mod_lt _ (by norm_num)) (wsib i) (wswap i)
+
+@[keygen_norm]
+private theorem layerAt_output_column
+    (G : Generators) (Q : Point Fp) (hQ : Q.OnCurve) (l₀ : ℕ)
+    (wsib : ℕ → WitgenIR Fp 1)
+    (wswap : ℕ → Placed ProverEnvironment Fp → Bool)
+    (cfg : CondSwap.Config × Config × LookupRangeCheck.Config 10)
+    (input : Var Layer.Input Fp) (region : RegionIndex) (i : ℕ) :
+    ((layerAt G Q hQ l₀ wsib wswap i).output cfg input region).cell.column =
+      cfg.2.1.sinsemilla.xA :=
+  Layer.circuit_output_column G Q hQ _ _ _ _ cfg input region
 
 /-- Feed a layer's root cell back as the next layer's node. -/
 def toInput : Var field Fp → Var Layer.Input Fp := fun out => { node := out }
@@ -2274,13 +2746,35 @@ private theorem retargetLayerConfigured_lookups
   rfl
 
 @[keygen_norm]
+private theorem retargetLayerConfigured_permutationColumns
+    {cfg : CondSwap.Config × Config × LookupRangeCheck.Config 10}
+    {l l' : ℕ} {hl : l < 2 ^ 10} {hl' : l' < 2 ^ 10}
+    {wb wb' : WitgenIR Fp 1}
+    {swapWitness swapWitness' : Placed ProverEnvironment Fp → Bool}
+    (configured : (Layer.circuit G Q hQ l hl wb swapWitness).Configured cfg) :
+    (retargetLayerConfigured G Q hQ
+      (l' := l') (hl' := hl') (wb' := wb')
+      (swapWitness' := swapWitness') configured).permutationColumns =
+        configured.permutationColumns := by
+  rcases configured with ⟨configInput, counts,
+    ⟨swapConfigured, hashConfigured⟩, output_eq⟩
+  rcases swapConfigured with ⟨swapInput, swapCounts, swapLawful, swapOutput⟩
+  rcases hashConfigured with ⟨hashInput, hashCounts,
+    ⟨rangeConfigured, hashToPointConfigured, gateConfigured⟩, hashOutput⟩
+  rcases gateConfigured with ⟨gateInput, gateCounts, gateLawful, gateOutput⟩
+  rfl
+
+@[keygen_norm]
 def keygenRequirements :
     KeygenRequirements Fp
-      (CondSwap.Config × Config × LookupRangeCheck.Config 10) where
+      (CondSwap.Config × Config × LookupRangeCheck.Config 10)
+      (Var Layer.Input Fp) where
   configLawful cfg :=
     (layerAt G Q hQ l₀ wsib wswap 0).Configured cfg
   gates _ configured := configured.gates
   lookups _ configured := configured.lookups
+  permutationColumns _ configured := configured.permutationColumns
+  inputPermutationColumns _ _ input := [input.node.cell.column]
 
 @[keygen_configured]
 private def layerAtConfigured
@@ -2305,6 +2799,131 @@ private theorem layerAtConfigured_lookups
       configured.lookups :=
   retargetLayerConfigured_lookups G Q hQ configured
 
+@[keygen_norm]
+private theorem layerAtConfigured_permutationColumns
+    {cfg : CondSwap.Config × Config × LookupRangeCheck.Config 10}
+    (configured : (layerAt G Q hQ l₀ wsib wswap 0).Configured cfg) (i : ℕ) :
+    (layerAtConfigured G Q hQ l₀ wsib wswap configured i).permutationColumns =
+      configured.permutationColumns :=
+  retargetLayerConfigured_permutationColumns G Q hQ configured
+
+private theorem foldState_node_column_mem
+    {cfg : CondSwap.Config × Config × LookupRangeCheck.Config 10}
+    (configured : (layerAt G Q hQ l₀ wsib wswap 0).Configured cfg)
+    (input : Var Layer.Input Fp) (region : RegionIndex) : ∀ m : ℕ,
+    (FormalCircuit.foldState
+        (layerAt G Q hQ l₀ wsib wswap) toInput cfg input region m).1.node.cell.column ∈
+      configured.permutationColumns ++ [input.node.cell.column]
+  | 0 => by
+      simp [FormalCircuit.foldState]
+  | m + 1 => by
+      simp only [FormalCircuit.foldState, toInput]
+      rw [layerAt_output_column]
+      apply List.mem_append_left
+      have hcolumn := Layer.Configured.outputColumn_mem_permutationColumns
+        G Q hQ _ _ _ _ (layerAtConfigured G Q hQ l₀ wsib wswap configured m)
+      simpa only [layerAtConfigured_permutationColumns] using hcolumn
+
+/-- A nonempty Merkle fold carries the last layer's `xA` output column; the empty
+fold returns its input cell unchanged. -/
+@[keygen_norm]
+private theorem foldState_node_column
+    (G : Generators) (Q : Point Fp) (hQ : Q.OnCurve) (l₀ : ℕ)
+    (wsib : ℕ → WitgenIR Fp 1)
+    (wswap : ℕ → Placed ProverEnvironment Fp → Bool)
+    (cfg : CondSwap.Config × Config × LookupRangeCheck.Config 10)
+    (input : Var Layer.Input Fp) (region : RegionIndex) (m : ℕ) :
+    (FormalCircuit.foldState
+        (layerAt G Q hQ l₀ wsib wswap) toInput cfg input region m).1.node.cell.column =
+      if m = 0 then input.node.cell.column else cfg.2.1.sinsemilla.xA := by
+  cases m with
+  | zero => simp [FormalCircuit.foldState]
+  | succ m =>
+      simp only [FormalCircuit.foldState, toInput]
+      rw [layerAt_output_column]
+      simp
+
+private def synthesize
+    (cfg : CondSwap.Config × Config × LookupRangeCheck.Config 10)
+    (input : Var Layer.Input Fp) : Circuit Fp (Var field Fp) := do
+  let acc ← FormalCircuit.foldCall
+    (layerAt G Q hQ l₀ wsib wswap) toInput cfg input d
+  pure acc.node
+
+private theorem synthesize_keygenRegistered :
+    ∀ (configInput : CondSwap.Config × Config × LookupRangeCheck.Config 10)
+      (counts : ConfigureCounts)
+      (hconfig : (keygenRequirements G Q hQ l₀ wsib wswap).configLawful configInput)
+      (input : Var Layer.Input Fp) (region : RegionIndex),
+    let program := (pure configInput : Configure Fp _)
+    ((synthesize G Q hQ l₀ d wsib wswap (program.output counts) input).operations
+      region).KeygenRegistered
+      ((keygenRequirements G Q hQ l₀ wsib wswap).gates configInput hconfig ++
+        (program.delta counts).gates)
+      ((keygenRequirements G Q hQ l₀ wsib wswap).lookups configInput hconfig ++
+        (program.delta counts).lookups)
+      ((keygenRequirements G Q hQ l₀ wsib wswap).permutationColumns configInput hconfig ++
+        (program.delta counts).permutationRequests ++
+        (keygenRequirements G Q hQ l₀ wsib wswap).inputPermutationColumns
+          configInput hconfig input) := by
+  intro configInput counts hconfig input region
+  simp only [synthesize, Circuit.operations_bind, Circuit.operations_pure,
+    Operations.KeygenRegistered.append, Operations.KeygenRegistered.nil,
+    and_true]
+  apply FormalCircuit.foldCall_keygenRegistered
+    (c := layerAt G Q hQ l₀ wsib wswap)
+    (toInput := toInput) (config := configInput)
+    (init := input) (i₀ := region) d
+    (fun i => layerAtConfigured G Q hQ l₀ wsib wswap hconfig i)
+  · intro i gate hgate
+    rw [layerAtConfigured_gates] at hgate
+    simpa only [keygenRequirements, Configure.delta_pure,
+      List.append_nil] using hgate
+  · intro i argument hargument
+    rw [layerAtConfigured_lookups] at hargument
+    simpa only [keygenRequirements, Configure.delta_pure,
+      List.append_nil] using hargument
+  · intro i column hcolumn
+    rw [layerAtConfigured_permutationColumns] at hcolumn
+    simp only [keygenRequirements, Configure.delta_pure,
+      List.append_nil, List.mem_append]
+    exact Or.inl hcolumn
+  · intro i column hcolumn
+    simp only [FormalCircuit.Configured.inputPermutationColumns,
+      layerAt, Layer.circuit, FormalCircuit.keygenRequirements,
+      ElaboratedCircuit.keygenRequirements, Layer.keygenRequirements,
+      List.mem_singleton] at hcolumn
+    subst column
+    exact foldState_node_column_mem G Q hQ l₀ wsib wswap
+      hconfig input region i
+
+/-- Reduced summary of all Merkle layers, composed from each layer's declared
+summary at its fold state. -/
+def synthesisSummary
+    (cfg : CondSwap.Config × Config × LookupRangeCheck.Config 10)
+    : FloorPlanner.SynthesisSummary :=
+  FloorPlanner.SynthesisSummary.replicate d
+    (Layer.synthesisSummary cfg.1 cfg.2.1 cfg.2.2)
+
+theorem synthesisSummary_eq
+    (cfg : CondSwap.Config × Config × LookupRangeCheck.Config 10)
+    (input : Var Layer.Input Fp) (region : RegionIndex) :
+    synthesisSummary d cfg =
+      FloorPlanner.synthesisSummary
+        ((synthesize G Q hQ l₀ d wsib wswap cfg input).operations region) := by
+  rw [synthesize, Circuit.operations_bind,
+    Circuit.operations_pure, List.append_nil,
+    FormalCircuit.foldCall_operations]
+  rw [← FormalCircuit.foldSynthesisSummary_eq]
+  symm
+  apply FormalCircuit.foldSynthesisSummary_eq_replicate
+  · intro i
+    rfl
+  · rw [Layer.synthesisSummary_eq G Q hQ ((l₀ + 0) % 2 ^ 10)
+        (Nat.mod_lt _ (by norm_num)) (wsib 0) (wswap 0)
+        cfg.1 cfg.2.1 cfg.2.2 input region]
+    exact FloorPlanner.synthesisSummary_columns_nodup _
+
 /-- Rust `MerklePath::calculate_root` (`merkle.rs`): the 32-layer serial fold of
 `Layer.circuit` (layer `i` at `l = i`), fed by the per-layer sibling/position-bit witness
 programs. Its spec is the extraction-friendly `ExactMerklePathData` chain (zcash/ironwood#97):
@@ -2319,13 +2938,13 @@ def circuit :
   name := "MerkleCRH calculate_root"
   configure := pure
 
-  synthesize cfg input := do
-    let acc ← FormalCircuit.foldCall (layerAt G Q hQ l₀ wsib wswap) toInput cfg input d
-    pure acc.node
+  synthesize := synthesize G Q hQ l₀ d wsib wswap
 
   elaborated :=
     { keygenRequirements := keygenRequirements G Q hQ l₀ wsib wswap
-      registered := by keygen_registration
+      synthesisSummary cfg _ _ := synthesisSummary d cfg
+      synthesisSummary_eq := synthesisSummary_eq G Q hQ l₀ d wsib wswap
+      registered := synthesize_keygenRegistered G Q hQ l₀ d wsib wswap
       output := fun cfg input i =>
         (FormalCircuit.foldState (layerAt G Q hQ l₀ wsib wswap) toInput cfg input i d).1.node
       regionCount _ := 8 * d
@@ -2651,8 +3270,52 @@ theorem circuit_synthesize_operations
     ((circuit G Q hQ l₀ d hld wsib wswap).synthesize cfg input).operations i =
       (FormalCircuit.foldCall (layerAt G Q hQ l₀ wsib wswap) toInput
         cfg input d).operations i := by
-  simp only [circuit, Circuit.operations_bind, Circuit.operations_pure,
+  simp only [circuit, synthesize, Circuit.operations_bind, Circuit.operations_pure,
     List.append_nil]
+
+/-- A calculate-root call publishes the fold's reduced synthesis summary. -/
+@[synthesis_summary_norm]
+theorem circuit_synthesisSummary_eq
+    (config : CondSwap.Config × Config × LookupRangeCheck.Config 10)
+    (input : Var Layer.Input Fp) (region : RegionIndex) :
+    (circuit G Q hQ l₀ d hld wsib wswap).elaborated.synthesisSummary
+        config input region =
+      synthesisSummary d config := rfl
+
+/-- The calculate-root output column is determined by the fold shape alone. -/
+@[keygen_norm]
+theorem circuit_output_column
+    (cfg : CondSwap.Config × Config × LookupRangeCheck.Config 10)
+    (input : Var Layer.Input Fp) (region : RegionIndex) :
+    ((circuit G Q hQ l₀ d hld wsib wswap).output cfg input region).cell.column =
+      if d = 0 then input.node.cell.column else cfg.2.1.sinsemilla.xA := by
+  unfold FormalCircuit.output ElaboratedCircuit.output circuit
+  exact foldState_node_column G Q hQ l₀ wsib wswap cfg input region d
+
+/-- A calculate-root fold requests exactly four deferred constants per Merkle
+layer. -/
+@[synthesis_summary_norm]
+theorem circuit_synthesisSummary_constantSiteCount
+    (config : CondSwap.Config × Config × LookupRangeCheck.Config 10)
+    (input : Var Layer.Input Fp) (region : RegionIndex) :
+    ((circuit G Q hQ l₀ d hld wsib wswap).elaborated.synthesisSummary
+      config input region).constantSiteCount = 4 * d := by
+  rw [ElaboratedCircuit.synthesisSummary_constantSiteCount_eq]
+  simp only [circuit, synthesize, Circuit.operations_bind,
+    Circuit.operations_pure, List.append_nil]
+  rw [FormalCircuit.foldCall_synthesisSummary_constantSiteCount]
+  have hround (i : Fin d) :
+      ((layerAt G Q hQ l₀ wsib wswap i).elaborated.synthesisSummary
+        config
+        (FormalCircuit.foldState (layerAt G Q hQ l₀ wsib wswap)
+          toInput config input region i).1
+        (FormalCircuit.foldState (layerAt G Q hQ l₀ wsib wswap)
+          toInput config input region i).2).constantSiteCount = 4 := by
+    simp only [layerAt]
+    apply Layer.circuit_synthesisSummary_constantSiteCount
+  simp_rw [hround]
+  simp
+  omega
 
 /-- Package the fold from the single layer-family capability it exposes. -/
 def configurationCertificate
@@ -2673,6 +3336,11 @@ def configurationCertificate
       ElaboratedCircuit.keygenRequirements, keygenRequirements,
       Configure.delta_pure, List.append_nil] at hrequired
     exact layer.lookups_of_configured required hrequired
+  · intro required hrequired
+    simp only [circuit, FormalCircuit.keygenRequirements,
+      ElaboratedCircuit.keygenRequirements, keygenRequirements,
+      Configure.delta_pure, List.append_nil] at hrequired
+    exact layer.permutationColumns_of_configured required hrequired
 
 derive_contract_bridges circuit (G : Generators) (Q : Point Fp) (hQ : Q.OnCurve)
   (l₀ d : ℕ) (hld : l₀ + d ≤ 2 ^ 10) (wsib : ℕ → WitgenIR Fp 1)

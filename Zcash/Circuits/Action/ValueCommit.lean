@@ -42,7 +42,7 @@ def keygenRequirements
     (V : Ecc.MulFixed.Short.FixedBase) (R : FixedBase) :
     KeygenRequirements Fp
       (Ecc.MulFixed.Short.Config × Ecc.MulFixed.FullWidth.Config ×
-        Ecc.Add.Config) where
+        Ecc.Add.Config) (Var Inputs Fp) where
   configLawful cfg :=
     (Ecc.MulFixed.Short.circuit V).Configured cfg.1 ×
       (Ecc.MulFixed.FullWidth.circuit R).Configured cfg.2.1 ×
@@ -53,6 +53,24 @@ def keygenRequirements
   lookups _ configured :=
     configured.1.lookups ++ configured.2.1.lookups ++
       configured.2.2.lookups
+  permutationColumns cfg configured :=
+    configured.1.permutationColumns ++ configured.2.1.permutationColumns ++
+      configured.2.2.permutationColumns ++
+        ([cfg.1.superConfig.addConfig.xQR,
+          cfg.1.superConfig.addConfig.yP,
+          cfg.2.1.superConfig.addConfig.xQR,
+          cfg.2.1.superConfig.addConfig.yQR] : List AnyColumn)
+  inputPermutationColumns _ _ input :=
+    [input.magnitude.cell.column, input.sign.cell.column]
+
+def synthesisSummary
+    (cfg : Ecc.MulFixed.Short.Config × Ecc.MulFixed.FullWidth.Config ×
+      Ecc.Add.Config) :
+    FloorPlanner.SynthesisSummary :=
+  (Ecc.MulFixed.Short.circuitSynthesisSummary cfg.1).combine
+    ((Ecc.MulFixed.FullWidth.circuitSynthesisSummary cfg.2.1).combine
+      (FloorPlanner.SynthesisSummary.ofRegion
+        (Ecc.Add.synthesisSummary cfg.2.2 0)))
 
 /-! ## The `value_commit_orchard` bundle -/
 
@@ -80,7 +98,20 @@ def circuit (V : Ecc.MulFixed.Short.FixedBase) (R : FixedBase) :
   elaborated :=
     { keygenRequirements := keygenRequirements V R
       registered := by keygen_registration
-      regionCount _ := 5 }
+      output cfg _ i :=
+        { x := .of (i + 4) 1 cfg.2.2.xQR,
+          y := .of (i + 4) 1 cfg.2.2.yQR }
+      regionCount _ := 5
+      synthesisSummary cfg _ _ := synthesisSummary cfg
+      synthesisSummary_eq := by
+        intro cfg input region
+        simp only [synthesisSummary, circuit_norm, synthesis_summary_norm]
+      output_eq := by
+        intro cfg input i
+        simp only [Circuit.output_bind, Circuit.output_pure,
+          FormalCircuit.output_call', FormalCircuit.nextRegionIndex_call',
+          FormalCircuit.call_regionCount', circuit_norm,
+          Ecc.Add.addFormal_output_cells] }
 
   EnvAssumptions := fun (scfg, fcfg, _) env =>
     Ecc.MulFixed.Short.EnvAssumptions scfg env ∧
@@ -109,9 +140,17 @@ def circuit (V : Ecc.MulFixed.Short.FixedBase) (R : FixedBase) :
         rcases hcases with ⟨-, h⟩ | ⟨-, h⟩ <;> rw [h] <;> exact V.smul_valid _,
       by rw [hBl]; exact R.smul_valid _⟩
     refine ⟨hm_lt, ?_⟩
+    rw [Ecc.Add.addFormal_output_cells] at cv_eq
+    have hcv : ({ x := output_x, y := output_y } : Point Fp) =
+        eval (⟨place, env⟩ : Placed Environment Fp) cv := by
+      rw [← cv_eq]
+      simp only [Point.eval_eq, circuit_norm]
+      simp_all
     rcases hcases with ⟨hsign, hCm⟩ | ⟨hsign, hCm⟩
-    · exact Or.inl ⟨hsign, by simp_all⟩
-    · exact Or.inr ⟨hsign, by simp_all⟩
+    · refine Or.inl ⟨hsign, ?_⟩
+      rw [hcv, hAddS.2, hCm, hBl]
+    · refine Or.inr ⟨hsign, ?_⟩
+      rw [hcv, hAddS.2, hCm, hBl]
 
   completeness := by
     circuit_proof_start2 [Ecc.MulFixed.Short.circuit, Ecc.MulFixed.FullWidth.circuit,
@@ -122,6 +161,27 @@ def circuit (V : Ecc.MulFixed.Short.FixedBase) (R : FixedBase) :
     have hBl := blind_spec hFEnv
     refine ⟨⟨hSEnv, hmag, hsign⟩, hFEnv, ?_, by rw [hBl]; exact R.smul_valid _⟩
     rcases hcases with ⟨-, h⟩ | ⟨-, h⟩ <;> rw [h] <;> exact V.smul_valid _
+
+@[synthesis_summary_norm]
+theorem circuit_synthesisSummary_eq
+    (V : Ecc.MulFixed.Short.FixedBase) (R : FixedBase)
+    (config : Ecc.MulFixed.Short.Config × Ecc.MulFixed.FullWidth.Config ×
+      Ecc.Add.Config) (input : Var Inputs Fp) (region : RegionIndex) :
+    ((circuit V R).elaborated.synthesisSummary config input region) =
+      synthesisSummary config := rfl
+
+/-- A value commitment requests only the short scalar's strict-decomposition
+constant allocation. -/
+@[synthesis_summary_norm]
+theorem circuit_synthesisSummary_constantSiteCount
+    (V : Ecc.MulFixed.Short.FixedBase) (R : FixedBase)
+    (config : Ecc.MulFixed.Short.Config × Ecc.MulFixed.FullWidth.Config ×
+      Ecc.Add.Config)
+    (input : Var Inputs Fp) (region : RegionIndex) :
+    ((circuit V R).elaborated.synthesisSummary
+      config input region).constantSiteCount = 1 := by
+  rw [circuit_synthesisSummary_eq]
+  simp only [synthesisSummary, synthesis_summary_norm]
 
 derive_contract_bridges circuit (V : Ecc.MulFixed.Short.FixedBase)
   (R : FixedBase) := circuit V R

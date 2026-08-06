@@ -42,7 +42,7 @@ deriving CircuitType
 
 @[keygen_norm]
 def keygenRequirements (G : FixedBase) : KeygenRequirements Fp
-    (Ecc.MulFixed.FullWidth.Config × Ecc.Add.Config) where
+    (Ecc.MulFixed.FullWidth.Config × Ecc.Add.Config) (Var Input Fp) where
   configLawful cfg :=
     (Ecc.MulFixed.FullWidth.circuit G).Configured cfg.1 ×
       Ecc.Add.addFormal.Configured cfg.2
@@ -50,6 +50,19 @@ def keygenRequirements (G : FixedBase) : KeygenRequirements Fp
     configured.1.gates ++ configured.2.gates
   lookups _ configured :=
     configured.1.lookups ++ configured.2.lookups
+  permutationColumns cfg configured :=
+    configured.1.permutationColumns ++ configured.2.permutationColumns ++
+      ([cfg.1.superConfig.addConfig.xQR,
+        cfg.1.superConfig.addConfig.yQR] : List AnyColumn)
+  inputPermutationColumns _ _ input :=
+    [input.akP.x.cell.column, input.akP.y.cell.column]
+
+def synthesisSummary
+    (cfg : Ecc.MulFixed.FullWidth.Config × Ecc.Add.Config) :
+    FloorPlanner.SynthesisSummary :=
+  (Ecc.MulFixed.FullWidth.circuitSynthesisSummary cfg.1).combine
+    (FloorPlanner.SynthesisSummary.ofRegion
+      (Ecc.Add.synthesisSummary cfg.2 0))
 
 /-- Rust `Circuit::synthesize`'s spend-authority block: `[alpha] SpendAuthG` (the
 `FullWidth` bundle) plus `ak_P`. `Spec` is knowledge soundness at the extracted
@@ -71,7 +84,20 @@ def circuit (G : FixedBase) : FormalCircuit Fp
   elaborated :=
     { keygenRequirements := keygenRequirements G
       registered := by keygen_registration
-      regionCount _ := 3 }
+      output cfg _ i :=
+        { x := .of (i + 2) 1 cfg.2.xQR,
+          y := .of (i + 2) 1 cfg.2.yQR }
+      regionCount _ := 3
+      synthesisSummary cfg _ _ := synthesisSummary cfg
+      synthesisSummary_eq := by
+        intro cfg input region
+        simp only [synthesisSummary, circuit_norm, synthesis_summary_norm]
+      output_eq := by
+        intro cfg input i
+        simp only [Circuit.output_bind, Circuit.output_pure,
+          FormalCircuit.output_call', FormalCircuit.nextRegionIndex_call',
+          FormalCircuit.call_regionCount', circuit_norm,
+          Ecc.Add.addFormal_output_cells] }
 
   EnvAssumptions := fun (fcfg, _) env =>
     Ecc.MulFixed.FullWidth.EnvAssumptions fcfg env
@@ -90,11 +116,24 @@ def circuit (G : FixedBase) : FormalCircuit Fp
     circuit_proof_start2 [Ecc.MulFixed.FullWidth.circuit, Ecc.Add.addFormal]
     have hAl := alphaCommitment_spec env_assumptions
     have hAddS := rk_spec ⟨by rw [hAl]; exact G.smul_valid _, assumptions⟩
-    simp_all
+    rw [Ecc.Add.addFormal_output_cells] at rk_eq
+    have hrk : ({ x := output_x, y := output_y } : Point Fp) =
+        eval (⟨place, env⟩ : Placed Environment Fp) rk := by
+      rw [← rk_eq]
+      simp only [Point.eval_eq, circuit_norm]
+      simp_all
+    rw [hrk, hAddS.2, hAl]
   completeness := by
     circuit_proof_start2 [Ecc.MulFixed.FullWidth.circuit, Ecc.Add.addFormal]
     have hAl := alphaCommitment_spec env_assumptions
     exact ⟨env_assumptions, by rw [hAl]; exact G.smul_valid _, assumptions⟩
+
+@[synthesis_summary_norm]
+theorem circuit_synthesisSummary_eq (G : FixedBase)
+    (config : Ecc.MulFixed.FullWidth.Config × Ecc.Add.Config)
+    (input : Var Input Fp) (region : RegionIndex) :
+    (circuit G).elaborated.synthesisSummary config input region =
+      synthesisSummary config := rfl
 
 derive_contract_bridges circuit (G : FixedBase) := circuit G
 

@@ -282,31 +282,8 @@ theorem soundness (G : Generators) (R : FixedBase) (Q : Point Fp)
                 AssignedCell.of (i₀ + 6) 0 cfg.hashConfig.witnessPieces],
             r := input_var_rivk }
           (i₀ + 7)) : Point Fp).x := by
-    -- the output walk crosses the commit call (opaque): land the walk on the folded call's
-    -- output projection (defeq), open it with `output_call`, then the rest is metadata defeq
-    rw [← h_output,
-      show (synth G R Q hQ cfg
-          { ak := input_var_ak, nk := input_var_nk, rivk := input_var_rivk }).output i₀
-        = ((Sinsemilla.CommitDomain.commit G ns R Q hQ ns_ne_nil).output
-            (cfg.mulConfig, cfg.hashConfig, cfg.addConfig)
-            { pieces :=
-                #v[AssignedCell.of i₀ 0 cfg.hashConfig.witnessPieces,
-                  AssignedCell.of (i₀ + 3) 0 cfg.hashConfig.witnessPieces,
-                  AssignedCell.of (i₀ + 4) 0 cfg.hashConfig.witnessPieces,
-                  AssignedCell.of (i₀ + 6) 0 cfg.hashConfig.witnessPieces],
-              r := input_var_rivk }
-            (i₀ + 7)).x from by
-        show (((Sinsemilla.CommitDomain.commit G ns R Q hQ ns_ne_nil).call
-            (cfg.mulConfig, cfg.hashConfig, cfg.addConfig)
-            { pieces :=
-                #v[AssignedCell.of i₀ 0 cfg.hashConfig.witnessPieces,
-                  AssignedCell.of (i₀ + 3) 0 cfg.hashConfig.witnessPieces,
-                  AssignedCell.of (i₀ + 4) 0 cfg.hashConfig.witnessPieces,
-                  AssignedCell.of (i₀ + 6) 0 cfg.hashConfig.witnessPieces],
-              r := input_var_rivk }).output
-          (i₀ + 7)).x = _
-        rw [FormalCircuit.output_call]]
-    with_unfolding_all rfl
+    rw [← h_output, Sinsemilla.CommitDomain.commit_output]
+    simp only [explicit_provable_type, circuit_norm, Nat.add_assoc, Nat.reduceAdd]
   show (output : Fp) = _
   rw [show (output : Fp) = ({ x := output, y := 0 } : Point Fp).x from rfl, hOutVar,
     hOut]
@@ -698,6 +675,13 @@ def circuit (G : Generators) (R : FixedBase) (Q : Point Fp) (hQ : Q.OnCurve) :
   soundness := soundness G R Q hQ
   completeness := completeness G R Q hQ
 
+@[synthesis_summary_norm]
+theorem circuit_synthesisSummary_eq (G : Generators) (R : FixedBase)
+    (Q : Point Fp) (hQ : Q.OnCurve) (config : Config)
+    (input : Var Inputs Fp) (region : RegionIndex) :
+    (circuit G R Q hQ).elaborated.synthesisSummary config input region =
+      synthesisSummary config := rfl
+
 /-- Package CommitIvk from the commitment child and the three arguments registered
 by its own piece/canonicity stages. -/
 def configurationCertificate (G : Generators) (R : FixedBase)
@@ -709,7 +693,10 @@ def configurationCertificate (G : Generators) (R : FixedBase)
     (bitshift : LookupRangeCheck.bitshiftGate 10 cfg.lookupConfig ∈ context.gates)
     (canonicity : CommitIvk.gate cfg.gate ∈ context.gates)
     (rangeLookup : LookupRangeCheck.rangeCheckLookup 10 cfg.lookupConfig ∈
-      context.lookups) :
+      context.lookups)
+    (requiredPermutationColumns : ∀ column,
+      column ∈ permutationColumns cfg commit.configured.permutationColumns →
+        column ∈ context.permutationColumns) :
     (circuit G R Q hQ).ConfigurationCertificate cfg context := by
   apply ((circuit G R Q hQ).configureCertificate
     cfg {} commit.configured).mono
@@ -734,6 +721,11 @@ def configurationCertificate (G : Generators) (R : FixedBase)
       rw [hrange]
       exact rangeLookup
     · exact commit.lookups_of_configured required hcommit
+  · intro required hrequired
+    simp only [circuit, FormalCircuit.keygenRequirements,
+      elaborated, keygenRequirements, Configure.delta_pure,
+      List.append_nil] at hrequired
+    exact requiredPermutationColumns required hrequired
 
 derive_contract_bridges circuit (G : Generators) (R : FixedBase) (Q : Point Fp)
   (hQ : Q.OnCurve) := circuit G R Q hQ

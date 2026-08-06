@@ -84,7 +84,7 @@ private theorem deriveNullifier_regionCount (K : FixedBase)
 @[keygen_norm]
 def keygenRequirements (K : FixedBase) : KeygenRequirements Fp
     (Poseidon.Config × AddChip.Config × Ecc.MulFixed.BaseFieldElem.Config ×
-      Ecc.Add.Config) where
+      Ecc.Add.Config) (Var Input Fp) where
   configLawful cfg :=
     (Poseidon.hash (Hash.ConstantLength.capacity 2)).Configured cfg.1 ×
       AddChip.addFormal.Configured cfg.2.1 ×
@@ -96,6 +96,26 @@ def keygenRequirements (K : FixedBase) : KeygenRequirements Fp
   lookups _ configured :=
     configured.1.lookups ++ configured.2.1.lookups ++
       configured.2.2.1.lookups ++ configured.2.2.2.lookups
+  permutationColumns cfg configured :=
+    configured.1.permutationColumns ++ configured.2.1.permutationColumns ++
+      configured.2.2.1.permutationColumns ++ configured.2.2.2.permutationColumns ++
+        ([cfg.1.state 0, cfg.2.1.c,
+          cfg.2.2.1.superConfig.addConfig.xQR,
+          cfg.2.2.1.superConfig.addConfig.yQR] : List AnyColumn)
+  inputPermutationColumns _ _ input :=
+    [input.nk.cell.column, input.rho.cell.column, input.psi.cell.column,
+      input.cm.x.cell.column, input.cm.y.cell.column]
+
+def synthesisSummary
+    (cfg : Poseidon.Config × AddChip.Config ×
+      Ecc.MulFixed.BaseFieldElem.Config × Ecc.Add.Config) :
+    FloorPlanner.SynthesisSummary :=
+  (Poseidon.hashSynthesisSummary cfg.1).combine
+    ((FloorPlanner.SynthesisSummary.ofRegion
+      (AddChip.synthesisSummary cfg.2.1 0)).combine
+      ((Ecc.MulFixed.BaseFieldElem.circuitSynthesisSummary cfg.2.2.1).combine
+        (FloorPlanner.SynthesisSummary.ofRegion
+          (Ecc.Add.synthesisSummary cfg.2.2.2 0))))
 
 /-- Rust `gadget.rs::derive_nullifier`: the Poseidon hash of `(nk, rho)`, the add-chip
 sum with `psi`, the `[scalar] NullifierK` base-field-element fixed-base mul, and the
@@ -125,18 +145,18 @@ def circuit (K : FixedBase) : FormalCircuit Fp
     { keygenRequirements := keygenRequirements K
       registered := by keygen_registration
       output cfg input i :=
-        let (pcfg, acfg, bcfg, ecfg) := cfg
-        ((do
-          let hash ← (Poseidon.hash (Hash.ConstantLength.capacity 2)).call pcfg
-            { x0 := input.nk, x1 := input.rho }
-          let scalar ← AddChip.addFormal.call acfg
-            { a := hash, b := input.psi }
-          let product ← (Ecc.MulFixed.BaseFieldElem.circuit K).call bcfg scalar
-          let nf ← Ecc.Add.addFormal.call ecfg
-            { p := input.cm, q := product }
-          pure nf.x : Circuit Fp (Var field Fp)).output i)
+        .of (i + 8) 1 cfg.2.2.2.xQR
       regionCount _ := 9
-      output_eq := by intro _ _ _; rfl
+      synthesisSummary cfg _ _ := synthesisSummary cfg
+      synthesisSummary_eq := by
+        intro cfg input region
+        simp only [synthesisSummary, circuit_norm, synthesis_summary_norm]
+      output_eq := by
+        intro cfg input i
+        simp only [Circuit.output_bind, Circuit.output_pure,
+          FormalCircuit.output_call', FormalCircuit.nextRegionIndex_call',
+          FormalCircuit.call_regionCount', circuit_norm,
+          Ecc.Add.addFormal_output_cells]
       regionCount_eq := fun (pcfg, acfg, bcfg, ecfg) input i =>
         (deriveNullifier_regionCount K pcfg acfg bcfg ecfg input i).symm }
 
@@ -170,16 +190,11 @@ def circuit (K : FixedBase) : FormalCircuit Fp
       rw [Ecc.Add.addFormal_assumptions_eq]
       exact ⟨hA, by rw [hB]; exact K.smul_valid _⟩)
     rw [Ecc.Add.addFormal_spec_eq] at hAddS
-    have hSum : (eval (⟨place, env⟩ : Placed Environment Fp) x_gen_out_3
-        : Value Point Fp)
-        = ({ x := input_cm_x, y := input_cm_y } : Point Fp)
-          + (eval (⟨place, env⟩ : Placed Environment Fp) x_gen_out_2
-            : Value Point Fp) := hAddS.2
-    rw [← h_output]
-    rw [show AssignedCell.eval place env x_gen_out_3.x
-      = (eval (⟨place, env⟩ : Placed Environment Fp) x_gen_out_3
-          : Value Point Fp).x from by simp only [Point.eval_eq, circuit_norm]]
-    rw [hSum, hB, hS, hH, constantLength_value_two]
+    rw [Ecc.Add.addFormal_output_cells] at hAddS
+    have hSum := congrArg Point.x hAddS.2
+    simp only [Point.eval_eq, circuit_norm] at hSum
+    simp only [Point.eval_eq, circuit_norm] at hB
+    rw [← h_output, hSum, hB, hS, hH, constantLength_value_two]
 
   completeness := by
     circuit_proof_start
@@ -192,6 +207,14 @@ def circuit (K : FixedBase) : FormalCircuit Fp
       trivial, ?_, trivial⟩
     rw [Ecc.Add.addFormal_assumptions_eq]
     exact ⟨hA, by rw [hB]; exact K.smul_valid _⟩
+
+@[synthesis_summary_norm]
+theorem circuit_synthesisSummary_eq (K : FixedBase)
+    (config : Poseidon.Config × AddChip.Config ×
+      Ecc.MulFixed.BaseFieldElem.Config × Ecc.Add.Config)
+    (input : Var Input Fp) (region : RegionIndex) :
+    (circuit K).elaborated.synthesisSummary config input region =
+      synthesisSummary config := rfl
 
 derive_contract_bridges circuit (K : FixedBase) := circuit K
 

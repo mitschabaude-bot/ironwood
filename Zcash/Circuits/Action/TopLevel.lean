@@ -11,8 +11,6 @@ namespace Zcash.Circuits.Action
 open Halo2
 open Circuit
 
-set_option maxHeartbeats 20000
-
 theorem initialGeneratorTableIdx_mem
     (cfg : Config) (i : RegionIndex) :
     Operation.loadTable cfg.sinsemilla1.generatorTable.tableIdx
@@ -147,7 +145,7 @@ private theorem actionQueryRequirements :
 def Internal.actionCircuitImpl : TopLevelCircuit Fp Config PublicInputs where
   formalCircuit :=
     circuit Specs.Sinsemilla.orchardGenerators orchardBases
-  noCallerRequirements := ⟨(), rfl, rfl⟩
+  noCallerRequirements := ⟨(), rfl, rfl, rfl, fun _ => rfl⟩
   selectorRequirements := actionSelectorRequirements
   queryRequirements := actionQueryRequirements
   exists_rotation_mem_fixedQueries_of_lt := by
@@ -167,6 +165,11 @@ def Internal.actionCircuitImpl : TopLevelCircuit Fp Config PublicInputs where
     apply Or.inr
     rw [ConfigureCounts.ofConstraintSystem_empty]
     exact hquery
+  constantSiteCount_le_constantCapacityLowerBound := by
+    dsimp only
+    rw [Zcash.Circuits.Action.Circuit.circuit_synthesisSummary_eq]
+    set_option maxRecDepth 10000 in
+      decide
   publicInputLayout := PublicInputs.layout
   PrivateWitness := PrivateWitness
   extractPrivate := fun cfg env =>

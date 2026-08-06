@@ -35,12 +35,43 @@ structure Inputs (F : Type) where
   b3 : F
 deriving ProvableStruct
 
+def synthesisSummary (config : Config) (offset : ℕ) :
+    FloorPlanner.RegionSynthesisSummary :=
+  .ofColumns
+    [.selector config.qNotecommitB.index,
+      .column .advice config.colL.index,
+      .column .advice config.colM.index,
+      .column .advice config.colR.index,
+      .column .advice config.colM.index,
+      .column .advice config.colR.index]
+    (offset + 2) 0
+
 /-- Rust `DecomposeB::assign` (`note_commit.rs:179-215`), parameterized by the `b_1`
 witness program (Rust: `RangeConstrained::bitrange_of(gd_x, 254..255)`). Output is the
 witnessed `b_1` cell; `Spec` is the donor `DecomposeB.Gate.Spec`. -/
 def bundle (wb1 : WitgenIR Fp 1) : FormalRegionCircuit Fp Config Config Inputs field where
   configure := pure
-  elaborated := { keygenRequirements := { gates cfg _ := [gate cfg] } }
+  elaborated :=
+    { keygenRequirements :=
+        { gates cfg _ := [gate cfg]
+          permutationColumns cfg _ :=
+            [cfg.colL, cfg.colM, cfg.colR]
+          inputPermutationColumns _ _ input :=
+            [input.b.cell.column, input.b0.cell.column,
+              input.b2.cell.column, input.b3.cell.column] }
+      synthesisSummary config offset _ _ :=
+        synthesisSummary config offset
+      synthesisSummary_eq := by
+        intro _ _ _ _
+        unfold synthesisSummary
+        apply FloorPlanner.RegionSynthesisSummary.ext
+        · rw [FloorPlanner.regionSynthesisSummary_columns_eq_unionColumns]
+          simp only [circuit_norm, gate, List.flatMap_cons, List.flatMap_nil,
+            FloorPlanner.regionOperationShapeColumns, List.append_nil,
+            List.nil_append, List.singleton_append]
+        · simp only [circuit_norm]
+          omega
+        · simp only [circuit_norm] }
 
   synthesize cfg offset (input : Inputs (AssignedCell Fp)) := do
     (gate cfg).enable offset
@@ -79,6 +110,12 @@ def bundle (wb1 : WitgenIR Fp 1) : FormalRegionCircuit Fp Config Config Inputs f
     · rcases hpa2 with h | h <;> rw [h] <;> ring
     · linear_combination hpa3
 
+@[synthesis_summary_norm]
+theorem bundle_synthesisSummary_eq (wb1 : WitgenIR Fp 1) (cfg : Config)
+    (offset : ℕ) (input : Var Inputs Fp) (region : RegionIndex) :
+    (bundle wb1).elaborated.synthesisSummary cfg offset input region =
+      synthesisSummary cfg offset := rfl
+
 derive_contract_bridges bundle (wb1 : WitgenIR Fp 1) := bundle wb1
 
 end DecomposeB
@@ -92,12 +129,43 @@ structure Inputs (F : Type) where
   d3 : F
 deriving ProvableStruct
 
+def synthesisSummary (config : Config) (offset : ℕ) :
+    FloorPlanner.RegionSynthesisSummary :=
+  .ofColumns
+    [.selector config.qNotecommitD.index,
+      .column .advice config.colL.index,
+      .column .advice config.colM.index,
+      .column .advice config.colR.index,
+      .column .advice config.colM.index,
+      .column .advice config.colR.index]
+    (offset + 2) 0
+
 /-- Rust `DecomposeD::assign` (`note_commit.rs:297-340`), parameterized by the `d_0`
 witness program (bit 254 of `x(pk_d)`). Output is the witnessed `d_0` cell; `Spec` is
 the donor `DecomposeD.Gate.Spec`. -/
 def bundle (wd0 : WitgenIR Fp 1) : FormalRegionCircuit Fp Config Config Inputs field where
   configure := pure
-  elaborated := { keygenRequirements := { gates cfg _ := [gate cfg] } }
+  elaborated :=
+    { keygenRequirements :=
+        { gates cfg _ := [gate cfg]
+          permutationColumns cfg _ :=
+            [cfg.colL, cfg.colM, cfg.colR]
+          inputPermutationColumns _ _ input :=
+            [input.d.cell.column, input.d1.cell.column,
+              input.d2.cell.column, input.d3.cell.column] }
+      synthesisSummary config offset _ _ :=
+        synthesisSummary config offset
+      synthesisSummary_eq := by
+        intro _ _ _ _
+        unfold synthesisSummary
+        apply FloorPlanner.RegionSynthesisSummary.ext
+        · rw [FloorPlanner.regionSynthesisSummary_columns_eq_unionColumns]
+          simp only [circuit_norm, gate, List.flatMap_cons, List.flatMap_nil,
+            FloorPlanner.regionOperationShapeColumns, List.append_nil,
+            List.nil_append, List.singleton_append]
+        · simp only [circuit_norm]
+          omega
+        · simp only [circuit_norm] }
 
   synthesize cfg offset (input : Inputs (AssignedCell Fp)) := do
     (gate cfg).enable offset
@@ -136,6 +204,12 @@ def bundle (wd0 : WitgenIR Fp 1) : FormalRegionCircuit Fp Config Config Inputs f
     · rcases hpa2 with h | h <;> rw [h] <;> ring
     · linear_combination hpa3
 
+@[synthesis_summary_norm]
+theorem bundle_synthesisSummary_eq (wd0 : WitgenIR Fp 1) (cfg : Config)
+    (offset : ℕ) (input : Var Inputs Fp) (region : RegionIndex) :
+    (bundle wd0).elaborated.synthesisSummary cfg offset input region =
+      synthesisSummary cfg offset := rfl
+
 derive_contract_bridges bundle (wd0 : WitgenIR Fp 1) := bundle wd0
 
 end DecomposeD
@@ -148,11 +222,40 @@ structure Inputs (F : Type) where
   e1 : F
 deriving ProvableStruct
 
+def synthesisSummary (config : Config) (offset : ℕ) :
+    FloorPlanner.RegionSynthesisSummary :=
+  .ofColumns
+    [.selector config.qNotecommitE.index,
+      .column .advice config.colL.index,
+      .column .advice config.colM.index,
+      .column .advice config.colR.index]
+    (offset + 1) 0
+
 /-- Rust `DecomposeE::assign` (`note_commit.rs:418-448`): pure copies, no in-gate
 witness. `Spec` is the donor `DecomposeE.Gate.Spec`. -/
 def bundle : FormalRegionCircuit Fp Config Config Inputs unit where
   configure := pure
-  elaborated := { keygenRequirements := { gates cfg _ := [gate cfg] } }
+  elaborated :=
+    { keygenRequirements :=
+        { gates cfg _ := [gate cfg]
+          permutationColumns cfg _ :=
+            [cfg.colL, cfg.colM, cfg.colR]
+          inputPermutationColumns _ _ input :=
+            [input.e.cell.column, input.e0.cell.column,
+              input.e1.cell.column] }
+      synthesisSummary config offset _ _ :=
+        synthesisSummary config offset
+      synthesisSummary_eq := by
+        intro _ _ _ _
+        unfold synthesisSummary
+        apply FloorPlanner.RegionSynthesisSummary.ext
+        · rw [FloorPlanner.regionSynthesisSummary_columns_eq_unionColumns]
+          simp only [circuit_norm, gate, List.flatMap_cons, List.flatMap_nil,
+            FloorPlanner.regionOperationShapeColumns, List.append_nil,
+            List.nil_append, List.singleton_append]
+        · simp only [circuit_norm]
+          omega
+        · simp only [circuit_norm] }
 
   synthesize cfg offset (input : Inputs (AssignedCell Fp)) := do
     (gate cfg).enable offset
@@ -175,6 +278,12 @@ def bundle : FormalRegionCircuit Fp Config Config Inputs unit where
     circuit_proof_start [gate]
     linear_combination hPA
 
+@[synthesis_summary_norm]
+theorem bundle_synthesisSummary_eq (cfg : Config) (offset : ℕ)
+    (input : Var Inputs Fp) (region : RegionIndex) :
+    bundle.elaborated.synthesisSummary cfg offset input region =
+      synthesisSummary cfg offset := rfl
+
 derive_contract_bridges bundle := bundle
 
 end DecomposeE
@@ -187,12 +296,41 @@ structure Inputs (F : Type) where
   g2 : F
 deriving ProvableStruct
 
+def synthesisSummary (config : Config) (offset : ℕ) :
+    FloorPlanner.RegionSynthesisSummary :=
+  .ofColumns
+    [.selector config.qNotecommitG.index,
+      .column .advice config.colL.index,
+      .column .advice config.colM.index,
+      .column .advice config.colL.index,
+      .column .advice config.colM.index]
+    (offset + 2) 0
+
 /-- Rust `DecomposeG::assign` (`note_commit.rs:540-575`), parameterized by the `g_0`
 witness program (bit 254 of `rho`). Output is the witnessed `g_0` cell; `Spec` is the
 donor `DecomposeG.Gate.Spec`. -/
 def bundle (wg0 : WitgenIR Fp 1) : FormalRegionCircuit Fp Config Config Inputs field where
   configure := pure
-  elaborated := { keygenRequirements := { gates cfg _ := [gate cfg] } }
+  elaborated :=
+    { keygenRequirements :=
+        { gates cfg _ := [gate cfg]
+          permutationColumns cfg _ := [cfg.colL, cfg.colM]
+          inputPermutationColumns _ _ input :=
+            [input.g.cell.column, input.g1.cell.column,
+              input.g2.cell.column] }
+      synthesisSummary config offset _ _ :=
+        synthesisSummary config offset
+      synthesisSummary_eq := by
+        intro _ _ _ _
+        unfold synthesisSummary
+        apply FloorPlanner.RegionSynthesisSummary.ext
+        · rw [FloorPlanner.regionSynthesisSummary_columns_eq_unionColumns]
+          simp only [circuit_norm, gate, List.flatMap_cons, List.flatMap_nil,
+            FloorPlanner.regionOperationShapeColumns, List.append_nil,
+            List.nil_append, List.singleton_append]
+        · simp only [circuit_norm]
+          omega
+        · simp only [circuit_norm] }
 
   synthesize cfg offset (input : Inputs (AssignedCell Fp)) := do
     (gate cfg).enable offset
@@ -227,6 +365,12 @@ def bundle (wg0 : WitgenIR Fp 1) : FormalRegionCircuit Fp Config Config Inputs f
     · rcases hpa1 with h | h <;> rw [h] <;> ring
     · linear_combination hpa2
 
+@[synthesis_summary_norm]
+theorem bundle_synthesisSummary_eq (wg0 : WitgenIR Fp 1) (cfg : Config)
+    (offset : ℕ) (input : Var Inputs Fp) (region : RegionIndex) :
+    (bundle wg0).elaborated.synthesisSummary cfg offset input region =
+      synthesisSummary cfg offset := rfl
+
 derive_contract_bridges bundle (wg0 : WitgenIR Fp 1) := bundle wg0
 
 end DecomposeG
@@ -238,12 +382,40 @@ structure Inputs (F : Type) where
   h0 : F
 deriving ProvableStruct
 
+def synthesisSummary (config : Config) (offset : ℕ) :
+    FloorPlanner.RegionSynthesisSummary :=
+  .ofColumns
+    [.selector config.qNotecommitH.index,
+      .column .advice config.colL.index,
+      .column .advice config.colM.index,
+      .column .advice config.colR.index]
+    (offset + 1) 0
+
 /-- Rust `DecomposeH::assign` (`note_commit.rs:660-694`), parameterized by the `h_1`
 witness program (bit 254 of `psi`). Output is the witnessed `h_1` cell; `Spec` is the
 donor `DecomposeH.Gate.Spec`. -/
 def bundle (wh1 : WitgenIR Fp 1) : FormalRegionCircuit Fp Config Config Inputs field where
   configure := pure
-  elaborated := { keygenRequirements := { gates cfg _ := [gate cfg] } }
+  elaborated :=
+    { keygenRequirements :=
+        { gates cfg _ := [gate cfg]
+          permutationColumns cfg _ :=
+            [cfg.colL, cfg.colM, cfg.colR]
+          inputPermutationColumns _ _ input :=
+            [input.h.cell.column, input.h0.cell.column] }
+      synthesisSummary config offset _ _ :=
+        synthesisSummary config offset
+      synthesisSummary_eq := by
+        intro _ _ _ _
+        unfold synthesisSummary
+        apply FloorPlanner.RegionSynthesisSummary.ext
+        · rw [FloorPlanner.regionSynthesisSummary_columns_eq_unionColumns]
+          simp only [circuit_norm, gate, List.flatMap_cons, List.flatMap_nil,
+            FloorPlanner.regionOperationShapeColumns, List.append_nil,
+            List.nil_append, List.singleton_append]
+        · simp only [circuit_norm]
+          omega
+        · simp only [circuit_norm] }
 
   synthesize cfg offset (input : Inputs (AssignedCell Fp)) := do
     (gate cfg).enable offset
@@ -274,6 +446,12 @@ def bundle (wh1 : WitgenIR Fp 1) : FormalRegionCircuit Fp Config Config Inputs f
     refine ⟨⟨?_, ?_⟩, h_output.symm⟩
     · rcases hpa1 with h | h <;> rw [h] <;> ring
     · linear_combination hpa2
+
+@[synthesis_summary_norm]
+theorem bundle_synthesisSummary_eq (wh1 : WitgenIR Fp 1) (cfg : Config)
+    (offset : ℕ) (input : Var Inputs Fp) (region : RegionIndex) :
+    (bundle wh1).elaborated.synthesisSummary cfg offset input region =
+      synthesisSummary cfg offset := rfl
 
 derive_contract_bridges bundle (wh1 : WitgenIR Fp 1) := bundle wh1
 

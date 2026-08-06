@@ -79,7 +79,7 @@ theorem gate
       | constrainInstance cell column row =>
           have hrest := (OperationsKeygenCoherent.constrainInstance_cons
             cs cell column row rest).mp hcoherent
-          exact ih hrest henabled
+          exact ih hrest.2.2 henabled
       | loadTable table values =>
           have hrest := (OperationsKeygenCoherent.loadTable_cons
             cs table values rest).mp hcoherent
@@ -141,7 +141,7 @@ theorem lookup
       | constrainInstance cell column row =>
           have hrest := (OperationsKeygenCoherent.constrainInstance_cons
             cs cell column row rest).mp hcoherent
-          exact ih hrest henabled
+          exact ih hrest.2.2 henabled
       | loadTable table values =>
           have hrest := (OperationsKeygenCoherent.loadTable_cons
             cs table values rest).mp hcoherent

@@ -67,20 +67,53 @@ theorem sumWit_eval (a b : AssignedCell Fp) (env : Placed ProverEnvironment Fp)
   simp only [sumWit, Witgen.WitgenIROver.eval_native_apply]
   rfl
 
-/-- Rust `AddInstruction::add`'s region body (`add_chip.rs:71-91`): `q_add` at row 0,
-copy `a` and `b` in, assign `c = a + b`. `Spec`: the output is the field sum. -/
-def add : FormalRegionCircuit Fp Config Config Inputs field where
-  configure := pure
-
-  synthesize cfg offset (input : Inputs (AssignedCell Fp)) := do
+/-- Rust `AddInstruction::add`'s region body (`add_chip.rs:71-91`). -/
+def synthesize (cfg : Config) (offset : ℕ)
+    (input : Inputs (AssignedCell Fp)) : RegionCircuit Fp (AssignedCell Fp) := do
     (addGate cfg).enable offset
     let _a ← copyAdvice input.a cfg.a offset
     let _b ← copyAdvice input.b cfg.b offset
     assignAdvice cfg.c offset (sumWit input.a input.b)
 
+/-- Rust `AddInstruction::add`'s region body (`add_chip.rs:71-91`): `q_add` at row 0,
+copy `a` and `b` in, assign `c = a + b`. `Spec`: the output is the field sum. -/
+def synthesisSummary (cfg : Config) (offset : ℕ) :
+    FloorPlanner.RegionSynthesisSummary :=
+  .ofColumns
+    [.selector cfg.qAdd.index,
+      .column .advice cfg.a.index,
+      .column .advice cfg.b.index,
+      .column .advice cfg.c.index]
+    (offset + 1) 0
+
+def add : FormalRegionCircuit Fp Config Config Inputs field where
+  configure := pure
+
+  synthesize := synthesize
+
   elaborated :=
-    { keygenRequirements := { gates cfg _ := [addGate cfg] }
-      registered := by keygen_registration }
+    { keygenRequirements :=
+        { gates cfg _ := [addGate cfg]
+          permutationColumns input _ := [input.a, input.b]
+          inputPermutationColumns _ _ input :=
+            [input.a.cell.column, input.b.cell.column] }
+      registered := by keygen_registration [synthesize]
+      output cfg offset _ self := .of self offset cfg.c
+      synthesisSummary cfg offset _ _ := synthesisSummary cfg offset
+      output_eq := by
+        intro _ _ _ _
+        simp only [synthesize, circuit_norm]
+      synthesisSummary_eq := by
+        intro _ _ _ _
+        apply FloorPlanner.RegionSynthesisSummary.ext
+        · rw [FloorPlanner.regionSynthesisSummary_columns_eq_unionColumns]
+          simp only [synthesisSummary, synthesize, circuit_norm, addGate]
+          simp only [List.flatMap_cons, List.flatMap_nil,
+            FloorPlanner.regionOperationShapeColumns, List.append_nil,
+            List.nil_append, List.singleton_append]
+        · simp only [synthesisSummary, synthesize, circuit_norm, addGate]
+          omega
+        · simp only [synthesisSummary, synthesize, circuit_norm, addGate] }
 
   Spec input output _ := output = input.a + input.b
   ProverSpec input output _ _ := output = input.a + input.b
@@ -100,13 +133,21 @@ chip (`add_chip.rs`: `assign_region(|| "c = a + b", …)`). -/
 def addFormal :=
   add.toFormal "c = a + b"
 
+@[synthesis_summary_norm]
+theorem addFormal_synthesisSummary_eq
+    (cfg : Config) (input : Var Inputs Fp) (region : RegionIndex) :
+    addFormal.elaborated.synthesisSummary cfg input region =
+      FloorPlanner.SynthesisSummary.ofRegion (synthesisSummary cfg 0) := rfl
+
 /-- The layouter add capability exported by one AddChip configure run. -/
 def addFormalConfigureCertificate (a b c : Column .advice)
     (counts : ConfigureCounts) :
     addFormal.ConfigurationCertificate
       ((configure a b c).output counts)
       { gates := ((configure a b c).delta counts).gates
-        lookups := ((configure a b c).delta counts).lookups } := by
+        lookups := ((configure a b c).delta counts).lookups
+        permutationColumns := ([a, b] : List AnyColumn) ++
+          ((configure a b c).delta counts).permutationRequests } := by
   let cfg := (configure a b c).output counts
   apply (add.configureCertificate cfg {} ()).mono
   · intro gate hgate
@@ -120,6 +161,10 @@ def addFormalConfigureCertificate (a b c : Column .advice)
       ElaboratedRegionCircuit.keygenRequirements, Configure.delta_pure,
       List.append_nil] at hargument
     exact False.elim (List.not_mem_nil hargument)
+  · intro column hcolumn
+    simpa only [keygen_norm, add, cfg, configure,
+      FormalRegionCircuit.keygenRequirements,
+      ElaboratedRegionCircuit.keygenRequirements] using hcolumn
 
 derive_contract_bridges addFormal := addFormal
 

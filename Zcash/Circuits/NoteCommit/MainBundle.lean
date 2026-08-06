@@ -162,7 +162,9 @@ private theorem peelGates (cfg : Config) (input : Var Inputs Fp)
           g2 := zCell cfg.hashConfig iHash 6 1, g1G2Prime := ccs.gZs.z0,
           z13G := zCell cfg.hashConfig iHash 6 13,
           z13G1G2Prime := ccs.gZs.zLast }).operations (i₀ + 9)) (i₀ + 9) := by
-  simp only [synthGates, circuit_norm, decomposeB_output,
+  simp only [synthGates, synthDecompositions, synthCanonicity,
+    synthGdPkdValueCanonicity, synthRhoPsiCanonicity,
+    circuit_norm, decomposeB_output,
     decomposeD_output, decomposeG_output, decomposeH_output] at h
   exact h
 
@@ -322,7 +324,9 @@ private theorem buildGates (cfg : Config) (input : Var Inputs Fp)
           z13G := zCell cfg.hashConfig iHash 6 13,
           z13G1G2Prime := ccs.gZs.zLast }).operations (i₀ + 9)) (i₀ + 9)) :
     Constraints place env ((synthGates cfg input pcs ccs iHash).operations i₀) i₀ := by
-  simp only [synthGates, circuit_norm, decomposeB_output,
+  simp only [synthGates, synthDecompositions, synthCanonicity,
+    synthGdPkdValueCanonicity, synthRhoPsiCanonicity,
+    circuit_norm, decomposeB_output,
     decomposeD_output, decomposeG_output, decomposeH_output]
   exact h
 
@@ -487,7 +491,9 @@ private theorem peelGatesW (cfg : Config) (input : Var Inputs Fp)
           g2 := zCell cfg.hashConfig iHash 6 1, g1G2Prime := ccs.gZs.z0,
           z13G := zCell cfg.hashConfig iHash 6 13,
           z13G1G2Prime := ccs.gZs.zLast }).operations (i₀ + 9)) (i₀ + 9) := by
-  simp only [synthGates, circuit_norm, decomposeB_output,
+  simp only [synthGates, synthDecompositions, synthCanonicity,
+    synthGdPkdValueCanonicity, synthRhoPsiCanonicity,
+    circuit_norm, decomposeB_output,
     decomposeD_output, decomposeG_output, decomposeH_output] at h
   exact h
 
@@ -514,7 +520,7 @@ private theorem yc_lsb_witness (w : WitgenIR Fp 1)
   have hg := h.2.2.2.2
   rw [YCanonicityCheck.gateChild_call_witnesses] at hg
   simp only [YCanonicity.bundle, YCanonicity.gate, circuit_norm] at hg
-  have hlsb := hg.2.1
+  have hlsb := hg.2.2.2.1
   simp only [Nat.add_assoc, Nat.reduceAdd] at hlsb ⊢
   exact hlsb
 
@@ -655,38 +661,6 @@ private theorem commit_derived_spec (G : Generators) (R : FixedBase)
         exact ⟨hPB', hHon'⟩)).1
   rw [Sinsemilla.CommitDomain.commit_spec_eq, Sinsemilla.CommitDomain.commit_extract_eq] at h
   exact h
-
-/-- The bundle output is the commit child's output. Kept outside `soundness` so the
-symbolic stage-output walk is kernel-checked once instead of enlarging the already-heavy
-soundness proof term. -/
-private theorem synth_output_eq_commit_output
-    (G : Generators) (R : FixedBase)
-    (Q : Point Fp) (hQ : Q.OnCurve) (cfg : Config)
-    (input : Var Inputs Fp) (i : RegionIndex) :
-    (synth G R Q hQ cfg input).output i
-      = (Sinsemilla.CommitDomain.commit G ns R Q hQ ns_ne_nil).output
-          (cfg.mulConfig, cfg.hashConfig, cfg.addConfig)
-          { pieces :=
-              #v[AssignedCell.of i 0 cfg.hashConfig.witnessPieces,
-                AssignedCell.of (i + 1 + 2) 0 cfg.hashConfig.witnessPieces,
-                AssignedCell.of (i + 2 + 2) 0 cfg.hashConfig.witnessPieces,
-                AssignedCell.of (i + 4 + 2) 0 cfg.hashConfig.witnessPieces,
-                AssignedCell.of (i + 7 + 2) 0 cfg.hashConfig.witnessPieces,
-                AssignedCell.of (i + 8 + 2) 0 cfg.hashConfig.witnessPieces,
-                AssignedCell.of (i + 10 + 2) 0 cfg.hashConfig.witnessPieces,
-                AssignedCell.of (i + 12 + 2) 0 cfg.hashConfig.witnessPieces],
-            r := input.rcm }
-          (i + 15 + 5 + 5) := by
-  -- kernel-light shape: the output walk to the folded `synthChecks` stage is pure defeq
-  -- (the opaque calls inside `synthPieces`/`synthGates` are beta-discarded by the
-  -- projections, never reduced), so `show` it in one step — a simp walk over the whole
-  -- `synth` term replays a congruence chain past the kernel's timeout — then open the
-  -- stage with the single recorded `synthChecks_output` rewrite and close by metadata defeq.
-  show ((synthChecks G R Q hQ cfg input
-      ((synthPieces cfg input).output i) (i + 27)).output
-    ((synthPieces cfg input).nextRegionIndex i)).cm = _
-  rw [synthChecks_output]
-  rfl
 
 theorem soundness (G : Generators) (R : FixedBase)
     (Q : Point Fp) (hQ : Q.OnCurve) (cfg : Config) :
@@ -1099,10 +1073,9 @@ theorem soundness (G : Generators) (R : FixedBase)
             r := input_var_rcm }
           (i₀ + 15 + 5 + 5)) := by
     rw [← h_output]
-    change eval (⟨place, env⟩ : Placed Environment Fp)
-      ((synth G R Q hQ cfg _).output i₀) = _
-    exact congrArg (eval (⟨place, env⟩ : Placed Environment Fp))
-      (synth_output_eq_commit_output G R Q hQ cfg _ i₀)
+    rw [Sinsemilla.CommitDomain.commit_output_cells]
+    simp only [output, circuit_norm, Nat.add_assoc,
+      Nat.reduceAdd]
   rw [hOutVar]
   exact hOut
 
@@ -1937,7 +1910,7 @@ def circuit (G : Generators) (R : FixedBase)
   name := "NoteCommit"
   configure := pure
   synthesize := synth G R Q hQ
-  elaborated := elaboratedFolded G R Q hQ
+  elaborated := elaborated G R Q hQ
   Witness := fun _ => Vector Fp 85 × Fq
   extract := rcmExtract
   EnvAssumptions := EnvAssumptions G
@@ -1947,6 +1920,28 @@ def circuit (G : Generators) (R : FixedBase)
   ProverSpec := fun _ _ _ _ => True
   soundness := soundness G R Q hQ
   completeness := completeness G R Q hQ
+
+@[synthesis_summary_norm]
+theorem circuit_synthesisSummary_eq (G : Generators) (R : FixedBase)
+    (Q : Point Fp) (hQ : Q.OnCurve) (config : Config)
+    (input : Var Inputs Fp) (region : RegionIndex) :
+    (circuit G R Q hQ).elaborated.synthesisSummary config input region =
+      synthesisSummary config := rfl
+
+@[keygen_norm]
+theorem Configured.inputPermutationColumns_eq
+    (G : Generators) (R : FixedBase) (Q : Point Fp) (hQ : Q.OnCurve)
+    {cfg : Config} (configured : (circuit G R Q hQ).Configured cfg)
+    (input : Var Inputs Fp) :
+    configured.inputPermutationColumns input =
+      [input.gdX.cell.column, input.gdY.cell.column,
+        input.pkdX.cell.column, input.pkdY.cell.column,
+        input.value.cell.column, input.rho.cell.column,
+        input.psi.cell.column] := by
+  simp only [FormalCircuit.Configured.inputPermutationColumns,
+    circuit, FormalCircuit.keygenRequirements,
+    elaborated, ElaboratedCircuit.keygenRequirements,
+    keygenRequirements]
 
 /-- Package NoteCommit from its commitment child and the arguments registered by
 its own decomposition/canonicity stages. -/
@@ -1970,26 +1965,34 @@ def configurationCertificate (G : Generators) (R : FixedBase)
         RhoCanonicity.gate cfg.gates.rho,
         PsiCanonicity.gate cfg.gates.psi] → gate ∈ context.gates)
     (rangeLookup : LookupRangeCheck.rangeCheckLookup 10 cfg.lookupConfig ∈
-      context.lookups) :
+      context.lookups)
+    (requiredPermutationColumns : ∀ column,
+      column ∈ permutationColumns cfg commit.configured.permutationColumns →
+        column ∈ context.permutationColumns) :
     (circuit G R Q hQ).ConfigurationCertificate cfg context := by
   apply ((circuit G R Q hQ).configureCertificate
     cfg {} commit.configured).mono
   · intro required hrequired
     simp only [circuit, FormalCircuit.keygenRequirements,
-      elaboratedFolded, keygenRequirements, Configure.delta_pure,
+      elaborated, keygenRequirements, Configure.delta_pure,
       List.append_nil] at hrequired
     rcases List.mem_append.mp hrequired with hlocal | hcommit
     · exact directGates required hlocal
     · exact commit.gates_of_configured required hcommit
   · intro required hrequired
     simp only [circuit, FormalCircuit.keygenRequirements,
-      elaboratedFolded, keygenRequirements, Configure.delta_pure,
+      elaborated, keygenRequirements, Configure.delta_pure,
       List.append_nil] at hrequired
     rcases List.mem_append.mp hrequired with hrange | hcommit
     · simp only [List.mem_singleton] at hrange
       rw [hrange]
       exact rangeLookup
     · exact commit.lookups_of_configured required hcommit
+  · intro required hrequired
+    simp only [circuit, FormalCircuit.keygenRequirements,
+      elaborated, keygenRequirements, Configure.delta_pure,
+      List.append_nil] at hrequired
+    exact requiredPermutationColumns required hrequired
 
 derive_contract_bridges circuit (G : Generators) (R : FixedBase) (Q : Point Fp)
   (hQ : Q.OnCurve) := circuit G R Q hQ

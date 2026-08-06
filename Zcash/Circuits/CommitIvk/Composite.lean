@@ -83,6 +83,15 @@ def gateChild (wb1 wd1 : WitgenIR Fp 1) :
     FormalCircuit Fp Config Config CommitIvk.Inputs unit :=
   (bundle wb1 wd1).toFormal "Assign cells used in canonicity gate"
 
+/-- The lifted gate child exposes the gate bundle's reduced one-region footprint. -/
+@[synthesis_summary_norm]
+theorem gateChild_synthesisSummary (wb1 wd1 : WitgenIR Fp 1)
+    (cfg : Config) (input : Var CommitIvk.Inputs Fp)
+    (region : RegionIndex) :
+    (gateChild wb1 wd1).elaborated.synthesisSummary cfg input region =
+      FloorPlanner.SynthesisSummary.ofRegion
+        (CommitIvk.synthesisSummary cfg 0) := rfl
+
 derive_contract_bridges gateChild (wb1 wd1 : WitgenIR Fp 1) := gateChild wb1 wd1
 
 def synth (wb1 wd1 : WitgenIR Fp 1) (gcfg : Config) (lcfg : LookupRangeCheck.Config 10)
@@ -110,6 +119,17 @@ private theorem gateChild_extract_cells (wb1 wd1 : WitgenIR Fp 1) (cfg : Config)
       = (eval env (AssignedCell.of i 0 (cfg.advices 4) : Var field Fp),
          eval env (AssignedCell.of i (0 + 1) (cfg.advices 4) : Var field Fp)) := rfl
 
+/-- Reduced synthesis footprint of the two witness-check regions and the gate region. -/
+def circuitSynthesisSummary (gcfg : Config)
+    (lcfg : LookupRangeCheck.Config 10) :
+    FloorPlanner.SynthesisSummary :=
+  (LookupRangeCheck.witnessCheckSynthesisSummary
+      10 13 false lcfg).combine
+    ((LookupRangeCheck.witnessCheckSynthesisSummary
+        10 14 false lcfg).combine
+      (FloorPlanner.SynthesisSummary.ofRegion
+        (CommitIvk.synthesisSummary gcfg 0)))
+
 /-- Rust `CommitIvkChip` canonicity flow: the two shift `witness_check`s, then the
 `"Assign cells used in canonicity gate"` region. `Spec` is the donor composite payoff
 (`CommitIvk.Canonicity.Spec`): the canonical bit slices of `ak`/`nk` and
@@ -125,12 +145,29 @@ def circuit (wb1 wd1 : WitgenIR Fp 1) :
   elaborated :=
     { keygenRequirements :=
         { gates cfg _ := [gate cfg.1]
-          lookups cfg _ := [LookupRangeCheck.rangeCheckLookup 10 cfg.2] }
+          lookups cfg _ := [LookupRangeCheck.rangeCheckLookup 10 cfg.2]
+          permutationColumns cfg _ :=
+            permutationColumns cfg.1 ++ ([cfg.2.runningSum] : List AnyColumn)
+          inputPermutationColumns _ _ input :=
+            [input.ak.cell.column, input.a.cell.column,
+              input.bWhole.cell.column, input.b0.cell.column,
+              input.b2.cell.column, input.z13A.cell.column,
+              input.nk.cell.column, input.c.cell.column,
+              input.dWhole.cell.column, input.d0.cell.column,
+              input.z13C.cell.column] }
       output _ _ _ := ()
       regionCount _ := 3
+      synthesisSummary cfg _ _ := circuitSynthesisSummary cfg.1 cfg.2
       output_eq := by intro _ _ _; rfl
       regionCount_eq := fun (gcfg, lcfg) input i =>
-        (synth_regionCount wb1 wd1 gcfg lcfg input i).symm }
+        (synth_regionCount wb1 wd1 gcfg lcfg input i).symm
+      synthesisSummary_eq := by
+        intro cfg input region
+        simp only [circuitSynthesisSummary, synth, gateChild_synthesisSummary,
+          circuit_norm, synthesis_summary_norm]
+        rw [LookupRangeCheck.witnessCheck_synthesisSummary,
+          LookupRangeCheck.witnessCheck_nextRegionIndex,
+          LookupRangeCheck.witnessCheck_synthesisSummary] }
 
   EnvAssumptions := fun (_, lcfg) env =>
     LookupRangeCheck.TableLoaded 10 lcfg env.env ∧
@@ -279,6 +316,13 @@ def circuit (wb1 wd1 : WitgenIR Fp 1) :
       · -- the donor gate `Spec` at the witnessed `(b_1, d_1)` readings
         simp only [CommitIvk.toDonor, CommitIvk.Gate.Spec]
         exact ⟨hpa1, hpa2, hpa3, hpa4, hpa5, hpa6, hpa7, hpa8, hpa9⟩
+
+@[synthesis_summary_norm]
+theorem circuit_synthesisSummary_eq (wb1 wd1 : WitgenIR Fp 1)
+    (cfg : Config × LookupRangeCheck.Config 10) (input : Var Inputs Fp)
+    (region : RegionIndex) :
+    (circuit wb1 wd1).elaborated.synthesisSummary cfg input region =
+      circuitSynthesisSummary cfg.1 cfg.2 := rfl
 
 derive_contract_bridges circuit (wb1 wd1 : WitgenIR Fp 1) := circuit wb1 wd1
 
