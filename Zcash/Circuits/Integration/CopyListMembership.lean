@@ -30,6 +30,257 @@ def resolveDeclared (permCols : List ColRef) (starts : List ℕ) :
         permIndex permCols col.toAny, row)
   | _ => none
 
+/-- A column present in the permutation layout resolves to an in-range index. -/
+theorem permIndex_lt_length_of_mem
+    (permCols : List ColRef) {column : AnyColumn}
+    (hcolumn : column ∈ permCols.map ColRef.toAny) :
+    permIndex permCols column < permCols.length := by
+  have hexists : ∃ candidate ∈ permCols.map ColRef.toAny,
+      decide (candidate = column) = true :=
+    ⟨column, hcolumn, by simp⟩
+  rw [permIndex, List.findIdx?_eq_some_of_exists hexists,
+    Option.getD_some]
+  simpa only [List.length_map] using
+    List.findIdx_lt_length_of_exists hexists
+
+/-- Looking up the index of a registered permutation column recovers that column. -/
+theorem permCols_getD_permIndex
+    (permCols : List ColRef) (column : AnyColumn) (fallback : ColRef)
+    (hcolumn : column ∈ permCols.map ColRef.toAny) :
+    ColRef.toAny (permCols.getD (permIndex permCols column) fallback) = column := by
+  let columns := permCols.map ColRef.toAny
+  have hexists : ∃ candidate ∈ columns,
+      decide (candidate = column) = true :=
+    ⟨column, hcolumn, by simp⟩
+  have hindex : columns.findIdx (fun candidate => decide (candidate = column)) <
+      columns.length :=
+    List.findIdx_lt_length_of_exists hexists
+  have hfound :=
+    List.findIdx_getElem
+      (p := fun candidate => decide (candidate = column))
+      (xs := columns) (w := hindex)
+  have hvalue :
+      columns[columns.findIdx (fun candidate => decide (candidate = column))] =
+        column := by
+    exact of_decide_eq_true hfound
+  have hpermIndex :
+      permIndex permCols column =
+        columns.findIdx (fun candidate => decide (candidate = column)) := by
+    rw [permIndex, List.findIdx?_eq_some_of_exists hexists,
+      Option.getD_some]
+  have hpermIndexLt : permIndex permCols column < permCols.length := by
+    rw [hpermIndex]
+    simpa only [columns, List.length_map] using hindex
+  have hvalue' :
+      ColRef.toAny
+          permCols[columns.findIdx (fun candidate => decide (candidate = column))] =
+        column := by
+    simpa only [columns, List.getElem_map] using hvalue
+  rw [List.getD_eq_getElem _ _ hpermIndexLt]
+  simpa only [hpermIndex] using hvalue'
+
+/-- The column requirement carried by a declared copy endpoint. Constants acquire
+their concrete column later from the floor planner's allocation. -/
+def CopyEndpoint.PermutationColumnRegistered
+    (cs : ConstraintSystem Fp) : CopyEndpoint Fp → Prop
+  | CopyEndpoint.cell c => c.column ∈ cs.permutationColumns
+  | CopyEndpoint.instance column _ => column.toAny ∈ cs.permutationColumns
+  | CopyEndpoint.constant _ => True
+
+/-- The row requirement carried by a declared copy endpoint. Constants acquire
+their concrete row later from the floor planner's allocation. -/
+def CopyEndpoint.WithinRows
+    (starts : List ℕ) (bound : ℕ) : CopyEndpoint Fp → Prop
+  | CopyEndpoint.cell c =>
+      starts.getD c.regionIndex 0 + c.rowOffset < bound
+  | CopyEndpoint.instance _ row => row < bound
+  | CopyEndpoint.constant _ => True
+
+/-- Both endpoints of a coherent region copy use registered permutation columns. -/
+theorem regionDeclaredCopies_permutationColumns
+    (cs : ConstraintSystem Fp) (body : RegionOperations Fp)
+    (hcoherent : body.Forall (RegionOperation.KeygenCoherent cs))
+    (copy : DeclaredCopy Fp) (hcopy : copy ∈ regionDeclaredCopies body) :
+    copy.1.PermutationColumnRegistered cs ∧
+      copy.2.PermutationColumnRegistered cs := by
+  induction body with
+  | nil => simp [regionDeclaredCopies] at hcopy
+  | cons operation rest inductionHypothesis =>
+      rw [List.forall_cons] at hcoherent
+      cases operation with
+      | constrainEqual left right =>
+          simp only [regionDeclaredCopies, regionOperationDeclaredCopy?,
+            List.mem_cons] at hcopy
+          rcases hcopy with rfl | hcopy
+          · simpa [CopyEndpoint.PermutationColumnRegistered,
+              RegionOperation.KeygenCoherent] using hcoherent.1
+          · exact inductionHypothesis hcoherent.2 hcopy
+      | constrainConstant cell value =>
+          simp only [regionDeclaredCopies, regionOperationDeclaredCopy?,
+            List.mem_cons] at hcopy
+          rcases hcopy with rfl | hcopy
+          · simpa [CopyEndpoint.PermutationColumnRegistered,
+              RegionOperation.KeygenCoherent] using hcoherent.1
+          · exact inductionHypothesis hcoherent.2 hcopy
+      | constrainInstance cell column row =>
+          simp only [regionDeclaredCopies, regionOperationDeclaredCopy?,
+            List.mem_cons] at hcopy
+          rcases hcopy with rfl | hcopy
+          · simpa [CopyEndpoint.PermutationColumnRegistered,
+              RegionOperation.KeygenCoherent] using hcoherent.1
+          · exact inductionHypothesis hcoherent.2 hcopy
+      | assignAdvice column row witness =>
+          exact inductionHypothesis hcoherent.2 hcopy
+      | assignFixed column row value =>
+          exact inductionHypothesis hcoherent.2 hcopy
+      | enableGate gate row =>
+          exact inductionHypothesis hcoherent.2 hcopy
+      | enableLookup argument selectors row =>
+          exact inductionHypothesis hcoherent.2 hcopy
+
+/-- Both endpoints of every coherent layouter copy use registered permutation
+columns. -/
+theorem operationDeclaredCopies_permutationColumns
+    (cs : ConstraintSystem Fp) (operations : Operations Fp)
+    (hcoherent : OperationsKeygenCoherent cs operations)
+    (copy : DeclaredCopy Fp) (hcopy : copy ∈ operationDeclaredCopies operations) :
+    copy.1.PermutationColumnRegistered cs ∧
+      copy.2.PermutationColumnRegistered cs := by
+  induction operations with
+  | nil => simp [operationDeclaredCopies] at hcopy
+  | cons operation rest inductionHypothesis =>
+      cases operation with
+      | region name body =>
+          obtain ⟨hbody, hrest⟩ :=
+            (OperationsKeygenCoherent.region_cons cs name body rest).mp hcoherent
+          rw [operationDeclaredCopies, List.mem_append] at hcopy
+          rcases hcopy with hcopy | hcopy
+          · exact regionDeclaredCopies_permutationColumns cs body hbody copy hcopy
+          · exact inductionHypothesis hrest hcopy
+      | constrainInstance cell column row =>
+          obtain ⟨hcell, hcolumn, hrest⟩ :=
+            (OperationsKeygenCoherent.constrainInstance_cons
+              cs cell column row rest).mp hcoherent
+          rw [operationDeclaredCopies, List.mem_cons] at hcopy
+          rcases hcopy with rfl | hcopy
+          · exact ⟨hcell, hcolumn⟩
+          · exact inductionHypothesis hrest hcopy
+      | loadTable table values =>
+          have hrest :=
+            (OperationsKeygenCoherent.loadTable_cons
+              cs table values rest).mp hcoherent
+          exact inductionHypothesis hrest hcopy
+
+/-- Every endpoint extracted from a coherent copy stream carries its registered
+permutation-column fact. -/
+theorem declaredEndpoint_permutationColumnRegistered
+    (cs : ConstraintSystem Fp) (operations : Operations Fp)
+    (hcoherent : OperationsKeygenCoherent cs operations)
+    (endpoint : CopyEndpoint Fp)
+    (hendpoint : endpoint ∈
+      (operationDeclaredCopies operations).flatMap fun copy => [copy.1, copy.2]) :
+    endpoint.PermutationColumnRegistered cs := by
+  rw [List.mem_flatMap] at hendpoint
+  obtain ⟨copy, hcopy, hendpoint⟩ := hendpoint
+  have hcolumns := operationDeclaredCopies_permutationColumns
+    cs operations hcoherent copy hcopy
+  simp only [List.mem_cons, List.not_mem_nil, or_false] at hendpoint
+  rcases hendpoint with rfl | rfl
+  · exact hcolumns.1
+  · exact hcolumns.2
+
+/-- Every equality/instance copy emitted by a registered region uses in-range
+permutation columns. -/
+theorem regionCopiesSplit_fst_columns_lt
+    (cs : ConstraintSystem Fp) (body : RegionOperations Fp)
+    (hregistered : body.Forall (RegionOperation.KeygenCoherent cs))
+    (starts : List ℕ) (consts : List (ℕ × ℕ × ℕ))
+    (tuple : ℕ × ℕ × ℕ × ℕ)
+    (htuple : tuple ∈ (regionCopiesSplit
+      (Keygen.permColsOf cs) starts body consts).1) :
+    tuple.1 < (Keygen.permColsOf cs).length ∧
+      tuple.2.2.1 < (Keygen.permColsOf cs).length := by
+  simp only [regionCopiesSplit] at htuple
+  rw [List.mem_filterMap] at htuple
+  obtain ⟨operation, hoperation, htuple⟩ := htuple
+  have hoperationRegistered :=
+    List.forall_iff_forall_mem.mp hregistered operation hoperation
+  cases operation with
+  | constrainEqual left right =>
+      simp only at htuple
+      obtain rfl := Option.some.inj htuple
+      constructor <;>
+        apply permIndex_lt_length_of_mem <;>
+        rw [Keygen.permColsOf_map_toAny]
+      · exact hoperationRegistered.1
+      · exact hoperationRegistered.2
+  | constrainInstance cell column row =>
+      simp only at htuple
+      obtain rfl := Option.some.inj htuple
+      constructor <;>
+        apply permIndex_lt_length_of_mem <;>
+        rw [Keygen.permColsOf_map_toAny]
+      · exact hoperationRegistered.1
+      · exact hoperationRegistered.2
+  | constrainConstant cell value => simp at htuple
+  | assignAdvice column row value => simp at htuple
+  | assignFixed column row value => simp at htuple
+  | enableGate gate row => simp at htuple
+  | enableLookup argument enabled row => simp at htuple
+
+/-- The equality/instance half of V1's copy walk is column-safe for every keygen-lawful
+operation stream. -/
+theorem V1_go_fst_columns_lt
+    (cs : ConstraintSystem Fp) (ops : Operations Fp)
+    (hregistered : OperationsKeygenCoherent cs ops)
+    (starts : List ℕ) (consts : List (ℕ × ℕ × ℕ))
+    (tuple : ℕ × ℕ × ℕ × ℕ)
+    (htuple : tuple ∈ (V1.go
+      (Keygen.permColsOf cs) starts ops consts).1.1) :
+    tuple.1 < (Keygen.permColsOf cs).length ∧
+      tuple.2.2.1 < (Keygen.permColsOf cs).length := by
+  induction ops generalizing consts with
+  | nil => simp [V1.go] at htuple
+  | cons operation rest inductionHypothesis =>
+      cases operation with
+      | region name body =>
+          obtain ⟨hbody, hrest⟩ :=
+            (OperationsKeygenCoherent.region_cons cs name body rest).mp
+              hregistered
+          rcases hsplit : regionCopiesSplit (Keygen.permColsOf cs)
+              starts body consts with
+            ⟨equalities, constants, remainingConstants⟩
+          rcases hgo : V1.go (Keygen.permColsOf cs) starts
+              rest remainingConstants with
+            ⟨⟨restEqualities, restConstants⟩, finalConstants⟩
+          simp only [V1.go, hsplit, hgo] at htuple
+          rcases List.mem_append.mp htuple with htuple | htuple
+          · apply regionCopiesSplit_fst_columns_lt cs body hbody
+              starts consts tuple
+            rwa [hsplit]
+          · exact inductionHypothesis hrest remainingConstants (by
+              rwa [hgo])
+      | constrainInstance cell column row =>
+          obtain ⟨hcell, hcolumn, hrest⟩ :=
+            (OperationsKeygenCoherent.constrainInstance_cons
+              cs cell column row rest).mp hregistered
+          rcases hgo : V1.go (Keygen.permColsOf cs) starts rest consts with
+            ⟨⟨restEqualities, restConstants⟩, finalConstants⟩
+          simp only [V1.go, hgo, List.mem_cons] at htuple
+          rcases htuple with rfl | htuple
+          · constructor <;>
+              apply permIndex_lt_length_of_mem <;>
+              rw [Keygen.permColsOf_map_toAny]
+            · exact hcell
+            · exact hcolumn
+          · exact inductionHypothesis hrest consts (by rwa [hgo])
+      | loadTable table values =>
+          have hrest :=
+            (OperationsKeygenCoherent.loadTable_cons
+              cs table values rest).mp hregistered
+          exact inductionHypothesis hrest consts (by
+            simpa only [V1.go] using htuple)
+
 /-- The declared-copy extraction is a `filterMap`. -/
 theorem regionDeclaredCopies_eq_filterMap (body : RegionOperations Fp) :
     regionDeclaredCopies body = body.filterMap regionOperationDeclaredCopy? := by
@@ -40,6 +291,89 @@ theorem regionDeclaredCopies_eq_filterMap (body : RegionOperations Fp) :
       cases hop : regionOperationDeclaredCopy? (F := Fp) op with
       | none => simpa [hop] using ih
       | some copy => simpa [hop] using ih
+
+/-- Both endpoints of a region copy lie inside the complete operation footprint. -/
+theorem regionDeclaredCopies_rows
+    (root : Operations Fp) (name : String) (body : RegionOperations Fp)
+    (hregion : Operation.region name body ∈ root)
+    (copy : DeclaredCopy Fp) (hcopy : copy ∈ regionDeclaredCopies body) :
+    copy.1.WithinRows (FloorPlanner.V1.starts root) (Halo2.usedRows root) ∧
+      copy.2.WithinRows (FloorPlanner.V1.starts root) (Halo2.usedRows root) := by
+  rw [regionDeclaredCopies_eq_filterMap, List.mem_filterMap] at hcopy
+  obtain ⟨operation, hoperation, hcopy⟩ := hcopy
+  cases operation with
+  | constrainEqual left right =>
+      simp only [regionOperationDeclaredCopy?] at hcopy
+      obtain rfl := Option.some.inj hcopy
+      exact cells_row_lt_usedRows_of_constrainEqual_mem
+        root name body hregion left right hoperation
+  | constrainConstant cell value =>
+      simp only [regionOperationDeclaredCopy?] at hcopy
+      obtain rfl := Option.some.inj hcopy
+      exact ⟨cell_row_lt_usedRows_of_constrainConstant_mem
+        root name body hregion cell value hoperation, trivial⟩
+  | constrainInstance cell column row =>
+      simp only [regionOperationDeclaredCopy?] at hcopy
+      obtain rfl := Option.some.inj hcopy
+      exact rows_lt_usedRows_of_region_constrainInstance_mem
+        root name body hregion cell column row hoperation
+  | assignAdvice column row witness => simp [regionOperationDeclaredCopy?] at hcopy
+  | assignFixed column row value => simp [regionOperationDeclaredCopy?] at hcopy
+  | enableGate gate row => simp [regionOperationDeclaredCopy?] at hcopy
+  | enableLookup argument selectors row => simp [regionOperationDeclaredCopy?] at hcopy
+
+/-- Both endpoints of every layouter copy lie inside the complete operation
+footprint. -/
+theorem operationDeclaredCopies_rows
+    (operations : Operations Fp) (copy : DeclaredCopy Fp)
+    (hcopy : copy ∈ operationDeclaredCopies operations) :
+    copy.1.WithinRows (FloorPlanner.V1.starts operations) (Halo2.usedRows operations) ∧
+      copy.2.WithinRows (FloorPlanner.V1.starts operations) (Halo2.usedRows operations) := by
+  have auxiliary : ∀ current : Operations Fp,
+      (∀ operation ∈ current, operation ∈ operations) →
+      copy ∈ operationDeclaredCopies current →
+      copy.1.WithinRows (FloorPlanner.V1.starts operations) (Halo2.usedRows operations) ∧
+        copy.2.WithinRows (FloorPlanner.V1.starts operations) (Halo2.usedRows operations) := by
+    intro current hcurrent hcopy
+    induction current with
+    | nil => simp [operationDeclaredCopies] at hcopy
+    | cons operation rest inductionHypothesis =>
+        have hrest : ∀ next ∈ rest, next ∈ operations := by
+          intro next hnext
+          exact hcurrent next (List.mem_cons_of_mem operation hnext)
+        cases operation with
+        | region name body =>
+            rw [operationDeclaredCopies, List.mem_append] at hcopy
+            rcases hcopy with hbody | hcopy
+            · exact regionDeclaredCopies_rows operations name body
+                (hcurrent (.region name body) (by simp)) copy hbody
+            · exact inductionHypothesis hrest hcopy
+        | constrainInstance cell column row =>
+            rw [operationDeclaredCopies, List.mem_cons] at hcopy
+            rcases hcopy with rfl | hcopy
+            · exact rows_lt_usedRows_of_constrainInstance_mem
+                operations cell column row
+                (hcurrent (.constrainInstance cell column row) (by simp))
+            · exact inductionHypothesis hrest hcopy
+        | loadTable table values =>
+            exact inductionHypothesis hrest hcopy
+  exact auxiliary operations (fun _ hoperation => hoperation) hcopy
+
+/-- Every endpoint extracted from a copy stream lies inside the complete operation
+footprint. -/
+theorem declaredEndpoint_rows
+    (operations : Operations Fp) (endpoint : CopyEndpoint Fp)
+    (hendpoint : endpoint ∈
+      (operationDeclaredCopies operations).flatMap fun copy => [copy.1, copy.2]) :
+    endpoint.WithinRows
+      (FloorPlanner.V1.starts operations) (Halo2.usedRows operations) := by
+  rw [List.mem_flatMap] at hendpoint
+  obtain ⟨copy, hcopy, hendpoint⟩ := hendpoint
+  have hrows := operationDeclaredCopies_rows operations copy hcopy
+  simp only [List.mem_cons, List.not_mem_nil, or_false] at hendpoint
+  rcases hendpoint with rfl | rfl
+  · exact hrows.1
+  · exact hrows.2
 
 /-- A resolvable declared copy of a region body is among the region's extracted
 equality/instance copies. -/
@@ -345,6 +679,51 @@ theorem constrainConstant_mem_of_mem_constSites
       | enableLookup =>
           exact List.mem_cons_of_mem _
             (inductionHypothesis (by simpa [constSites] using hsite))
+
+/-- A registered region's constant sites lie on equality-enabled columns. -/
+theorem constantSite_column_mem_permutationColumns
+    (cs : ConstraintSystem Fp) (body : RegionOperations Fp)
+    (hregistered : body.Forall (RegionOperation.KeygenCoherent cs))
+    {cell : Cell} {value : Fp}
+    (hsite : (cell, value) ∈ constSites body) :
+    cell.column ∈ cs.permutationColumns := by
+  have hoperation := constrainConstant_mem_of_mem_constSites
+    body cell value hsite
+  have hregisteredOperation :=
+    List.forall_iff_forall_mem.mp hregistered
+      (.constrainConstant cell value) hoperation
+  exact hregisteredOperation
+
+/-- Every constant site in a keygen-lawful operation stream lies on an
+equality-enabled column. -/
+theorem operationConstSite_column_mem_permutationColumns
+    (cs : ConstraintSystem Fp) (operations : Operations Fp)
+    (hregistered : OperationsKeygenCoherent cs operations)
+    {cell : Cell} {value : Fp}
+    (hsite : (cell, value) ∈ operationConstSites operations) :
+    cell.column ∈ cs.permutationColumns := by
+  induction operations with
+  | nil => simp [operationConstSites] at hsite
+  | cons operation rest inductionHypothesis =>
+      cases operation with
+      | region name body =>
+          obtain ⟨hbody, hrest⟩ :=
+            (OperationsKeygenCoherent.region_cons cs name body rest).mp
+              hregistered
+          rcases List.mem_append.mp hsite with hbodySite | hrestSite
+          · exact constantSite_column_mem_permutationColumns
+              cs body hbody hbodySite
+          · exact inductionHypothesis hrest hrestSite
+      | constrainInstance cell column row =>
+          have hrest :=
+            (OperationsKeygenCoherent.constrainInstance_cons
+              cs cell column row rest).mp hregistered |>.2.2
+          exact inductionHypothesis hrest hsite
+      | loadTable table values =>
+          have hrest :=
+            (OperationsKeygenCoherent.loadTable_cons
+              cs table values rest).mp hregistered
+          exact inductionHypothesis hrest hsite
 
 /-- A whole-stream constant site lies below the compiler-derived operation
 footprint. -/
@@ -705,6 +1084,42 @@ theorem V1_copyList_rows_lt_usedRows
     exact ⟨hconstantRows entry hentry,
       constantSite_row_lt_usedRows operations cell value hsite⟩
 
+/-- Every tuple in V1's copy list uses in-range permutation columns whenever synthesis
+is keygen-lawful and the planner's constants allocation uses configured constant
+columns. -/
+theorem V1_copyList_columns_lt
+    (cs : ConstraintSystem Fp) (operations : Operations Fp)
+    (hregistered : OperationsKeygenCoherent cs operations)
+    (starts : List ℕ) (constants : List (ℕ × ℕ × ℕ))
+    (hfit : (operationConstSites operations).length ≤ constants.length)
+    (hconstantColumns : ∀ entry ∈ constants,
+      (AnyColumn.mk .fixed entry.2.1) ∈ cs.permutationColumns)
+    (tuple : ℕ × ℕ × ℕ × ℕ)
+    (htuple : tuple ∈ V1.copyList
+      (Keygen.permColsOf cs) starts operations constants) :
+    tuple.1 < (Keygen.permColsOf cs).length ∧
+      tuple.2.2.1 < (Keygen.permColsOf cs).length := by
+  rw [V1.copyList, List.mem_append] at htuple
+  rcases htuple with hequality | hconstant
+  · exact V1_go_fst_columns_lt cs operations hregistered
+      starts constants tuple hequality
+  · have hconstants :=
+      (V1_go_snd_eq (Keygen.permColsOf cs) starts
+        operations constants hfit).1
+    rw [hconstants, List.mem_map] at hconstant
+    obtain ⟨⟨⟨cell, value⟩, entry⟩, hallocation, htuple⟩ := hconstant
+    have hsite : (cell, value) ∈ operationConstSites operations :=
+      (List.of_mem_zip hallocation).1
+    have hentry : entry ∈ constants :=
+      (List.of_mem_zip hallocation).2
+    obtain rfl := htuple
+    constructor <;>
+      apply permIndex_lt_length_of_mem <;>
+      rw [Keygen.permColsOf_map_toAny]
+    · exact hconstantColumns entry hentry
+    · exact operationConstSite_column_mem_permutationColumns
+        cs operations hregistered hsite
+
 /-- Every declared copy has a `Cell` left endpoint, and its right endpoint is a cell,
 an instance read, or a constant — so every declared copy either resolves or is a
 constant declaration. -/
@@ -747,5 +1162,31 @@ theorem declared_shape (ops : Operations Fp) (permCols : List ColRef)
       | loadTable tbl values =>
           rw [operationDeclaredCopies] at hmem
           exact ih hmem
+
+/-- A constant occurring among the declared copy endpoints comes from a concrete
+`constrainConstant` site in the operation stream. -/
+theorem exists_constantSite_of_mem_declaredEndpoints
+    (ops : Operations Fp) {value : Fp}
+    (hendpoint : CopyEndpoint.constant value ∈
+      (operationDeclaredCopies ops).flatMap fun copy => [copy.1, copy.2]) :
+    ∃ cell, (cell, value) ∈ operationConstSites ops := by
+  rw [List.mem_flatMap] at hendpoint
+  obtain ⟨copy, hcopy, hendpoint⟩ := hendpoint
+  rcases declared_shape ops [] [] copy hcopy with hres | hconstant
+  · obtain ⟨tuple, htuple⟩ := hres
+    rcases copy with ⟨left, right⟩
+    cases left <;> cases right <;>
+      simp [resolveDeclared] at htuple hendpoint
+  · obtain ⟨cell, foundValue, rfl⟩ := hconstant
+    simp only [List.mem_cons] at hendpoint
+    rcases hendpoint with hendpoint | hendpoint
+    · simp at hendpoint
+    · rcases hendpoint with hendpoint | hnil
+      · have hvalue : value = foundValue :=
+          CopyEndpoint.constant.inj hendpoint
+        subst value
+        exact ⟨cell,
+          mem_operationConstSites_of_declared_constant ops cell foundValue hcopy⟩
+      · simp at hnil
 
 end Zcash.Snark

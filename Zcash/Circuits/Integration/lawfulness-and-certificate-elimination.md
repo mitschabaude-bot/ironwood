@@ -104,14 +104,14 @@ and should normally be discharged by default tactics and compositional theorems.
 | 1 | `queryCoverageFailures_eq_nil` | L | Gate and lookup query-support laws, plus generic registration/projection theorems. The current diagnostic checks both that every allocated fixed column is queried and that every queried column is allocated; replace both directions structurally, while narrowing coverage to semantically consumed columns. | Medium |
 | 2 | `realizationFailures_eq_nil` | L | Region-local fixed-write consistency, table-load consistency, constant-allocation consistency, and selector-packing consistency; compose them using V1 shared-column non-overlap. | Hard |
 | 3 | `actionNumPermCols_pos` | R | Let generic replay accept an empty permutation family; derive positivity only in branches that consume a copy edge. | Easy |
-| 4 | `actionCopyColumnBounds` (narrowed from `actionCopyBounds`) | L | Every copied cell is allocated and both endpoint columns are equality-enabled; derive encoded column bounds generically. Row bounds are now compiler-derived. | Medium |
+| 4 | `actionCopyColumnBounds` (eliminated as a certificate) | G | Generic operation-stream traversal shows that both endpoints use registered permutation columns; finite-index bounds follow from membership. | Done |
 | 5 | `actionCopyActiveRowFailures_eq_nil` (eliminated) | G | `usedRows` includes operation copy endpoints and V1 deferred-constant allocations; structural traversal of the V1 copy stream transfers those bounds to every decoded copy. | Done |
 | 6 | `actionNumPermCols_eq` | R | Parameterize replay by `permutationColumns` derived from the circuit; remove the literal `15`. | Easy |
-| 7 | `actionCopyAddressFailures_eq_nil` | L | From allocated/equality-enabled endpoints, prove the generic permutation-column-index and placement address round trip. | Medium |
-| 8 | `actionMissingConstantAllocations_eq_nil` | L | A constants-allocation law: every `constrainConstant` has an enabled constant column and a free V1 allocation site. | Medium–hard |
-| 9 | `actionConstantSites_fit` | L | Derive from the stronger allocation-completeness theorem rather than checking the final Action list. | Medium |
-| 10 | `actionConstantValueFailures_eq_nil` | G | Prove that constant collection and allocation traverse the same ordered stream and preserve values through `zip`/`map`. | Easy–medium |
-| 11 | `actionConstantCellAddressFailures_eq_nil` | L | Configure law: constant columns are equality-enabled and represented by the permutation/fixed-query machinery; combine with generic address routing. | Medium |
+| 7 | `actionCopyAddressFailures_eq_nil` (eliminated) | G | Generic endpoint registration and row-footprint theorems reduce encoding to the permutation-index round trip. | Done |
+| 8 | `actionMissingConstantAllocations_eq_nil` (eliminated) | G | Keygen lawfulness supplies enough equality-enabled constant capacity; generic V1 stream correspondence supplies each declared constant's allocation. | Done |
+| 9 | `actionConstantSites_fit` (eliminated as a certificate) | G | The compositional constant-capacity law directly bounds the operation stream by V1's assignments. | Done |
+| 10 | `actionConstantValueFailures_eq_nil` (eliminated) | G | Generic ordered-stream and positional-zip theorems preserve every allocated constant value. | Done |
+| 11 | `actionConstantCellAddressFailures_eq_nil` (eliminated) | G | Keygen registration places constant columns in the permutation family; generic row bounds and permutation-index inversion give the address round trip. | Done |
 | 12a | `gateData_eq`, gate component | L | Raw configure/synthesis registration: every synthesis-enabled gate was registered by `configure`. This must make gate closure inactive. | Medium |
 | 12b | `gateData_eq`, selector-count component | L | Every selector used by a configured or enabled lookup is below raw `numSelectors`. This must make the closure maximum inactive. | Medium |
 | 13 | `selectorDegree` | L | Compositional gate/lookup degree bounds, then a generic `ConstraintSystem` degree theorem. | Medium |

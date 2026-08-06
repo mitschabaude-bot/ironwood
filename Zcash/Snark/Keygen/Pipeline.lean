@@ -107,6 +107,19 @@ def permColsOf (cs : ConstraintSystem Fp) : List Halo2.Layout.ColRef :=
     | .fixed => .fixed c.index
     | .instance => .instance c.index
 
+/-- Translating the keygen permutation columns back to Clean columns is lossless. -/
+theorem permColsOf_map_toAny (cs : ConstraintSystem Fp) :
+    (permColsOf cs).map Halo2.Layout.ColRef.toAny =
+      cs.permutationColumns := by
+  rw [permColsOf, List.map_map]
+  induction cs.permutationColumns with
+  | nil => rfl
+  | cons column rest ih =>
+      simp only [List.map_cons]
+      rw [ih]
+      rcases column with ⟨kind, index⟩
+      cases kind <;> rfl
+
 /-- `[ω^0, ω^1, …, ω^(n−1)]` (`build_vk`'s `omega_powers`, `permutation/keygen.rs:108-116`;
 map form rather than iterated multiplication so entries are `getElem`-transparent for the
 σ-row identification — `ZMod` powers are binary-fast, so the cost difference is noise). -/

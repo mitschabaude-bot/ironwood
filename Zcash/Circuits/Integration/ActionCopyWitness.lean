@@ -42,7 +42,9 @@ theorem actionConstantSites_fit :
     (operationConstSites
         (actionCircuit.operations)).length ≤
       actionConsts.length := by
-  native_decide
+  rw [actionConsts, Keygen.constantCopyEntries, List.length_map,
+    operationConstSites_length]
+  exact actionCircuit.constantValues_length_le_constantAssignments_length
 
 /-- The keygen copy list of the Action operation stream. -/
 def actionCopyRaw : List (ℕ × ℕ × ℕ × ℕ) :=
@@ -79,11 +81,33 @@ theorem actionActiveRows_le_domainSize :
   unfold actionActiveRows TopLevelCircuit.usableRowsAt
   exact le_trans (Nat.sub_le _ _) (Nat.sub_le _ _)
 
+theorem actionUsedRows_le_domainSize :
+    Halo2.usedRows actionCircuit.operations ≤ actionDomainSize :=
+  actionCircuit.operations_usedRows_le_usedRows.trans
+    (actionCircuit.usedRows_le_usableRowsAt_domainExponent.trans
+      actionActiveRows_le_domainSize)
+
+/-- Every Action constants allocation uses an equality-enabled configured constants
+column. -/
+theorem actionConst_column_mem_permutationColumns
+    (entry : ℕ × ℕ × ℕ) (hentry : entry ∈ actionConsts) :
+    (AnyColumn.mk .fixed entry.2.1) ∈
+      actionCircuit.constraintSystem.permutationColumns := by
+  rw [actionConsts, Keygen.constantCopyEntries, List.mem_map] at hentry
+  obtain ⟨⟨value, column, row⟩, hassignment, rfl⟩ := hentry
+  exact actionCircuit.constantAssignmentColumn_mem_permutationColumns
+    hassignment
+
 /-- Every keygen copy tuple names two Action permutation columns. Row bounds are
 proved generically from the compiler below. -/
 theorem actionCopyColumnBounds : ∀ t ∈ actionCopyRaw,
     t.1 < actionNumPermCols ∧ t.2.2.1 < actionNumPermCols := by
-  native_decide
+  intro tuple htuple
+  apply V1_copyList_columns_lt actionCircuit.constraintSystem
+    actionCircuit.operations actionCircuit.keygenCoherent
+    actionCircuit.regionStarts actionConsts actionConstantSites_fit
+    actionConst_column_mem_permutationColumns tuple
+  simpa only [actionCopyRaw, actionPermCols] using htuple
 
 /-- Every V1 Action constant allocation lies below the compiler-derived operation
 footprint. -/
@@ -117,13 +141,8 @@ theorem actionCopyBounds : ∀ t ∈ actionCopyRaw, t.1 < actionNumPermCols ∧
   intro tuple htuple
   have hcolumns := actionCopyColumnBounds tuple htuple
   have hrows := actionCopyRaw_rows_lt_usedRows tuple htuple
-  have husedRows :
-      Halo2.usedRows actionCircuit.operations ≤ actionDomainSize :=
-    actionCircuit.operations_usedRows_le_usedRows.trans
-      (actionCircuit.usedRows_le_usableRowsAt_domainExponent.trans
-        actionActiveRows_le_domainSize)
-  exact ⟨hcolumns.1, hrows.1.trans_le husedRows,
-    hcolumns.2, hrows.2.trans_le husedRows⟩
+  exact ⟨hcolumns.1, hrows.1.trans_le actionUsedRows_le_domainSize,
+    hcolumns.2, hrows.2.trans_le actionUsedRows_le_domainSize⟩
 
 /-- The decoded Action copy list. -/
 def actionCopies :
@@ -867,24 +886,6 @@ def actionConstantCellAddressFailures : List (ℕ × ℕ × ℕ) :=
             entry.2.2) ≠
         (ColRef.toAny (.fixed entry.2.1), entry.2.2))
 
-/--
-The Action layout compiler preserves the concrete address of every declared
-copy endpoint through finite permutation-cell encoding.
--/
-theorem actionCopyAddressFailures_eq_nil :
-    actionCopyAddressFailures = [] := by
-  native_decide
-
-/-- Every declared Action constant endpoint has a V1 constants allocation. -/
-theorem actionMissingConstantAllocations_eq_nil :
-    actionMissingConstantAllocations = [] := by
-  native_decide
-
-/-- Every allocated Action constant cell survives permutation-coordinate encoding. -/
-theorem actionConstantCellAddressFailures_eq_nil :
-    actionConstantCellAddressFailures = [] := by
-  native_decide
-
 /-- A member of the positional allocation zip stores its site's field value. -/
 theorem actionConstantAllocation_value
     {site : Cell × Fp} {entry : ℕ × ℕ × ℕ}
@@ -909,6 +910,39 @@ theorem actionConstantAllocation_value
   simpa only [actionConstantAllocations, actionConsts,
     Keygen.constantCopyEntries] using hallocation
 
+private theorem exists_actionConst_of_declared_direct
+    {value : Fp}
+    (hendpoint : CopyEndpoint.constant value ∈ actionDeclaredEndpoints) :
+    ∃ entry ∈ actionConsts, entry.1 = value.val := by
+  have hsite := exists_constantSite_of_mem_declaredEndpoints
+    actionCircuit.operations (by
+      simpa only [actionDeclaredEndpoints] using hendpoint)
+  obtain ⟨cell, hcell⟩ := hsite
+  have hfit :
+      (operationConstSites actionCircuit.operations).length ≤ actionConsts.length :=
+    actionConstantSites_fit
+  obtain ⟨entry, hallocation⟩ := exists_mem_zip_of_mem_left
+    (operationConstSites actionCircuit.operations) actionConsts hfit hcell
+  have hvalue : entry.1 = value.val :=
+    actionConstantAllocation_value (by
+      simpa only [actionConstantAllocations] using hallocation)
+  exact ⟨entry, (List.of_mem_zip hallocation).2, hvalue⟩
+
+/-- Encoding an in-range row on a registered Action permutation column and decoding
+it again preserves the concrete column and row. -/
+theorem actionRawCellAddress_permIndex
+    {column : AnyColumn} {row : ℕ}
+    (hcolumn : column ∈ actionPermCols.map ColRef.toAny)
+    (hrow : row < actionDomainSize) :
+    actionRawCellAddress (permIndex actionPermCols column, row) =
+      (column, row) := by
+  have hcolumnIndex : permIndex actionPermCols column < actionNumPermCols := by
+    simpa only [actionNumPermCols] using
+      permIndex_lt_length_of_mem actionPermCols hcolumn
+  simp only [actionRawCellAddress, mkActionCell, Fin.val_mk]
+  rw [Nat.mod_eq_of_lt hcolumnIndex, Nat.mod_eq_of_lt hrow,
+    permCols_getD_permIndex actionPermCols column (.advice 0) hcolumn]
+
 /-- An allocated Action constant cell has the expected concrete address. -/
 theorem actionConstantCellAddress
     {entry : ℕ × ℕ × ℕ} (hentry : entry ∈ actionConsts) :
@@ -917,12 +951,106 @@ theorem actionConstantCellAddress
             (ColRef.toAny (.fixed entry.2.1)),
           entry.2.2) =
       (ColRef.toAny (.fixed entry.2.1), entry.2.2) := by
-  by_contra hne
-  have hfailure : entry ∈ actionConstantCellAddressFailures := by
-    rw [actionConstantCellAddressFailures, List.mem_filter]
-    exact ⟨hentry, decide_eq_true hne⟩
-  rw [actionConstantCellAddressFailures_eq_nil] at hfailure
-  simp at hfailure
+  have hcolumn : ColRef.toAny (.fixed entry.2.1) ∈
+      actionPermCols.map ColRef.toAny := by
+    rw [actionPermCols, Keygen.permColsOf_map_toAny]
+    exact actionConst_column_mem_permutationColumns entry hentry
+  have hrow : entry.2.2 < actionDomainSize :=
+    (actionConst_row_lt_usedRows entry hentry).trans_le
+      actionUsedRows_le_domainSize
+  exact actionRawCellAddress_permIndex hcolumn hrow
+
+/-- Declared endpoint encoding preserves its concrete address. -/
+theorem actionEncodedAddress_eq
+    {endpoint : CopyEndpoint Fp}
+    (hendpoint : endpoint ∈ actionDeclaredEndpoints) :
+    actionEncodedAddress endpoint = actionEndpointAddress endpoint := by
+  have hcolumnRegistered :=
+    declaredEndpoint_permutationColumnRegistered
+      actionCircuit.constraintSystem actionCircuit.operations
+      actionCircuit.keygenCoherent endpoint (by
+        simpa only [actionDeclaredEndpoints] using hendpoint)
+  have hwithinRows := declaredEndpoint_rows
+    actionCircuit.operations endpoint (by
+      simpa only [actionDeclaredEndpoints] using hendpoint)
+  cases endpoint with
+  | cell cell =>
+      simp only [CopyEndpoint.PermutationColumnRegistered] at hcolumnRegistered
+      simp only [CopyEndpoint.WithinRows] at hwithinRows
+      have hcolumn : cell.column ∈ actionPermCols.map ColRef.toAny := by
+        rw [actionPermCols, Keygen.permColsOf_map_toAny]
+        exact hcolumnRegistered
+      have hrow :
+          actionCircuit.regionStarts.getD cell.regionIndex 0 + cell.rowOffset <
+            actionDomainSize := by
+        simpa only [TopLevelCircuit.regionStarts,
+          TopLevelCompilation.regionStarts] using
+          hwithinRows.trans_le actionUsedRows_le_domainSize
+      simpa only [actionEncodedAddress, actionCopyEncode, actionEndpointAddress,
+        actionRawCellAddress, resolveCell, place] using
+        actionRawCellAddress_permIndex hcolumn hrow
+  | «instance» column row =>
+      simp only [CopyEndpoint.PermutationColumnRegistered] at hcolumnRegistered
+      simp only [CopyEndpoint.WithinRows] at hwithinRows
+      have hcolumn : column.toAny ∈ actionPermCols.map ColRef.toAny := by
+        rw [actionPermCols, Keygen.permColsOf_map_toAny]
+        exact hcolumnRegistered
+      have hrow : row < actionDomainSize :=
+        hwithinRows.trans_le actionUsedRows_le_domainSize
+      simpa only [actionEncodedAddress, actionCopyEncode, actionEndpointAddress,
+        actionRawCellAddress] using
+        actionRawCellAddress_permIndex hcolumn hrow
+  | constant value =>
+      obtain ⟨entry, hentry, hvalue⟩ :=
+        exists_actionConst_of_declared_direct hendpoint
+      have hisSome :
+          (actionConsts.find? (fun current => current.1 = value.val)).isSome = true :=
+        List.find?_isSome.mpr ⟨entry, hentry, by simpa using hvalue⟩
+      obtain ⟨found, hfind⟩ : ∃ found,
+          actionConsts.find? (fun current => current.1 = value.val) = some found :=
+        Option.isSome_iff_exists.mp hisSome
+      have hfound : found ∈ actionConsts :=
+        List.mem_of_find?_eq_some hfind
+      simpa only [actionEncodedAddress, actionCopyEncode, actionEndpointAddress,
+        actionRawCellAddress, hfind] using
+        actionConstantCellAddress hfound
+
+/--
+The Action layout compiler preserves the concrete address of every declared
+copy endpoint through finite permutation-cell encoding.
+-/
+theorem actionCopyAddressFailures_eq_nil :
+    actionCopyAddressFailures = [] := by
+  rw [actionCopyAddressFailures, List.filter_eq_nil_iff]
+  intro endpoint hendpoint hfailure
+  rw [decide_eq_true_eq] at hfailure
+  exact hfailure (actionEncodedAddress_eq hendpoint)
+
+/-- Every declared Action constant endpoint has a V1 constants allocation. -/
+theorem actionMissingConstantAllocations_eq_nil :
+    actionMissingConstantAllocations = [] := by
+  rw [actionMissingConstantAllocations, List.filter_eq_nil_iff]
+  intro endpoint hendpoint
+  cases endpoint with
+  | cell cell => simp [actionConstantAllocated]
+  | «instance» column row => simp [actionConstantAllocated]
+  | constant value =>
+      obtain ⟨entry, hentry, hvalue⟩ :=
+        exists_actionConst_of_declared_direct hendpoint
+      have hisSome :
+          (actionConsts.find?
+            (fun current => current.1 = value.val)).isSome = true :=
+        List.find?_isSome.mpr ⟨entry, hentry, by simpa using hvalue⟩
+      simp only [actionConstantAllocated, hisSome, Bool.not_true]
+      exact Bool.false_ne_true
+
+/-- Every allocated Action constant cell survives permutation-coordinate encoding. -/
+theorem actionConstantCellAddressFailures_eq_nil :
+    actionConstantCellAddressFailures = [] := by
+  rw [actionConstantCellAddressFailures, List.filter_eq_nil_iff]
+  intro entry hentry hfailure
+  rw [decide_eq_true_eq] at hfailure
+  exact hfailure (actionConstantCellAddress hentry)
 
 /-- Either endpoint of a declared copy occurs in `actionDeclaredEndpoints`. -/
 theorem mem_actionDeclaredEndpoints
@@ -936,18 +1064,6 @@ theorem mem_actionDeclaredEndpoints
     exact ⟨copy, hcopy, by simp⟩
   · rw [actionDeclaredEndpoints, List.mem_flatMap]
     exact ⟨copy, hcopy, by simp⟩
-
-/-- Declared endpoint encoding preserves its concrete address. -/
-theorem actionEncodedAddress_eq
-    {endpoint : CopyEndpoint Fp}
-    (hendpoint : endpoint ∈ actionDeclaredEndpoints) :
-    actionEncodedAddress endpoint = actionEndpointAddress endpoint := by
-  by_contra hne
-  have hfailure : endpoint ∈ actionCopyAddressFailures := by
-    rw [actionCopyAddressFailures, List.mem_filter]
-    exact ⟨hendpoint, decide_eq_true hne⟩
-  rw [actionCopyAddressFailures_eq_nil] at hfailure
-  simp at hfailure
 
 /-- A declared constant endpoint has a concrete allocation entry of that value. -/
 theorem exists_actionConst_of_declared
