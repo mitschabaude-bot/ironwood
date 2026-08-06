@@ -1,5 +1,4 @@
 import Zcash.Snark.Fixtures.MultiAction.Honest.Fixture
-import Zcash.Circuits.Integration.ActionPermutationDomainCompute
 import Zcash.Snark.Keygen.Certificate
 
 /-!

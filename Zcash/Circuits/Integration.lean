@@ -7,7 +7,6 @@ import Zcash.Circuits.Integration.ActionCorrectness
 import Zcash.Circuits.Integration.ActionPermutationDomain
 import Zcash.Circuits.Integration.ActionPermutationCycle
 import Zcash.Circuits.Integration.ActionCopyReplay
-import Zcash.Circuits.Integration.ActionPermutationDomainCompute
 import Zcash.Circuits.Integration.CircuitIntegration
 import Zcash.Circuits.Integration.CircuitSatisfaction
 import Zcash.Circuits.Integration.CopyListMembership

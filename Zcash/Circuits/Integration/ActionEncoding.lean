@@ -116,7 +116,7 @@ def actionTopLevelCircuitCorrectness
         actionCircuit.omega ^
           (i : ℕ) :=
     TopLevelAssignment.domainRowsInjective_of_domainExponent_eq
-      ActionPermutationDomain.domainExponent_lt hdomainExponent
+      ActionConstraintBounds.domainExponent_lt hdomainExponent
   refine
     { gates := ActionConstraintBounds.constraintBounds
       fixedEncoding := ?_
@@ -137,10 +137,10 @@ def actionTopLevelCircuitCorrectness
       assignment
       (TopLevelAssignment.domainRowsInjective
         (top := actionCircuit)
-        ActionPermutationDomain.domainExponent_lt)
+        ActionConstraintBounds.domainExponent_lt)
       (TopLevelAssignment.domainRoot
         (top := actionCircuit)
-        ActionPermutationDomain.domainExponent_lt)
+        ActionConstraintBounds.domainExponent_lt)
     intro column
     simpa only [assignment, hdomainSize] using hbinding column
   · intro proofIndex
@@ -163,7 +163,7 @@ def actionTopLevelCircuitCorrectness
           actionCircuit.omega ^
             actionCircuit.n = 1 :=
         TopLevelAssignment.domainRoot
-          ActionPermutationDomain.domainExponent_lt
+          ActionConstraintBounds.domainExponent_lt
       have hn : actionCircuit.n ≠ 0 := by
         exact actionCircuit.n_ne_zero
       have hsatisfaction :=

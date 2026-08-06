@@ -210,11 +210,11 @@ theorem staticChecks_of_derived
     rw [hvk basis, actionCircuit.toVerifierKey_omega,
       actionCircuit.toVerifierKey_n]
     exact TopLevelAssignment.domainRoot
-      ActionPermutationDomain.domainExponent_lt
+      ActionConstraintBounds.domainExponent_lt
   characteristic := fun basis => by
     rw [hvk basis, actionCircuit.toVerifierKey_n]
     exact TopLevelAssignment.domainSizeCastNeZero
-      ActionPermutationDomain.domainExponent_lt
+      ActionConstraintBounds.domainExponent_lt
 
 /-- **The captured `x`-squeeze schedule at the derived key** (issue #128 F3): the degree caps
 transfer through the scalar equalities, and pinning is the family's own derived projection. -/
@@ -312,11 +312,11 @@ theorem staticChecks_of_derived_for (numProofs : ℕ)
     rw [hvk basis, actionCircuit.toVerifierKey_omega,
       actionCircuit.toVerifierKey_n]
     exact TopLevelAssignment.domainRoot
-      ActionPermutationDomain.domainExponent_lt
+      ActionConstraintBounds.domainExponent_lt
   characteristic := fun basis => by
     rw [hvk basis, actionCircuit.toVerifierKey_n]
     exact TopLevelAssignment.domainSizeCastNeZero
-      ActionPermutationDomain.domainExponent_lt
+      ActionConstraintBounds.domainExponent_lt
 
 /-- The captured `x`-squeeze schedule transported to an arbitrary Action bundle size. -/
 def schedule_of_derived_for (numProofs : ℕ)
@@ -905,7 +905,7 @@ private theorem adaptive_action_x_degree_le_for (numProofs : ℕ)
   have hrows : Function.Injective fun i : Fin actionCircuit.n =>
       actionCircuit.omega ^ (i : ℕ) :=
     TopLevelAssignment.domainRowsInjective
-      ActionPermutationDomain.domainExponent_lt
+      ActionConstraintBounds.domainExponent_lt
   have hblindingVk : avk.blindingFactors < avk.n :=
     actionCircuit.toVerifierKey_blindingFactors_lt_n
       (ursOfAugmentedBasis

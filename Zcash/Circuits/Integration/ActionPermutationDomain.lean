@@ -1,4 +1,4 @@
-import Zcash.Circuits.Integration.ActionPermutationDomainCompute
+import Zcash.Circuits.Integration.ActionConstraintBoundsCompute
 import Zcash.Circuits.Integration.PermutationCompiler
 import Zcash.Circuits.Integration.TopLevelAssignment
 import Zcash.Circuits.Integration.TopLevelConstraintModel
@@ -27,6 +27,7 @@ open Halo2
 open Zcash.Circuits.Action
   (actionCircuit actionCircuit_numAdviceColumns_eq
     actionCircuit_numFixedColumns_eq actionCircuit_numInstanceColumns_eq)
+open ActionConstraintBounds (domainExponent_lt)
 
 namespace ActionPermutationDomain
 

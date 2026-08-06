@@ -22,6 +22,7 @@ open Zcash.Arithmetic (derivedUrsGLagrange omegaOf)
 open Halo2 CompPoly.CPolynomial
 open Keygen
 open ActionPermutationDomain
+open ActionConstraintBounds (domainExponent_lt)
 open Zcash.Circuits.Action (actionCircuit)
 
 variable {G : Type} [AddCommGroup G] [Module Fp G]

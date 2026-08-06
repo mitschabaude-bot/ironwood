@@ -265,7 +265,7 @@ def adaptiveActionWitnessOrRelationOfDecode?
                   let hblinding := actionCircuit.toVerifierKey_blindingFactors_lt_n urs
                   let hnFp : (actionCircuit.n : Fp) ≠ 0 :=
                     TopLevelAssignment.domainSizeCastNeZero
-                      ActionPermutationDomain.domainExponent_lt
+                      ActionConstraintBounds.domainExponent_lt
                   match acceptedModel_circuitSat_or_relation_of_decodedMemberPolynomial_eq
                       urs rfl (actionCircuit.toVerifierKey urs)
                       (actionCircuit.instanceCommitment urs inputs) pnu.1.proof.1 ch
@@ -278,9 +278,9 @@ def adaptiveActionWitnessOrRelationOfDecode?
                         PSum.inl (decode.memberBinding hchar slot point hpoint))
                       (actionCircuit.permutationChunkRoutingCoherent urs)
                       (TopLevelAssignment.toVerifierKey_domainRowsInjective
-                        urs ActionPermutationDomain.domainExponent_lt)
+                        urs ActionConstraintBounds.domainExponent_lt)
                       (TopLevelAssignment.toVerifierKey_domainRoot
-                        urs ActionPermutationDomain.domainExponent_lt)
+                        urs ActionConstraintBounds.domainExponent_lt)
                       hnFp
                       (by exact hxgoodProof.down) with
                   | PSum.inr relation =>
