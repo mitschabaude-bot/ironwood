@@ -218,6 +218,42 @@ theorem Internal.actionCircuit_eq_impl :
     actionCircuit = Internal.actionCircuitImpl :=
   actionCircuitPacked.property
 
+/-- Action's configured primary column witnesses that its permutation family is
+nonempty. -/
+theorem actionCircuit_permutationColumns_nonempty :
+    actionCircuit.permutationColumns ≠ [] := by
+  rw [Internal.actionCircuit_eq_impl]
+  let program := Circuit.configure Specs.Sinsemilla.orchardGenerators
+  let primary := (program.output {}).primary.toAny
+  have hprimary : primary ∈ (program.run {}).2.permutationColumns :=
+    (Configure.mem_permutationColumns_run_iff program {} primary).mpr
+      (Or.inr (by
+        simpa only [program, primary] using
+          Circuit.configure_output_primary_mem_permutationRequests
+            Specs.Sinsemilla.orchardGenerators {}))
+  exact List.ne_nil_of_mem hprimary
+
+/-- Action's closed configure run allocates ten advice columns. -/
+theorem actionCircuit_numAdviceColumns_eq :
+    actionCircuit.constraintSystem.numAdviceColumns = 10 := by
+  rw [Internal.actionCircuit_eq_impl]
+  exact Circuit.configure_finalCounts_numAdviceColumns
+    Specs.Sinsemilla.orchardGenerators
+
+/-- Action's closed configure run allocates fourteen fixed columns. -/
+theorem actionCircuit_numFixedColumns_eq :
+    actionCircuit.constraintSystem.numFixedColumns = 14 := by
+  rw [Internal.actionCircuit_eq_impl]
+  exact Circuit.configure_finalCounts_numFixedColumns
+    Specs.Sinsemilla.orchardGenerators
+
+/-- Action's closed configure run allocates one instance column. -/
+theorem actionCircuit_numInstanceColumns_eq :
+    actionCircuit.constraintSystem.numInstanceColumns = 1 := by
+  rw [Internal.actionCircuit_eq_impl]
+  exact Circuit.configure_finalCounts_numInstanceColumns
+    Specs.Sinsemilla.orchardGenerators
+
 /-- The opaque circuit's private-witness field is the public Action witness type. -/
 theorem actionCircuit_privateWitness_eq :
     actionCircuit.PrivateWitness = PrivateWitness := by

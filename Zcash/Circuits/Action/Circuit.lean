@@ -509,6 +509,21 @@ theorem configure_fixedColumn_indices (G : Generators) :
     NoteCommit.RhoCanonicity.configure, NoteCommit.PsiCanonicity.configure,
     NoteCommit.YCanonicity.configure]
 
+/-- The closed Action configuration allocates ten advice columns. -/
+theorem configure_finalCounts_numAdviceColumns (G : Generators) :
+    ((configure G).finalCounts {}).numAdviceColumns = 10 := by
+  configure_norm
+
+/-- The closed Action configuration allocates fourteen fixed columns. -/
+theorem configure_finalCounts_numFixedColumns (G : Generators) :
+    ((configure G).finalCounts {}).numFixedColumns = 14 := by
+  configure_norm
+
+/-- The closed Action configuration allocates one instance column. -/
+theorem configure_finalCounts_numInstanceColumns (G : Generators) :
+    ((configure G).finalCounts {}).numInstanceColumns = 1 := by
+  configure_norm
+
 private instance elaboratedConfigure (G : Generators) : ElaboratedConfigure (configure G) := by
   unfold configure
   infer_instance

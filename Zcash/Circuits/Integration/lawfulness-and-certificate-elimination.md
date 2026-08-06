@@ -103,10 +103,10 @@ and should normally be discharged by default tactics and compositional theorems.
 |---:|---|:---:|---|---|
 | 1 | `queryCoverageFailures_eq_nil` | L | Gate and lookup query-support laws, plus generic registration/projection theorems. The current diagnostic checks both that every allocated fixed column is queried and that every queried column is allocated; replace both directions structurally, while narrowing coverage to semantically consumed columns. | Medium |
 | 2 | `realizationFailures_eq_nil` | L | Region-local fixed-write consistency, table-load consistency, constant-allocation consistency, and selector-packing consistency; compose them using V1 shared-column non-overlap. | Hard |
-| 3 | `actionNumPermCols_pos` | R | Let generic replay accept an empty permutation family; derive positivity only in branches that consume a copy edge. | Easy |
+| 3 | `actionNumPermCols_pos` (eliminated as a certificate) | G | Action's configured primary column witnesses nonemptiness; no exact column-count computation is needed. | Done |
 | 4 | `actionCopyColumnBounds` (eliminated as a certificate) | G | Generic operation-stream traversal shows that both endpoints use registered permutation columns; finite-index bounds follow from membership. | Done |
 | 5 | `actionCopyActiveRowFailures_eq_nil` (eliminated) | G | `usedRows` includes operation copy endpoints and V1 deferred-constant allocations; structural traversal of the V1 copy stream transfers those bounds to every decoded copy. | Done |
-| 6 | `actionNumPermCols_eq` | R | Parameterize replay by `permutationColumns` derived from the circuit; remove the literal `15`. | Easy |
+| 6 | `actionNumPermCols_eq` (eliminated) | R | Replay now uses the circuit-derived permutation family directly; the literal `15` is absent from the semantic path. | Done |
 | 7 | `actionCopyAddressFailures_eq_nil` (eliminated) | G | Generic endpoint registration and row-footprint theorems reduce encoding to the permutation-index round trip. | Done |
 | 8 | `actionMissingConstantAllocations_eq_nil` (eliminated) | G | Keygen lawfulness supplies enough equality-enabled constant capacity; generic V1 stream correspondence supplies each declared constant's allocation. | Done |
 | 9 | `actionConstantSites_fit` (eliminated as a certificate) | G | The compositional constant-capacity law directly bounds the operation stream by V1's assignments. | Done |
@@ -119,7 +119,7 @@ and should normally be discharged by default tactics and compositional theorems.
 | 15 | permutation `domainExponent_lt` | R | Share the generic top-level supported-domain fact; remove the duplicate Action computation. | Easy |
 | 16 | `domainExponent_eq` | R | Reason over the abstract derived exponent. Keep exact `K = 11` only as part of deployment identity. | Medium |
 | 17 | `chunks_eq` | R | Prove generic chunking order/index facts over the derived permutation columns; remove literal `[7, 7, 1]`. | Medium |
-| 18 | `permutationColumnCount_eq` | R | Bound the derived permutation-column count without fixing it to the literal `15`; chunk width and variable-width chunks are already structural. | Medium |
+| 18 | `permutationColumnCount_eq` (eliminated) | G | Configure interpretation deduplicates equality requests and every request lies in the configured column space; Action's small advice/fixed/instance counts bound that space without fixing the permutation family to `15`. | Done |
 | 19 | `queryLayouts_eq` | G | Both sides project the same pinned CS. Prove the projection equality with behavioral simp lemmas, not reduction through the concrete circuit. | Medium |
 | 20 | `routingCoherent` | L | Configure permutation law: every permutation column has the required zero-rotation query; derive routing from generic chunk indices. | Medium |
 | 21 | `deltaPowers_injective` | G | Pure field/group-order argument for the supported permutation-column range. | Medium |

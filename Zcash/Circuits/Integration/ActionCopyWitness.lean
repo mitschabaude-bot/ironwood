@@ -67,11 +67,8 @@ theorem actionActiveRows_eq :
 theorem actionNumPermCols_pos : 0 < actionNumPermCols := by
   rw [actionNumPermCols, actionPermCols, Keygen.permColsOf,
     List.length_map]
-  have hcolumns :
-      actionCircuit.constraintSystem.permutationColumns.length = 15 := by
-    simpa only [TopLevelCircuit.permutationColumnCount] using
-      ActionPermutationDomain.permutationColumnCount_eq
-  omega
+  exact List.length_pos_iff_ne_nil.mpr
+    actionCircuit_permutationColumns_nonempty
 
 theorem actionDomainSize_pos : 0 < actionDomainSize :=
   Nat.two_pow_pos _

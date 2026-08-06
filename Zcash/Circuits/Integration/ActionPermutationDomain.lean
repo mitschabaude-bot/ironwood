@@ -24,7 +24,9 @@ open Zcash.Arithmetic
 
 open CompPoly.CPolynomial
 open Halo2
-open Zcash.Circuits.Action (actionCircuit)
+open Zcash.Circuits.Action
+  (actionCircuit actionCircuit_numAdviceColumns_eq
+    actionCircuit_numFixedColumns_eq actionCircuit_numInstanceColumns_eq)
 
 namespace ActionPermutationDomain
 
@@ -243,12 +245,12 @@ theorem namesInjective
           (j'.1 : ℕ) * actionCircuit.chunkLen + (j'.2 : ℕ) <
             actionCircuit.permutationColumnCount := by
         omega
-      have hcolumns :
-          actionCircuit.permutationColumnCount = 15 :=
-        permutationColumnCount_eq
       have hsupported :
           actionCircuit.permutationColumnCount ≤ deltaFpOrder := by
-        rw [hcolumns]
+        apply actionCircuit.permutationColumnCount_le_configuredColumnCount |>.trans
+        rw [actionCircuit_numAdviceColumns_eq,
+          actionCircuit_numFixedColumns_eq,
+          actionCircuit_numInstanceColumns_eq]
         norm_num [deltaFpOrder, scalarFieldOrder,
           CompElliptic.Fields.Pasta.PALLAS_BASE_CARD]
       have hglobal :
