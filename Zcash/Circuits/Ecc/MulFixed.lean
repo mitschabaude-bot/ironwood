@@ -129,6 +129,10 @@ def coordsGate (cfg : Config) : Gate Fp :=
     let word := zCur - zNext * (((H : ℕ) : Fp) : Expression Fp Query)
     coordsCheck cfg word
 
+@[circuit_norm, configure_selector_norm, keygen_norm, synthesis_summary_norm]
+theorem coordsGate_selector (cfg : Config) :
+    (coordsGate cfg).selector = cfg.runningSumConfig.qRangeCheck := rfl
+
 /-- The `CoordsParams` read off the environment's fixed cells at a given row — what the
 coords gate's queries see. -/
 def readParams (cfg : Config) (f : Query → Fp) : CoordsParams Fp where
@@ -167,6 +171,12 @@ def configureProgram (window : Column .advice) (qRunningSum : Selector) :
   let runningSumConfig ← DecomposeRunningSum.configure 3 qRunningSum window
   let fixedZ ← fixedColumn
   return (runningSumConfig, fixedZ)
+
+@[configure_selector_norm, keygen_norm]
+theorem configureProgram_delta_lookups
+    (window : Column .advice) (qRunningSum : Selector) (counts) :
+    ((configureProgram window qRunningSum).delta counts).lookups = [] := by
+  simp [configureProgram, DecomposeRunningSum.configure]
 
 instance (window : Column .advice) (qRunningSum : Selector) :
     ElaboratedConfigure (configureProgram window qRunningSum) := by
@@ -226,7 +236,18 @@ def configureTail
   return configureResult lagrangeCoeffs window u
     addConfig addIncompleteConfig qRunningSum value
 
-instance (lagrangeCoeffs : Fin 8 → Column .fixed)
+@[configure_selector_norm, keygen_norm]
+theorem configureTail_delta_lookups
+    (lagrangeCoeffs : Fin 8 → Column .fixed)
+    (window u : Column .advice)
+    (addConfig : Add.Config)
+    (addIncompleteConfig : AddIncomplete.Config) (counts) :
+    ((configureTail lagrangeCoeffs window u addConfig
+      addIncompleteConfig).delta counts).lookups = [] := by
+  simp [configureTail, configureProgram_delta_lookups]
+
+@[reducible] private def configureTailInferred
+    (lagrangeCoeffs : Fin 8 → Column .fixed)
     (window u : Column .advice)
     (addConfig : Add.Config)
     (addIncompleteConfig : AddIncomplete.Config) :
@@ -234,6 +255,29 @@ instance (lagrangeCoeffs : Fin 8 → Column .fixed)
       (configureTail lagrangeCoeffs window u addConfig addIncompleteConfig) := by
   unfold configureTail
   infer_instance
+
+private theorem configureTail_selectorRequirements
+    (lagrangeCoeffs : Fin 8 → Column .fixed)
+    (window u : Column .advice)
+    (addConfig : Add.Config)
+    (addIncompleteConfig : AddIncomplete.Config) (counts) :
+    (configureTailInferred lagrangeCoeffs window u addConfig
+      addIncompleteConfig).selectorRequirements counts := by
+  dsimp only [configureTailInferred, configureTail]
+  simp [configure_selector_norm, keygen_norm,
+    ConfigureDelta.LookupSelectorsCrossCompatible,
+    configureProgram_delta_lookups]
+
+instance (lagrangeCoeffs : Fin 8 → Column .fixed)
+    (window u : Column .advice)
+    (addConfig : Add.Config)
+    (addIncompleteConfig : AddIncomplete.Config) :
+    ElaboratedConfigure
+      (configureTail lagrangeCoeffs window u addConfig addIncompleteConfig) :=
+  (configureTailInferred lagrangeCoeffs window u addConfig addIncompleteConfig)
+    |>.closeSelectorRequirements
+      (configureTail_selectorRequirements lagrangeCoeffs window u
+        addConfig addIncompleteConfig)
 
 @[simp] theorem configureTail_output
     (lagrangeCoeffs : Fin 8 → Column .fixed)
@@ -272,12 +316,42 @@ def configure (lagrangeCoeffs : Fin 8 → Column .fixed) (window u : Column .adv
   enableEquality u
   configureTail lagrangeCoeffs window u addConfig addIncompleteConfig
 
-instance (lagrangeCoeffs : Fin 8 → Column .fixed) (window u : Column .advice)
+@[configure_selector_norm, keygen_norm]
+theorem configure_delta_lookups
+    (lagrangeCoeffs : Fin 8 → Column .fixed) (window u : Column .advice)
+    (addConfig : Add.Config) (addIncompleteConfig : AddIncomplete.Config)
+    (counts) :
+    ((configure lagrangeCoeffs window u addConfig
+      addIncompleteConfig).delta counts).lookups = [] := by
+  simp [configure, configureTail_delta_lookups]
+
+@[reducible] private def configureInferred
+    (lagrangeCoeffs : Fin 8 → Column .fixed) (window u : Column .advice)
     (addConfig : Add.Config) (addIncompleteConfig : AddIncomplete.Config) :
     ElaboratedConfigure
       (configure lagrangeCoeffs window u addConfig addIncompleteConfig) := by
   unfold configure
   infer_instance
+
+private theorem configure_selectorRequirements
+    (lagrangeCoeffs : Fin 8 → Column .fixed) (window u : Column .advice)
+    (addConfig : Add.Config) (addIncompleteConfig : AddIncomplete.Config)
+    (counts) :
+    (configureInferred lagrangeCoeffs window u addConfig
+      addIncompleteConfig).selectorRequirements counts := by
+  dsimp only [configureInferred, configure]
+  simp [configure_selector_norm, keygen_norm,
+    ConfigureDelta.LookupSelectorsCrossCompatible,
+    configureTail_delta_lookups]
+
+instance (lagrangeCoeffs : Fin 8 → Column .fixed) (window u : Column .advice)
+    (addConfig : Add.Config) (addIncompleteConfig : AddIncomplete.Config) :
+    ElaboratedConfigure
+      (configure lagrangeCoeffs window u addConfig addIncompleteConfig) :=
+  (configureInferred lagrangeCoeffs window u addConfig addIncompleteConfig)
+    |>.closeSelectorRequirements
+      (configure_selectorRequirements lagrangeCoeffs window u
+        addConfig addIncompleteConfig)
 
 /-! ## Shared keygen requirements -/
 
@@ -696,6 +770,36 @@ theorem windowChain_processWindow_synthesisSummary_constantSiteCount
   apply windowChain_synthesisSummary_constantSiteCount_eq_zero
   intro w row
   simp only [processWindow, circuit_norm]
+
+/-- Lookup-local activation correctness composes through the shared window-chain
+driver whenever it holds for the supplied per-window program. -/
+theorem windowChain_lookupActivationsWellFormed
+    (cfg : Config)
+    (processW : ℕ → ℕ → RegionCircuit Fp (Point (AssignedCell Fp)))
+    (offset numWindows : ℕ) (region : RegionIndex)
+    (hprocessW : ∀ w row,
+      ((processW w row).operations region).LookupActivationsWellFormed) :
+    ((windowChain cfg processW offset numWindows).operations region)
+      |>.LookupActivationsWellFormed := by
+  unfold windowChain
+  simp only [RegionCircuit.operations_bind, RegionCircuit.operations_pure,
+    RegionOperations.LookupActivationsWellFormed, List.forall_append,
+    List.forall_nil, and_true, operations_cellAt]
+  keygen_registration
+
+/-- The standard fixed-base per-window program and its shared driver satisfy the
+lookup-local activation law. -/
+@[keygen_norm]
+theorem windowChain_processWindow_lookupActivationsWellFormed
+    (B : FixedBaseData) (table : ℕ → ℕ → Point Fp) (cfg : Config)
+    (alpha : AssignedCell Fp) (offset numWindows : ℕ)
+    (region : RegionIndex) :
+    ((windowChain cfg (processWindow B table cfg alpha)
+      offset numWindows).operations region).LookupActivationsWellFormed := by
+  apply windowChain_lookupActivationsWellFormed
+  intro w row
+  unfold processWindow
+  keygen_registration
 
 @[keygen_helper]
 theorem windowChain_processWindow_keygenRegistered

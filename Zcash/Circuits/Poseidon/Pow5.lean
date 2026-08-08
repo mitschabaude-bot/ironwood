@@ -67,7 +67,7 @@ def fullRoundGate (cfg : Config) : Gate Fp :=
         - queryAdvice (cfg.state nextIdx) 1
     [("", row 0), ("", row 1), ("", row 2)]
 
-@[circuit_norm, synthesis_summary_norm]
+@[circuit_norm, configure_selector_norm, keygen_norm, synthesis_summary_norm]
 theorem fullRoundGate_selector (cfg : Config) :
     (fullRoundGate cfg).selector = cfg.sFull := rfl
 
@@ -101,7 +101,7 @@ def partialRoundsGate (cfg : Config) : Gate Fp :=
      ("", mid 1 + rcB 1 - next 1),
      ("", mid 2 + rcB 2 - next 2)]
 
-@[circuit_norm, synthesis_summary_norm]
+@[circuit_norm, configure_selector_norm, keygen_norm, synthesis_summary_norm]
 theorem partialRoundsGate_selector (cfg : Config) :
     (partialRoundsGate cfg).selector = cfg.sPartial := rfl
 
@@ -121,11 +121,11 @@ def padAndAddGate (cfg : Config) : Gate Fp :=
     [("", padAndAdd 0), ("", padAndAdd 1),
      ("", queryAdvice (cfg.state 2) (-1) - queryAdvice (cfg.state 2) 1)]
 
-@[circuit_norm, synthesis_summary_norm]
+@[circuit_norm, configure_selector_norm, keygen_norm, synthesis_summary_norm]
 theorem padAndAddGate_selector (cfg : Config) :
     (padAndAddGate cfg).selector = cfg.sPadAndAdd := rfl
 
-@[reducible] private def configureEqualities
+@[reducible] def configureEqualities
     (state : Fin 3 → Column .advice) (rcB : Fin 3 → Column .fixed) :
     Configure Fp Unit := do
   enableEquality (state 0).toAny
@@ -141,7 +141,7 @@ private instance (state : Fin 3 → Column .advice)
   unfold configureEqualities
   infer_instance
 
-@[reducible] private def configureGates (cfg : Config) : Configure Fp Unit := do
+@[reducible] def configureGates (cfg : Config) : Configure Fp Unit := do
   createGate (fullRoundGate cfg)
   createGate (partialRoundsGate cfg)
   createGate (padAndAddGate cfg)
@@ -162,6 +162,12 @@ def configure (state : Fin 3 → Column .advice) (partialSbox : Column .advice)
   let cfg : Config := { state, partialSbox, rcA, rcB, sFull, sPartial, sPadAndAdd }
   configureGates cfg
   return cfg
+
+@[configure_selector_norm, keygen_norm] theorem configure_delta_lookups
+    (state : Fin 3 → Column .advice) (partialSbox : Column .advice)
+    (rcA rcB : Fin 3 → Column .fixed) (counts) :
+    ((configure state partialSbox rcA rcB).delta counts).lookups = [] := by
+  simp [configure, configureEqualities, configureGates]
 
 /-- Every state column is equality-enabled by the Pow5 configure program. -/
 theorem state_mem_configure_permutationRequests
@@ -201,6 +207,11 @@ instance (state : Fin 3 → Column .advice) (partialSbox : Column .advice)
     ElaboratedConfigure (configure state partialSbox rcA rcB) :=
   { configureElaborated state partialSbox rcA rcB with
     selectorRequirements _ := True
+    lookupSelectorsCompatible := by
+      intro counts _
+      simp [configure, configureEqualities, configureGates,
+        ConfigureDelta.LookupSelectorsCompatible,
+        Halo2.LookupSelectorsCompatible]
     selectorsAllocated := by
       intro counts _
       constructor
