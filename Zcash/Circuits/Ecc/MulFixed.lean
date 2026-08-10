@@ -264,9 +264,7 @@ private theorem configureTail_selectorRequirements
     (configureTailInferred lagrangeCoeffs window u addConfig
       addIncompleteConfig).selectorRequirements counts := by
   dsimp only [configureTailInferred, configureTail]
-  simp [configure_selector_norm, keygen_norm,
-    ConfigureDelta.LookupSelectorsCrossCompatible,
-    configureProgram_delta_lookups]
+  simp [configure_selector_norm, keygen_norm]
 
 instance (lagrangeCoeffs : Fin 8 → Column .fixed)
     (window u : Column .advice)
@@ -340,9 +338,7 @@ private theorem configure_selectorRequirements
     (configureInferred lagrangeCoeffs window u addConfig
       addIncompleteConfig).selectorRequirements counts := by
   dsimp only [configureInferred, configure]
-  simp [configure_selector_norm, keygen_norm,
-    ConfigureDelta.LookupSelectorsCrossCompatible,
-    configureTail_delta_lookups]
+  simp [configure_selector_norm, keygen_norm]
 
 instance (lagrangeCoeffs : Fin 8 → Column .fixed) (window u : Column .advice)
     (addConfig : Add.Config) (addIncompleteConfig : AddIncomplete.Config) :

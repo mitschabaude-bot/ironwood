@@ -26,11 +26,11 @@ double-count the bundle's `K = 11`, which is already represented by
 `domainExponent_eq`.
 
 Two further synthesis laws, `LookupRelevantSelectorActivationsExact` and
-`LookupInputsNoSimpleSelectors`, were once proved here — at the wrong abstraction
-layer, as fields of `TopLevelCircuit` rather than of `FormalCircuit`, backed by a
-roughly 3,000-line Action/NoteCommit proof stack. Since nothing consumed them they
-have been withdrawn rather than relocated; the residual fidelity gap that leaves is
-recorded below. They were never included in the count of 26.
+`LookupInputsNoSimpleSelectors`, were once proved here at the wrong abstraction
+layer, backed by a roughly 3,000-line Action/NoteCommit proof stack. The former was
+withdrawn as consumerless. The latter is now enforced directly by lookup
+registration and is therefore no longer a top-level synthesis obligation. Neither
+was included in the count of 26.
 
 The guiding rule is:
 
@@ -187,7 +187,7 @@ and the duplicate `action_gates_selectorsCovered` computation in the VK-match bu
 were replaced by the packaged selector-allocation law and compositional proofs carried
 by the formal circuits themselves.
 
-## Withdrawn synthesis-law sidecars and the residual fidelity gap
+## Lookup selector fidelity
 
 `TopLevelCircuit` once carried two static synthesis obligations:
 
@@ -201,23 +201,22 @@ Both fields, together with the sidecars that discharged them for Action
 (`Action/SynthesisLaws.lean`, `NoteCommit/SynthesisLaws.lean`, and
 `Action/TopLevelSynthesisLaws.lean`, which retraced the entire Action and NoteCommit
 synthesis call graphs because circuit and subcircuit constructors do not preserve
-this evidence), have been withdrawn as consumerless: no keygen or verifier theorem
-ever read them. Lookup projection coverage is established independently, by counting
-selector indices rather than by appealing to a region-local activation law.
+this evidence), were withdrawn. Lookup projection coverage is established
+independently, by counting selector indices rather than by appealing to a
+region-local activation law.
 
-That withdrawal leaves a known fidelity gap. Halo 2 rejects simple selectors supplied
-to a lookup argument — lookup registration panics on one — and Clean no longer models
-that rejection anywhere. Nothing in the present chain becomes unsound as a result,
-because nothing claims it; but a keygen-fidelity theorem relating Clean's
-`configure`/`synthesize` output to halo2's own key generation cannot be stated
-faithfully without it. Such a theorem will need a no-simple-selectors premise
-reintroduced explicitly.
+The no-simple-selector condition has since been restored at its natural boundary.
+`LookupArgument` proves that every input contains no simple selector, `lookup`
+requires that proof when registering the argument, and complex selectors have a
+distinct type. The configure elaboration additionally tracks the exact selector
+usage of gates and lookups, including which uses were inherited from a parent
+program. Circuit owners reduce that provenance to compact summaries, so cross-child
+compatibility composes without reopening the full Action configure tree.
 
-When that happens, the premise should not be reinstated in the withdrawn shape. The
-lesson of the sidecars is that these are laws of `FormalCircuit.synthesize`: the
-obligation belongs locally on lookup-emitting bundles, preserved compositionally by
-the circuit combinators, rather than reproved across a whole synthesis call graph and
-reattached at the top-level wrapper.
+`LookupRelevantSelectorActivationsExact` remains withdrawn. If a future theorem
+needs its region-local synthesis claim, the evidence should be packaged on the
+lookup-emitting circuit bundles and preserved by circuit composition rather than
+reattached as a whole-Action sidecar.
 
 ## Current compile-cost baseline
 

@@ -767,8 +767,10 @@ theorem gateSelectorsCovered_deriveSelCompressMap
       exact List.forall_iff_forall_mem.mp hallocated gate hgate
     exact deriveSelCompressMap_lookup_isSome_of_lt
       cs n activations hselectorLt
-  · exact List.forall_iff_forall_mem.mp
-      gate.wellFormed.selectorsOwned constraint hconstraint
+  · exact Expression.selectorsCovered_of_selectorsOwnedBy
+      gate.selector constraint.poly <|
+        List.forall_iff_forall_mem.mp
+          gate.wellFormed.selectorsOwned constraint hconstraint
 
 end Halo2
 
