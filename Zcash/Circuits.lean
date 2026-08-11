@@ -84,6 +84,7 @@ import Zcash.Circuits.Action.RealBases
 import Zcash.Circuits.Action.Spec
 import Clean.Halo2.TopLevel
 import Zcash.Circuits.Action.TopLevel
+import Zcash.Circuits.Action.Planner
 import Zcash.Circuits.Integration
 
 /-!
