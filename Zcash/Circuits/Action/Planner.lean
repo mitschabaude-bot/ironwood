@@ -7,6 +7,40 @@ open Halo2 FloorPlanner
 def actionConfig : Circuit.Config :=
   (Circuit.configure Specs.Sinsemilla.orchardGenerators {}).1
 
+/-- Controlled reduced synthesis summary of the opaque Action circuit. Planner
+proofs use this interface instead of unfolding the top-level package repeatedly. -/
+theorem actionCircuit_synthesisSummary_eq :
+    actionCircuit.synthesisSummary =
+      Circuit.mainPostSynthesisSummary actionConfig := by
+  rw [Internal.actionCircuit_eq_impl]
+  unfold TopLevelCircuit.synthesisSummary Internal.actionCircuitImpl
+  rw [Circuit.circuit_synthesisSummary_eq]
+  exact congrArg Circuit.mainPostSynthesisSummary
+    (show Internal.actionCircuitImpl.config = actionConfig by rfl)
+
+/-- The selector-free reduced input to Action's physical V1 placement. -/
+def actionPlannerSummaries : List RegionShapeSummary :=
+  actionCircuit.synthesisSummary.regionShapes.map
+    RegionShapeSummary.withoutSelectors
+
+/-- Action's exact selector-free summary order after consensus pdqsort. -/
+def actionSortedPlannerSummaries : List RegionShapeSummary :=
+  (V1.sortedSummaryOrder actionCircuit.operations).map
+    RegionShapeSummary.withoutSelectors
+
+theorem actionPlannerSummaries_wellFormed :
+    actionPlannerSummaries.Forall RegionShapeSummary.WellFormed := by
+  unfold actionPlannerSummaries
+  rw [List.forall_iff_forall_mem]
+  intro physical hphysical
+  obtain ⟨summary, hsummary, rfl⟩ := List.mem_map.mp hphysical
+  apply V1.RegionShapeSummary.withoutSelectors_wellFormed
+  have hall : actionCircuit.synthesisSummary.regionShapes.Forall
+      RegionShapeSummary.WellFormed := by
+    rw [actionCircuit.synthesisSummary_eq_operations]
+    exact synthesisSummary_regionShapes_wellFormed actionCircuit.operations
+  exact List.forall_iff_forall_mem.mp hall summary hsummary
+
 private theorem actionConfig_advice0 : (actionConfig.advices 0).index = 0 := by rfl
 private theorem actionConfig_advice5 : (actionConfig.advices 5).index = 5 := by rfl
 private theorem actionConfig_advice6 : (actionConfig.advices 6).index = 6 := by rfl
@@ -1673,10 +1707,15 @@ private theorem actionMainPost_selectorAnchored :
 theorem actionCircuit_selectorAnchored :
     V1.SelectorAnchoredBy actionCircuit.synthesisSummary.regionShapes
       (selectorAnchor actionConfig) := by
-  rw [Internal.actionCircuit_eq_impl]
-  unfold TopLevelCircuit.synthesisSummary
-  unfold Internal.actionCircuitImpl
-  rw [Circuit.circuit_synthesisSummary_eq]
+  rw [actionCircuit_synthesisSummary_eq]
   exact actionMainPost_selectorAnchored
+
+theorem actionCircuit_placementEnd_eq :
+    V1.placementEnd actionCircuit.operations =
+      V1.slotSummaryEndFrom actionSortedPlannerSummaries ∅ := by
+  apply V1.placementEnd_eq_slotSummaryEndFrom_withoutSelectors
+    actionCircuit.operations (selectorAnchor actionConfig)
+  rw [← actionCircuit.synthesisSummary_eq_operations]
+  exact actionCircuit_selectorAnchored
 
 end Zcash.Circuits.Action
