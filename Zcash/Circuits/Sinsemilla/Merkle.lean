@@ -2409,6 +2409,26 @@ def Layer.synthesisSummary (ccfg : CondSwap.Config) (cfg : Config)
         1 0)).combine
     (HashLayer.synthesisSummary cfg lookupCfg)
 
+theorem Layer.synthesisSummary_physicalShapes_eq
+    (ccfg : CondSwap.Config) (cfg : Config)
+    (lookupCfg : LookupRangeCheck.Config 10) :
+    (Layer.synthesisSummary ccfg cfg lookupCfg).regionShapes.map
+        FloorPlanner.RegionShapeSummary.withoutSelectors =
+      [(FloorPlanner.RegionSynthesisSummary.ofColumns
+          [.selector ccfg.qSwap.index,
+            .column .advice ccfg.a.index,
+            .column .advice ccfg.b.index,
+            .column .advice ccfg.swap.index,
+            .column .advice ccfg.aSwapped.index,
+            .column .advice ccfg.bSwapped.index]
+          1 0).toRegionShapeSummary.withoutSelectors] ++
+      (HashLayer.synthesisSummary cfg lookupCfg).regionShapes.map
+        FloorPlanner.RegionShapeSummary.withoutSelectors := by
+  unfold Layer.synthesisSummary
+  simp only [FloorPlanner.SynthesisSummary.combine_regionShapes,
+    FloorPlanner.SynthesisSummary.ofRegion_regionShapes,
+    List.map_append, List.map_cons, List.map_nil]
+
 theorem Layer.synthesisSummary_eq (G : Generators) (Q : Point Fp)
     (hQ : Q.OnCurve) (l : ℕ) (hl : l < 2 ^ 10)
     (wsib : WitgenIR Fp 1) (wswap : Placed ProverEnvironment Fp → Bool)
@@ -3126,6 +3146,21 @@ def synthesisSummary
     : FloorPlanner.SynthesisSummary :=
   FloorPlanner.SynthesisSummary.replicate d
     (Layer.synthesisSummary cfg.1 cfg.2.1 cfg.2.2)
+
+theorem synthesisSummary_physicalShapes_eq
+    (cfg : CondSwap.Config × Config × LookupRangeCheck.Config 10) :
+    (synthesisSummary d cfg).regionShapes.map
+        FloorPlanner.RegionShapeSummary.withoutSelectors =
+      (List.replicate d
+        ((Layer.synthesisSummary cfg.1 cfg.2.1 cfg.2.2).regionShapes.map
+          FloorPlanner.RegionShapeSummary.withoutSelectors)).flatten := by
+  unfold synthesisSummary
+  rw [FloorPlanner.SynthesisSummary.replicate_regionShapes]
+  induction d with
+  | zero => rfl
+  | succ count inductionHypothesis =>
+      rw [List.replicate_succ, List.flatten_cons, List.map_append,
+        List.replicate_succ, List.flatten_cons, inductionHypothesis]
 
 theorem synthesisSummary_eq
     (cfg : CondSwap.Config × Config × LookupRangeCheck.Config 10)
