@@ -23,6 +23,10 @@ def actionPlannerSummaries : List RegionShapeSummary :=
   actionCircuit.synthesisSummary.regionShapes.map
     RegionShapeSummary.withoutSelectors
 
+theorem actionPlannerSummaries_eq_physicalRegionShapes :
+    actionPlannerSummaries =
+      actionCircuit.synthesisSummary.physicalRegionShapes := rfl
+
 /-- Action's exact selector-free summary order after consensus pdqsort. -/
 def actionSortedPlannerSummaries : List RegionShapeSummary :=
   (V1.sortedSummaryOrder actionCircuit.operations).map

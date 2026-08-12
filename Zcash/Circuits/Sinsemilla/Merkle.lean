@@ -1456,26 +1456,21 @@ def HashLayer.synthesisSummary (cfg : Config)
 
 theorem HashLayer.synthesisSummary_physicalShapes_eq (cfg : Config)
     (lookupCfg : LookupRangeCheck.Config 10) :
-    (HashLayer.synthesisSummary cfg lookupCfg).regionShapes.map
-        FloorPlanner.RegionShapeSummary.withoutSelectors =
+    (HashLayer.synthesisSummary cfg lookupCfg).physicalRegionShapes =
       (HashToPoint.witnessMessagePieceSynthesisSummary
-          cfg.sinsemilla).regionShapes.map
-          FloorPlanner.RegionShapeSummary.withoutSelectors ++
+        cfg.sinsemilla).physicalRegionShapes ++
       (LookupRangeCheck.witnessShortCheckSynthesisSummary
-          10 lookupCfg).regionShapes.map
-          FloorPlanner.RegionShapeSummary.withoutSelectors ++
+        10 lookupCfg).physicalRegionShapes ++
       (LookupRangeCheck.witnessShortCheckSynthesisSummary
-          10 lookupCfg).regionShapes.map
-          FloorPlanner.RegionShapeSummary.withoutSelectors ++
+        10 lookupCfg).physicalRegionShapes ++
       (HashToPoint.witnessMessagePieceSynthesisSummary
-          cfg.sinsemilla).regionShapes.map
-          FloorPlanner.RegionShapeSummary.withoutSelectors ++
+        cfg.sinsemilla).physicalRegionShapes ++
       (HashToPoint.witnessMessagePieceSynthesisSummary
-          cfg.sinsemilla).regionShapes.map
-          FloorPlanner.RegionShapeSummary.withoutSelectors ++
+        cfg.sinsemilla).physicalRegionShapes ++
       [hashPhysicalShape cfg.sinsemilla] ++
       [(Gate.synthesisSummary cfg.gate 0).toRegionShapeSummary.withoutSelectors] := by
-  unfold HashLayer.synthesisSummary
+  unfold FloorPlanner.SynthesisSummary.physicalRegionShapes
+    HashLayer.synthesisSummary
   simp only [FloorPlanner.SynthesisSummary.combine_regionShapes,
     List.map_append, hashCircuitPhysicalShapes_eq,
     FloorPlanner.SynthesisSummary.ofRegion_regionShapes, List.map_cons,
@@ -2412,8 +2407,7 @@ def Layer.synthesisSummary (ccfg : CondSwap.Config) (cfg : Config)
 theorem Layer.synthesisSummary_physicalShapes_eq
     (ccfg : CondSwap.Config) (cfg : Config)
     (lookupCfg : LookupRangeCheck.Config 10) :
-    (Layer.synthesisSummary ccfg cfg lookupCfg).regionShapes.map
-        FloorPlanner.RegionShapeSummary.withoutSelectors =
+    (Layer.synthesisSummary ccfg cfg lookupCfg).physicalRegionShapes =
       [(FloorPlanner.RegionSynthesisSummary.ofColumns
           [.selector ccfg.qSwap.index,
             .column .advice ccfg.a.index,
@@ -2422,9 +2416,9 @@ theorem Layer.synthesisSummary_physicalShapes_eq
             .column .advice ccfg.aSwapped.index,
             .column .advice ccfg.bSwapped.index]
           1 0).toRegionShapeSummary.withoutSelectors] ++
-      (HashLayer.synthesisSummary cfg lookupCfg).regionShapes.map
-        FloorPlanner.RegionShapeSummary.withoutSelectors := by
-  unfold Layer.synthesisSummary
+      (HashLayer.synthesisSummary cfg lookupCfg).physicalRegionShapes := by
+  unfold FloorPlanner.SynthesisSummary.physicalRegionShapes
+    Layer.synthesisSummary
   simp only [FloorPlanner.SynthesisSummary.combine_regionShapes,
     FloorPlanner.SynthesisSummary.ofRegion_regionShapes,
     List.map_append, List.map_cons, List.map_nil]
@@ -3149,18 +3143,11 @@ def synthesisSummary
 
 theorem synthesisSummary_physicalShapes_eq
     (cfg : CondSwap.Config × Config × LookupRangeCheck.Config 10) :
-    (synthesisSummary d cfg).regionShapes.map
-        FloorPlanner.RegionShapeSummary.withoutSelectors =
+    (synthesisSummary d cfg).physicalRegionShapes =
       (List.replicate d
-        ((Layer.synthesisSummary cfg.1 cfg.2.1 cfg.2.2).regionShapes.map
-          FloorPlanner.RegionShapeSummary.withoutSelectors)).flatten := by
+        (Layer.synthesisSummary cfg.1 cfg.2.1 cfg.2.2).physicalRegionShapes).flatten := by
   unfold synthesisSummary
-  rw [FloorPlanner.SynthesisSummary.replicate_regionShapes]
-  induction d with
-  | zero => rfl
-  | succ count inductionHypothesis =>
-      rw [List.replicate_succ, List.flatten_cons, List.map_append,
-        List.replicate_succ, List.flatten_cons, inductionHypothesis]
+  exact FloorPlanner.SynthesisSummary.replicate_physicalRegionShapes _ _
 
 theorem synthesisSummary_eq
     (cfg : CondSwap.Config × Config × LookupRangeCheck.Config 10)

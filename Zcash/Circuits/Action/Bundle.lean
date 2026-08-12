@@ -2071,6 +2071,16 @@ def mainPostSynthesisSummary (cfg : Config) :
   (synthesizeBaseSynthesisSummary cfg).combine
     (synthCrossAddressChecksSynthesisSummary cfg)
 
+theorem mainPostSynthesisSummary_physicalRegionShapes (cfg : Config) :
+    (mainPostSynthesisSummary cfg).physicalRegionShapes =
+      (synthWitnessSynthesisSummary cfg).physicalRegionShapes ++
+      (synthChecksSynthesisSummary cfg).physicalRegionShapes ++
+      (synthNotesSynthesisSummary cfg).physicalRegionShapes ++
+      (synthCrossAddressChecksSynthesisSummary cfg).physicalRegionShapes := by
+  unfold mainPostSynthesisSummary synthesizeBaseSynthesisSummary
+  simp only [FloorPlanner.SynthesisSummary.combine_physicalRegionShapes,
+    List.append_assoc]
+
 @[synthesis_summary_norm]
 theorem mainPost_synthesisSummary_eq (G : Generators) (B : Bases)
     (cfg : Config) (input : Var unit Fp) (region : RegionIndex) :

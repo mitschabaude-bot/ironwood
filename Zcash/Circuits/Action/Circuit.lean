@@ -1177,6 +1177,27 @@ def synthWitnessSynthesisSummary (cfg : Config) :
     load, load, point, nonId, nonId, load, load, load].foldr
     FloorPlanner.SynthesisSummary.combine {}
 
+theorem synthWitnessSynthesisSummary_physicalRegionShapes (cfg : Config) :
+    (synthWitnessSynthesisSummary cfg).physicalRegionShapes =
+      [Sinsemilla.loadSynthesisSummary,
+        loadPrivateSynthesisSummary (cfg.advices 0),
+        loadPrivateSynthesisSummary (cfg.advices 0),
+        FloorPlanner.SynthesisSummary.ofRegion
+          (Ecc.WitnessPoint.pointSynthesisSummary
+            cfg.eccConfig.witnessPoint 0),
+        FloorPlanner.SynthesisSummary.ofRegion
+          (Ecc.WitnessPoint.pointNonIdSynthesisSummary
+            cfg.eccConfig.witnessPoint 0),
+        FloorPlanner.SynthesisSummary.ofRegion
+          (Ecc.WitnessPoint.pointNonIdSynthesisSummary
+            cfg.eccConfig.witnessPoint 0),
+        loadPrivateSynthesisSummary (cfg.advices 0),
+        loadPrivateSynthesisSummary (cfg.advices 0),
+        loadPrivateSynthesisSummary (cfg.advices 0)].flatMap
+          FloorPlanner.SynthesisSummary.physicalRegionShapes := by
+  unfold synthWitnessSynthesisSummary
+  exact FloorPlanner.SynthesisSummary.foldr_combine_physicalRegionShapes _
+
 @[synthesis_summary_norm]
 theorem synthWitness_synthesisSummary_eq (G : Generators)
     (W : Witnesses Fp) (cfg : Config) (region : RegionIndex) :
@@ -1213,6 +1234,33 @@ def synthChecksSynthesisSummary (cfg : Config) :
     AddressIntegrity.synthesisSummary
       (cfg.eccConfig.mul, cfg.eccConfig.witnessPoint)].foldr
         FloorPlanner.SynthesisSummary.combine {}
+
+theorem synthChecksSynthesisSummary_physicalRegionShapes (cfg : Config) :
+    (synthChecksSynthesisSummary cfg).physicalRegionShapes =
+      [Sinsemilla.Merkle.CalculateRoot.synthesisSummary 16
+          (cfg.merkle1.condSwap, cfg.merkle1, cfg.lookupConfig),
+        Sinsemilla.Merkle.CalculateRoot.synthesisSummary 16
+          (cfg.merkle2.condSwap, cfg.merkle2, cfg.lookupConfig),
+        loadPrivateSynthesisSummary (cfg.advices 9),
+        loadPrivateSynthesisSummary (cfg.advices 9),
+        ValueCommit.synthesisSummary
+          (cfg.eccConfig.mulFixedShort, cfg.eccConfig.mulFixedFull,
+            cfg.eccConfig.add),
+        DeriveNullifier.synthesisSummary
+          (cfg.poseidonConfig, cfg.addChipConfig,
+            cfg.eccConfig.mulFixedBaseField, cfg.eccConfig.add),
+        SpendAuthority.synthesisSummary
+          (cfg.eccConfig.mulFixedFull, cfg.eccConfig.add),
+        CommitIvk.Main.synthesisSummary
+          { gate := cfg.commitIvkConfig, hashConfig := cfg.sinsemilla1,
+            lookupConfig := cfg.lookupConfig,
+            mulConfig := cfg.eccConfig.mulFixedFull,
+            addConfig := cfg.eccConfig.add },
+        AddressIntegrity.synthesisSummary
+          (cfg.eccConfig.mul, cfg.eccConfig.witnessPoint)].flatMap
+            FloorPlanner.SynthesisSummary.physicalRegionShapes := by
+  unfold synthChecksSynthesisSummary
+  exact FloorPlanner.SynthesisSummary.foldr_combine_physicalRegionShapes _
 
 @[synthesis_summary_norm]
 theorem synthChecks_synthesisSummary_eq (G : Generators) (B : Bases)
@@ -1251,6 +1299,31 @@ def synthNotesSynthesisSummary (cfg : Config) :
     loadPrivateSynthesisSummary (cfg.advices 0), noteNew,
     orchardChecksSynthesisSummary cfg].foldr
       FloorPlanner.SynthesisSummary.combine {}
+
+theorem synthNotesSynthesisSummary_physicalRegionShapes (cfg : Config) :
+    (synthNotesSynthesisSummary cfg).physicalRegionShapes =
+      [NoteCommit.Main.synthesisSummary
+          { gates := cfg.noteCommitOld, hashConfig := cfg.sinsemilla1,
+            lookupConfig := cfg.lookupConfig,
+            mulConfig := cfg.eccConfig.mulFixedFull,
+            addConfig := cfg.eccConfig.add },
+        FloorPlanner.SynthesisSummary.ofRegion {},
+        FloorPlanner.SynthesisSummary.ofRegion
+          (Ecc.WitnessPoint.pointNonIdSynthesisSummary
+            cfg.eccConfig.witnessPoint 0),
+        FloorPlanner.SynthesisSummary.ofRegion
+          (Ecc.WitnessPoint.pointNonIdSynthesisSummary
+            cfg.eccConfig.witnessPoint 0),
+        loadPrivateSynthesisSummary (cfg.advices 0),
+        NoteCommit.Main.synthesisSummary
+          { gates := cfg.noteCommitNew, hashConfig := cfg.sinsemilla2,
+            lookupConfig := cfg.lookupConfig,
+            mulConfig := cfg.eccConfig.mulFixedFull,
+            addConfig := cfg.eccConfig.add },
+        orchardChecksSynthesisSummary cfg].flatMap
+          FloorPlanner.SynthesisSummary.physicalRegionShapes := by
+  unfold synthNotesSynthesisSummary
+  exact FloorPlanner.SynthesisSummary.foldr_combine_physicalRegionShapes _
 
 @[synthesis_summary_norm]
 theorem synthNotes_synthesisSummary_eq (G : Generators) (B : Bases)
