@@ -123,8 +123,9 @@ def actionPlannerTrace : List V1.PlannedSummaryBlock :=
    { count := 6, summary := plannerShape [0] 1, start := 1768 },
    { count := 56, summary := plannerShape [7] 1, start := 274 }]
 
-def emptyPlannerView : V1.AllocationView := fun _ : RegionColumn =>
-  (#[] : Allocations)
+def actionPlannerTraceSummaries : List RegionShapeSummary :=
+  (V1.PlannedSummaryBlock.blocks actionPlannerTrace).flatMap fun block =>
+    List.replicate block.1 block.2
 
 set_option maxRecDepth 10000 in
 theorem actionPlannerTrace_endpoint :
@@ -285,6 +286,65 @@ theorem actionPlannerTrace_blocks_endpoint :
     (by simp [V1.AllocationView.Valid, V1.AllocationView.empty,
       Allocations.Valid]) actionPlannerTrace_lawful
   exact hresult.1.trans actionPlannerTrace_endpoint
+
+set_option maxRecDepth 10000 in
+theorem actionCanonicalPlannerSummaries_eq_trace :
+    actionCanonicalPlannerSummaries =
+      actionPlannerTraceSummaries ++
+        List.replicate 2 (plannerShape [] 0) := by
+  unfold actionCanonicalPlannerSummaries actionPlannerTraceSummaries
+    V1.PlannedSummaryBlock.blocks actionPlannerBlocks actionPlannerTrace
+  simp only [List.map_cons, List.map_nil, List.flatMap_cons,
+    List.flatMap_nil]
+  rw [show List.replicate 20 (plannerShape [5,6,7,8,9] 2) =
+      List.replicate 7 (plannerShape [5,6,7,8,9] 2) ++
+        List.replicate 13 (plannerShape [5,6,7,8,9] 2) by
+      rw [← List.replicate_add],
+    show List.replicate 16 (plannerShape [5,6,7,8,9] 1) =
+      List.replicate 1 (plannerShape [5,6,7,8,9] 1) ++
+        List.replicate 6 (plannerShape [5,6,7,8,9] 1) ++
+          List.replicate 9 (plannerShape [5,6,7,8,9] 1) by
+      rw [← List.replicate_add, ← List.replicate_add],
+    show List.replicate 2 (plannerShape [6,7] 2) =
+      List.replicate 1 (plannerShape [6,7] 2) ++
+        List.replicate 1 (plannerShape [6,7] 2) by
+      rw [← List.replicate_add],
+    show List.replicate 89 (plannerShape [9] 3) =
+      List.replicate 53 (plannerShape [9] 3) ++
+        List.replicate 12 (plannerShape [9] 3) ++
+          List.replicate 7 (plannerShape [9] 3) ++
+            List.replicate 2 (plannerShape [9] 3) ++
+              List.replicate 7 (plannerShape [9] 3) ++
+                List.replicate 8 (plannerShape [9] 3) by
+      repeat' rw [← List.replicate_add],
+    show List.replicate 2 (plannerShape [9] 1) =
+      List.replicate 1 (plannerShape [9] 1) ++
+        List.replicate 1 (plannerShape [9] 1) by
+      rw [← List.replicate_add]]
+  simp only [List.append_assoc, List.append_nil]
+
+set_option maxRecDepth 10000 in
+theorem actionCanonicalPlannerSummaries_endpoint :
+    (V1.slotSummaryStateFromWith 0 actionCanonicalPlannerSummaries
+      (∅ : CircuitAllocations)).1 = 1779 := by
+  rw [actionCanonicalPlannerSummaries_eq_trace,
+    V1.slotSummaryStateFromWith_append]
+  have htrace :
+      (V1.slotSummaryStateFromWith 0 actionPlannerTraceSummaries
+        (∅ : CircuitAllocations)).1 = 1779 := by
+    rw [actionPlannerTraceSummaries,
+      V1.slotSummaryStateFromWith_flatMap_replicate]
+    exact actionPlannerTrace_blocks_endpoint
+  generalize hresult : V1.slotSummaryStateFromWith 0
+    actionPlannerTraceSummaries (∅ : CircuitAllocations) = result
+  rcases result with ⟨endpoint, allocations⟩
+  rw [hresult] at htrace
+  simp only at htrace
+  rw [show plannerShape [] 0 =
+      ({ columns := [], rowCount := 0 } : RegionShapeSummary) by
+        simp [plannerShape],
+    V1.slotSummaryStateFromWith_replicate_empty]
+  exact htrace
 
 
 end Zcash.Circuits.Action
