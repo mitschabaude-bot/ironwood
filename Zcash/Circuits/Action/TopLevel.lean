@@ -254,6 +254,21 @@ theorem actionCircuit_numInstanceColumns_eq :
   exact Circuit.configure_finalCounts_numInstanceColumns
     Specs.Sinsemilla.orchardGenerators
 
+set_option maxRecDepth 10000 in
+/-- Action's configured query depth requires five blinding rows. -/
+theorem actionCircuit_blindingFactors_eq :
+    actionCircuit.blindingFactors = 5 := by
+  rw [Internal.actionCircuit_eq_impl]
+  unfold TopLevelCircuit.blindingFactors TopLevelCircuit.constraintSystem
+    TopLevelCompilation.constraintSystem Internal.actionCircuitImpl
+  configure_norm
+
+/-- Action's public instance layout occupies ten rows. -/
+theorem actionCircuit_publicInputLayout_usedRows_eq :
+    actionCircuit.publicInputLayout.usedRows = 10 := by
+  rw [Internal.actionCircuit_eq_impl]
+  rfl
+
 /-- The opaque circuit's private-witness field is the public Action witness type. -/
 theorem actionCircuit_privateWitness_eq :
     actionCircuit.PrivateWitness = PrivateWitness := by

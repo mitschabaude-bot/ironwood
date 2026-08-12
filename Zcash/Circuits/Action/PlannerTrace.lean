@@ -2396,5 +2396,29 @@ theorem actionCircuit_placementEnd_eq_1779 :
   rw [← V1.slotSummaryStateFromWith_fst]
   exact actionSortedPlannerSummaries_endpoint
 
+/-- Once the non-region operation footprint is bounded by the exact V1 endpoint,
+Halo 2's minimal-domain calculation selects exponent 11. -/
+theorem actionCircuit_domainExponent_eq_of_usedRows_eq
+    (husedRows : actionCircuit.usedRows = 1779) :
+    actionCircuit.domainExponent = 11 := by
+  have hcompiledUsedRows :
+      TopLevelCompilation.usedRows actionCircuit.formalCircuit
+        actionCircuit.publicInputLayout = 1779 := by
+    simpa only [TopLevelCircuit.usedRows] using husedRows
+  have hcompiledBlindingFactors :
+      (TopLevelCompilation.constraintSystem
+        actionCircuit.formalCircuit).blindingFactors = 5 := by
+    simpa only [TopLevelCircuit.blindingFactors,
+      TopLevelCircuit.constraintSystem] using
+        actionCircuit_blindingFactors_eq
+  unfold TopLevelCircuit.domainExponent TopLevelCompilation.domainExponent
+  apply minimalKForRows_eq_succ_of (k := 10)
+  · simp only [ConstraintSystem.minimumRows, hcompiledUsedRows,
+      hcompiledBlindingFactors]
+    norm_num
+  · simp only [ConstraintSystem.minimumRows, hcompiledUsedRows,
+      hcompiledBlindingFactors]
+    norm_num
+
 
 end Zcash.Circuits.Action
