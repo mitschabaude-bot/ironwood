@@ -1080,6 +1080,152 @@ def wcWit (right : AssignedCell Fp) : WitgenIR Fp 1 :=
 /-- The MerkleCRH piece widths (25/2/25 words). -/
 def merkleNs : List ℕ := [24, 1, 24]
 
+/-- The common physical footprint source for each of the three MerkleCRH
+Sinsemilla pieces. `ofColumns` normalizes the repeated columns when constructing
+the actual summary. -/
+def hashSlotColumns (cfg : HashPiece.Config) : List FloorPlanner.RegionColumn :=
+  [.column .advice cfg.bits.index,
+    .column .advice cfg.xP.index,
+    .column .advice cfg.lambda1.index,
+    .column .advice cfg.lambda2.index] ++
+  HashPiece.roundColumns cfg
+
+private theorem hashSlotExtraColumns_subset (cfg : HashPiece.Config) :
+    ∀ column ∈ [.column .fixed cfg.qS2.index,
+        .column .advice cfg.xA.index, .selector cfg.qS1.index,
+        .column .fixed cfg.qS2.index, .selector cfg.qS1.index],
+      column ∈ hashSlotColumns cfg := by
+  intro column hcolumn
+  unfold hashSlotColumns HashPiece.roundColumns
+  simp only [List.mem_append, List.mem_cons, List.not_mem_nil,
+    or_false] at hcolumn ⊢
+  grind
+
+private theorem hashSlot0_synthesisSummary_eq (cfg : HashPiece.Config) :
+    Chain.slotIterationSynthesisSummary [24, 1, 24] 0 cfg 0 =
+      FloorPlanner.RegionSynthesisSummary.ofColumns
+        (hashSlotColumns cfg) 26 0 := by
+  simp only [Chain.slotIterationSynthesisSummary,
+    Chain.slotSynthesisSummary, HashPiece.circuitSynthesisSummary,
+    HashPiece.loopSynthesisSummary]
+  norm_num [FloorPlanner.RegionSynthesisSummary.repeatColumns]
+  repeat rw [FloorPlanner.RegionSynthesisSummary.ofColumns_combine_ofColumns]
+  norm_num [HashPiece.sinsemillaGate_selector]
+  exact FloorPlanner.RegionSynthesisSummary.ofColumns_append_redundant
+    (hashSlotColumns cfg)
+    [.column .fixed cfg.qS2.index, .column .advice cfg.xA.index,
+      .selector cfg.qS1.index, .column .fixed cfg.qS2.index,
+      .selector cfg.qS1.index] 26 0 (hashSlotExtraColumns_subset cfg)
+
+private theorem hashSlot1_synthesisSummary_eq (cfg : HashPiece.Config) :
+    Chain.slotIterationSynthesisSummary [24, 1, 24] 1 cfg 25 =
+      FloorPlanner.RegionSynthesisSummary.ofColumns
+        (hashSlotColumns cfg) 28 0 := by
+  simp only [Chain.slotIterationSynthesisSummary,
+    Chain.slotSynthesisSummary, HashPiece.circuitSynthesisSummary,
+    HashPiece.loopSynthesisSummary]
+  norm_num [FloorPlanner.RegionSynthesisSummary.repeatColumns]
+  repeat rw [FloorPlanner.RegionSynthesisSummary.ofColumns_combine_ofColumns]
+  norm_num [HashPiece.sinsemillaGate_selector]
+  exact FloorPlanner.RegionSynthesisSummary.ofColumns_append_redundant
+    (hashSlotColumns cfg)
+    [.column .fixed cfg.qS2.index, .column .advice cfg.xA.index,
+      .selector cfg.qS1.index, .column .fixed cfg.qS2.index,
+      .selector cfg.qS1.index] 28 0 (hashSlotExtraColumns_subset cfg)
+
+private theorem hashSlot2_synthesisSummary_eq (cfg : HashPiece.Config) :
+    Chain.slotIterationSynthesisSummary [24, 1, 24] 2 cfg 27 =
+      FloorPlanner.RegionSynthesisSummary.ofColumns
+        (hashSlotColumns cfg) 53 0 := by
+  simp only [Chain.slotIterationSynthesisSummary,
+    Chain.slotSynthesisSummary, HashPiece.circuitSynthesisSummary,
+    HashPiece.loopSynthesisSummary]
+  norm_num [FloorPlanner.RegionSynthesisSummary.repeatColumns]
+  repeat rw [FloorPlanner.RegionSynthesisSummary.ofColumns_combine_ofColumns]
+  norm_num [HashPiece.sinsemillaGate_selector]
+  exact FloorPlanner.RegionSynthesisSummary.ofColumns_append_redundant
+    (hashSlotColumns cfg)
+    [.column .fixed cfg.qS2.index, .column .advice cfg.xA.index,
+      .selector cfg.qS1.index, .column .fixed cfg.qS2.index,
+      .selector cfg.qS1.index] 53 0 (hashSlotExtraColumns_subset cfg)
+
+private def hashChainExtraColumns (cfg : HashPiece.Config) :
+    List FloorPlanner.RegionColumn :=
+  hashSlotColumns cfg ++ hashSlotColumns cfg ++
+    [.column .advice cfg.lambda1.index,
+      .column .advice cfg.lambda2.index,
+      .column .advice cfg.xP.index]
+
+private theorem hashChainExtraColumns_subset (cfg : HashPiece.Config) :
+    ∀ column ∈ hashChainExtraColumns cfg,
+      column ∈ hashSlotColumns cfg := by
+  intro column hcolumn
+  unfold hashChainExtraColumns hashSlotColumns HashPiece.roundColumns at *
+  simp only [List.mem_append, List.mem_cons, List.not_mem_nil,
+    or_false] at hcolumn ⊢
+  grind
+
+/-- Compact column source for the MerkleCRH hash region. `ofColumns` performs
+the final duplicate removal. -/
+def hashRegionColumns (cfg : HashPiece.Config) :
+    List FloorPlanner.RegionColumn :=
+  [.selector cfg.qS4.index,
+    .column .fixed cfg.fixedYQ.index,
+    .column .advice cfg.xA.index] ++
+  hashSlotColumns cfg
+
+/-- The three-piece MerkleCRH Hash-to-Point call has one exact, already reduced
+region summary. This prevents clients from replaying its `List.ofFn` synthesis
+description merely to recover its physical shape. -/
+theorem hashCircuitSynthesisSummary_eq (cfg : HashPiece.Config) :
+    HashToPoint.hashCircuitSynthesisSummary merkleNs cfg =
+  FloorPlanner.SynthesisSummary.ofRegion
+        (FloorPlanner.RegionSynthesisSummary.ofColumns
+          (hashRegionColumns cfg) 53 1) := by
+  unfold HashToPoint.hashCircuitSynthesisSummary
+  apply congrArg FloorPlanner.SynthesisSummary.ofRegion
+  unfold HashToPoint.hashRegionSynthesisSummary
+  rw [HashPiece.initialYQGate_selector]
+  have hchain : Chain.circuitSynthesisSummary merkleNs cfg 0 =
+      FloorPlanner.RegionSynthesisSummary.ofColumns
+        (hashSlotColumns cfg) 53 0 := by
+    unfold Chain.circuitSynthesisSummary
+    norm_num [merkleNs, Chain.prefixRows]
+    rw [hashSlot0_synthesisSummary_eq,
+      hashSlot1_synthesisSummary_eq, hashSlot2_synthesisSummary_eq,
+      FloorPlanner.RegionSynthesisSummary.combine_empty]
+    repeat rw [FloorPlanner.RegionSynthesisSummary.ofColumns_combine_ofColumns]
+    norm_num
+    exact FloorPlanner.RegionSynthesisSummary.ofColumns_append_redundant
+      (hashSlotColumns cfg) (hashChainExtraColumns cfg) 53 0
+        (hashChainExtraColumns_subset cfg)
+  rw [hchain,
+    FloorPlanner.RegionSynthesisSummary.ofColumns_combine_ofColumns]
+  norm_num [hashRegionColumns]
+
+/-- The exact selector-free shape seen by V1 for a MerkleCRH hash region. -/
+def hashPhysicalShape (cfg : HashPiece.Config) :
+    FloorPlanner.RegionShapeSummary where
+  columns := FloorPlanner.physicalColumns
+    (FloorPlanner.unionColumns [] (hashRegionColumns cfg))
+  rowCount := 53
+
+theorem hashCircuitPhysicalShapes_eq (cfg : HashPiece.Config) :
+    (HashToPoint.hashCircuitSynthesisSummary merkleNs cfg).regionShapes.map
+        FloorPlanner.RegionShapeSummary.withoutSelectors =
+      [hashPhysicalShape cfg] := by
+  rw [hashCircuitSynthesisSummary_eq]
+  simp only [FloorPlanner.SynthesisSummary.ofRegion_regionShapes,
+    List.map_cons, List.map_nil]
+  apply congrArg (fun shape => [shape])
+  apply FloorPlanner.RegionShapeSummary.ext
+  · unfold FloorPlanner.RegionShapeSummary.withoutSelectors hashPhysicalShape
+    rw [FloorPlanner.RegionSynthesisSummary.toRegionShapeSummary_columns,
+      FloorPlanner.RegionSynthesisSummary.ofColumns_columns]
+  · unfold FloorPlanner.RegionShapeSummary.withoutSelectors hashPhysicalShape
+    rw [FloorPlanner.RegionSynthesisSummary.toRegionShapeSummary_rowCount,
+      FloorPlanner.RegionSynthesisSummary.ofColumns_rowCount]
+
 /-- `MerkleInstructions::hash_layer`, layouter-level, in the Rust region sequence: witness `a`,
 short-range-check `b_1`/`b_2` (5 bits), witness `b`/`c`, `hash_to_point` (the `hashMessage`
 region), the `"Check piece decomposition"` gate region. Output: the hash point's `x` cell. -/
@@ -1307,6 +1453,33 @@ def HashLayer.synthesisSummary (cfg : Config)
                 HashLayer.merkleNs cfg.sinsemilla).combine
               (FloorPlanner.SynthesisSummary.ofRegion
                 (Gate.synthesisSummary cfg.gate 0)))))))
+
+theorem HashLayer.synthesisSummary_physicalShapes_eq (cfg : Config)
+    (lookupCfg : LookupRangeCheck.Config 10) :
+    (HashLayer.synthesisSummary cfg lookupCfg).regionShapes.map
+        FloorPlanner.RegionShapeSummary.withoutSelectors =
+      (HashToPoint.witnessMessagePieceSynthesisSummary
+          cfg.sinsemilla).regionShapes.map
+          FloorPlanner.RegionShapeSummary.withoutSelectors ++
+      (LookupRangeCheck.witnessShortCheckSynthesisSummary
+          10 lookupCfg).regionShapes.map
+          FloorPlanner.RegionShapeSummary.withoutSelectors ++
+      (LookupRangeCheck.witnessShortCheckSynthesisSummary
+          10 lookupCfg).regionShapes.map
+          FloorPlanner.RegionShapeSummary.withoutSelectors ++
+      (HashToPoint.witnessMessagePieceSynthesisSummary
+          cfg.sinsemilla).regionShapes.map
+          FloorPlanner.RegionShapeSummary.withoutSelectors ++
+      (HashToPoint.witnessMessagePieceSynthesisSummary
+          cfg.sinsemilla).regionShapes.map
+          FloorPlanner.RegionShapeSummary.withoutSelectors ++
+      [hashPhysicalShape cfg.sinsemilla] ++
+      [(Gate.synthesisSummary cfg.gate 0).toRegionShapeSummary.withoutSelectors] := by
+  unfold HashLayer.synthesisSummary
+  simp only [FloorPlanner.SynthesisSummary.combine_regionShapes,
+    List.map_append, hashCircuitPhysicalShapes_eq,
+    FloorPlanner.SynthesisSummary.ofRegion_regionShapes, List.map_cons,
+    List.map_nil, List.append_assoc]
 
 theorem HashLayer.synthesisSummary_eq (G : Generators) (Q : Point Fp)
     (hQ : Q.OnCurve) (l : ℕ) (cfg : Config)
