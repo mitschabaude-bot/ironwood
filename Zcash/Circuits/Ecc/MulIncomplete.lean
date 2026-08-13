@@ -773,6 +773,15 @@ def double_and_add (n : ℕ) (w : ℕ) :
       exact hlast
 
 /-- The complete incomplete-multiplication bundle exposes its reduced footprint. -/
+@[keygen_output_norm]
+theorem double_and_add_output (n w : ℕ) (cfg : Config) (offset : ℕ)
+    (input : Var Inputs Fp) (self : RegionIndex) :
+    (double_and_add n w).output cfg offset input self =
+      { acc :=
+          { x := .of self (offset + n + 2) cfg.xA
+            y := .of self (offset + n + 2) cfg.lambda1 }
+        zs := Vector.ofFn fun j => .of self (offset + 1 + j.val) cfg.z } := rfl
+
 @[synthesis_summary_norm]
 theorem double_and_add_synthesisSummary_eq
     (n w : ℕ) (cfg : Config) (offset : ℕ)

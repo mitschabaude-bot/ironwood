@@ -308,10 +308,51 @@ def hashRegion (G : Generators) (ns : List ℕ) (Q : Point Fp) (hQ : Q.OnCurve)
             input.pieces.toList.map (·.cell) }
       registered := by
         intro cfg counts hconfig offset input region
+        let hchain : (Sinsemilla.Chain.circuit G ns fun _ => Q.y).Configured cfg :=
+          FormalRegionCircuit.Configured.ofPure _ cfg () rfl
         keygen_registration [hashRegionSynthesize]
+        apply (Sinsemilla.Chain.circuit G ns fun _ => Q.y)
+          |>.callPacked_keygenRegistered cfg hchain offset input region
+        · simp only [hchain, FormalRegionCircuit.Configured.ofPure_gates,
+            FormalRegionCircuit.keygenRequirements,
+            Sinsemilla.Chain.circuit, ElaboratedRegionCircuit.keygenRequirements,
+            List.mem_cons] at *
+          aesop
+        · simp only [hchain, FormalRegionCircuit.Configured.ofPure_lookups,
+            FormalRegionCircuit.keygenRequirements,
+            Sinsemilla.Chain.circuit, ElaboratedRegionCircuit.keygenRequirements,
+            List.mem_cons] at *
+          aesop
+        · simp only [hchain,
+            FormalRegionCircuit.Configured.ofPure_permutationColumns,
+            FormalRegionCircuit.keygenRequirements,
+            Sinsemilla.Chain.circuit, ElaboratedRegionCircuit.keygenRequirements,
+            List.mem_cons, List.mem_append, List.mem_map] at *
+          aesop
+        · simp only [hchain, FormalRegionCircuit.Configured.ofPure_inputCells,
+            FormalRegionCircuit.keygenRequirements,
+            Sinsemilla.Chain.circuit, ElaboratedRegionCircuit.keygenRequirements,
+            List.forall_iff_forall_mem]
+          intro cell hcell
+          simp only [List.mem_append, List.mem_cons, List.mem_map]
+          right
+          rcases List.mem_map.mp hcell with ⟨assigned, hassigned, rfl⟩
+          exact ⟨assigned.cell, ⟨assigned, hassigned, rfl⟩, rfl⟩
       copyCellsAssigned := by
         intro cfg counts hconfig offset input region
-        keygen_registration [hashRegionSynthesize]
+        let hchain : (Sinsemilla.Chain.circuit G ns fun _ => Q.y).Configured cfg :=
+          FormalRegionCircuit.Configured.ofPure _ cfg () rfl
+        keygen_registration [hashRegionSynthesize, z1Cells]
+        · apply (Sinsemilla.Chain.circuit G ns fun _ => Q.y)
+            |>.callPacked_copyCellsAssignedFrom cfg hchain offset input region
+          intro cell hcell
+          simp only [hchain, FormalRegionCircuit.Configured.ofPure_inputCells,
+            FormalRegionCircuit.keygenRequirements,
+            Sinsemilla.Chain.circuit, ElaboratedRegionCircuit.keygenRequirements,
+            List.mem_map] at hcell
+          simp only [List.mem_cons]
+          exact Or.inr (Or.inr (List.mem_map.mpr hcell))
+        · exact RegionOperations.CopyCellsAssignedFrom.nil _
       output cfg offset input self :=
         { point :=
             { x := AssignedCell.of self
