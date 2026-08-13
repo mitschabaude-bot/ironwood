@@ -1,4 +1,4 @@
-import Zcash.Circuits.Action.TopLevel
+import Zcash.Circuits.Action.PlannerTrace
 import Zcash.Circuits.Integration.TopLevelGates
 import Mathlib.Util.AssertNoSorry
 
@@ -26,7 +26,8 @@ theorem selectorDegree :
 /-- The circuit-derived Action domain exponent is within Pasta's supported range. -/
 theorem domainExponent_lt :
     actionCircuit.domainExponent < 33 := by
-  native_decide
+  rw [Zcash.Circuits.Action.actionCircuit_domainExponent_eq]
+  norm_num
 
 assert_no_sorry selectorDegree
 assert_no_sorry domainExponent_lt
