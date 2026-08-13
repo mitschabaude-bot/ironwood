@@ -181,8 +181,7 @@ def generatorLookup (G : Generators) (cfg : Config) : LookupArgument Fp where
       Expression.noSimpleSelectors_queryComplexSelector,
       Expression.noSimpleSelectors_queryAdvice,
       Expression.noSimpleSelectors_queryFixed]
-  tablesFree := by
-    simp [Expression.SelectorFree, queryFixed]
+  tablesFree := by simp [Expression.SelectorFree, queryFixed]
   arity := rfl
 
 @[circuit_norm, synthesis_summary_norm, keygen_norm]
@@ -413,7 +412,7 @@ theorem configure_output_equalityColumn_mem_permutationRequests (G : Generators)
     configure_output_lambda1, configure_output_lambda2] using hcolumn
 
 set_option synthInstance.maxSize 2048 in
-@[reducible] private def configureElaborated
+@[reducible] def configureElaborated
     (G : Generators) (xA xP bits lambda1 lambda2 : Column .advice)
     (witnessPieces : Column .advice) (fixedYQ : Column .fixed)
     (genTable : GeneratorTableConfig) :
@@ -1043,7 +1042,8 @@ def round (G : Generators) (i : ℕ) : FormalRegionCircuit Fp Config Config fiel
             List.nil_append, List.singleton_append, List.map_cons, List.map_nil]
         · simp only [roundSynthesisSummary, roundColumns, circuit_norm]
           omega
-        · simp only [roundSynthesisSummary, circuit_norm] }
+        · simp only [roundSynthesisSummary, circuit_norm]
+        · simp only [roundSynthesisSummary, circuit_norm, synthesis_summary_norm] }
 
   synthesize cfg offset (piece : AssignedCell Fp) := do
     let w ← readState cfg offset

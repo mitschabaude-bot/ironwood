@@ -2396,15 +2396,49 @@ theorem actionCircuit_placementEnd_eq_1779 :
   rw [← V1.slotSummaryStateFromWith_fst]
   exact actionSortedPlannerSummaries_endpoint
 
-/-- Once the non-region operation footprint is bounded by the exact V1 endpoint,
-Halo 2's minimal-domain calculation selects exponent 11. -/
-theorem actionCircuit_domainExponent_eq_of_usedRows_eq
-    (husedRows : actionCircuit.usedRows = 1779) :
+/-- The Action circuit's reduced synthesis summary records the exact table endpoint. -/
+theorem actionCircuit_synthesisSummary_tableRowExtent_eq :
+    actionCircuit.synthesisSummary.tableRowExtent = 1025 := by
+  rw [actionCircuit_synthesisSummary_eq]
+  unfold Circuit.mainPostSynthesisSummary Circuit.synthesizeBaseSynthesisSummary
+  simp only [synthesis_summary_norm]
+
+/-- The Action circuit's reduced synthesis summary records the exact instance endpoint. -/
+theorem actionCircuit_synthesisSummary_instanceRowExtent_eq :
+    actionCircuit.synthesisSummary.instanceRowExtent = 9 := by
+  rw [actionCircuit_synthesisSummary_eq]
+  unfold Circuit.mainPostSynthesisSummary Circuit.synthesizeBaseSynthesisSummary
+  simp only [synthesis_summary_norm]
+
+/-- V1 placement covers the Action circuit's complete operation footprint exactly. -/
+theorem actionCircuit_operations_usedRows_eq_1779 :
+    Halo2.usedRows actionCircuit.operations = 1779 := by
+  apply Nat.le_antisymm
+  · apply (Operations.usedRows_le_summaryExtents
+      actionCircuit.operations actionCircuit.operationsCopyCellsAssigned).trans
+    rw [actionCircuit_placementEnd_eq_1779,
+      ← actionCircuit.synthesisSummary_eq_operations,
+      actionCircuit_synthesisSummary_tableRowExtent_eq,
+      actionCircuit_synthesisSummary_instanceRowExtent_eq]
+    norm_num
+  · rw [← actionCircuit_placementEnd_eq_1779]
+    exact V1_placementEnd_le_usedRows actionCircuit.operations
+
+/-- The Action circuit's public inputs do not extend its exact operation footprint. -/
+theorem actionCircuit_usedRows_eq_1779 :
+    actionCircuit.usedRows = 1779 := by
+  unfold TopLevelCircuit.usedRows TopLevelCompilation.usedRows
+  rw [actionCircuit_operations_usedRows_eq_1779,
+    actionCircuit_publicInputLayout_usedRows_eq]
+
+/-- Halo 2's minimal-domain calculation selects exponent 11 for the Action circuit. -/
+theorem actionCircuit_domainExponent_eq :
     actionCircuit.domainExponent = 11 := by
   have hcompiledUsedRows :
       TopLevelCompilation.usedRows actionCircuit.formalCircuit
         actionCircuit.publicInputLayout = 1779 := by
-    simpa only [TopLevelCircuit.usedRows] using husedRows
+    simpa only [TopLevelCircuit.usedRows] using
+      actionCircuit_usedRows_eq_1779
   have hcompiledBlindingFactors :
       (TopLevelCompilation.constraintSystem
         actionCircuit.formalCircuit).blindingFactors = 5 := by

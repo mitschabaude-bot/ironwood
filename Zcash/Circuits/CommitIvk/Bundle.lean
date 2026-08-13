@@ -111,15 +111,12 @@ def bundleElaborated (wb1 wd1 : WitgenIR Fp 1) :
   { keygenRequirements :=
       { gates cfg _ := [gate cfg]
         permutationColumns cfg _ := permutationColumns cfg
-        inputPermutationColumns _ _ input :=
-          [input.ak.cell.column, input.a.cell.column,
-            input.bWhole.cell.column, input.b0.cell.column,
-            input.b2.cell.column, input.z13A.cell.column,
-            input.aPrime.cell.column, input.z13APrime.cell.column,
-            input.nk.cell.column, input.c.cell.column,
-            input.dWhole.cell.column, input.d0.cell.column,
-            input.z13C.cell.column, input.b2CPrime.cell.column,
-            input.z14B2CPrime.cell.column] }
+        inputCells _ _ input :=
+          [input.ak.cell, input.a.cell, input.bWhole.cell, input.b0.cell,
+            input.b2.cell, input.z13A.cell, input.aPrime.cell,
+            input.z13APrime.cell, input.nk.cell, input.c.cell,
+            input.dWhole.cell, input.d0.cell, input.z13C.cell,
+            input.b2CPrime.cell, input.z14B2CPrime.cell] }
     synthesisSummary cfg offset _ _ := synthesisSummary cfg offset
     synthesisSummary_eq := by
       intro _ _ _ _
@@ -130,7 +127,10 @@ def bundleElaborated (wb1 wd1 : WitgenIR Fp 1) :
           synthesis_summary_norm]
         omega
       · simp only [synthesisSummary, bundleSynthesize, circuit_norm,
-          synthesis_summary_norm] }
+          synthesis_summary_norm]
+      · simp only [synthesisSummary, bundleSynthesize, circuit_norm,
+          synthesis_summary_norm]
+    copyCellsAssigned := by keygen_registration [bundleSynthesize] }
 
 /-- Rust `CommitIvkChip` canonicity `assign` (`commit_ivk.rs:519-660`), parameterized by
 the `b_1`/`d_1` witness programs. The `(b1, d1)` readings are the extraction data;
@@ -256,8 +256,7 @@ def bundle (wb1 wd1 : WitgenIR Fp 1) :
     have hiz13A : AssignedCell.eval env.place env.env.toEnvironment input_var.z13A = input.z13A := congrArg Inputs.z13A h_input
     have hiaPrime : AssignedCell.eval env.place env.env.toEnvironment input_var.aPrime = input.aPrime := congrArg Inputs.aPrime h_input
     have hiz13APrime : AssignedCell.eval env.place env.env.toEnvironment input_var.z13APrime = input.z13APrime := congrArg Inputs.z13APrime h_input
-    have hInputNk : AssignedCell.eval env.place env.env.toEnvironment input_var.nk = input.nk :=
-      congrArg Inputs.nk h_input
+    have hink : AssignedCell.eval env.place env.env.toEnvironment input_var.nk = input.nk := congrArg Inputs.nk h_input
     have hic : AssignedCell.eval env.place env.env.toEnvironment input_var.c = input.c := congrArg Inputs.c h_input
     have hidWhole : AssignedCell.eval env.place env.env.toEnvironment input_var.dWhole = input.dWhole := congrArg Inputs.dWhole h_input
     have hid0 : AssignedCell.eval env.place env.env.toEnvironment input_var.d0 = input.d0 := congrArg Inputs.d0 h_input
@@ -278,7 +277,7 @@ def bundle (wb1 wd1 : WitgenIR Fp 1) :
     rw [← hibWhole, ← hib0, ← hib2, ← hwb, ← hwb0, ← hwb2] at he3
     rw [← hidWhole, ← hid0, ← hwd, ← hwd0] at he4
     rw [← hia, ← hib0, ← hiak, ← hwa, ← hwb0, ← hwak] at he5
-    rw [← hib2, ← hic, ← hid0, ← hInputNk, ← hwb2, ← hwc, ← hwd0, ← hwnk] at he6
+    rw [← hib2, ← hic, ← hid0, ← hink, ← hwb2, ← hwc, ← hwd0, ← hwnk] at he6
     rw [← hib0, ← hwb0] at he7
     rw [← hiz13A, ← hwz13a] at he8
     rw [← hia, ← hiaPrime, ← hwa, ← hwap] at he9

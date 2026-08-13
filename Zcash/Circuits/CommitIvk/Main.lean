@@ -247,7 +247,7 @@ theorem synth_output (G : Generators) (R : FixedBase)
 
 /-! ## The bundle contract -/
 
-open Specs.Sinsemilla (hashToPoint HashGuarded commitIvkChunks)
+open Specs.Sinsemilla (hashToPoint hashToPointB SpecOrBreak commitIvkChunks)
 open CompElliptic.Fields.Pasta (Fq)
 
 def permutationColumns (cfg : Config) (childColumns : List AnyColumn) :
@@ -289,8 +289,8 @@ def keygenRequirements (G : Generators) (R : FixedBase) (Q : Point Fp)
     [LookupRangeCheck.rangeCheckLookup 10 cfg.lookupConfig] ++ configured.lookups
   permutationColumns cfg configured :=
     permutationColumns cfg configured.permutationColumns
-  inputPermutationColumns _ _ input :=
-    [input.ak.cell.column, input.nk.cell.column]
+  inputCells _ _ input :=
+    [input.ak.cell, input.nk.cell]
 
 @[keygen_helper]
 theorem synthPieces_keygenRegistered
@@ -384,18 +384,17 @@ def rivkExtract (cfg : Config) (_ : Var Inputs Fp) (i₀ : RegionIndex)
     (env : Placed Environment Fp) : Vector Fp 85 × Fq :=
   Ecc.MulFixed.FullWidth.fwExtract cfg.mulConfig (i₀ + 7) env
 
-/-- The `Commit^ivk` contract in the specification's guarded ⊥-model (§4.17.4's
-`ivk ∈ {…, ⊥}`): whenever the Sinsemilla chain over the canonical `commit_ivk`
-chunks of `ak`/`nk` is defined, the output is the extracted short commitment
-`(B + [rivk]R).x`. Exceptional chains are not constrained here; the security layer
-recomputes them from the same chunks and consumes them as breaks
-(`specOrBreak_hashToPointB_iff_guarded`). -/
+/-- Breaks-as-data `Commit^ivk` contract (zcash/ironwood#45): either the Sinsemilla
+chain over the canonical `commit_ivk` chunks of `ak`/`nk` is defined and the output
+is the extracted short commitment `(B + [rivk]R).x`, or the incomplete-addition
+escape is exhibited as a valid break. -/
 def Spec (G : Generators) (Q : Point Fp) (R : FixedBase)
     (input : Value Inputs Fp) (output : Value field Fp)
     (rivk : Vector Fp 85 × Fq) : Prop :=
-  HashGuarded G.S Q
-    (commitIvkChunks (show Fp from input.ak).val (show Fp from input.nk).val)
+  SpecOrBreak G.S Q
     (fun B => (output : Fp) = (B + (rivk.2 • R : Point Fp)).x)
+    (hashToPointB G.S Q
+      (commitIvkChunks (show Fp from input.ak).val (show Fp from input.nk).val))
 
 /-- Honest-prover precondition: the canonical message hash is defined. The full-width
 child derives and proves the 3-bit bounds for its scalar windows. -/

@@ -331,16 +331,6 @@ def slotSynthesisSummary (ns : List ℕ) (i : ℕ) (cfg : Config)
 piece call's width-dependent output lives inside this bundle). Slot `i` of the width list
 `ns`: the `HashPiece` call at its own base row, the boundary `q_s2` re-pin, and the
 piece-linking `sinsemillaGate` at its last row. -/
-def slotSynthesize (G : Generators) (ns : List ℕ)
-    (yaIn : Placed Environment Fp → Fp) (i : ℕ)
-    (cfg : Config) (base : ℕ) (piece : AssignedCell Fp) :
-    RegionCircuit Fp Unit := do
-  let prev ← readState cfg (base - 1)
-  let xEnter ← HashPiece.cellAt cfg.xA base
-  let _ ← (HashPiece.circuit G (ns.getD i 0) (decide (i = ns.length - 1))
-      (if i = 0 then yaIn else boundaryYA prev.row xEnter)).call cfg base piece
-  pure ()
-
 def slot (G : Generators) (ns : List ℕ) (yaIn : Placed Environment Fp → Fp) (i : ℕ) :
     FormalRegionCircuit Fp Config Config field unit where
   configure := pure
@@ -349,14 +339,40 @@ def slot (G : Generators) (ns : List ℕ) (yaIn : Placed Environment Fp → Fp) 
         { gates cfg _ := [sinsemillaGate cfg]
           lookups cfg _ := [HashPiece.generatorLookup G cfg]
           permutationColumns cfg _ := [cfg.bits]
-          inputPermutationColumns _ _ input := [input.cell.column] }
+          inputCells _ _ input := [input.cell] }
       synthesisSummary cfg base _ _ := slotSynthesisSummary ns i cfg base
       synthesisSummary_eq := by
         intro _ _ _ _
-        simp only [slotSynthesisSummary, slotSynthesize, circuit_norm,
-          synthesis_summary_norm] }
+        simp only [slotSynthesisSummary, circuit_norm, synthesis_summary_norm]
+      copyCellsAssigned := by
+        intro configInput counts hconfig base input region
+        simp only [Configure.output_pure, RegionCircuit.operations_bind,
+          RegionCircuit.operations_pure, HashPiece.operations_readState,
+          HashPiece.operations_cellAt, HashPiece.output_readState,
+          HashPiece.output_cellAt, List.nil_append, List.append_nil]
+        let child := HashPiece.circuit G (ns.getD i 0)
+          (decide (i = ns.length - 1))
+          (if i = 0 then yaIn else boundaryYA
+            (HashPiece.reads configInput (base - 1) region).row
+            (AssignedCell.of region base configInput.xA))
+        have hchild : child.keygenRequirements.configLawful configInput := by
+          simpa only [child, HashPiece.circuit,
+            HashPiece.circuitKeygenRequirements] using hconfig
+        apply child.call_copyCellsAssignedFrom configInput
+          (FormalRegionCircuit.Configured.ofPure child configInput hchild rfl)
+        intro cell hcell
+        simpa only [child, HashPiece.circuit, HashPiece.circuitKeygenRequirements,
+          FormalRegionCircuit.keygenRequirements,
+          ElaboratedRegionCircuit.keygenRequirements,
+          FormalRegionCircuit.Configured.inputCells,
+          FormalRegionCircuit.Configured.ofPure, List.mem_singleton] using hcell }
 
-  synthesize := slotSynthesize G ns yaIn i
+  synthesize cfg base (piece : AssignedCell Fp) := do
+    let prev ← readState cfg (base - 1)
+    let xEnter ← HashPiece.cellAt cfg.xA base
+    let _ ← (HashPiece.circuit G (ns.getD i 0) (decide (i = ns.length - 1))
+        (if i = 0 then yaIn else boundaryYA prev.row xEnter)).call cfg base piece
+    pure ()
 
   Witness := SlotReads (ns.getD i 0 + 1)
   extract cfg base _ self env :=
@@ -441,13 +457,6 @@ theorem slot_synthesisSummary_constantSiteCount
       config offset piece region).constantSiteCount = 0 := by
   rw [slot_synthesisSummary_eq]
   simp only [synthesis_summary_norm]
-
-@[circuit_norm]
-theorem slot_synthesize_eq
-    (G : Generators) (ns : List ℕ)
-    (yaIn : Placed Environment Fp → Fp) (i : ℕ) :
-    (slot G ns yaIn i).synthesize = slotSynthesize G ns yaIn i :=
-  rfl
 
 /-! Contract bridges for the slot child (generated — including over the function-typed
 `yaIn` binder); only the applied deep-extract bridge stays hand-written. -/
@@ -1087,18 +1096,17 @@ theorem slotIteration_synthesisSummary_eq
           (sinsemillaGate cfg).enable (base + ns.getD i 0)).operations self) =
       slotIterationSynthesisSummary ns i cfg base := by
   apply FloorPlanner.RegionSynthesisSummary.ext
-  · simp only [slotIterationSynthesisSummary, slotSynthesisSummary,
-      RegionCircuit.operations_bind,
-      FloorPlanner.regionSynthesisSummary_append, slotSynthesize, circuit_norm,
+  · simp only [slotIterationSynthesisSummary, RegionCircuit.operations_bind,
+      FloorPlanner.regionSynthesisSummary_append, circuit_norm,
       synthesis_summary_norm]
-  · simp only [slotIterationSynthesisSummary, slotSynthesisSummary,
-      RegionCircuit.operations_bind,
-      FloorPlanner.regionSynthesisSummary_append, slotSynthesize, circuit_norm,
+  · simp only [slotIterationSynthesisSummary, RegionCircuit.operations_bind,
+      FloorPlanner.regionSynthesisSummary_append, circuit_norm,
       synthesis_summary_norm]
-    omega
-  · simp only [slotIterationSynthesisSummary, slotSynthesisSummary,
-      RegionCircuit.operations_bind,
-      FloorPlanner.regionSynthesisSummary_append, slotSynthesize, circuit_norm,
+  · simp only [slotIterationSynthesisSummary, RegionCircuit.operations_bind,
+      FloorPlanner.regionSynthesisSummary_append, circuit_norm,
+      synthesis_summary_norm]
+  · simp only [slotIterationSynthesisSummary, RegionCircuit.operations_bind,
+      FloorPlanner.regionSynthesisSummary_append, circuit_norm,
       synthesis_summary_norm]
 
 @[synthesis_summary_norm]
@@ -1106,6 +1114,32 @@ theorem slotIterationSynthesisSummary_constantSiteCount
     (ns : List ℕ) (i : ℕ) (cfg : Config) (base : ℕ) :
     (slotIterationSynthesisSummary ns i cfg base).constantSiteCount = 0 := by
   simp only [slotIterationSynthesisSummary, synthesis_summary_norm]
+
+theorem slotIteration_copyCellsAssignedFrom
+    (G : Generators) (ns : List ℕ)
+    (yaIn : Placed Environment Fp → Fp) (i : ℕ) (cfg : Config)
+    (base : ℕ) (piece : AssignedCell Fp) (self : RegionIndex)
+    (available : List Cell) (hpiece : piece.cell ∈ available) :
+    RegionOperations.CopyCellsAssignedFrom self available ((do
+        let _ ← (slot G ns yaIn i).call cfg base piece
+        let _ ← assignFixed cfg.qS2 (base + ns.getD i 0)
+          (qS2Boundary (decide (i = ns.length - 1)))
+        (sinsemillaGate cfg).enable (base + ns.getD i 0)).operations self) := by
+  simp only [RegionCircuit.operations_bind,
+    RegionOperations.copyCellsAssignedFrom_append_iff]
+  constructor
+  · apply (slot G ns yaIn i).call_copyCellsAssignedFrom cfg
+      (FormalRegionCircuit.Configured.ofPure
+        (slot G ns yaIn i) cfg () rfl)
+    intro cell hcell
+    have heq : cell = piece.cell := by
+      simpa only [slot, FormalRegionCircuit.Configured.inputCells,
+      FormalRegionCircuit.Configured.ofPure, FormalRegionCircuit.keygenRequirements,
+        ElaboratedRegionCircuit.keygenRequirements, List.mem_singleton] using hcell
+    exact heq ▸ hpiece
+  · constructor <;>
+      apply RegionOperations.copyCellsAssignedFrom_of_forall_copiedCells_eq_nil <;>
+      simp only [circuit_norm, RegionOperation.copiedCells, List.Forall]
 
 /-- Reduced footprint of the whole chain region. -/
 def circuitSynthesisSummary (ns : List ℕ) (cfg : Config) (offset : ℕ) :
@@ -1157,8 +1191,35 @@ def circuit (G : Generators) (ns : List ℕ) (yaIn : Placed Environment Fp → F
         { gates cfg _ := [sinsemillaGate cfg]
           lookups cfg _ := [HashPiece.generatorLookup G cfg]
           permutationColumns cfg _ := [cfg.bits]
-          inputPermutationColumns _ _ input :=
-            input.pieces.toList.map (·.cell.column) }
+          inputCells _ _ input :=
+            input.pieces.toList.map (·.cell) }
+      registered := by
+        intro cfg counts hconfig offset input region
+        simp only [Configure.output_pure, RegionCircuit.operations_bind,
+          RegionCircuit.operations_pure, List.forall_append,
+          RegionCircuit.forRangeVar'_forall, circuit_norm]
+        intro i
+        apply (slot G ns yaIn i).call_keygenRegistered cfg
+            (FormalRegionCircuit.Configured.ofPure
+              (slot G ns yaIn i) cfg () rfl)
+            (offset + prefixRows ns i) input.pieces[i]! region
+        all_goals try keygen_registration
+        right
+        refine ⟨input.pieces[i]!.cell, ?_, rfl⟩
+        exact ⟨input.pieces[i]!, by simp, rfl⟩
+      copyCellsAssigned := by
+        intro cfg counts hconfig offset input region
+        simp only [Configure.output_pure, RegionCircuit.operations_bind,
+          RegionCircuit.operations_pure, RegionOperations.CopyCellsAssigned]
+        rw [RegionOperations.copyCellsAssignedFrom_append_iff]
+        constructor
+        · apply RegionCircuit.forRangeVar'_copyCellsAssignedFrom
+          intro i
+          apply slotIteration_copyCellsAssignedFrom G ns yaIn i cfg
+          simp only [List.mem_map]
+          exact ⟨input.pieces[i]!, by simp, rfl⟩
+        · apply RegionOperations.copyCellsAssignedFrom_of_forall_copiedCells_eq_nil
+          simp only [circuit_norm, RegionOperation.copiedCells, List.Forall]
       output cfg offset _ self := circuitOutputCells cfg ns offset self
       synthesisSummary cfg offset _ _ := circuitSynthesisSummary ns cfg offset
       output_eq := by
@@ -1183,7 +1244,7 @@ def circuit (G : Generators) (ns : List ℕ) (yaIn : Placed Environment Fp → F
         · apply FloorPlanner.RegionSynthesisSummary.ext
           · simp only [circuit_norm, synthesis_summary_norm]
           · simp only [circuit_norm, synthesis_summary_norm]
-            omega
+          · simp only [circuit_norm, synthesis_summary_norm]
           · simp only [circuit_norm, synthesis_summary_norm] }
 
   Witness := ChainWit ns
