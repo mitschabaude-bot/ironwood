@@ -1,5 +1,5 @@
 import Zcash.Snark.Keygen.Pipeline
-import Zcash.Circuits.Action.TopLevel
+import Zcash.Circuits.Action.PlannerTrace
 import Zcash.Arithmetic.CommitLagrange
 import Zcash.Snark.Fixtures.SingleAction.Honest.Fixture
 import Mathlib.Util.AssertNoSorry
@@ -277,15 +277,13 @@ theorem actionCircuitShape_eq_fixtureCircuitShape :
     actionCircuit.shape = shape.toCircuitShape :=
   congrArg Shape.toCircuitShape actionShape_eq_fixtureShape
 
-/-- The keygen domain exponent the columns are built at IS the captured URS's `k`, so the
+/-- The keygen domain exponent the columns are built at is the captured URS's `k`, so the
 column length the commitment families produce is the domain the committer's inverse DFT runs
-over. Read this from the certified circuit shape rather than by reducing `minimalK`. -/
+over. The circuit side comes from the proved planner trace; the capture merely records `k = 11`. -/
 private theorem domainExponent_eq :
     actionCircuit.domainExponent = capturedURS.k := by
-  have h := congrArg (fun proofShape : Shape => proofShape.k) actionShape_eq_fixtureShape
-  simp only [CircuitShape.withProofParams_k, actionCircuit.shape_k] at h
-  rw [h]
-  decide
+  rw [Zcash.Circuits.Action.actionCircuit_domainExponent_eq]
+  rfl
 
 set_option maxRecDepth 1000000 in
 /-- **The bundle's per-column committer IS the pipeline's affine default at the derived

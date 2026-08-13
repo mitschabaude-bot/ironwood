@@ -1,6 +1,7 @@
 import Zcash.Snark.Keygen.Certificate
 import Zcash.Snark.Keygen.Lagrange
 import Zcash.Circuits.Integration.TopLevelInstanceCommitment
+import Zcash.Circuits.Action.PlannerTrace
 import Mathlib.Util.AssertNoSorry
 
 /-!
@@ -146,13 +147,10 @@ theorem publicInputRows_capturedActionInputs (proofIndex : Fin Fixture.shape.num
 
 /-! ## The seam: the capstone's family is the captured one -/
 
-/-- The keygen domain exponent is the captured URS's `k`, read off the certificate's `Shape`
-component rather than by reducing `minimalKForRows`. -/
+/-- The structurally derived Action domain exponent agrees with the captured URS's `k = 11`. -/
 theorem actionCircuit_domainExponent : actionCircuit.domainExponent = capturedURS.k := by
-  have h := congrArg (fun proofShape : Shape => proofShape.k) actionShape_eq_fixtureShape
-  simp only [CircuitShape.withProofParams_k, actionCircuit.shape_k] at h
-  rw [h]
-  decide
+  rw [Zcash.Circuits.Action.actionCircuit_domainExponent_eq]
+  rfl
 
 /-- The derived verifying key's domain generator is the captured URS's, so a key stated at that key's
 `omega` is a key at the captured domain. -/

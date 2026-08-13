@@ -1,7 +1,7 @@
 import Zcash.Snark.Fixtures.SingleAction.Honest.Fixture
 import Zcash.Arithmetic.Domain
 import Zcash.Snark.Keygen.Pipeline
-import Zcash.Circuits.Action.TopLevel
+import Zcash.Circuits.Action.PlannerTrace
 import Clean.Halo2.TopLevel
 import Mathlib.Util.AssertNoSorry
 
@@ -58,8 +58,6 @@ proposition re-runs the circuit's configure/synthesize chain during `native_deci
 evaluation, so the bundles below are stated over these once-per-process definitions.
 The public theorems restate the facts in method spelling via `simp only` unfolding. -/
 
-private def actionK : ℕ := actionCircuit.domainExponent
-
 /-- The capture's permutation columns, in raw column space. The captured
 `vk.permutationChunks` stores the verifier view — `ColumnRef`s in QUERY-INDEX space
 (`ColumnRef.resolve` reads the eval arrays by query index) — so each ref resolves to
@@ -89,34 +87,32 @@ def capturedPinnedView : PinnedConstraintSystem Fp :=
     lookupInputExprs := (List.ofFn vk.lookupInputExprs).map (·.map RichExpression.ofExpr)
     lookupTableExprs := (List.ofFn vk.lookupTableExprs).map (·.map RichExpression.ofExpr) }
 
-/-- **The capture is the derived Action circuit** (pinned CS), the domain exponent
-computes to orchard's pinned `K = 11` (`circuit.rs:76`), and no `queriedCells` entry
-poisoned registration. One bundled `native_decide` shares the concrete circuit
-evaluation across these three facts. -/
+/-- **The capture is the derived Action circuit** (pinned CS), and no `queriedCells`
+entry poisoned registration. One bundled `native_decide` shares the concrete circuit
+evaluation across these two capture checks. The domain exponent is proved structurally
+from the circuit's planner trace instead. -/
 private theorem bundle_pinned :
-    (capturedPinnedView, actionK,
+    (capturedPinnedView,
       actionCircuit.constraintSystem.invalidQueriedCells.isEmpty)
-      = (actionPinnedCs, 11, true) := by native_decide
+      = (actionPinnedCs, true) := by native_decide
 
 /-- **The capture is the derived Action circuit** (pinned CS, captured families). -/
 theorem capturedPinnedView_eq_derived : capturedPinnedView = actionPinnedCs := by
   have h := bundle_pinned
-  simp only [actionK, Prod.mk.injEq] at h
+  simp only [Prod.mk.injEq] at h
   exact h.1
 
 /-- The derived domain exponent is orchard's pinned `K = 11` (`circuit.rs:76`). -/
 theorem actionK_eq : actionCircuit.domainExponent = 11 := by
-  have h := bundle_pinned
-  simp only [actionK, Prod.mk.injEq] at h
-  exact h.2.1
+  exact Zcash.Circuits.Action.actionCircuit_domainExponent_eq
 
 /-- Every hand-listed `queriedCells` entry was a well-formed query atom (the poison
 list is empty) — the registration recorded exactly the per-gate lists. -/
 theorem action_queriedCells_wellFormed :
     actionCircuit.constraintSystem.invalidQueriedCells.isEmpty := by
   have h := bundle_pinned
-  simp only [actionK, Prod.mk.injEq] at h
-  exact h.2.2
+  simp only [Prod.mk.injEq] at h
+  exact h.2
 
 /-- **The captured verifying key's gates are the derived Action circuit's.** The
 verifying key holds `Zcash.Snark.Expr` gates and the derivation holds
