@@ -36,12 +36,11 @@ open Halo2 Fixtures Halo2.FloorPlanner
 /-! ## V1: the full Action circuit (ironwood + pre-ironwood base)
 
 The derived starts / constants are checked against the JSON fixtures at `#eval` time; the
-fixtures are loaded through their content-hash pins (see `Fixtures/Json.lean`). Orchard's
+fixtures are loaded by name through their SHA-256 pins (see `Fixtures/Json.lean`). Orchard's
 constants column is fixed column 3 (`enable_constant`; the only constants column). -/
 
 #eval show IO Unit from do
-  let fx ← Json.loadLayoutFixture "Clean/Ironwood/Fixtures/actionLayout.json"
-    0x51cd2f7ce66a8c7
+  let fx ← Json.loadLayoutFixture "actionLayout.json"
   let ops : Operations Fp := Test.LayoutAction.aProgram.operations
   let fixtureStarts : List ℕ := (fx.regions.filter (·.name ≠ "generator_table")).map (·.start)
   Json.runChecks [
@@ -52,8 +51,7 @@ constants column is fixed column 3 (`enable_constant`; the only constants column
         (fun (value, column, row) => (value.val, column, row)) == fx.constants)]
 
 #eval show IO Unit from do
-  let fx ← Json.loadLayoutFixture "Clean/Ironwood/Fixtures/actionBaseLayout.json"
-    0x193f3922aa59191e
+  let fx ← Json.loadLayoutFixture "actionBaseLayout.json"
   let ops : Operations Fp := Test.LayoutAction.aProgramBase.operations
   let fixtureStarts : List ℕ := (fx.regions.filter (·.name ≠ "generator_table")).map (·.start)
   Json.runChecks [
