@@ -1222,22 +1222,44 @@ private theorem emptyRegion_selectorAnchored (anchor : ℕ → RegionColumn) :
   V1.SelectorAnchoredBy.ofRegion
     (V1.SummarySelectorsAnchoredBy.empty anchor)
 
+private theorem instanceRow_selectorAnchored (row : ℕ)
+    (anchor : ℕ → RegionColumn) :
+    V1.SelectorAnchoredBy
+      (SynthesisSummary.ofInstanceRow row).regionShapes anchor := by
+  rw [SynthesisSummary.ofInstanceRow_regionShapes]
+  trivial
+
+private theorem selectorAnchoredBy_foldr_combine
+    {summaries : List SynthesisSummary} {anchor : ℕ → RegionColumn}
+    (hsummaries : summaries.Forall fun summary =>
+      V1.SelectorAnchoredBy summary.regionShapes anchor) :
+    V1.SelectorAnchoredBy
+      (summaries.foldr SynthesisSummary.combine {}).regionShapes anchor := by
+  induction summaries with
+  | nil => exact empty_selectorAnchored anchor
+  | cons summary rest inductionHypothesis =>
+      rw [List.forall_cons] at hsummaries
+      exact hsummaries.1.combine (inductionHypothesis hsummaries.2)
+
 private theorem actionSynthChecks_selectorAnchored :
     V1.SelectorAnchoredBy
       (Circuit.synthChecksSynthesisSummary actionConfig).regionShapes
       (selectorAnchor actionConfig) := by
   unfold Circuit.synthChecksSynthesisSummary
-  simp only [List.foldr_cons, List.foldr_nil]
-  apply V1.SelectorAnchoredBy.combine merkle1_selectorAnchored
-  apply V1.SelectorAnchoredBy.combine merkle2_selectorAnchored
-  apply V1.SelectorAnchoredBy.combine (loadPrivate_selectorAnchored _)
-  apply V1.SelectorAnchoredBy.combine (loadPrivate_selectorAnchored _)
-  apply V1.SelectorAnchoredBy.combine actionValueCommit_selectorAnchored
-  apply V1.SelectorAnchoredBy.combine actionDeriveNullifier_selectorAnchored
-  apply V1.SelectorAnchoredBy.combine actionSpendAuthority_selectorAnchored
-  apply V1.SelectorAnchoredBy.combine actionCommitIvk_selectorAnchored
-  apply V1.SelectorAnchoredBy.combine actionAddressIntegrity_selectorAnchored
-  exact empty_selectorAnchored (selectorAnchor actionConfig)
+  apply selectorAnchoredBy_foldr_combine
+  simp only [List.forall_cons, List.forall_nil, and_true]
+  exact ⟨merkle1_selectorAnchored, merkle2_selectorAnchored,
+    loadPrivate_selectorAnchored _, loadPrivate_selectorAnchored _,
+    actionValueCommit_selectorAnchored,
+    instanceRow_selectorAnchored _ (selectorAnchor actionConfig),
+    instanceRow_selectorAnchored _ (selectorAnchor actionConfig),
+    actionDeriveNullifier_selectorAnchored,
+    instanceRow_selectorAnchored _ (selectorAnchor actionConfig),
+    actionSpendAuthority_selectorAnchored,
+    instanceRow_selectorAnchored _ (selectorAnchor actionConfig),
+    instanceRow_selectorAnchored _ (selectorAnchor actionConfig),
+    actionCommitIvk_selectorAnchored,
+    actionAddressIntegrity_selectorAnchored⟩
 
 private theorem point_selectorAnchored
     (cfg : Ecc.WitnessPoint.Config) (offset : ℕ)
@@ -1291,11 +1313,11 @@ private theorem actionCrossAddress_selectorAnchored :
       (selectorAnchor actionConfig) := by
   unfold Circuit.synthCrossAddressChecksSynthesisSummary
   apply V1.SelectorAnchoredBy.ofRegion
-  unfold RegionSynthesisSummary.repeatColumns
-  norm_num
-  apply V1.SummarySelectorsAnchoredBy.ofColumns
   intro selector hselector
-  simp [Circuit.crossAddressColumns] at hselector
+  simp only [RegionSynthesisSummary.toRegionShapeSummary_columns,
+    RegionSynthesisSummary.repeatColumns_columns] at hselector
+  simp [FloorPlanner.mem_unionColumns_iff,
+    Circuit.crossAddressColumns] at hselector
   subst selector
   have hanchor : selectorAnchor actionConfig actionConfig.qOrchard.index =
       .column .advice (actionConfig.advices 0).index := by
@@ -1303,7 +1325,10 @@ private theorem actionCrossAddress_selectorAnchored :
     rw [actionConfig_qOrchard]
     norm_num
   rw [hanchor]
-  simp [Circuit.crossAddressColumns, physicalColumns]
+  simp [RegionSynthesisSummary.toRegionShapeSummary_columns,
+    RegionSynthesisSummary.repeatColumns_columns,
+    FloorPlanner.mem_unionColumns_iff, Circuit.crossAddressColumns,
+    physicalColumns]
 
 private theorem witnessCheckDecomposed_selectorAnchored
     (cfg : LookupRangeCheck.Config 10) (anchor : ℕ → RegionColumn)
@@ -1660,8 +1685,10 @@ private theorem orchardChecks_selectorAnchored :
   unfold Circuit.orchardChecksSynthesisSummary
   apply V1.SelectorAnchoredBy.ofRegion
   unfold Circuit.orchardChecksRegionSynthesisSummary
-  apply V1.SummarySelectorsAnchoredBy.ofColumns
   intro selector hselector
+  simp only [RegionSynthesisSummary.toRegionShapeSummary_columns,
+    RegionSynthesisSummary.ofColumns_columns,
+    FloorPlanner.mem_unionColumns_iff] at hselector
   simp at hselector
   subst selector
   have hanchor : selectorAnchor actionConfig actionConfig.qOrchard.index =
@@ -1670,7 +1697,9 @@ private theorem orchardChecks_selectorAnchored :
     rw [actionConfig_qOrchard]
     norm_num
   rw [hanchor]
-  simp [physicalColumns]
+  simp [RegionSynthesisSummary.toRegionShapeSummary_columns,
+    RegionSynthesisSummary.ofColumns_columns,
+    FloorPlanner.mem_unionColumns_iff, physicalColumns]
 
 private theorem actionSynthNotes_selectorAnchored :
     V1.SelectorAnchoredBy

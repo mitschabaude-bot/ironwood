@@ -718,13 +718,23 @@ private theorem baseFieldPhysicalShapes :
     RegionColumn.kindRank, plannerShape]
   decide
 
+set_option maxRecDepth 10000 in
 private theorem merkle1HashPhysicalShape :
     (Sinsemilla.Merkle.HashLayer.hashPhysicalShape
       actionConfig.merkle1.sinsemilla).normalized =
       plannerShape [0,1,2,3,4] 53 [3,12] := by
-  simp only [Sinsemilla.Merkle.HashLayer.hashPhysicalShape,
-    Sinsemilla.Merkle.HashLayer.hashRegionColumns,
-    Sinsemilla.Merkle.HashLayer.hashSlotColumns,
+  simp only [Sinsemilla.Merkle.HashLayer.hashPhysicalShape_eq,
+    Sinsemilla.HashToPoint.hashRegionSynthesisSummary,
+    Sinsemilla.Chain.circuitSynthesisSummary,
+    Sinsemilla.Chain.slotIterationSynthesisSummary,
+    Sinsemilla.Chain.slotSynthesisSummary,
+    Sinsemilla.HashPiece.circuitSynthesisSummary,
+    Sinsemilla.HashPiece.loopSynthesisSummary,
+    RegionSynthesisSummary.combine,
+    RegionSynthesisSummary.repeatColumns,
+    RegionSynthesisSummary.ofColumns,
+    RegionSynthesisSummary.toRegionShapeSummary,
+    RegionShapeSummary.withoutSelectors,
     Sinsemilla.HashPiece.roundColumns]
   rw [show actionConfig.merkle1.sinsemilla.fixedYQ.index = 3 by rfl,
     show actionConfig.merkle1.sinsemilla.qS2.index = 12 by rfl,
@@ -738,13 +748,23 @@ private theorem merkle1HashPhysicalShape :
     RegionColumn.kindRank, plannerShape]
   decide
 
+set_option maxRecDepth 10000 in
 private theorem merkle2HashPhysicalShape :
     (Sinsemilla.Merkle.HashLayer.hashPhysicalShape
       actionConfig.merkle2.sinsemilla).normalized =
       plannerShape [5,6,7,8,9] 53 [4,13] := by
-  simp only [Sinsemilla.Merkle.HashLayer.hashPhysicalShape,
-    Sinsemilla.Merkle.HashLayer.hashRegionColumns,
-    Sinsemilla.Merkle.HashLayer.hashSlotColumns,
+  simp only [Sinsemilla.Merkle.HashLayer.hashPhysicalShape_eq,
+    Sinsemilla.HashToPoint.hashRegionSynthesisSummary,
+    Sinsemilla.Chain.circuitSynthesisSummary,
+    Sinsemilla.Chain.slotIterationSynthesisSummary,
+    Sinsemilla.Chain.slotSynthesisSummary,
+    Sinsemilla.HashPiece.circuitSynthesisSummary,
+    Sinsemilla.HashPiece.loopSynthesisSummary,
+    RegionSynthesisSummary.combine,
+    RegionSynthesisSummary.repeatColumns,
+    RegionSynthesisSummary.ofColumns,
+    RegionSynthesisSummary.toRegionShapeSummary,
+    RegionShapeSummary.withoutSelectors,
     Sinsemilla.HashPiece.roundColumns]
   rw [show actionConfig.merkle2.sinsemilla.fixedYQ.index = 4 by rfl,
     show actionConfig.merkle2.sinsemilla.qS2.index = 13 by rfl,
@@ -754,6 +774,99 @@ private theorem merkle2HashPhysicalShape :
     show actionConfig.merkle2.sinsemilla.lambda1.index = 8 by rfl,
     show actionConfig.merkle2.sinsemilla.lambda2.index = 9 by rfl]
   simp [RegionShapeSummary.normalized, physicalColumns, unionColumns, addColumn,
+    sortRegionColumns, RegionColumn.lt, RegionColumn.ordKey,
+    RegionColumn.kindRank, plannerShape]
+  decide
+
+set_option maxRecDepth 10000 in
+private theorem noteCommitOldHashPhysicalShape :
+    (Sinsemilla.HashToPoint.hashPhysicalShape NoteCommit.Main.ns
+      actionConfig.sinsemilla1).normalized =
+        plannerShape [0,1,2,3,4] 110 [3,12] := by
+  simp only [Sinsemilla.HashToPoint.hashPhysicalShape_eq,
+    Sinsemilla.HashToPoint.hashRegionSynthesisSummary,
+    Sinsemilla.Chain.circuitSynthesisSummary,
+    Sinsemilla.Chain.slotIterationSynthesisSummary,
+    Sinsemilla.Chain.slotSynthesisSummary,
+    Sinsemilla.HashPiece.circuitSynthesisSummary,
+    Sinsemilla.HashPiece.loopSynthesisSummary,
+    RegionSynthesisSummary.combine,
+    RegionSynthesisSummary.repeatColumns,
+    RegionSynthesisSummary.ofColumns,
+    RegionSynthesisSummary.toRegionShapeSummary,
+    RegionShapeSummary.withoutSelectors,
+    Sinsemilla.HashPiece.roundColumns]
+  rw [show actionConfig.sinsemilla1.fixedYQ.index = 3 by rfl,
+    show actionConfig.sinsemilla1.qS2.index = 12 by rfl,
+    show actionConfig.sinsemilla1.xA.index = 0 by rfl,
+    show actionConfig.sinsemilla1.bits.index = 2 by rfl,
+    show actionConfig.sinsemilla1.xP.index = 1 by rfl,
+    show actionConfig.sinsemilla1.lambda1.index = 3 by rfl,
+    show actionConfig.sinsemilla1.lambda2.index = 4 by rfl]
+  simp [NoteCommit.Main.ns, Sinsemilla.Chain.prefixRows,
+    RegionShapeSummary.normalized, physicalColumns, unionColumns, addColumn,
+    sortRegionColumns, RegionColumn.lt, RegionColumn.ordKey,
+    RegionColumn.kindRank, plannerShape]
+  decide
+
+set_option maxRecDepth 10000 in
+private theorem noteCommitNewHashPhysicalShape :
+    (Sinsemilla.HashToPoint.hashPhysicalShape NoteCommit.Main.ns
+      actionConfig.sinsemilla2).normalized =
+        plannerShape [5,6,7,8,9] 110 [4,13] := by
+  simp only [Sinsemilla.HashToPoint.hashPhysicalShape_eq,
+    Sinsemilla.HashToPoint.hashRegionSynthesisSummary,
+    Sinsemilla.Chain.circuitSynthesisSummary,
+    Sinsemilla.Chain.slotIterationSynthesisSummary,
+    Sinsemilla.Chain.slotSynthesisSummary,
+    Sinsemilla.HashPiece.circuitSynthesisSummary,
+    Sinsemilla.HashPiece.loopSynthesisSummary,
+    RegionSynthesisSummary.combine,
+    RegionSynthesisSummary.repeatColumns,
+    RegionSynthesisSummary.ofColumns,
+    RegionSynthesisSummary.toRegionShapeSummary,
+    RegionShapeSummary.withoutSelectors,
+    Sinsemilla.HashPiece.roundColumns]
+  rw [show actionConfig.sinsemilla2.fixedYQ.index = 4 by rfl,
+    show actionConfig.sinsemilla2.qS2.index = 13 by rfl,
+    show actionConfig.sinsemilla2.xA.index = 5 by rfl,
+    show actionConfig.sinsemilla2.bits.index = 7 by rfl,
+    show actionConfig.sinsemilla2.xP.index = 6 by rfl,
+    show actionConfig.sinsemilla2.lambda1.index = 8 by rfl,
+    show actionConfig.sinsemilla2.lambda2.index = 9 by rfl]
+  simp [NoteCommit.Main.ns, Sinsemilla.Chain.prefixRows,
+    RegionShapeSummary.normalized, physicalColumns, unionColumns, addColumn,
+    sortRegionColumns, RegionColumn.lt, RegionColumn.ordKey,
+    RegionColumn.kindRank, plannerShape]
+  decide
+
+set_option maxRecDepth 10000 in
+private theorem commitIvkHashPhysicalShape :
+    (Sinsemilla.HashToPoint.hashPhysicalShape CommitIvk.Main.ns
+      actionConfig.sinsemilla1).normalized =
+        plannerShape [0,1,2,3,4] 52 [3,12] := by
+  simp only [Sinsemilla.HashToPoint.hashPhysicalShape_eq,
+    Sinsemilla.HashToPoint.hashRegionSynthesisSummary,
+    Sinsemilla.Chain.circuitSynthesisSummary,
+    Sinsemilla.Chain.slotIterationSynthesisSummary,
+    Sinsemilla.Chain.slotSynthesisSummary,
+    Sinsemilla.HashPiece.circuitSynthesisSummary,
+    Sinsemilla.HashPiece.loopSynthesisSummary,
+    RegionSynthesisSummary.combine,
+    RegionSynthesisSummary.repeatColumns,
+    RegionSynthesisSummary.ofColumns,
+    RegionSynthesisSummary.toRegionShapeSummary,
+    RegionShapeSummary.withoutSelectors,
+    Sinsemilla.HashPiece.roundColumns]
+  rw [show actionConfig.sinsemilla1.fixedYQ.index = 3 by rfl,
+    show actionConfig.sinsemilla1.qS2.index = 12 by rfl,
+    show actionConfig.sinsemilla1.xA.index = 0 by rfl,
+    show actionConfig.sinsemilla1.bits.index = 2 by rfl,
+    show actionConfig.sinsemilla1.xP.index = 1 by rfl,
+    show actionConfig.sinsemilla1.lambda1.index = 3 by rfl,
+    show actionConfig.sinsemilla1.lambda2.index = 4 by rfl]
+  simp [CommitIvk.Main.ns, Sinsemilla.Chain.prefixRows,
+    RegionShapeSummary.normalized, physicalColumns, unionColumns, addColumn,
     sortRegionColumns, RegionColumn.lt, RegionColumn.ordKey,
     RegionColumn.kindRank, plannerShape]
   decide
@@ -796,13 +909,48 @@ private theorem checksPlannerBlocks_correct :
     ((Circuit.synthChecksSynthesisSummary actionConfig).physicalRegionShapes.map
       RegionShapeSummary.normalized : Multiset RegionShapeSummary) =
         plannerBlockMultiset checksPlannerBlocks := by
+  let merkle1Shape := Sinsemilla.Merkle.HashLayer.hashPhysicalShape
+    actionConfig.merkle1.sinsemilla
+  have hmerkle1Shape :
+      Sinsemilla.Merkle.HashLayer.hashPhysicalShape
+        actionConfig.merkle1.sinsemilla = merkle1Shape := rfl
+  clear_value merkle1Shape
+  let merkle2Shape := Sinsemilla.Merkle.HashLayer.hashPhysicalShape
+    actionConfig.merkle2.sinsemilla
+  have hmerkle2Shape :
+      Sinsemilla.Merkle.HashLayer.hashPhysicalShape
+        actionConfig.merkle2.sinsemilla = merkle2Shape := rfl
+  clear_value merkle2Shape
+  have hmerkle1Normalized : merkle1Shape.normalized =
+      plannerShape [0,1,2,3,4] 53 [3,12] := by
+    rw [← hmerkle1Shape]
+    exact merkle1HashPhysicalShape
+  have hmerkle2Normalized : merkle2Shape.normalized =
+      plannerShape [5,6,7,8,9] 53 [4,13] := by
+    rw [← hmerkle2Shape]
+    exact merkle2HashPhysicalShape
+  let ivkHashShape := Sinsemilla.HashToPoint.hashPhysicalShape
+    CommitIvk.Main.ns actionConfig.sinsemilla1
+  have hivkHashShape :
+      Sinsemilla.HashToPoint.hashPhysicalShape CommitIvk.Main.ns
+        actionConfig.sinsemilla1 = ivkHashShape := rfl
+  clear_value ivkHashShape
+  have hivkHashNormalized : ivkHashShape.normalized =
+      plannerShape [0,1,2,3,4] 52 [3,12] := by
+    rw [← hivkHashShape]
+    exact commitIvkHashPhysicalShape
   rw [Circuit.synthChecksSynthesisSummary_physicalRegionShapes]
   unfold checksPlannerBlocks plannerBlockMultiset
-  simp only [List.flatMap_cons, List.flatMap_nil,
+  simp only [List.flatMap_cons, List.flatMap_nil]
+  rw [Sinsemilla.Merkle.CalculateRoot.synthesisSummary_physicalShapes_eq,
     Sinsemilla.Merkle.CalculateRoot.synthesisSummary_physicalShapes_eq,
     Sinsemilla.Merkle.Layer.synthesisSummary_physicalShapes_eq,
+    Sinsemilla.Merkle.Layer.synthesisSummary_physicalShapes_eq,
     Sinsemilla.Merkle.HashLayer.synthesisSummary_physicalShapes_eq,
-    synthesis_summary_norm,
+    Sinsemilla.Merkle.HashLayer.synthesisSummary_physicalShapes_eq,
+    hmerkle1Shape, hmerkle2Shape]
+  simp only [synthesis_summary_norm, List.map_append, List.map_nil]
+  simp only [
     ValueCommit.synthesisSummary, DeriveNullifier.synthesisSummary,
     SpendAuthority.synthesisSummary, CommitIvk.Main.synthesisSummary,
     AddressIntegrity.synthesisSummary,
@@ -816,13 +964,8 @@ private theorem checksPlannerBlocks_correct :
     Poseidon.addInputRegionSynthesisSummary,
     Poseidon.initRegionSynthesisSummary,
     Poseidon.permuteSynthesisSummary,
-    Sinsemilla.HashToPoint.hashCircuitSynthesisSummary,
-    Sinsemilla.HashToPoint.hashRegionSynthesisSummary,
-    Sinsemilla.Chain.circuitSynthesisSummary,
-    Sinsemilla.Chain.slotIterationSynthesisSummary,
-    Sinsemilla.Chain.slotSynthesisSummary,
-    Sinsemilla.HashPiece.circuitSynthesisSummary,
-    Sinsemilla.HashPiece.loopSynthesisSummary,
+    Sinsemilla.HashToPoint.hashCircuitSynthesisSummary_physicalShapes_eq,
+    hivkHashShape,
     RegionSynthesisSummary.repeatColumns,
     SynthesisSummary.combine_physicalRegionShapes,
     SynthesisSummary.ofRegion_physicalRegionShapes,
@@ -841,11 +984,8 @@ private theorem checksPlannerBlocks_correct :
     RegionSynthesisSummary.ofColumns,
     RegionSynthesisSummary.toRegionShapeSummary,
     RegionShapeSummary.withoutSelectors, unionColumns]
-  simp only [merkle1HashPhysicalShape, merkle2HashPhysicalShape,
-    variableBaseMulPhysicalShape]
-  simp [CommitIvk.Main.ns, Sinsemilla.Chain.prefixRows,
-    Sinsemilla.HashPiece.roundColumns,
-    Ecc.WitnessPoint.pointNonIdSynthesisSummary,
+  simp only [variableBaseMulPhysicalShape]
+  simp [Ecc.WitnessPoint.pointNonIdSynthesisSummary,
     RegionSynthesisSummary.combine,
     actionConfig, Circuit.configure,
     Circuit.configureBase, Circuit.configureChips, Circuit.configureShared,
@@ -861,6 +1001,8 @@ private theorem checksPlannerBlocks_correct :
     Ecc.MulComplete.configure, Ecc.MulIncomplete.configure,
     Ecc.MulOverflow.configure, Sinsemilla.Merkle.Gate.configure,
     lookupTableColumn, Configure.run_fst, keygen_norm]
+  simp only [hmerkle1Normalized, hmerkle2Normalized,
+    hivkHashNormalized]
   simp [plannerShape, SynthesisSummary.physicalRegionShapes,
     SynthesisSummary.ofRegion,
     LookupRangeCheck.copyCheckSynthesisSummary,
@@ -878,13 +1020,35 @@ private theorem checksPlannerBlocks_correct :
   simp only [Multiset.count_cons, Multiset.count_add,
     Multiset.count_nsmul, Multiset.count_singleton,
     Multiset.count_zero]
-  omega
+  ring
 
 set_option maxRecDepth 10000 in
 private theorem notesPlannerBlocks_correct :
     ((Circuit.synthNotesSynthesisSummary actionConfig).physicalRegionShapes.map
       RegionShapeSummary.normalized : Multiset RegionShapeSummary) =
         plannerBlockMultiset notesPlannerBlocks := by
+  let oldHashShape :=
+    Sinsemilla.HashToPoint.hashPhysicalShape NoteCommit.Main.ns
+      actionConfig.sinsemilla1
+  have holdHashShape :
+      Sinsemilla.HashToPoint.hashPhysicalShape NoteCommit.Main.ns
+        actionConfig.sinsemilla1 = oldHashShape := rfl
+  clear_value oldHashShape
+  let newHashShape :=
+    Sinsemilla.HashToPoint.hashPhysicalShape NoteCommit.Main.ns
+      actionConfig.sinsemilla2
+  have hnewHashShape :
+      Sinsemilla.HashToPoint.hashPhysicalShape NoteCommit.Main.ns
+        actionConfig.sinsemilla2 = newHashShape := rfl
+  clear_value newHashShape
+  have holdHashNormalized : oldHashShape.normalized =
+      plannerShape [0,1,2,3,4] 110 [3,12] := by
+    rw [← holdHashShape]
+    exact noteCommitOldHashPhysicalShape
+  have hnewHashNormalized : newHashShape.normalized =
+      plannerShape [5,6,7,8,9] 110 [4,13] := by
+    rw [← hnewHashShape]
+    exact noteCommitNewHashPhysicalShape
   rw [Circuit.synthNotesSynthesisSummary_physicalRegionShapes]
   unfold notesPlannerBlocks plannerBlockMultiset
   simp only [List.flatMap_cons, List.flatMap_nil, synthesis_summary_norm,
@@ -911,14 +1075,8 @@ private theorem notesPlannerBlocks_correct :
     LookupRangeCheck.witnessCheckSynthesisSummary,
     LookupRangeCheck.witnessShortCheckSynthesisSummary,
     LookupRangeCheck.witnessCheckDecomposedSynthesisSummary,
-    Sinsemilla.HashToPoint.hashCircuitSynthesisSummary,
-    Sinsemilla.HashToPoint.hashRegionSynthesisSummary,
-    Sinsemilla.Chain.circuitSynthesisSummary,
-    Sinsemilla.Chain.slotIterationSynthesisSummary,
-    Sinsemilla.Chain.slotSynthesisSummary,
-    Sinsemilla.HashPiece.circuitSynthesisSummary,
-    Sinsemilla.HashPiece.loopSynthesisSummary,
-    RegionSynthesisSummary.repeatColumns,
+    Sinsemilla.HashToPoint.hashCircuitSynthesisSummary_physicalShapes_eq,
+    holdHashShape, hnewHashShape,
     SynthesisSummary.combine_physicalRegionShapes,
     SynthesisSummary.ofRegion_physicalRegionShapes,
     SynthesisSummary.foldr_combine_physicalRegionShapes,
@@ -933,10 +1091,7 @@ private theorem notesPlannerBlocks_correct :
     RegionSynthesisSummary.ofColumns,
     RegionSynthesisSummary.toRegionShapeSummary,
     RegionShapeSummary.withoutSelectors, unionColumns]
-  simp [NoteCommit.Main.ns, Sinsemilla.Chain.prefixRows,
-    Sinsemilla.HashPiece.roundColumns,
-    RegionSynthesisSummary.combine,
-    actionConfig, Circuit.configure,
+  simp [actionConfig, Circuit.configure,
     Circuit.configureBase, Circuit.configureChips, Circuit.configureShared,
     Circuit.configureAdvices, Circuit.configureAdviceEqualitiesLow,
     Circuit.configureAdviceEqualitiesHigh, Circuit.configureEqualities,
@@ -956,8 +1111,9 @@ private theorem notesPlannerBlocks_correct :
     Ecc.MulComplete.configure, Ecc.MulIncomplete.configure,
     Ecc.MulOverflow.configure, Sinsemilla.Merkle.Gate.configure,
     lookupTableColumn, Configure.run_fst, keygen_norm]
+  simp only [holdHashNormalized, hnewHashNormalized]
   simp [plannerShape,
-    RegionShapeSummary.normalized, physicalColumns, unionColumns,
+    RegionShapeSummary.normalized, physicalColumns,
     addColumn, sortRegionColumns, List.insertionSort, List.orderedInsert,
     RegionColumn.lt, RegionColumn.ordKey, RegionColumn.kindRank]
   simp only [listCoe_cons, Multiset.coe_nil]
@@ -967,7 +1123,7 @@ private theorem notesPlannerBlocks_correct :
   simp only [Multiset.count_cons, Multiset.count_add,
     Multiset.count_nsmul, Multiset.count_singleton,
     Multiset.count_zero]
-  omega
+  ring
 
 set_option maxRecDepth 10000 in
 private theorem actionOwnerPlannerBlocks_eq :
@@ -2405,16 +2561,17 @@ theorem actionCircuit_synthesisSummary_tableRowExtent_eq :
 
 /-- The Action circuit's reduced synthesis summary records the exact instance endpoint. -/
 theorem actionCircuit_synthesisSummary_instanceRowExtent_eq :
-    actionCircuit.synthesisSummary.instanceRowExtent = 9 := by
+    actionCircuit.synthesisSummary.instanceRowExtent = 10 := by
   rw [actionCircuit_synthesisSummary_eq]
   unfold Circuit.mainPostSynthesisSummary Circuit.synthesizeBaseSynthesisSummary
   simp only [synthesis_summary_norm]
+  norm_num
 
 /-- V1 placement covers the Action circuit's complete operation footprint exactly. -/
 theorem actionCircuit_operations_usedRows_eq_1779 :
     Halo2.usedRows actionCircuit.operations = 1779 := by
   apply Nat.le_antisymm
-  · apply (Operations.usedRows_le_summaryExtents
+  · apply (Halo2.usedRows_le_summaryExtents
       actionCircuit.operations actionCircuit.operationsCopyCellsAssigned).trans
     rw [actionCircuit_placementEnd_eq_1779,
       ← actionCircuit.synthesisSummary_eq_operations,
@@ -2427,9 +2584,10 @@ theorem actionCircuit_operations_usedRows_eq_1779 :
 /-- The Action circuit's public inputs do not extend its exact operation footprint. -/
 theorem actionCircuit_usedRows_eq_1779 :
     actionCircuit.usedRows = 1779 := by
-  unfold TopLevelCircuit.usedRows TopLevelCompilation.usedRows
-  rw [actionCircuit_operations_usedRows_eq_1779,
+  rw [TopLevelCircuit.usedRows_eq_max,
+    actionCircuit_operations_usedRows_eq_1779,
     actionCircuit_publicInputLayout_usedRows_eq]
+  norm_num
 
 /-- Halo 2's minimal-domain calculation selects exponent 11 for the Action circuit. -/
 theorem actionCircuit_domainExponent_eq :
