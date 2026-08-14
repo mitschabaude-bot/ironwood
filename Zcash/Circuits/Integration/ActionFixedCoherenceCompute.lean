@@ -1,6 +1,6 @@
 import Zcash.Circuits.Action.TopLevel
 import Zcash.Circuits.Integration.FixedColumns
-import Zcash.Circuits.Integration.ActionConstraintBoundsCompute
+import Zcash.Circuits.Integration.ActionConstraintBounds
 import Zcash.Snark.Keygen.Lagrange
 import Mathlib.Util.AssertNoSorry
 

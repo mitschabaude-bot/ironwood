@@ -2,7 +2,6 @@ import Zcash.Circuits.Integration.ActionCopyWitness
 import Zcash.Circuits.Integration.ActionEncoding
 import Zcash.Circuits.Integration.ActionFixedCoherenceCompute
 import Zcash.Circuits.Integration.ActionConstraintBounds
-import Zcash.Circuits.Integration.ActionConstraintBoundsCompute
 import Zcash.Circuits.Integration.ActionCorrectness
 import Zcash.Circuits.Integration.ActionPermutationDomain
 import Zcash.Circuits.Integration.ActionPermutationCycle

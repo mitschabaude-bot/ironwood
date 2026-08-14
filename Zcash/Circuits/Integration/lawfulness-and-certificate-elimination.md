@@ -114,7 +114,7 @@ and should normally be discharged by default tactics and compositional theorems.
 | 11 | `actionConstantCellAddressFailures_eq_nil` (eliminated) | G | Keygen registration places constant columns in the permutation family; generic row bounds and permutation-index inversion give the address round trip. | Done |
 | 12a | `gateData_eq`, gate component | L | Raw configure/synthesis registration: every synthesis-enabled gate was registered by `configure`. This must make gate closure inactive. | Medium |
 | 12b | `gateData_eq`, selector-count component | L | Every selector used by a configured or enabled lookup is below raw `numSelectors`. This must make the closure maximum inactive. | Medium |
-| 13 | `selectorDegree` | L | Compositional gate/lookup degree bounds, then a generic `ConstraintSystem` degree theorem. | Medium |
+| 13 | `selectorDegree` (eliminated as a certificate) | L | Exact gate/lookup degree summaries compose with configure; Action's reduced degree is `9`, so the field-order bound is an ordinary numerical corollary. | Done |
 | 14 | gate `domainExponent_lt` (eliminated as a certificate) | L | Exact reduced synthesis summaries feed the proved V1 planner, yielding `usedRows = 1779`, `domainExponent = 11`, and hence the supported-domain bound without evaluating the concrete circuit. | Done |
 | 15 | permutation `domainExponent_lt` (eliminated) | R | Every consumer shares the proved top-level supported-domain fact. | Done |
 | 16 | `domainExponent_eq` (eliminated as a certificate) | R | Generic consumers reason over the derived exponent; the exact Action value is now a theorem of the compositional planner model rather than a deployment computation. | Done |
@@ -145,6 +145,13 @@ Row **#18 (R)** is partially closed: all replay and cycle consumers use the deri
 The only remaining R/G work is this law-dependent tail of row #18. All listed L rows remain design inputs rather than implementation targets on this branch.
 
 The subsequent keygen-lawfulness work also closes **#12a**, **#12b**, **#25**, and **#26**. These were L-classified because they required new packaged laws rather than because they required Action-specific proofs: `FormalCircuit.KeygenLawful` and the selector-allocation interface now supply them generically. The former `TopLevelGateCoherence` record has accordingly been reduced to numerical domain and degree facts and renamed `TopLevelConstraintBounds`.
+
+The constraint-degree slice closes **#13**. `ElaboratedConfigure` now carries the exact
+degree of its emitted gates and lookups, bind composition combines child degrees by
+`max`, and every top-level circuit exposes the resulting compiler-derived value.
+Action's reduced degree is `9`; the Pasta field-order bound is therefore proved by
+ordinary arithmetic, and the former whole-circuit `native_decide` module and trust
+allowances have been deleted.
 
 The query-correctness slice closes **#1** and **#24** as well. Gates and lookup
 arguments now carry local query-declaration laws, configure composition preserves
@@ -226,7 +233,6 @@ shared concrete-circuit evaluation, and proof checking are included.
 
 | Certificate group | Containing module | Approximate compile time | Approximate peak memory |
 |---|---|---:|---:|
-| Constraint degree and domain | `ActionConstraintBoundsCompute.lean` | 10 s | 7.0 GB |
 | Primary-instance registration | `ActionInstanceCommitmentCompute.lean` | 4 s | 3.8 GB |
 | Permutation column count | `ActionPermutationDomainCompute.lean` | 3 s | not remeasured |
 | Copy bounds, addresses, constants | `ActionCopyWitness.lean` | 30–40 s | 7.7 GB |

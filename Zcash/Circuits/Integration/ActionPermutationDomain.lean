@@ -1,4 +1,4 @@
-import Zcash.Circuits.Integration.ActionConstraintBoundsCompute
+import Zcash.Circuits.Integration.ActionConstraintBounds
 import Zcash.Circuits.Integration.PermutationCompiler
 import Zcash.Circuits.Integration.TopLevelAssignment
 import Zcash.Circuits.Integration.TopLevelConstraintModel

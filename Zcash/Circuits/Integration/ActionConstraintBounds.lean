@@ -1,4 +1,5 @@
-import Zcash.Circuits.Integration.ActionConstraintBoundsCompute
+import Zcash.Circuits.Action.PlannerTrace
+import Zcash.Circuits.Integration.TopLevelGates
 import Mathlib.Util.AssertNoSorry
 
 /-!
@@ -11,11 +12,25 @@ from its intrinsic configure and gate lawfulness guarantees.
 
 namespace Zcash.Snark
 
+open Zcash.Arithmetic (scalarFieldOrder)
+
 open Halo2 Keygen
-open Halo2
 open Zcash.Circuits.Action (actionCircuit)
 
 namespace ActionConstraintBounds
+
+/-- The derived Action constraint-system degree is below the Pasta field order. -/
+theorem selectorDegree :
+    csDegree actionCircuit.constraintSystem < scalarFieldOrder := by
+  rw [actionCircuit.constraintSystem_csDegree,
+    Zcash.Circuits.Action.actionCircuit_constraintDegree_eq]
+  norm_num [scalarFieldOrder]
+
+/-- The circuit-derived Action domain exponent is within Pasta's supported range. -/
+theorem domainExponent_lt :
+    actionCircuit.domainExponent < 33 := by
+  rw [Zcash.Circuits.Action.actionCircuit_domainExponent_eq]
+  norm_num
 
 /-- The deployed Orchard Action circuit satisfies the polynomial bridge's numerical
 bounds. -/
@@ -25,6 +40,8 @@ theorem constraintBounds :
   selectorDegree := selectorDegree
 
 assert_no_sorry constraintBounds
+assert_no_sorry selectorDegree
+assert_no_sorry domainExponent_lt
 
 end ActionConstraintBounds
 

@@ -224,19 +224,9 @@ theorem _root_.Halo2.TopLevelCircuit.permutationChunkRoutingCoherent
 `csDegree` is at least the permutation argument's baseline degree three. -/
 theorem constraintSystem_chunkLen_pos (cs : ConstraintSystem Fp) :
     0 < cs.chunkLen := by
-  unfold ConstraintSystem.chunkLen csDegree
-  dsimp only
-  have hdegree :
-      3 ≤
-        max 3
-          (max
-            (List.foldl
-              (fun m lookup => max m lookup.requiredDegree)
-              1 cs.lookups)
-            (List.foldl
-              (fun m expression => max m expression.degree)
-              0 (flatGates cs))) :=
-    le_max_left _ _
+  have hdegree : 3 ≤ csDegree cs :=
+    three_le_constraintDegree cs.gates cs.lookups
+  simp only [ConstraintSystem.chunkLen]
   omega
 
 /-- The verifier CS emits exactly the circuit-owned ceiling number of chunks. -/
