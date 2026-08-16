@@ -50,7 +50,7 @@ natural-number value. `chainNat` mirrors `z ↦ 2z + bit` over `ℕ`.
 The chain/canonicity lemmas of this file (`chainNat_*`, `chain_cast`, `accScalar_closed`,
 `nsmul_step`, `neg_add_nsmul`, `k_canonical`, `m_bounds`, `cells_kNat`, `z0_cell_value`,
 `overflow_spec_honest`) are public: the Ironwood region-level port
-(`Zcash/Circuits/Ecc/Mul.lean`) consumes them directly. -/
+(`Clean/Ironwood/Ecc/Mul.lean`) consumes them directly. -/
 
 /-- The running sum continued from `zin` by `b` steps of `z ↦ 2z + bit`. -/
 def chainNat (zin : ℕ) (bits : ℕ → Bool) : ℕ → ℕ

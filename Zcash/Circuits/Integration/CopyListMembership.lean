@@ -169,7 +169,7 @@ theorem operationDeclaredCopies_permutationColumns
           have hrest :=
             (OperationsKeygenCoherent.loadTable_cons
               cs table values rest).mp hcoherent
-          exact inductionHypothesis hrest hcopy
+          exact inductionHypothesis hrest.2 hcopy
 
 /-- Every endpoint extracted from a coherent copy stream carries its registered
 permutation-column fact. -/
@@ -278,7 +278,7 @@ theorem V1_go_fst_columns_lt
           have hrest :=
             (OperationsKeygenCoherent.loadTable_cons
               cs table values rest).mp hregistered
-          exact inductionHypothesis hrest consts (by
+          exact inductionHypothesis hrest.2 consts (by
             simpa only [V1.go] using htuple)
 
 /-- The declared-copy extraction is a `filterMap`. -/
@@ -723,7 +723,7 @@ theorem operationConstSite_column_mem_permutationColumns
           have hrest :=
             (OperationsKeygenCoherent.loadTable_cons
               cs table values rest).mp hregistered
-          exact inductionHypothesis hrest hsite
+          exact inductionHypothesis hrest.2 hsite
 
 /-- A whole-stream constant site lies below the compiler-derived operation
 footprint. -/

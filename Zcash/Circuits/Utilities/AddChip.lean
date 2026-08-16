@@ -136,6 +136,23 @@ chip (`add_chip.rs`: `assign_region(|| "c = a + b", …)`). -/
 def addFormal :=
   add.toFormal "c = a + b"
 
+theorem addFormal_configure :
+    addFormal.configure = add.configure :=
+  rfl
+
+@[keygen_norm]
+theorem addFormal_keygenRequirements_fixedColumns
+    (cfg : Config) (hcfg : addFormal.keygenRequirements.configLawful cfg) :
+    addFormal.keygenRequirements.fixedColumns cfg hcfg = [] :=
+  rfl
+
+@[keygen_norm]
+theorem addFormal_configure_fixedColumns
+    (cfg : Config) (counts : ConfigureCounts) :
+    (addFormal.configure cfg).fixedColumns counts = [] := by
+  rw [addFormal_configure]
+  simp [add]
+
 /-- The layouter add's result cell is assigned by its sole region. -/
 theorem addFormal_call_output_cell_assigned (cfg : Config)
     (input : Var Inputs Fp) (self : RegionIndex) :
@@ -171,6 +188,7 @@ def addFormalConfigureCertificate (a b c : Column .advice)
       ((configure a b c).output counts)
       { gates := ((configure a b c).delta counts).gates
         lookups := ((configure a b c).delta counts).lookups
+        fixedColumns := (configure a b c).fixedColumns counts
         permutationColumns := ([a, b] : List AnyColumn) ++
           ((configure a b c).delta counts).permutationRequests } := by
   let cfg := (configure a b c).output counts
@@ -186,6 +204,10 @@ def addFormalConfigureCertificate (a b c : Column .advice)
       ElaboratedRegionCircuit.keygenRequirements, Configure.delta_pure,
       List.append_nil] at hargument
     exact False.elim (List.not_mem_nil hargument)
+  · intro column hcolumn
+    simp only [keygen_norm, add, cfg, configure,
+      FormalRegionCircuit.keygenRequirements,
+      ElaboratedRegionCircuit.keygenRequirements] at hcolumn
   · intro column hcolumn
     simpa only [keygen_norm, add, cfg, configure,
       FormalRegionCircuit.keygenRequirements,

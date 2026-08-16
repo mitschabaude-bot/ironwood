@@ -83,7 +83,7 @@ theorem gate
       | loadTable table values =>
           have hrest := (OperationsKeygenCoherent.loadTable_cons
             cs table values rest).mp hcoherent
-          exact ih hrest henabled
+          exact ih hrest.2 henabled
 
 /-- A coherent region registers every extracted enabled lookup. -/
 theorem region_lookup
@@ -145,7 +145,7 @@ theorem lookup
       | loadTable table values =>
           have hrest := (OperationsKeygenCoherent.loadTable_cons
             cs table values rest).mp hcoherent
-          exact ih hrest henabled
+          exact ih hrest.2 henabled
 
 end OperationsKeygenCoherent
 

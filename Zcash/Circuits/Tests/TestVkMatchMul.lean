@@ -1,4 +1,5 @@
-import Clean.Halo2.Keygen
+import Zcash.Circuits.Fixtures.Project
+import Zcash.Circuits.Fixtures.MulPre
 import Zcash.Circuits.Fixtures.MulPost
 import Zcash.Circuits.Fixtures.MulSelMap
 import Zcash.Circuits.Ecc.Mul
@@ -8,20 +9,23 @@ import Zcash.Circuits.Ecc.Mul
 
 Runs the ported mul configure-chain on the same columns the Rust harness uses
 (`configure_mul` in `halo2_gadgets/src/ecc/chip/dump.rs`), projects the resulting
-`ConstraintSystem` to the `CsFixture` shape, and checks it **equal** to the fixture
-dumped from the actual Rust circuit (`mulPost`, after `compress_selectors`) with the
-REAL packing: the Rust harness circuit (`MulDumpCircuit`) runs one actual mul
-synthesize (witnessed base point × witnessed scalar, `Value::unknown()` — keygen's
-view) through the floor planner at `k = 11` to gather the true per-selector activation
-table; `compress_selectors` on that table packs the 13 selectors into **7 new fixed
-columns** (q_lookup, q_running: own columns, degree-0; q_add and q_mul_overflow: own
-columns, degree budget; the remaining 8 simple selectors: three 3-member combinations).
-The 45 gates (range-check bitshift, complete addition, hi/lo incomplete rounds,
-complete-decompose, overflow, LSB) include the range-check LOOKUP, the first lookup in
-the Halo2-Clean pipeline. Lean applies the dumped map (`mulSelMap`) mechanically via
-`projectCS` — the map's derivation stays Rust-side (trust boundary, see `Project.lean`
-/ `FixtureTypes.lean`), and this equality check validates the applied result
-byte-for-byte.
+`ConstraintSystem` to the ironwood `CsFixture`, and checks it **equal** to the fixtures
+dumped from the actual Rust circuit — BOTH phases:
+
+* `mulPre` — pre-selector-compression (gates carry `.selector`): 45 gates (range-check
+  bitshift, complete addition, hi/lo incomplete rounds, complete-decompose, overflow, LSB),
+  24 advice queries, 2 fixed queries (constants + table), and the range-check LOOKUP (the
+  first lookup in the Halo2-Clean pipeline).
+* `mulPost` — post-`compress_selectors`, with the REAL packing: the Rust harness circuit
+  (`MulDumpCircuit`) runs one actual mul synthesize (witnessed base point × witnessed
+  scalar, `Value::unknown()` — keygen's view) through the floor planner at `k = 11` to
+  gather the true per-selector activation table; `compress_selectors` on that table packs
+  the 13 selectors into **7 new fixed columns** (q_lookup, q_running: own columns, degree-0;
+  q_add and q_mul_overflow: own columns, degree budget; the remaining 8 simple selectors:
+  three 3-member combinations). Lean applies the dumped map (`mulSelMap`) mechanically via
+  `projectCSPostMap` — the map's derivation stays Rust-side (trust boundary, see
+  `Project.lean` / `FixtureTypes.lean`), and this equality check validates the applied
+  result byte-for-byte.
 
 The mul-relevant configure chain (mirroring the subsequence of `EccChip::configure` that
 mul consumes) is, in registration order:
@@ -74,11 +78,16 @@ def mulProgram : Configure Fp Config := do
 def mulCS : ConstraintSystem Fp := (mulProgram {}).2
 
 -- Every gate's/lookup's `queriedCells` registered faithfully (no ill-formed entries);
--- the layout equality below then certifies the recorded order against the Rust dump.
+-- the layout equalities below then certify the recorded order against the Rust dump.
 #guard mulCS.invalidQueriedCells.isEmpty
 
--- The Rust-dumped selector-compression map, applied mechanically to the
--- configure-recorded CS, yields exactly the dumped CS.
-#guard projectCS mulSelMap mulCS == mulPost
+-- Pre-compression: projected CS (query layouts from the configure-recorded queries)
+-- equals the dumped fixture.
+#guard projectCS mulCS == mulPre
+
+-- Post-compression: the Rust-dumped selector-compression map, applied mechanically,
+-- yields exactly the dumped post-compression CS (packed columns' fixed queries appended
+-- to the recorded layout in packing order).
+#guard projectCSPostMap mulSelMap mulCS == mulPost
 
 end Zcash.Circuits.Fixtures.Test

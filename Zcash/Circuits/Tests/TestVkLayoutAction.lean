@@ -23,7 +23,7 @@ the dumped window tables, and every other child called through its bundle.
 
 namespace Zcash.Circuits.Fixtures.Test.LayoutAction
 
-open Halo2 Fixtures Fixtures.Layout Halo2.Layout
+open Halo2 Fixtures Fixtures.Layout
 open Specs.Sinsemilla (Generators)
 open Action.Circuit (Config configure orchardGate loadPrivate
   ANCHOR ENABLE_SPEND ENABLE_OUTPUT CV_NET_X CV_NET_Y NF_OLD RK_X RK_Y CMX)
@@ -71,11 +71,12 @@ def aProgramBase : Circuit Fp Unit := do
 /-! ## The reconstructed layout products vs the ported Action stack (ironwood)
 
 All checks live in ONE `#eval` so the shared reconstruction (ops → regions → copy list →
-σ → fixed) evaluates exactly once; the fixture is loaded by name through its SHA-256 pin
-(see `Fixtures/Json.lean`). Split into per-product checks temporarily when debugging a
-mismatch. -/
+σ → fixed) evaluates exactly once; the fixture is loaded from `actionLayout.json`
+(pinned content hash — see `Fixtures/Json.lean`). Split into per-product checks
+temporarily when debugging a mismatch. -/
 #eval show IO Unit from do
-  let fx ← Json.loadLayoutFixture "actionLayout.json"
+  let fx ← Json.loadLayoutFixture "Clean/Ironwood/Fixtures/actionLayout.json"
+    0x51cd2f7ce66a8c7
   let ops : Operations Fp := aProgram.operations
   let regions : List (ℕ × RegionOperations Fp) := (indexedRegions ops 0).1
   -- Region starts from the fixture placements (the single `generator_table` slot is the
@@ -93,6 +94,10 @@ mismatch. -/
         ++ constantsFixed fx.constants
         ++ selectorFixed actionSelMap (activations starts regions)
         ++ regionAssignFixed (ZMod.val : Fp → ℕ) starts regions))
+  let compiledFixed : List (ℕ × ℕ × ℕ) :=
+    (Halo2.Layout.compileFixed usable actionSelMap
+      (Action.Circuit.configure aG {}).2 ops).map
+        fun (column, row, value) => (column, row, ZMod.val value)
   Json.runChecks [
     -- keygen `Assembly` σ replay from the fixture's OWN ordered copy list
     ("σ replay from fixture copyList",
@@ -107,6 +112,9 @@ mismatch. -/
     -- the keygen permutation σ
     ("σ", decide (sigma = fx.sigma)),
     -- the full fixed contents
-    ("fixed contents", decide (fixed = sortFixed fx.fixed))]
+    ("fixed contents", decide (fixed = sortFixed fx.fixed)),
+    -- the field-valued semantic compiler matches the same V1 keygen layout
+    ("field-valued fixed compiler",
+      decide (compiledFixed = sortFixed fx.fixed))]
 
 end Zcash.Circuits.Fixtures.Test.LayoutAction

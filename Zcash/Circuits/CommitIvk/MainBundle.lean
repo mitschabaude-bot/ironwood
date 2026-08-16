@@ -5,7 +5,7 @@ import Zcash.Circuits.CommitIvk.Main
 
 Kept separate from `Main.lean` (the defs/contract layer): this file is the
 kernel-heavy part — the fully proven soundness/completeness theorems and the
-bundled `circuit`. Mirrors `Zcash/Circuits/NoteCommit/MainBundle.lean` at a third
+bundled `circuit`. Mirrors `Clean/Ironwood/NoteCommit/MainBundle.lean` at a third
 of the scale (10 children, one canonicity composite called as a unit).
 -/
 
@@ -764,6 +764,11 @@ def configurationCertificate (G : Generators) (R : FixedBase)
       rw [hrange]
       exact rangeLookup
     · exact commit.lookups_of_configured required hcommit
+  · intro required hrequired
+    simp only [circuit, FormalCircuit.keygenRequirements,
+      elaborated, keygenRequirements, Configure.fixedColumns_pure,
+      List.append_nil] at hrequired
+    exact commit.fixedColumns_of_configured required hrequired
   · intro required hrequired
     simp only [circuit, FormalCircuit.keygenRequirements,
       elaborated, keygenRequirements, Configure.delta_pure,

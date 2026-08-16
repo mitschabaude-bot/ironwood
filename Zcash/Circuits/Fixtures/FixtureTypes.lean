@@ -1,47 +1,45 @@
 import Zcash.Circuits.Ecc.Basic
-import Zcash.Common.Expr
 import Clean.Halo2.Keygen
-import Clean.Halo2.Keygen.Layout
 
 /-!
 # VK-matching fixture types
 
 The record shapes for comparing a Halo2-Clean `ConstraintSystem` projection against a
-fixture dumped from the actual Rust circuit. The symbolic CS shapes — `CsFixture`,
-`LookupFixture`, `SelCompress`, `SelCompressMap` — are now the Clean-core pinned types
-(`Clean.Halo2.Keygen`), re-exported here as `Fp`-specialised abbreviations so the fixture
-data literals (`AddPost.lean`, `MulPost.lean`, the `actionPost.json` codec) and the layout
-tests keep addressing them unqualified. Gate polynomials are the pinned AST
-`Halo2.RichExpression Fp`; the verifier's own `Zcash.Snark.Expr` coincides on the shared
-constructors and converts at the VK boundary (`Zcash/Common/ExprRich.lean`).
+fixture dumped from the actual Rust circuit. The gate-polynomial AST (`Expr`), the
+selector-compression datum/map (`SelCompress`/`SelCompressMap`) and the projected record
+shapes (`CsFixture`/`LookupFixture`) now live in Clean core
+(`Clean.Halo2.Keygen`); this module re-exports them specialised to `Fp` so the
+auto-generated fixture data files keep compiling unchanged, and adds the phase-2 layout
+fixture shapes (which stay fixture-side).
 
 The dumper (`halo2_proofs::plonk::dump_lean`) emits `CsFixture` literals into
-`AddPost.lean` in this namespace.
+`AddPre.lean` / `AddPost.lean` in this namespace.
 -/
 
 namespace Zcash.Circuits.Fixtures
+
+/-- The pinned gate-polynomial AST (core `Halo2.RichExpression`), index-based:
+`fixed`/`advice`/`instance` carry a **query index**, not a `(column, rotation)`; a
+pre-compression `selector` node carries a selector index. This is the erasure target of
+`Halo2.Expression F Query`. -/
+abbrev Expr := Halo2.RichExpression
+
+/-- One selector's compression datum (core `Halo2.SelCompress`). -/
+abbrev SelCompress := Halo2.SelCompress
+
+/-- The whole selector-compression map (core `Halo2.SelCompressMap`). -/
+abbrev SelCompressMap := Halo2.SelCompressMap
+
+/-- One projected lookup argument (core `Halo2.LookupFixture`), specialised to `Fp`. -/
+abbrev LookupFixture := Halo2.LookupFixture Fp
+
+/-- The projected constraint-system data (core `Halo2.CsFixture`), specialised to `Fp`. -/
+abbrev CsFixture := Halo2.CsFixture Fp
 
 /-- Build an `Fp` from four little-endian u64 limbs, matching the ironwood fixture's `mkFp`
 and the Rust dumper's `to_repr()` limb encoding. -/
 def mkFp (a b c d : ℕ) : Fp :=
   (a : Fp) + (b : Fp) * (2 : Fp) ^ 64 + (c : Fp) * (2 : Fp) ^ 128 + (d : Fp) * (2 : Fp) ^ 192
-
-/-- One projected lookup argument (the pinned `(lookupInputExprs, lookupTableExprs)`
-per-lookup shape). Both sides are index-based `RichExpression`s. -/
-abbrev LookupFixture := Halo2.LookupFixture Fp
-
-/-- The constraint-system data a Halo2-Clean projection must reproduce (the pinned/verifier
-CS-field shape), specialised to a single circuit's dump. Gate polynomials are the pinned
-`Halo2.RichExpression Fp`. -/
-abbrev CsFixture := Halo2.CsFixture Fp
-
-/-- One selector's compression datum from `compress_selectors`: packed fixed-column index,
-combination length, and this selector's assigned root. -/
-abbrev SelCompress := Halo2.SelCompress
-
-/-- The whole selector-compression map: the new packed-column count and per selector its
-`SelCompress`. -/
-abbrev SelCompressMap := Halo2.SelCompressMap
 
 /-! ## Phase 2: layout fixtures (permutation σ + fixed values + region placements)
 
@@ -52,9 +50,14 @@ The `CsFixture` above captures the *symbolic* constraint system. `LayoutFixture`
 `ℕ` literals — canonical Pallas-base representatives (the same `to_repr()` integer `mkFp`
 decodes, but decimal, so no field arithmetic is forced during elaboration). -/
 
-/-- A permutation-argument column reference, in `cs.permutation.get_columns()` order —
-upstreamed to Clean (`Halo2.Layout.ColRef`); re-exposed here for the fixture records. -/
-abbrev ColRef := Halo2.Layout.ColRef
+/-- A permutation-argument column reference, in `cs.permutation.get_columns()` order.
+Matches the ironwood `permutationChunks` `ColumnRef` spelling (`.advice`/`.fixed`/`.instance`
+with a per-type column index). -/
+inductive ColRef where
+  | advice : ℕ → ColRef
+  | fixed : ℕ → ColRef
+  | instance : ℕ → ColRef
+deriving DecidableEq, Repr
 
 /-- One floor-planner region placement: creation-order `index`, region `name`, and `start`
 row. `start` is the minimum absolute row the region touches, which equals the

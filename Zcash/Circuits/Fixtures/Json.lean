@@ -1,37 +1,22 @@
 import Lean.Data.Json
+import Lean.Util.Path
 import Zcash.Circuits.Fixtures.FixtureTypes
-import Zcash.Circuits.Fixtures.Stamp
 
 /-!
-# JSON codecs and the loader for VK fixtures
+# JSON codecs and the checked loader for VK fixtures
 
 The large generated fixtures (the whole-circuit Action CS and layout dumps) are stored
 as `.json` DATA files, not Lean literals: elaborating a ~1 MB fixture as a Lean term
 costs ~40 s and gigabytes of RSS, while `Json.parse` + decode of the same data runs in
 ~150 ms at `#eval` time. The consuming test loads the file inside its `#eval` check, so
-a parse failure (or a failed load) is a build failure exactly as with `#guard`.
+a mismatch (or a failed load) is a build failure exactly as with `#guard`.
 
-**Integrity**: two independent guards, neither of which recomputes a hash inside Lean (no
-fast SHA-256 exists in the toolchain, and a hand-rolled one is not worth maintaining):
-
-* *Semantic* — the `CircuitCheck` `#eval`s reconstruct the Lean CS/layout and assert it
-  equals the parsed fixture (`TestVk*`), so a fixture that drifts from the Lean circuit
-  model fails the build.
-* *Content* — every fixture's SHA-256 is pinned in `Zcash/Circuits/Fixtures/SHA256SUMS`
-  and enforced by the `Fixtures/*.json` guard in `.github/workflows/lean.yml`
-  (`sha256sum -c`, the OS tool). SHA-256 (rather than a non-cryptographic checksum) means
-  the pin also resists a *crafted* swap, not just accidental drift. The loaders resolve a
-  fixture by name through the pins (`pinnedPath`), so an unpinned file cannot be read.
-
-**Rebuild tracking**: Lake tracks a module's imports, not the `.json` files a `#eval` reads,
-so a regenerated fixture on its own leaves the semantic check cached and unrun locally.
-`Stamp.lean` — the pins as Lean data, generated from `SHA256SUMS` by `stamp.sh` — puts the
-fixture content in the import graph. Refreshing a fixture obliges refreshing `SHA256SUMS`,
-and the stamp with it (CI diffs the two), which is a source change Lake follows: the tests
-below re-elaborate and their checks re-run. Regenerate both from this directory, listing the
-files in the committed order (the stamp follows it):
-
-    sha256sum <files> > SHA256SUMS && ./stamp.sh > Stamp.lean
+**Dependency tracking / integrity**: Lake does not know a `.lean` file reads a `.json`,
+so each consuming test pins the fixture's FNV-1a-64 content hash as a literal
+(`loadJsonChecked path expectedHash`). Regenerating a fixture changes the hash, the
+loader fails with the actual hash in the message, and updating the pinned literal is
+what makes Lake rebuild the test. The committed Lean source therefore still pins the
+exact fixture content, as it did when the data was a term.
 
 Small fixtures (the Add/Mul doc-test pairs, the SelMaps) stay as readable Lean
 literals; only the whole-circuit Action dumps use this path.
@@ -41,25 +26,49 @@ namespace Zcash.Circuits.Fixtures.Json
 
 open Lean (Json JsonNumber)
 open Fixtures
-open Halo2 (RichExpression)
 
-/-- The fixture directory, relative to the repository root — where `lake` runs, and so the
-working directory of an elaborating `#eval`. -/
-def fixtureDir : System.FilePath := "Zcash/Circuits/Fixtures"
+/-! ## Content hash (FNV-1a 64) -/
 
-/-- The path of a content-pinned fixture, by file name. A name the stamp does not list is
-an `IO` error, so a test cannot consume a fixture that `SHA256SUMS` leaves unpinned. -/
-def pinnedPath (file : String) : IO System.FilePath := do
-  unless Stamp.entries.any (fun e => e.1 == file) do
-    throw <| IO.userError
-      s!"fixture {file} is not pinned in {fixtureDir}/SHA256SUMS (see PROVENANCE.md)"
-  return fixtureDir / file
+def fnv1a (bytes : ByteArray) : UInt64 :=
+  bytes.foldl (fun h b => (h ^^^ b.toUInt64) * 0x100000001b3) 0xcbf29ce484222325
 
-/-- Read a JSON fixture and parse it. A missing file or parse error is an `IO` error → a
-build failure at the consuming `#eval`. Content integrity is enforced out of band (see the
-module header): the SHA-256 pin in `SHA256SUMS` + the `CircuitCheck` reconstruction. -/
-def loadJson (path : System.FilePath) : IO Json := do
+/-- Read a JSON fixture, check its content hash, parse. Any failure (missing file, hash
+drift after regeneration, parse error) is an `IO` error → a build failure at the
+consuming `#eval`. -/
+def hex (u : UInt64) : String := String.ofList (Nat.toDigits 16 u.toNat)
+
+private def packageSourceRoot : IO System.FilePath := do
+  let searchPath ← Lean.searchPathRef.get
+  let relativeOLean := System.FilePath.mk "Clean/Ironwood/Fixtures/Json.olean"
+  let some oleanRoot ← searchPath.findM? fun root =>
+      (root / relativeOLean).pathExists
+    | throw <| IO.userError "could not locate the Clean package in LEAN_PATH"
+  let some libDir := oleanRoot.parent
+    | throw <| IO.userError s!"unexpected Clean build path: {oleanRoot}"
+  let some buildDir := libDir.parent
+    | throw <| IO.userError s!"unexpected Clean build path: {oleanRoot}"
+  let some lakeDir := buildDir.parent
+    | throw <| IO.userError s!"unexpected Clean build path: {oleanRoot}"
+  let some packageRoot := lakeDir.parent
+    | throw <| IO.userError s!"unexpected Clean build path: {oleanRoot}"
+  pure packageRoot
+
+private def resolveSourcePath (path : System.FilePath) : IO System.FilePath := do
+  if ← path.pathExists then
+    return path
+  let candidate := (← packageSourceRoot) / path
+  unless ← candidate.pathExists do
+    throw <| IO.userError s!"fixture not found at {path} or {candidate}"
+  pure candidate
+
+def loadJsonChecked (path : System.FilePath) (expectedHash : UInt64) : IO Json := do
+  let path ← resolveSourcePath path
   let bytes ← IO.FS.readBinFile path
+  let h := fnv1a bytes
+  unless h == expectedHash do
+    throw <| IO.userError
+      s!"fixture {path}: content hash 0x{hex h} ≠ pinned 0x{hex expectedHash}. \
+        If you regenerated the fixture, update the pinned hash in the consuming test."
   IO.ofExcept (Json.parse (String.fromUTF8! bytes) |>.mapError IO.userError)
 
 /-! ## Primitive codecs
@@ -130,11 +139,9 @@ def getQuad (j : Json) : Except String (ℕ × ℕ × ℕ × ℕ) := do
   | #[a, b, c, d] => pure (← getNat a, ← getNat b, ← getNat c, ← getNat d)
   | _ => .error "expected [nat, nat, nat, nat]"
 
-/-! ## Gate-polynomial `RichExpression` (tagged arrays)
+/-! ## Gate-polynomial `Expr` (tagged arrays) -/
 
-The dumped gates are post-compression, hence selector-free, so no `selector` tag occurs. -/
-
-def jExpr : RichExpression Fp → Json
+def jExpr : Expr Fp → Json
   | .constant c => Json.arr #["c", jFp c]
   | .fixed i => Json.arr #["f", jNat i]
   | .advice i => Json.arr #["a", jNat i]
@@ -143,9 +150,9 @@ def jExpr : RichExpression Fp → Json
   | .sum a b => Json.arr #["+", jExpr a, jExpr b]
   | .product a b => Json.arr #["*", jExpr a, jExpr b]
   | .scaled e c => Json.arr #["s", jExpr e, jFp c]
-  | .selector i => Json.arr #["sel", jNat i]
+  | .selector i => Json.arr #["q", jNat i]
 
-partial def getExpr (j : Json) : Except String (RichExpression Fp) := do
+partial def getExpr (j : Json) : Except String (Expr Fp) := do
   match ← getArr j with
   | #[.str "c", c] => pure (.constant (← getFp c))
   | #[.str "f", i] => pure (.fixed (← getNat i))
@@ -155,7 +162,8 @@ partial def getExpr (j : Json) : Except String (RichExpression Fp) := do
   | #[.str "+", a, b] => pure (.sum (← getExpr a) (← getExpr b))
   | #[.str "*", a, b] => pure (.product (← getExpr a) (← getExpr b))
   | #[.str "s", e, c] => pure (.scaled (← getExpr e) (← getFp c))
-  | _ => .error s!"unknown RichExpression node {j.compress}"
+  | #[.str "q", i] => pure (.selector (← getNat i))
+  | _ => .error s!"unknown Expr node {j.compress}"
 
 /-! ## `CsFixture` -/
 
@@ -231,17 +239,13 @@ def getLayoutFixture (j : Json) : Except String LayoutFixture := do
     constants := ← decodeList (← field j "constants") getTriple,
     fixed := ← decodeList (← field j "fixed") getTriple }
 
-/-! ## Checked loaders
+/-! ## Checked loaders -/
 
-Both take a fixture's file name and resolve it through `pinnedPath`, so the only fixtures
-a test can read are the ones `SHA256SUMS` pins.
--/
+def loadCsFixture (path : System.FilePath) (expectedHash : UInt64) : IO CsFixture := do
+  IO.ofExcept ((getCsFixture (← loadJsonChecked path expectedHash)).mapError IO.userError)
 
-def loadCsFixture (file : String) : IO CsFixture := do
-  IO.ofExcept ((getCsFixture (← loadJson (← pinnedPath file))).mapError IO.userError)
-
-def loadLayoutFixture (file : String) : IO LayoutFixture := do
-  IO.ofExcept ((getLayoutFixture (← loadJson (← pinnedPath file))).mapError IO.userError)
+def loadLayoutFixture (path : System.FilePath) (expectedHash : UInt64) : IO LayoutFixture := do
+  IO.ofExcept ((getLayoutFixture (← loadJsonChecked path expectedHash)).mapError IO.userError)
 
 /-- `#eval`-check helper: named boolean checks, first failure reported. -/
 def runChecks (checks : List (String × Bool)) : IO Unit := do
