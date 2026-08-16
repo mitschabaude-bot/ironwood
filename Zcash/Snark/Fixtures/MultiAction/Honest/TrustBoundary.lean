@@ -438,7 +438,6 @@ assert_axioms Zcash.Snark.Fixture.schedule_of_derived +native(
   Zcash.Circuits.Ecc.MulFixed.Short.windowScalar_ne_zero)
 assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_prob_le_captured +native(
   CompElliptic.Fields.Pasta.pallasBase,
-  Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.Fixture.vk_chunk_width_le,
   Zcash.Snark.Fixture.vk_gates_degree_le,
   Zcash.Snark.Fixture.vk_lookup_input_degree_le,
@@ -457,7 +456,6 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_prob_le_ca
 -- Orchard maximum rather than the captured one.
 assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_prob_le_captured_for +native(
   CompElliptic.Fields.Pasta.pallasBase,
-  Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.Fixture.vk_chunk_width_le,
   Zcash.Snark.Fixture.vk_gates_degree_le, Zcash.Snark.Fixture.vk_lookup_input_degree_le,
   Zcash.Snark.Fixture.vk_lookup_table_degree_le, Zcash.Snark.Keygen.certificate,
@@ -472,7 +470,6 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_prob_le_ca
   Zcash.Circuits.Ecc.MulFixed.Short.windowScalar_ne_zero)
 assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_prob_le_sequential +native(
   CompElliptic.Fields.Pasta.pallasBase,
-  Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.Fixture.vk_chunk_width_le,
   Zcash.Snark.Fixture.vk_gates_degree_le,
   Zcash.Snark.Fixture.vk_lookup_input_degree_le,
@@ -493,7 +490,6 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_prob_le_se
 -- Its consensus-generic form.
 assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_prob_le_sequential_for +native(
   CompElliptic.Fields.Pasta.pallasBase,
-  Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.Fixture.actionLookupActivationCount_le,
   Zcash.Snark.Fixture.actionLookupInputArity_le,
   Zcash.Snark.Fixture.resolverPermutationCell_card_eq, Zcash.Snark.Fixture.vk_chunk_width_le,
@@ -511,7 +507,6 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_prob_le_se
 -- Consensus-generic endpoints with concrete resources and transcript bias.
 assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_2pow123_workFactor_generatorRO_for +native(
   CompElliptic.Fields.Pasta.pallasBase,
-  Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.Fixture.actionLookupActivationCount_le,
   Zcash.Snark.Fixture.actionLookupInputArity_le,
   Zcash.Snark.Fixture.resolverPermutationCell_card_eq,
@@ -532,7 +527,6 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_2pow123_wo
 -- The single-multiplicity form of the same work-factor endpoint.
 assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_2pow123_workFactor_generatorRO +native(
   CompElliptic.Fields.Pasta.pallasBase,
-  Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.Fixture.actionLookupActivationCount_le,
   Zcash.Snark.Fixture.actionLookupInputArity_le,
   Zcash.Snark.Fixture.resolverPermutationCell_card_eq, Zcash.Snark.Fixture.vk_chunk_width_le,
@@ -549,7 +543,6 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_2pow123_wo
   Zcash.Circuits.Ecc.MulFixed.Short.windowScalar_ne_zero)
 assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_adaptive_2pow123_workFactor_generatorRO_for +native(
   CompElliptic.Fields.Pasta.pallasBase,
-  Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.Fixture.actionLookupActivationCount_le,
   Zcash.Snark.Fixture.actionLookupInputArity_le,
   Zcash.Snark.Fixture.resolverPermutationCell_card_eq,
@@ -567,7 +560,6 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_adaptive_2
   Zcash.Circuits.Ecc.MulFixed.Short.windowScalar_ne_zero)
 assert_axioms Zcash.Snark.Fixture.orchard_action_knowledgeFailure_adaptive_2pow123_workFactor_generatorRO_for +native(
   CompElliptic.Fields.Pasta.pallasBase,
-  Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.Fixture.actionLookupActivationCount_le,
   Zcash.Snark.Fixture.actionLookupInputArity_le,
   Zcash.Snark.Fixture.resolverPermutationCell_card_eq,
@@ -586,7 +578,6 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_knowledgeFailure_adaptive_2pow1
 -- The unpriced-resource form of the adaptive knowledge-failure bound.
 assert_axioms Zcash.Snark.Fixture.orchard_action_knowledgeFailure_prob_le_adaptive_for +native(
   CompElliptic.Fields.Pasta.pallasBase,
-  Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.Fixture.actionLookupActivationCount_le,
   Zcash.Snark.Fixture.actionLookupInputArity_le,
   Zcash.Snark.Fixture.resolverPermutationCell_card_eq, Zcash.Snark.Fixture.vk_chunk_width_le,
@@ -604,7 +595,6 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_knowledgeFailure_prob_le_adapti
 -- Census the public single-Action compatibility endpoints.
 assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_prob_le_adaptive +native(
   CompElliptic.Fields.Pasta.pallasBase,
-  Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.Fixture.actionLookupActivationCount_le,
   Zcash.Snark.Fixture.actionLookupInputArity_le,
   Zcash.Snark.Fixture.resolverPermutationCell_card_eq,
@@ -623,7 +613,6 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_prob_le_ad
 -- Its consensus-generic form.
 assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_prob_le_adaptive_for +native(
   CompElliptic.Fields.Pasta.pallasBase,
-  Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.Fixture.actionLookupActivationCount_le,
   Zcash.Snark.Fixture.actionLookupInputArity_le,
   Zcash.Snark.Fixture.resolverPermutationCell_card_eq, Zcash.Snark.Fixture.vk_chunk_width_le,
@@ -640,7 +629,6 @@ assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_prob_le_ad
   Zcash.Circuits.Ecc.MulFixed.Short.windowScalar_ne_zero)
 assert_axioms Zcash.Snark.Fixture.orchard_action_acceptFalseStatement_adaptive_2pow123_workFactor_generatorRO +native(
   CompElliptic.Fields.Pasta.pallasBase,
-  Zcash.Snark.ActionFixedCoherence.realizationFailures_eq_nil,
   Zcash.Snark.Fixture.actionLookupActivationCount_le,
   Zcash.Snark.Fixture.actionLookupInputArity_le,
   Zcash.Snark.Fixture.resolverPermutationCell_card_eq,

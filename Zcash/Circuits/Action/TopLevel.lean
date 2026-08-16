@@ -11,6 +11,10 @@ namespace Zcash.Circuits.Action
 open Halo2
 open Circuit
 
+/-- The closed configure output used by the Action top-level circuit. -/
+def actionConfig : Config :=
+  (configure Specs.Sinsemilla.orchardGenerators {}).1
+
 theorem initialGeneratorTableIdx_mem
     (cfg : Config) (i : RegionIndex) :
     Operation.loadTable cfg.sinsemilla1.generatorTable.tableIdx
@@ -217,6 +221,15 @@ deliberately not a simp lemma. -/
 theorem Internal.actionCircuit_eq_impl :
     actionCircuit = Internal.actionCircuitImpl :=
   actionCircuitPacked.property
+
+/-- Action's reduced lookup-selector anchor equations are exactly those of its
+top-level range-check configuration. -/
+theorem actionCircuit_lookupSelectorAnchorRequirements_eq :
+    actionCircuit.lookupSelectorAnchorRequirements =
+      LookupRangeCheck.lookupSelectorAnchorRequirements
+        actionConfig.lookupConfig := by
+  rw [Internal.actionCircuit_eq_impl]
+  rfl
 
 /-- Action's configured primary column witnesses that its permutation family is
 nonempty. -/

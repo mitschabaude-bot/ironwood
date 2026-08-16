@@ -102,7 +102,7 @@ and should normally be discharged by default tactics and compositional theorems.
 | # | Current computation | Class | Structural replacement | Expected difficulty |
 |---:|---|:---:|---|---|
 | 1 | `queryCoverageFailures_eq_nil` | L | Gate and lookup query-support laws, plus generic registration/projection theorems. The current diagnostic checks both that every allocated fixed column is queried and that every queried column is allocated; replace both directions structurally, while narrowing coverage to semantically consumed columns. | Medium |
-| 2 | `realizationFailures_eq_nil` | L | Region-local fixed-write consistency, table-load consistency, constant-allocation consistency, and selector-packing consistency; compose them using V1 shared-column non-overlap. | Hard |
+| 2 | `realizationFailures_eq_nil` (eliminated) | L | Keygen lawfulness makes the raw fixed stream collision-safe and generically realized after deduplication/scattering. Lookup selector leaves compile to singleton columns; the physical-anchor law and V1 shared-column separation prove disabled leaves remain zero. | Done |
 | 3 | `actionNumPermCols_pos` (eliminated as a certificate) | G | Action's configured primary column witnesses nonemptiness; no exact column-count computation is needed. | Done |
 | 4 | `actionCopyColumnBounds` (eliminated as a certificate) | G | Generic operation-stream traversal shows that both endpoints use registered permutation columns; finite-index bounds follow from membership. | Done |
 | 5 | `actionCopyActiveRowFailures_eq_nil` (eliminated) | G | `usedRows` includes operation copy endpoints and V1 deferred-constant allocations; structural traversal of the V1 copy stream transfers those bounds to every decoded copy. | Done |
@@ -236,7 +236,7 @@ shared concrete-circuit evaluation, and proof checking are included.
 | Primary-instance registration | `ActionInstanceCommitmentCompute.lean` | 4 s | 3.8 GB |
 | Permutation column count | `ActionPermutationDomainCompute.lean` | 3 s | not remeasured |
 | Copy bounds, addresses, constants | `ActionCopyWitness.lean` | 30–40 s | 7.7 GB |
-| Fixed realization | `ActionFixedCoherenceCompute.lean` | 30 s | 7.0 GB |
+| Fixed realization | Eliminated | — | — |
 
 The serial total was roughly 2 minutes 40 seconds. These numbers should guide
 iteration priorities, not be treated as stable benchmarks: several facts share one

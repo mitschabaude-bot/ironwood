@@ -1270,8 +1270,8 @@ def actionConstantEndpointRead_or_bad
       have hrequired :
           (entry.2.1, entry.2.2, (entry.1 : Fp)) ∈
             topLevelRequiredFixedEntries actionCircuit := by
-        exact List.mem_append_left _ <|
-          mem_topLevelCompilerFixedEntries_of_constant actionCircuit hconstantEntry
+        exact mem_topLevelCompilerFixedEntries_of_constant
+          actionCircuit hconstantEntry
       refine bindOrRelationWitness (fixedRead hrequired) fun hread => ?_
       have haddress := actionEncodedAddress_eq hendpoint
       rw [actionCopyValue_eq_encodedAddress, haddress,
@@ -1489,8 +1489,8 @@ def actionConstantCopyValue_or_bad
   have hrequired :
       (entry.2.1, entry.2.2, (entry.1 : Fp)) ∈
         topLevelRequiredFixedEntries actionCircuit := by
-    exact List.mem_append_left _ <|
-      mem_topLevelCompilerFixedEntries_of_constant actionCircuit hconstantEntry
+    exact mem_topLevelCompilerFixedEntries_of_constant
+      actionCircuit hconstantEntry
   have hendpoint :
       CopyEndpoint.constant value ∈ actionDeclaredEndpoints :=
     (mem_actionDeclaredEndpoints hcopy).2

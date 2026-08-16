@@ -216,47 +216,6 @@ def topLevelSelectorEntries
     List (Layout.FixedAssignment Fp) :=
   Layout.selectorAssignments top.selectorMap top.selectorActivations
 
-/--
-Expected dense cells for lookup-relevant selectors that the selector compiler packed
-alone at root one. Enabled leaves read one; disabled leaves read zero.
-
-A missing or non-singleton map entry emits an out-of-bounds sentinel, so realization
-of this interim list also rules those malformed cases out. This encoding relies on
-the strict `column < numFixedColumns` check in `interimFixedRealizationFailures`;
-widening or removing that bound would silently turn malformed selector mappings into
-accepted zero entries. The structural replacement derives singleton ownership and
-disabled-row zero from compiler invariants instead.
--/
-def topLevelSingletonLookupSelectorEntries
-    (top : TopLevelCircuit Fp Config PublicInput) :
-    List (Layout.FixedAssignment Fp) :=
-  let operations := top.operations
-  let selectorMap := top.selectorMap
-  let starts := top.regionStarts
-  (operationEnabledLookups operations 0).flatMap fun lookup =>
-    lookup.inputSelectorLeaves.filterMap fun selector =>
-      match selectorMap.lookup selector.index with
-      | some compressed =>
-          if compressed.combinationLen = 1 ∧
-              compressed.assignedRoot = 1 then
-            some
-              (compressed.packedCol,
-                starts.getD lookup.region 0 + lookup.row,
-                if lookup.enabled.any
-                    (fun candidate =>
-                      candidate.index == selector.index) then
-                  (1 : Fp)
-                else
-                  (0 : Fp))
-          else
-            some
-              (top.fixedColumnCount,
-                starts.getD lookup.region 0 + lookup.row, 0)
-      | none =>
-          some
-            (top.fixedColumnCount,
-              starts.getD lookup.region 0 + lookup.row, 0)
-
 /-- Fixed cells allocated for `constrainConstant` values by the V1 floor planner. -/
 def topLevelConstantEntries
     (top : TopLevelCircuit Fp Config PublicInput) :
@@ -299,16 +258,11 @@ theorem mem_topLevelCompilerFixedEntries_of_selector
   simpa only [topLevelSelectorEntries, topLevelCompilerFixedEntries,
     Layout.rawAssignments, List.mem_append] using Or.inl (Or.inr hassignment)
 
-/--
-Every fixed cell whose value is consumed by the semantic bridge: emitted table,
-region, constant, and selector assignments, plus the interim exact cells needed by
-lookup-selector projection.
--/
+/-- Every compiler-emitted fixed cell consumed by the semantic bridge. -/
 def topLevelRequiredFixedEntries
     (top : TopLevelCircuit Fp Config PublicInput) :
     List (Layout.FixedAssignment Fp) :=
-  topLevelCompilerFixedEntries top ++
-    topLevelSingletonLookupSelectorEntries top
+  topLevelCompilerFixedEntries top
 
 /-- Compiler-emitted fixed assignments are generically in bounds and realized by the
 top-level circuit's canonical dense fixed rows. -/
@@ -324,75 +278,23 @@ theorem topLevelCompilerFixedEntry_realized
   exact ⟨hbounds.2, hbounds.1,
     top.fixedRows_getD_getD_eq_of_mem_raw assignment hassignment⟩
 
-/--
-**INTERIM full-circuit fallback.** Required fixed/table/selector writes whose
-final dense keygen cell does not have the required bounds and value.
-
-The intended replacement follows the compiler pipeline:
-
-* V1 placement proves that different regions never overlap in cells;
-* region-local fixed writes are checked or proved within their small region;
-* table layout, constant allocation, and selector packing expose their own
-  collision and composition laws;
-* generic last-write/dedup/scatter theorems assemble those local facts.
-
-This diagnostic is deliberately named `interim` so a successful whole-circuit
-`native_decide` certificate cannot silently become the permanent architecture.
--/
-def interimFixedRealizationFailures
-    (top : TopLevelCircuit Fp Config PublicInput) :
-    List (Layout.FixedAssignment Fp) :=
-  let n := top.n
-  let numFixedColumns := top.fixedColumnCount
-  let rows := top.fixedRows
-  let required := topLevelRequiredFixedEntries top
-  required.filter fun entry =>
-    decide (¬ (
-      entry.2.1 < n ∧
-      entry.1 < numFixedColumns ∧
-      (rows.getD entry.1 []).getD entry.2.1 0 =
-        entry.2.2))
-
-/--
-An empty interim realization diagnostic proves the exact sparse-to-dense fact
-used by `TopLevelFixedCoherence`.
--/
-theorem fixedRowsRealize_of_interimFailures_eq_nil
+/-- Every required fixed entry is realized by the canonical dense compiler output. -/
+theorem topLevelRequiredFixedEntry_realized
     (top : TopLevelCircuit Fp Config PublicInput)
-    (hfail : interimFixedRealizationFailures top = []) :
-    ∀ column row value,
-      (column, row, value) ∈
-          topLevelRequiredFixedEntries top →
-        row < top.n ∧
-          column < top.fixedColumnCount ∧
-          (top.fixedRows.getD column []).getD row 0 =
-            value := by
-  intro column row value hentry
-  let property : Prop :=
-    row < top.n ∧
-      column < top.fixedColumnCount ∧
-      (top.fixedRows.getD column []).getD row 0 = value
-  have hnotFailure :
-      (column, row, value) ∉ interimFixedRealizationFailures top := by
-    rw [hfail]
-    simp
-  have hnotnot : ¬ ¬ property := by
-    intro hnot
-    apply hnotFailure
-    rw [interimFixedRealizationFailures, List.mem_filter]
-    refine ⟨hentry, ?_⟩
-    change decide (¬ property) = true
-    exact decide_eq_true hnot
-  exact Classical.not_not.mp hnotnot
+    (assignment : Layout.FixedAssignment Fp)
+    (hassignment : assignment ∈ topLevelRequiredFixedEntries top) :
+    assignment.2.1 < top.n ∧
+      assignment.1 < top.fixedColumnCount ∧
+      (top.fixedRows.getD assignment.1 []).getD assignment.2.1 0 =
+        assignment.2.2 :=
+  topLevelCompilerFixedEntry_realized top assignment hassignment
 
 /--
 The fixed-row part of a top-level circuit's keygen boundary.
 
 This record contains no proof-dependent data. Its rows and commitments are shared by
-every proof in a bundle. Query coverage and bounds follow from the top-level circuit's
-configure law. `realizes` is the layout compiler's
-sparse-to-dense correctness statement for exactly the entries consumed by Clean
-fixed/table semantics and selector activation.
+every proof in a bundle. Fixed-row realization, query coverage, and bounds follow
+generically from the top-level compiler.
 -/
 structure TopLevelFixedCoherence
     {Config : Type} {PublicInput : TypeMap}
@@ -405,12 +307,6 @@ structure TopLevelFixedCoherence
     column < top.fixedColumnCount →
       (top.fixedCommitments urs).getD column 0 =
         key.commitInstance (top.fixedRows.getD column []) 1
-  realizes : ∀ column row value,
-    (column, row, value) ∈
-        topLevelRequiredFixedEntries top →
-        row < top.n ∧
-        column < top.fixedColumnCount ∧
-        (top.fixedRows.getD column []).getD row 0 = value
 
 namespace TopLevelFixedCoherence
 
@@ -460,9 +356,8 @@ theorem fixedCommitment_eq_commitInstance
 /--
 Construct fixed coherence from the exact circuit-derived keygen rows.
 
-Dense-row shape, commitment provenance, query coverage, and query bounds are generic.
-The caller supplies only the setup's Lagrange-basis equations plus preservation of the
-sparse assignments after last-write deduplication and dense scattering.
+Dense-row realization, commitment provenance, query coverage, and query bounds are
+generic. The caller supplies only the setup's Lagrange-basis equations.
 -/
 def ofKeygen
     {Config : Type} {PublicInput : TypeMap}
@@ -475,14 +370,7 @@ def ofKeygen
       (derivedUrsGLagrange urs).getD (i : ℕ) 0 =
         commit urs (polynomialCoefficients (2 ^ urs.k)
           (rowPolynomial top.omega
-            (Pi.single i (1 : Fp)))))
-    (realizes : ∀ column row value,
-      (column, row, value) ∈
-        topLevelRequiredFixedEntries top →
-        row < top.n ∧
-          column < top.fixedColumnCount ∧
-          (top.fixedRows.getD column []).getD row 0 =
-            value) :
+            (Pi.single i (1 : Fp))))) :
     TopLevelFixedCoherence top urs where
   key :=
     LagrangeCommitmentKey.ofFullList
@@ -491,7 +379,6 @@ def ofKeygen
   commitment :=
     fixedCommitment_eq_commitInstance
       top urs hk hlen hgenerators
-  realizes := realizes
 
 end TopLevelFixedCoherence
 
@@ -559,29 +446,23 @@ theorem topLevelFixedEntryRead_of_column
     {top : TopLevelCircuit Fp Config PublicInput}
     {pp : ProofParams} {urs : URS G}
     (poly : CommitmentId → CPoly)
-    (rows : ℕ → List Fp)
     (hrows : Function.Injective
       fun i : Fin (2 ^ urs.k) =>
         top.omega ^ (i : ℕ))
     (hn : top.n = 2 ^ urs.k)
-    (realizes : ∀ column row value,
-      (column, row, value) ∈ topLevelRequiredFixedEntries top →
-        row < top.n ∧
-          column < top.fixedColumnCount ∧
-          (rows column).getD row 0 = value)
     (proofIndex : Fin pp.numProofs)
     {column row : ℕ} {value : Fp}
     (hentry :
       (column, row, value) ∈ topLevelRequiredFixedEntries top)
     (hpolyEq : poly (.fixedCol column) =
       instanceRowPolynomial (2 ^ urs.k)
-        top.omega (rows column)) :
+        top.omega (top.fixedRows.getD column [])) :
     (resolverEnvironment
         (top.toVerifierKey urs) poly proofIndex
         (top.usableRowsAt top.domainExponent)).fixed
           ⟨column⟩ (row : ℤ) = value := by
   obtain ⟨hrow, hcolumn, hvalue⟩ :=
-    realizes column row value hentry
+    topLevelRequiredFixedEntry_realized top (column, row, value) hentry
   have hrow' : row < 2 ^ urs.k := by
     rwa [← hn]
   rw [resolverEnvironment_fixed, hpolyEq]
@@ -600,22 +481,16 @@ def topLevelFixedEntryRead_or_bad
     {top : TopLevelCircuit Fp Config PublicInput}
     {pp : ProofParams} {urs : URS G}
     (poly : CommitmentId → CPoly)
-    (rows : ℕ → List Fp)
     (hrows : Function.Injective
       fun i : Fin (2 ^ urs.k) =>
         top.omega ^ (i : ℕ))
     (hn : top.n = 2 ^ urs.k)
-    (realizes : ∀ column row value,
-      (column, row, value) ∈ topLevelRequiredFixedEntries top →
-        row < top.n ∧
-          column < top.fixedColumnCount ∧
-          (rows column).getD row 0 = value)
     {Bad : Type}
     (binding : ∀ column,
       column < top.fixedColumnCount →
         poly (.fixedCol column) =
             instanceRowPolynomial (2 ^ urs.k)
-              top.omega (rows column) ⊕'
+              top.omega (top.fixedRows.getD column []) ⊕'
           Bad)
     (proofIndex : Fin pp.numProofs)
     {column row : ℕ} {value : Fp}
@@ -627,8 +502,9 @@ def topLevelFixedEntryRead_or_bad
           ⟨column⟩ (row : ℤ) = value ⊕'
       Bad :=
   bindOrRelationWitness
-    (binding column (realizes column row value hentry).2.1)
-    (topLevelFixedEntryRead_of_column poly rows hrows hn realizes proofIndex hentry)
+    (binding column
+      (topLevelRequiredFixedEntry_realized top (column, row, value) hentry).2.1)
+    (topLevelFixedEntryRead_of_column poly hrows hn proofIndex hentry)
 
 omit [Module Fp G] [DecidableEq G] in
 /--
@@ -642,23 +518,16 @@ def topLevelFixedConstraints_or_bad
     {top : TopLevelCircuit Fp Config PublicInput}
     {pp : ProofParams} {urs : URS G}
     (poly : CommitmentId → CPoly)
-    (rows : ℕ → List Fp)
     (hrows : Function.Injective
       fun i : Fin (2 ^ urs.k) =>
         top.omega ^ (i : ℕ))
     (hn : top.n = 2 ^ urs.k)
-    (realizes : ∀ column row value,
-      (column, row, value) ∈
-          topLevelRequiredFixedEntries top →
-          row < top.n ∧
-          column < top.fixedColumnCount ∧
-          (rows column).getD row 0 = value)
     {Bad : Type}
     (binding : ∀ column,
       column < top.fixedColumnCount →
         poly (.fixedCol column) =
             instanceRowPolynomial (2 ^ urs.k)
-              top.omega (rows column) ⊕'
+              top.omega (top.fixedRows.getD column []) ⊕'
           Bad)
     (proofIndex : Fin pp.numProofs) :
     (SelectorActivationsRealized
@@ -686,8 +555,10 @@ def topLevelFixedConstraints_or_bad
       intro column row value hentry
       exact
         topLevelFixedEntryRead_of_column
-          poly rows hrows hn realizes proofIndex hentry
-          (hbinding column (realizes column row value hentry).2.1)
+          poly hrows hn proofIndex hentry
+          (hbinding column
+            (topLevelRequiredFixedEntry_realized
+              top (column, row, value) hentry).2.1)
     change
       SelectorActivationsRealized
           top.selectorMap top.selectorActivations environment ∧
@@ -698,15 +569,12 @@ def topLevelFixedConstraints_or_bad
     · apply selectorActivationsRealized_of_selectorAssignments
       intro assignment hentry
       apply fixedRead
-      simp only [topLevelRequiredFixedEntries, List.mem_append]
-      exact Or.inl <| mem_topLevelCompilerFixedEntries_of_selector top hentry
+      exact mem_topLevelCompilerFixedEntries_of_selector top hentry
     · exact FixedLayout.constraints_of_entries
         top.regionStarts (top.usableRowsAt top.domainExponent)
         (top.operations) 0 environment rfl
         (fun column row value hentry => fixedRead (by
-          simp only [topLevelRequiredFixedEntries, List.mem_append]
-          exact Or.inl <|
-            mem_topLevelCompilerFixedEntries_of_operation top hentry))
+          exact mem_topLevelCompilerFixedEntries_of_operation top hentry))
 
 namespace CanonicalMemberConstraintRelation
 
@@ -1014,8 +882,7 @@ def topLevelFixedConstraints_or_relation
       NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
   apply topLevelFixedConstraints_or_bad
     relation.polynomial
-      (fun column => top.fixedRows.getD column [])
-      hrows hn coherence.realizes
+      hrows hn
   · intro column hcolumn
     have hcommitment :
         (top.toVerifierKey urs).fixedCommitment column =
@@ -1094,8 +961,7 @@ def topLevelFixedEntryRead_or_relation
       NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
   apply topLevelFixedEntryRead_or_bad
     relation.polynomial
-      (fun column => top.fixedRows.getD column [])
-      hrows hn coherence.realizes
+      hrows hn
   · intro fixedColumn hcolumn
     have hcommitment :
         (top.toVerifierKey urs).fixedCommitment fixedColumn =

@@ -37,9 +37,8 @@ The lookup bridge is split deliberately:
 * `LookupProjection.lean` proves the query-erasure and selector-substitution
   compiler semantics for configured lookups;
 * `LookupSelectorRows.lean` derives exact expression-level selector projection from
-  singleton packed-selector cells and the shared fixed-row realization boundary;
-  `ActionLookupSelectorRows.lean` merely instantiates that generic boundary with
-  Action's fixed coherence;
+  singleton packed-selector cells and the generic fixed-row realization theorem;
+  `ActionEncoding.lean` supplies Action's compositionally proved selector anchor;
 * `TopLevelLookups.lean` routes synthesis-enabled lookups through the
   circuit-derived verifying key, derives selector coverage, table freedom, tuple
   arity, and activation-row fit from Clean's top-level keygen invariants, reduces

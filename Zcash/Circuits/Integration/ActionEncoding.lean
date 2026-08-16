@@ -2,15 +2,15 @@ import Zcash.Circuits.Action.TopLevel
 import Zcash.Circuits.Integration.FixedColumns
 import Zcash.Common.RelationWitness
 import Zcash.Circuits.Integration.InstanceColumns
+import Zcash.Circuits.Integration.LookupSelectorRows
 import Zcash.Circuits.Integration.TopLevelLookups
 import Zcash.Snark.Soundness.Multiopen.CanonicalRelation
 import Zcash.Circuits.Integration.TopLevelCircuit
 import Zcash.Circuits.Integration.TopLevelGates
 import Zcash.Circuits.Integration.TopLevelCorrectness
 import Zcash.Circuits.Integration.ActionCopyReplay
-import Zcash.Circuits.Integration.ActionFixedCoherenceCompute
+import Zcash.Circuits.Integration.ActionFixedCoherence
 import Zcash.Circuits.Integration.ActionConstraintBounds
-import Zcash.Circuits.Integration.ActionLookupSelectorRows
 import Zcash.Snark.Keygen.Pipeline
 import Mathlib.Util.AssertNoSorry
 
@@ -184,8 +184,10 @@ def actionTopLevelCircuitCorrectness
               (lookup.activationRow_lt_usableRows henabled).trans_le
                 actionCircuit.usableRowsAt_domainExponent_le_n
         have hexact :=
-          actionLookupInputSelectorLeafRowsExact
-            fixedCoherence lookup henabled
+          lookup.inputSelectorLeafRowsExact actionCircuit
+            (selectorAnchor actionConfig)
+            actionCircuit_lookupSelectorAnchorRequirements_satisfied
+            henabled
         have hvalues :=
           lookup.inputSelectorValuesRealized_or_bad
             relation.polynomial

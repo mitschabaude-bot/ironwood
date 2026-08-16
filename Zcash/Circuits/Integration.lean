@@ -1,6 +1,6 @@
 import Zcash.Circuits.Integration.ActionCopyWitness
 import Zcash.Circuits.Integration.ActionEncoding
-import Zcash.Circuits.Integration.ActionFixedCoherenceCompute
+import Zcash.Circuits.Integration.ActionFixedCoherence
 import Zcash.Circuits.Integration.ActionConstraintBounds
 import Zcash.Circuits.Integration.ActionCorrectness
 import Zcash.Circuits.Integration.ActionPermutationDomain
@@ -15,7 +15,6 @@ import Zcash.Circuits.Integration.FixedLayout
 import Zcash.Circuits.Integration.InstanceColumns
 import Zcash.Circuits.Integration.LookupProjection
 import Zcash.Circuits.Integration.LookupSelectorRows
-import Zcash.Circuits.Integration.ActionLookupSelectorRows
 import Zcash.Circuits.Integration.OperationCopies
 import Zcash.Circuits.Integration.OperationFixed
 import Zcash.Circuits.Integration.OperationGates

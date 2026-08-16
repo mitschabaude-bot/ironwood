@@ -4,9 +4,6 @@ namespace Zcash.Circuits.Action
 
 open Halo2 FloorPlanner
 
-def actionConfig : Circuit.Config :=
-  (Circuit.configure Specs.Sinsemilla.orchardGenerators {}).1
-
 /-- Controlled reduced synthesis summary of the opaque Action circuit. Planner
 proofs use this interface instead of unfolding the top-level package repeatedly. -/
 theorem actionCircuit_synthesisSummary_eq :
@@ -49,6 +46,10 @@ private theorem actionConfig_advice0 : (actionConfig.advices 0).index = 0 := by 
 private theorem actionConfig_advice5 : (actionConfig.advices 5).index = 5 := by rfl
 private theorem actionConfig_advice6 : (actionConfig.advices 6).index = 6 := by rfl
 private theorem actionConfig_advice9 : (actionConfig.advices 9).index = 9 := by rfl
+private theorem actionConfig_qRunning :
+    actionConfig.lookupConfig.qRunning.index = 3 := by rfl
+private theorem actionConfig_runningSum :
+    actionConfig.lookupConfig.runningSum.index = 9 := by rfl
 private theorem actionConfig_qPoint :
     actionConfig.eccConfig.witnessPoint.qPoint.index = 5 := by rfl
 private theorem actionConfig_qPointNonId :
@@ -75,6 +76,19 @@ def selectorAnchor (cfg : Circuit.Config) (selector : ℕ) : RegionColumn :=
     .column .advice (cfg.advices 6).index
   else
     .column .advice (cfg.advices 0).index
+
+/-- The concrete Action selector anchor solves the reduced equations exposed by its
+top-level circuit. -/
+theorem actionCircuit_lookupSelectorAnchorRequirements_satisfied :
+    SelectorAnchorRequirementsSatisfied
+      actionCircuit.lookupSelectorAnchorRequirements
+      (selectorAnchor actionConfig) := by
+  rw [actionCircuit_lookupSelectorAnchorRequirements_eq]
+  simp only [LookupRangeCheck.lookupSelectorAnchorRequirements,
+    SelectorAnchorRequirementsSatisfied, List.forall_cons,
+    List.forall_nil, and_true]
+  rw [actionConfig_qRunning, actionConfig_runningSum]
+  simp [selectorAnchor, actionConfig_advice9]
 
 
 private theorem hashPieceLoop_selectorAnchored
