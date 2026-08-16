@@ -115,13 +115,13 @@ def actionCopyReplayWitness_or_relation
     have hdomainSize :
         actionCircuit.n = 2 ^ urs.k := by
       rw [actionCircuit.n_eq_two_pow_domainExponent, hk]
-    have hfixedRead : ∀ {column row value : ℕ},
+    have hfixedRead : ∀ {column row : ℕ} {value : Fp},
         (column, row, value) ∈
             topLevelRequiredFixedEntries actionCircuit →
           (resolverEnvironment
             (actionCircuit.toVerifierKey urs) relation.polynomial proofIndex
               actionActiveRows).fixed
-              ⟨column⟩ (row : ℤ) = (value : Fp) ⊕'
+              ⟨column⟩ (row : ℤ) = value ⊕'
             NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
       intro column row value hentry
       have source :=

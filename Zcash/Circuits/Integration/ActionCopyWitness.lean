@@ -118,6 +118,17 @@ theorem actionConst_row_lt_usedRows
     (actionCircuit.constraintSystem.constants.map (·.index))
     hassignment
 
+/-- A legacy copy-list constant entry is the field-valued fixed assignment emitted by
+the canonical top-level compiler. -/
+theorem actionConst_mem_topLevelConstantEntries
+    (entry : ℕ × ℕ × ℕ) (hentry : entry ∈ actionConsts) :
+    (entry.2.1, entry.2.2, (entry.1 : Fp)) ∈
+      topLevelConstantEntries actionCircuit := by
+  rw [actionConsts, Keygen.constantCopyEntries, List.mem_map] at hentry
+  obtain ⟨⟨value, column, row⟩, hassignment, rfl⟩ := hentry
+  rw [topLevelConstantEntries, Layout.constantAssignments, List.mem_map]
+  exact ⟨(value, column, row), hassignment, by simp⟩
+
 /-- Every raw Action keygen copy endpoint lies below the compiler-derived operation
 footprint. -/
 theorem actionCopyRaw_rows_lt_usedRows
@@ -1223,10 +1234,10 @@ shared fixed-commitment exceptional branch fires.
 -/
 def actionConstantEndpointRead_or_bad
     (env : Environment Fp) {Bad : Type}
-    (fixedRead : ∀ {column row value : ℕ},
+    (fixedRead : ∀ {column row : ℕ} {value : Fp},
       (column, row, value) ∈
           topLevelRequiredFixedEntries actionCircuit →
-        env.fixed ⟨column⟩ (row : ℤ) = (value : Fp) ⊕' Bad)
+        env.fixed ⟨column⟩ (row : ℤ) = value ⊕' Bad)
     (value : Fp)
     (hendpoint :
       CopyEndpoint.constant value ∈ actionDeclaredEndpoints) :
@@ -1253,15 +1264,14 @@ def actionConstantEndpointRead_or_bad
       have hentryValue : entry.1 = value.val := by
         simpa using List.find?_some hfind
       have hconstantEntry :
-          (entry.2.1, entry.2.2, entry.1) ∈
+          (entry.2.1, entry.2.2, (entry.1 : Fp)) ∈
             topLevelConstantEntries actionCircuit := by
-        rw [topLevelConstantEntries, Layout.constantsFixed, List.mem_map]
-        exact ⟨entry, hentryMem, rfl⟩
+        exact actionConst_mem_topLevelConstantEntries entry hentryMem
       have hrequired :
-          (entry.2.1, entry.2.2, entry.1) ∈
+          (entry.2.1, entry.2.2, (entry.1 : Fp)) ∈
             topLevelRequiredFixedEntries actionCircuit := by
-        simp only [topLevelRequiredFixedEntries, List.mem_append]
-        exact Or.inl (Or.inl (Or.inr hconstantEntry))
+        exact List.mem_append_left _ <|
+          mem_topLevelCompilerFixedEntries_of_constant actionCircuit hconstantEntry
       refine bindOrRelationWitness (fixedRead hrequired) fun hread => ?_
       have haddress := actionEncodedAddress_eq hendpoint
       rw [actionCopyValue_eq_encodedAddress, haddress,
@@ -1418,10 +1428,10 @@ def actionConstantCopyValue_or_bad
     (env : Environment Fp) {Bad : Type}
     (hpairval : ∀ pair ∈ actionCopies,
       actionCopyValue env pair.1 = actionCopyValue env pair.2 ⊕' Bad)
-    (fixedRead : ∀ {column row value : ℕ},
+    (fixedRead : ∀ {column row : ℕ} {value : Fp},
       (column, row, value) ∈
           topLevelRequiredFixedEntries actionCircuit →
-        env.fixed ⟨column⟩ (row : ℤ) = (value : Fp) ⊕' Bad)
+        env.fixed ⟨column⟩ (row : ℤ) = value ⊕' Bad)
     (copy : DeclaredCopy Fp)
     (hcopy : copy ∈ operationDeclaredCopies
       (actionCircuit.operations))
@@ -1473,15 +1483,14 @@ def actionConstantCopyValue_or_bad
   have hpairLeft := hpairFacts.1
   have hpairRight := hpairFacts.2
   have hconstantEntry :
-      (entry.2.1, entry.2.2, entry.1) ∈
+      (entry.2.1, entry.2.2, (entry.1 : Fp)) ∈
         topLevelConstantEntries actionCircuit := by
-    rw [topLevelConstantEntries, Layout.constantsFixed, List.mem_map]
-    exact ⟨entry, hentry, rfl⟩
+    exact actionConst_mem_topLevelConstantEntries entry hentry
   have hrequired :
-      (entry.2.1, entry.2.2, entry.1) ∈
+      (entry.2.1, entry.2.2, (entry.1 : Fp)) ∈
         topLevelRequiredFixedEntries actionCircuit := by
-    simp only [topLevelRequiredFixedEntries, List.mem_append]
-    exact Or.inl (Or.inl (Or.inr hconstantEntry))
+    exact List.mem_append_left _ <|
+      mem_topLevelCompilerFixedEntries_of_constant actionCircuit hconstantEntry
   have hendpoint :
       CopyEndpoint.constant value ∈ actionDeclaredEndpoints :=
     (mem_actionDeclaredEndpoints hcopy).2
@@ -1544,10 +1553,10 @@ def actionCopyReplayWitness_or_bad
       ∀ c v, copy = (.cell c, .constant v) →
         actionCopyValue env (actionCopyEncode (.cell c)) =
           actionCopyValue env (actionCopyEncode (.constant v)) ⊕' Bad)
-    (fixedRead : ∀ {column row value : ℕ},
+    (fixedRead : ∀ {column row : ℕ} {value : Fp},
       (column, row, value) ∈
           topLevelRequiredFixedEntries actionCircuit →
-        env.fixed ⟨column⟩ (row : ℤ) = (value : Fp) ⊕' Bad) :
+        env.fixed ⟨column⟩ (row : ℤ) = value ⊕' Bad) :
     CopyReplayWitness actionCircuit.placement env
         (actionCircuit.operations)
         (FlatCell actionNumPermCols actionDomainSize) Bad ⊕'
@@ -1609,10 +1618,10 @@ def actionCopyReplayWitness_ofPairValues_or_bad
     (env : Environment Fp) {Bad : Type}
     (hpairval : ∀ pair ∈ actionCopies,
       actionCopyValue env pair.1 = actionCopyValue env pair.2 ⊕' Bad)
-    (fixedRead : ∀ {column row value : ℕ},
+    (fixedRead : ∀ {column row : ℕ} {value : Fp},
       (column, row, value) ∈
           topLevelRequiredFixedEntries actionCircuit →
-        env.fixed ⟨column⟩ (row : ℤ) = (value : Fp) ⊕' Bad) :
+        env.fixed ⟨column⟩ (row : ℤ) = value ⊕' Bad) :
     CopyReplayWitness actionCircuit.placement env
         (actionCircuit.operations)
         (FlatCell actionNumPermCols actionDomainSize) Bad ⊕'

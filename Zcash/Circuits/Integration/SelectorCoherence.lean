@@ -774,72 +774,6 @@ theorem gateSelectorsCovered_deriveSelCompressMap
 
 end Halo2
 
-namespace Halo2.Layout
-
-set_option maxHeartbeats 20000
-
-/--
-Folding `HashSet.insert` over a list retains every element of both the initial
-set and the input list.
--/
-private theorem mem_foldl_insert_iff
-    (item : ℕ × ℕ) (items : List (ℕ × ℕ))
-    (initial : Std.HashSet (ℕ × ℕ)) :
-    item ∈ items.foldl (fun set next => set.insert next) initial ↔
-      item ∈ initial ∨ item ∈ items := by
-  induction items generalizing initial with
-  | nil =>
-      simp
-  | cons head tail ih =>
-      rw [List.foldl_cons, ih]
-      simp only [Std.HashSet.mem_insert, beq_iff_eq, List.mem_cons]
-      aesop
-
-/--
-Every activated selector with a compression-map entry is emitted by the generic
-layout compiler as the corresponding packed fixed assignment.
--/
-theorem mem_selectorFixed_of_activation
-    (map : SelCompressMap) (activationRows : List (ℕ × ℕ))
-    {selector row : ℕ} {compressed : SelCompress}
-    (hactivation : (selector, row) ∈ activationRows)
-    (hlookup : map.lookup selector = some compressed) :
-    (compressed.packedCol, row, compressed.assignedRoot) ∈
-      selectorFixed map activationRows := by
-  simp only [SelCompressMap.lookup, Option.map_eq_some_iff] at hlookup
-  obtain ⟨entry, hfind, hcompressed⟩ := hlookup
-  unfold selectorFixed
-  rw [List.mem_filterMap]
-  refine ⟨(selector, row), ?_, ?_⟩
-  · rw [Std.HashSet.mem_toList, mem_foldl_insert_iff]
-    exact Or.inr hactivation
-  · simp only [hfind, Option.map_some]
-    rw [← hcompressed]
-
-/--
-Conversely, every packed fixed assignment emitted by `selectorFixed` retains the
-row of some source activation.  Selector deduplication may forget multiplicity and
-order, but it cannot invent rows.
--/
-theorem exists_activation_of_mem_selectorFixed
-    (map : SelCompressMap) (activationRows : List (ℕ × ℕ))
-    {column row value : ℕ}
-    (hentry :
-      (column, row, value) ∈ selectorFixed map activationRows) :
-    ∃ selector, (selector, row) ∈ activationRows := by
-  unfold selectorFixed at hentry
-  rw [List.mem_filterMap] at hentry
-  obtain ⟨⟨selector, sourceRow⟩, huniq, hmapped⟩ := hentry
-  rw [Std.HashSet.mem_toList, mem_foldl_insert_iff] at huniq
-  rcases huniq with hfalse | hactivation
-  · simp at hfalse
-  · simp only [Option.map_eq_some_iff] at hmapped
-    obtain ⟨entry, _hfind, hresult⟩ := hmapped
-    simp only [Prod.mk.injEq] at hresult
-    exact ⟨selector, by simpa [hresult.2.1] using hactivation⟩
-
-end Halo2.Layout
-
 namespace Zcash.Snark
 
 open Zcash.Arithmetic (scalarFieldOrder)
@@ -904,21 +838,20 @@ theorem selectorRootsWellFormed_deriveSelCompressMap
   exact ⟨hbounds.1, hbounds.2.1,
     hbounds.2.2.trans_lt hdegree⟩
 
-/--
-It is enough to realize the fixed assignments emitted by `selectorFixed` in
-order to realize every selector activation expected by the gate resolver.
--/
-theorem selectorActivationsRealized_of_selectorFixed
+/-- It is enough to realize the packed assignments emitted by the canonical fixed
+compiler to realize every selector activation expected by the gate resolver. -/
+theorem selectorActivationsRealized_of_selectorAssignments
     (map : SelCompressMap) (activationRows : List (ℕ × ℕ))
     (environment : Environment Fp)
     (hfixed :
-      ∀ {column row value : ℕ},
-        (column, row, value) ∈ selectorFixed map activationRows →
-          environment.fixed ⟨column⟩ row = (value : Fp)) :
+      ∀ {assignment : Layout.FixedAssignment Fp},
+        assignment ∈ Layout.selectorAssignments map activationRows →
+          environment.fixed ⟨assignment.1⟩ assignment.2.1 =
+            assignment.2.2) :
     SelectorActivationsRealized map activationRows environment := by
   intro selector row compressed hactivation hlookup
   exact hfixed
-    (mem_selectorFixed_of_activation map activationRows
+    (Layout.mem_selectorAssignments_of_activation (F := Fp) map activationRows
       hactivation hlookup)
 
 /--
@@ -940,9 +873,10 @@ theorem selectorActivationsRealized_of_fixedRowPolynomials
     (hroots : SelectorRootsWellFormed map)
     (hlength : ∀ column, (fixedRows column).length = n)
     (hfixed :
-      ∀ {column row value : ℕ},
-        (column, row, value) ∈ selectorFixed map activationRows →
-          (fixedRows column).getD row 0 = (value : Fp)) :
+      ∀ {assignment : Layout.FixedAssignment Fp},
+        assignment ∈ Layout.selectorAssignments map activationRows →
+          (fixedRows assignment.1).getD assignment.2.1 0 =
+            assignment.2.2) :
     SelectorActivationsRealized map activationRows
       (polynomialEnvironment omega usableRows
         (fun column =>
@@ -951,7 +885,7 @@ theorem selectorActivationsRealized_of_fixedRowPolynomials
         adviceCols instanceCols) := by
   intro selector row compressed hactivation hlookup
   have hentry :=
-    mem_selectorFixed_of_activation map activationRows
+    Layout.mem_selectorAssignments_of_activation (F := Fp) map activationRows
       hactivation hlookup
   have hvalue := hfixed hentry
   obtain ⟨hpositive, hrootBound, hcombinationBound⟩ :=

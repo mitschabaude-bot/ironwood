@@ -46,7 +46,7 @@ theorem realizes :
           column <
             actionCircuit.pinnedCS.numFixedColumns ∧
           (actionCircuit.fixedRows.getD column []).getD row 0 =
-            (value : Fp) :=
+            value :=
   fixedRowsRealize_of_interimFailures_eq_nil
     actionCircuit realizationFailures_eq_nil
 

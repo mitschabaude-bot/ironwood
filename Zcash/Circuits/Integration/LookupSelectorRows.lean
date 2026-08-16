@@ -242,7 +242,7 @@ theorem EnabledLookup.inputSelectorLeafRowsExact_of_realizes
     (realizes : ∀ column row value,
       (column, row, value) ∈ topLevelRequiredFixedEntries top →
         column < top.fixedColumnCount ∧
-          (rows column).getD row 0 = (value : Fp)) :
+          (rows column).getD row 0 = value) :
     lookup.InputSelectorLeafRowsExact top rows := by
   rw [EnabledLookup.InputSelectorLeafRowsExact,
     List.forall_iff_forall_mem]
@@ -252,7 +252,7 @@ theorem EnabledLookup.inputSelectorLeafRowsExact_of_realizes
   apply hmembers.mono
   intro selector hselectorLeaf
   have required_of_result
-      (entry : ℕ × ℕ × ℕ)
+      (entry : Layout.FixedAssignment Fp)
       (hresult :
         (match top.selectorMap.lookup selector.index with
         | some compressed =>
@@ -300,7 +300,7 @@ theorem EnabledLookup.inputSelectorLeafRowsExact_of_realizes
       by_cases hsingleton :
           compressed.combinationLen = 1 ∧
             compressed.assignedRoot = 1
-      · let expected :=
+      · let expected : Fp :=
           if lookup.enabled.any
               (fun candidate =>
                 candidate.index == selector.index) then
@@ -330,7 +330,7 @@ theorem EnabledLookup.inputSelectorLeafRowsExact_of_realizes
             simp only [List.any_eq_true, beq_iff_eq]
             exact henabledSelector
           have hvalue := hrealized.2
-          simp only [expected, hany, if_true, Nat.cast_one] at hvalue
+          simp only [expected, hany, if_true] at hvalue
           simp only [hvalue, TopLevelCircuit.placement_apply,
             EnabledLookup.selectorValue, henabledSelector, if_true]
         · have hany :
@@ -343,8 +343,7 @@ theorem EnabledLookup.inputSelectorLeafRowsExact_of_realizes
               henabledSelector
                 ⟨candidate, hcandidate, beq_iff_eq.mp heq⟩
           have hvalue := hrealized.2
-          simp only [expected, hany, Bool.false_eq_true, if_false,
-            Nat.cast_zero] at hvalue
+          simp only [expected, hany, Bool.false_eq_true, if_false] at hvalue
           simp only [hvalue, TopLevelCircuit.placement_apply,
             EnabledLookup.selectorValue, henabledSelector, if_false]
       · have hrequired :=

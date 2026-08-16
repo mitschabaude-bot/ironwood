@@ -20,14 +20,14 @@ set_option maxHeartbeats 20000
 
 namespace FixedLayout
 
-/-- Every explicit row of a loaded table occurs in `Layout.tableFixed`. -/
-theorem mem_tableFixed_of_loadTable_of_lt
+/-- Every explicit row of a loaded table occurs in `Layout.tableAssignments`. -/
+theorem mem_tableAssignments_of_loadTable_of_lt
     (usable : ℕ) (ops : Operations Fp)
     (table : TableColumn) (values : List Fp)
     (hload : Operation.loadTable table values ∈ ops)
     (row : ℕ) (hrow : row < values.length) :
-    (table.inner.index, row, ZMod.val values[row]!) ∈
-      Layout.tableFixed (ZMod.val : Fp → ℕ) usable ops := by
+    (table.inner.index, row, values[row]!) ∈
+      Layout.tableAssignments usable ops := by
   induction ops with
   | nil => simp at hload
   | cons operation rest ih =>
@@ -40,28 +40,32 @@ theorem mem_tableFixed_of_loadTable_of_lt
           simp only [List.mem_cons] at hload
           rcases hload with hhead | htail
           · cases hhead
-            unfold Layout.tableFixed
+            unfold Layout.tableAssignments
             apply List.mem_append_left
+            unfold Layout.tableColumnAssignments
             apply List.mem_append_left
             apply List.mem_map.mpr
-            exact ⟨row, List.mem_range.mpr hrow, rfl⟩
-          · unfold Layout.tableFixed
+            exact ⟨(values[row]!, row), by
+              apply List.mk_mem_zipIdx_iff_getElem?.mpr
+              simp [List.getElem!_eq_getElem?_getD,
+                List.getElem?_eq_getElem hrow], rfl⟩
+          · unfold Layout.tableAssignments
             apply List.mem_append_right
             exact ih htail
 
 /--
 Every default-fill row of a nonempty loaded table occurs in
-`Layout.tableFixed`.
+`Layout.tableAssignments`.
 -/
-theorem mem_tableFixed_of_loadTable_of_fill
+theorem mem_tableAssignments_of_loadTable_of_fill
     (usable : ℕ) (ops : Operations Fp)
     (table : TableColumn) (values : List Fp)
     (hload : Operation.loadTable table values ∈ ops)
     (hne : values ≠ [])
     (row : ℕ) (hlower : values.length ≤ row)
     (hupper : row < usable) :
-    (table.inner.index, row, ZMod.val values[0]!) ∈
-      Layout.tableFixed (ZMod.val : Fp → ℕ) usable ops := by
+    (table.inner.index, row, values[0]!) ∈
+      Layout.tableAssignments usable ops := by
   induction ops with
   | nil => simp at hload
   | cons operation rest ih =>
@@ -74,17 +78,21 @@ theorem mem_tableFixed_of_loadTable_of_fill
           simp only [List.mem_cons] at hload
           rcases hload with hhead | htail
           · cases hhead
-            unfold Layout.tableFixed
+            unfold Layout.tableAssignments
             apply List.mem_append_left
+            unfold Layout.tableColumnAssignments
             apply List.mem_append_right
-            simp only [List.isEmpty_iff, if_neg hne]
+            rcases values with _ | ⟨first, rest⟩
+            · contradiction
             apply List.mem_map.mpr
-            refine ⟨row - values.length, ?_, ?_⟩
+            refine ⟨row - (first :: rest).length, ?_, ?_⟩
             · apply List.mem_range.mpr
               omega
-            · congr
+            · simp only [List.getElem!_eq_getElem?_getD,
+                List.getElem?_cons_zero, Option.getD_some]
+              congr
               omega
-          · unfold Layout.tableFixed
+          · unfold Layout.tableAssignments
             apply List.mem_append_right
             exact ih htail
 
@@ -174,17 +182,17 @@ private theorem region_eq_of_assignment_requirement
 
 /--
 Every extracted region fixed requirement occurs in the sparse
-`Layout.regionAssignFixed` output at its V1 absolute row.
+`Layout.regionAssignments` output at its V1 absolute row.
 -/
-theorem mem_regionAssignFixed_of_requirement
+theorem mem_regionAssignments_of_requirement
     (starts : List ℕ) (ops : Operations Fp) (i : RegionIndex)
     (region : RegionIndex) (column : Column .fixed)
     (row : ℕ) (value : Fp)
     (hrequirement :
       FixedRequirement.assignment region column row value ∈
         operationFixedRequirements ops i) :
-    (column.index, Layout.place starts region + row, ZMod.val value) ∈
-      Layout.regionAssignFixed (ZMod.val : Fp → ℕ) starts
+    (column.index, Layout.place starts region + row, value) ∈
+      Layout.regionAssignments starts
         (indexedRegions ops i).1 := by
   induction ops generalizing i with
   | nil => simp [operationFixedRequirements] at hrequirement
@@ -233,10 +241,10 @@ theorem requirement_satisfied_of_entries
     (husable : env.usableRows = usable)
     (hentries : ∀ column row value,
       (column, row, value) ∈
-        (Layout.tableFixed (ZMod.val : Fp → ℕ) usable ops ++
-          Layout.regionAssignFixed (ZMod.val : Fp → ℕ) starts
+        (Layout.tableAssignments usable ops ++
+          Layout.regionAssignments starts
             (indexedRegions ops i).1) →
-      env.fixed ⟨column⟩ (row : ℤ) = (value : Fp))
+      env.fixed ⟨column⟩ (row : ℤ) = value)
     (requirement : FixedRequirement Fp)
     (hrequirement :
       requirement ∈ operationFixedRequirements ops i) :
@@ -245,9 +253,9 @@ theorem requirement_satisfied_of_entries
   | assignment region column row value =>
       simp only [FixedRequirement.Satisfied]
       have hentry := hentries column.index
-        (Layout.place starts region + row) (ZMod.val value)
+        (Layout.place starts region + row) value
         (List.mem_append_right _
-          (mem_regionAssignFixed_of_requirement
+          (mem_regionAssignments_of_requirement
             starts ops i region column row value hrequirement))
       simpa using hentry
   | table column values =>
@@ -257,18 +265,18 @@ theorem requirement_satisfied_of_entries
       constructor
       · intro row hrow
         have hentry := hentries column.inner.index row
-          (ZMod.val values[row]!)
+          values[row]!
           (List.mem_append_left _
-            (mem_tableFixed_of_loadTable_of_lt
+            (mem_tableAssignments_of_loadTable_of_lt
               usable ops column values hload row hrow))
         simpa using hentry
       · intro hne row hlower hupper
         have hrow : row < usable := by
           simpa [husable] using hupper
         have hentry := hentries column.inner.index row
-          (ZMod.val values[0]!)
+          values[0]!
           (List.mem_append_left _
-            (mem_tableFixed_of_loadTable_of_fill
+            (mem_tableAssignments_of_loadTable_of_fill
               usable ops column values hload hne row hlower hrow))
         simpa using hentry
 
@@ -280,10 +288,10 @@ theorem constraints_of_entries
     (husable : env.usableRows = usable)
     (hentries : ∀ column row value,
       (column, row, value) ∈
-        (Layout.tableFixed (ZMod.val : Fp → ℕ) usable ops ++
-          Layout.regionAssignFixed (ZMod.val : Fp → ℕ) starts
+        (Layout.tableAssignments usable ops ++
+          Layout.regionAssignments starts
             (indexedRegions ops i).1) →
-      env.fixed ⟨column⟩ (row : ℤ) = (value : Fp)) :
+      env.fixed ⟨column⟩ (row : ℤ) = value) :
     CircuitConstraintFamily.constraints .fixed
       (Layout.place starts) env ops i := by
   apply fixed_constraints_of_requirements
@@ -311,16 +319,16 @@ theorem constraints_of_fixedRowPolynomials
         omega ^ (row : ℕ))
     (hentryRow : ∀ column row value,
       (column, row, value) ∈
-        (Layout.tableFixed (ZMod.val : Fp → ℕ) usable ops ++
-          Layout.regionAssignFixed (ZMod.val : Fp → ℕ) starts
+        (Layout.tableAssignments usable ops ++
+          Layout.regionAssignments starts
             (indexedRegions ops i).1) →
       row < n)
     (hfixed : ∀ column row value,
       (column, row, value) ∈
-        (Layout.tableFixed (ZMod.val : Fp → ℕ) usable ops ++
-          Layout.regionAssignFixed (ZMod.val : Fp → ℕ) starts
+        (Layout.tableAssignments usable ops ++
+          Layout.regionAssignments starts
             (indexedRegions ops i).1) →
-      (fixedRows column).getD row 0 = (value : Fp)) :
+      (fixedRows column).getD row 0 = value) :
     CircuitConstraintFamily.constraints .fixed
       (Layout.place starts)
       (polynomialEnvironment omega usable
