@@ -3,45 +3,34 @@ import Zcash.Snark.Verifier.FiatShamir
 /-!
 # Parametric verifier schedule obligations
 
-The generated fingerprint fixtures remain concrete empirical checks (`numProofs = 1` and `numProofs = 2`,
-plus any future selected captures). This module records the complementary generic obligation: the Lean verifier
-traverses every sub-proof by a `Fin shape.numProofs` fold, for arbitrary `shape.numProofs`.
-This is stronger than the Orchard consensus-scoped need: every consensus-valid action count
-`N ≤ 2^16 - 1` is one instantiation of the same `shape.numProofs` parameter.
+These theorems show that verifier assembly and the Fiat–Shamir schedule traverse every sub-proof for
+arbitrary `shape.numProofs`. Every consensus-valid Orchard action count is one instance.
 
-These theorems do not prove byte-for-byte Rust faithfulness; that boundary is still supplied by the
-capture/dumper plus selected fixtures. They make explicit that the Lean-side assembly and Fiat–Shamir
-schedule are not specialized to the current concrete fixtures.
+The generic definitions are total at `numProofs = 0` and `shape.k = 0`. Zero proofs represents the
+transaction-level absence of an Orchard bundle, not a call to Halo2 with an empty bundle; an actual
+verifier invocation has `0 < shape.numProofs`. Halo2's IPA implementation also requires `0 < k`.
+The deployed Action instance lies inside both boundaries (`k = 11`), so Rust behavioral
+correspondence is claimed only on that deployed domain.
 
-Most obligations here are definitional pins — `rfl`-provable restatements that fail loudly if a
-definition drifts. Two carry content beyond a pin: `subProofBlocks_length_const` (the flattened
-schedule carries exactly one block per sub-proof — none dropped, none duplicated) and
-`subProofOpeningQueries_commId_disjoint` (distinct sub-proofs' opening queries occupy disjoint
-commitment slots, so the multiopen grouping can never merge commitments across sub-proofs).
+Fixtures compare trusted typed Rust captures, not transcript bytes. Most results here are
+definitional pins; the remaining lemmas prevent block loss and cross-proof multiopen grouping.
 -/
 
 namespace Zcash.Snark
 
-/-- Orchard's consensus maximum number of actions, hence the maximum `numProofs` for the Orchard
-bundle proof verified by this model.
+/-- Orchard's consensus maximum action count, and therefore the maximum `numProofs` in this model.
 
-The bound is a consensus rule, not an encoding artifact: `nActionsOrchard` is a `compactSize` (which
-admits values up to `2^64 - 1`), but the Zcash Protocol Specification §7.1.2 "Transaction Consensus
-Rules" requires `nActionsOrchard < 2^16` (NU5 onward), so `nActionsOrchard ≤ 2^16 - 1 = 65535`. The v5
-transaction format carrying it is defined by ZIP 225. -/
+The protocol requires `nActionsOrchard < 2^16`; this is a consensus bound, not an encoding limit. -/
 def orchardConsensusMaxProofs : ℕ := 2^16 - 1
 
-/-- The consensus-scoped subcase of the stronger parametric theorems below. Only the upper bound is
-load-bearing: a consensus-valid transaction verifies an Orchard proof only when it has at least one
-action (`proofsOrchard` is present iff `nActionsOrchard > 0`, ZIP 225), so `numProofs = 0` never
-reaches the deployed verifier and is not excluded here. -/
+/-- The consensus-scoped upper bound on `shape.numProofs`.
+
+Zero is included to represent a transaction with no Orchard bundle. It is not an empty-bundle
+verifier invocation: the serialized bundle is absent and the Orchard verifier is never called. -/
 def Shape.hasConsensusNumProofs (shape : Shape) : Prop :=
   shape.numProofs ≤ orchardConsensusMaxProofs
 
-/-- Flatten one list-producing block over all sub-proofs. This is the parametric shape shared by the
-assembly and Fiat–Shamir schedules: the number of blocks is exactly the ambient `numProofs`. (The
-restatements below also reuse it for the inner per-lookup / per-permutation-set folds, where the index
-runs over lookups or sets rather than sub-proofs.) -/
+/-- Flatten one list-valued block for each index. Assembly and the Fiat–Shamir schedule use this shape. -/
 def subProofBlocks {α : Type*} {numProofs : ℕ} (block : Fin numProofs → List α) : List α :=
   (List.ofFn block).flatten
 
@@ -94,9 +83,10 @@ theorem absorbLookupPermuted_parametric_numProofs {F G : Type*} {numProofs looku
 
 /-- The per-sub-proof opening-query block used by `assembleQueries`. -/
 def subProofOpeningQueries {shape : Shape} {F G : Type*} [Field F] [Inhabited G]
-    (vk : VerifyingKey shape F G) (ps : ProofString shape F G) (x xInv xNext xLast : F)
+    (vk : VerifyingKey shape F G) (instanceCommitment : Fin shape.numProofs → ℕ → G)
+    (ps : ProofString shape F G) (x xInv xNext xLast : F)
     (p : Fin shape.numProofs) : List (VerifierQuery shape.k F G) :=
-  columnQueries vk.omega x (vk.instanceCommitment p) (CommitmentId.instanceCol p)
+  columnQueries vk.omega x (instanceCommitment p) (CommitmentId.instanceCol p)
       vk.instanceQueryLayout (List.ofFn (ps.instanceEvals p))
   ++ columnQueries vk.omega x (finFnG (ps.adviceCommitments p)) (CommitmentId.adviceCol p)
       vk.adviceQueryLayout (List.ofFn (ps.adviceEvals p))
@@ -123,9 +113,10 @@ def CommitmentId.subProofIdx? : CommitmentId → Option ℕ
 
 /-- Every opening query in sub-proof `p`'s block carries a commitment slot tagged with `p`. -/
 theorem commId_subProofIdx_of_mem_subProofOpeningQueries {shape : Shape} {F G : Type*} [Field F]
-    [Inhabited G] (vk : VerifyingKey shape F G) (ps : ProofString shape F G)
+    [Inhabited G] (vk : VerifyingKey shape F G) (instanceCommitment : Fin shape.numProofs → ℕ → G)
+    (ps : ProofString shape F G)
     (x xInv xNext xLast : F) (p : Fin shape.numProofs) :
-    ∀ q ∈ subProofOpeningQueries vk ps x xInv xNext xLast p,
+    ∀ q ∈ subProofOpeningQueries vk instanceCommitment ps x xInv xNext xLast p,
       q.commId.subProofIdx? = some p.val := by
   intro q hq
   simp only [subProofOpeningQueries, columnQueries, permutationQueries, lookupQueries,
@@ -150,29 +141,28 @@ theorem commId_subProofIdx_of_mem_subProofOpeningQueries {shape : Shape} {F G : 
     simp only [List.mem_cons, List.not_mem_nil, or_false] at hl
     rcases hl with rfl | rfl | rfl | rfl | rfl <;> rfl
 
-/-- Distinct sub-proofs' opening queries occupy disjoint commitment slots. `constructIntermediateSets`
-groups queries by `commId` (the Lean image of halo2 `construct_intermediate_sets`' pointer-identity
-keying), so the multiopen grouping can never merge commitments across sub-proofs — for any
-`numProofs`, not just the captured fixtures. -/
+/-- Distinct sub-proofs use disjoint commitment slots, so multiopen grouping cannot merge them. -/
 theorem subProofOpeningQueries_commId_disjoint {shape : Shape} {F G : Type*} [Field F]
-    [Inhabited G] (vk : VerifyingKey shape F G) (ps : ProofString shape F G)
+    [Inhabited G] (vk : VerifyingKey shape F G) (instanceCommitment : Fin shape.numProofs → ℕ → G)
+    (ps : ProofString shape F G)
     (x xInv xNext xLast : F) {p p' : Fin shape.numProofs} (hpp : p ≠ p') :
-    ∀ q ∈ subProofOpeningQueries vk ps x xInv xNext xLast p,
-      ∀ q' ∈ subProofOpeningQueries vk ps x xInv xNext xLast p',
+    ∀ q ∈ subProofOpeningQueries vk instanceCommitment ps x xInv xNext xLast p,
+      ∀ q' ∈ subProofOpeningQueries vk instanceCommitment ps x xInv xNext xLast p',
         q.commId ≠ q'.commId := by
   intro q hq q' hq' heq
   apply hpp
   apply Fin.val_injective
-  have h1 := commId_subProofIdx_of_mem_subProofOpeningQueries vk ps x xInv xNext xLast p q hq
-  have h2 := commId_subProofIdx_of_mem_subProofOpeningQueries vk ps x xInv xNext xLast p' q' hq'
+  have h1 := commId_subProofIdx_of_mem_subProofOpeningQueries vk instanceCommitment ps x xInv xNext xLast p q hq
+  have h2 := commId_subProofIdx_of_mem_subProofOpeningQueries vk instanceCommitment ps x xInv xNext xLast p' q' hq'
   rw [heq, h2] at h1
   exact (Option.some.inj h1).symm
 
 /-- `assembleQueries` builds all per-sub-proof opening-query blocks by folding over
 `Fin shape.numProofs`, then appends the shared fixed, permutation-common, and vanishing queries. -/
 theorem assembleQueries_parametric_numProofs {shape : Shape} {F G : Type*} [Field F] [Inhabited G]
-    (vk : VerifyingKey shape F G) (ps : ProofString shape F G) (ch : Challenges shape.k F) :
-    assembleQueries vk ps ch =
+    (vk : VerifyingKey shape F G) (instanceCommitment : Fin shape.numProofs → ℕ → G)
+    (ps : ProofString shape F G) (ch : Challenges shape.k F) :
+    assembleQueries vk instanceCommitment ps ch =
       let x := ch.x
       let xn := x ^ vk.n
       let xNext := rotateOmega vk.omega x 1
@@ -183,7 +173,7 @@ theorem assembleQueries_parametric_numProofs {shape : Shape} {F G : Type*} [Fiel
       let eHEval := expectedHEval exprs ch.y xn
       let hComm := vanishingHCommitment shape.k xn (List.ofFn ps.hPieces)
       let perProof := subProofBlocks (fun p : Fin shape.numProofs =>
-        subProofOpeningQueries vk ps x xInv xNext xLast p)
+        subProofOpeningQueries vk instanceCommitment ps x xInv xNext xLast p)
       let fixedQ := columnQueries vk.omega x vk.fixedCommitment CommitmentId.fixedCol
         vk.fixedQueryLayout (List.ofFn ps.fixedEvals)
       let permCommonQ := permutationCommonQueries x CommitmentId.permCommon
@@ -192,31 +182,29 @@ theorem assembleQueries_parametric_numProofs {shape : Shape} {F G : Type*} [Fiel
       perProof ++ fixedQ ++ permCommonQ ++ vanishingQ :=
   rfl
 
-/-- The Fiat–Shamir challenge schedule is generic in `shape.numProofs`. The per-proof absorbs in this
-schedule are the generic folds exposed by `absorbPoints2_parametric_numProofs`,
-`absorbScalars2_parametric_numProofs`, and `absorbLookupPermuted_parametric_numProofs`.
-The hash output is intentionally outside these parametric lemmas: Blake2b is taken at the
-random-oracle boundary, while the concrete fixtures use a fixture oracle over the captured transcript
-events (`Zcash.Snark.Fixtures.SingleAction.FiatShamir`, `Zcash.Snark.Fixtures.MultiAction.FiatShamir`). -/
+/-- The Fiat–Shamir schedule is generic in `shape.numProofs`.
+
+This theorem pins the per-proof folds, not Blake2b. The concrete fixtures check captured transcript
+events with their fixture oracles. -/
 theorem deriveChallenges_parametric_numProofs {shape : Shape} {F G : Type*} [Zero F]
     (fs : FiatShamir F G) (init : List (TranscriptElt F G)) (ps : ProofString shape F G) :
     deriveChallenges fs init ps =
       let t := init ++ subProofBlocks (fun p : Fin shape.numProofs =>
-        absorbPoints (ps.adviceCommitments p))
+        absorbPoints (ps.adviceCommitments p)) ++ [.challenge]
       let theta := fs.squeeze t
-      let t := t ++ [.scalar theta] ++ subProofBlocks (fun p : Fin shape.numProofs =>
+      let t := t ++ subProofBlocks (fun p : Fin shape.numProofs =>
         subProofBlocks (fun l : Fin shape.numLookups =>
           [TranscriptElt.point (ps.lookupPermutedInput p l),
-           TranscriptElt.point (ps.lookupPermutedTable p l)]))
+           TranscriptElt.point (ps.lookupPermutedTable p l)])) ++ [.challenge]
       let beta := fs.squeeze t
-      let t := t ++ [.scalar beta]
+      let t := t ++ [.challenge]
       let gamma := fs.squeeze t
-      let t := t ++ [.scalar gamma]
+      let t := t
         ++ subProofBlocks (fun p : Fin shape.numProofs => absorbPoints (ps.permutationProduct p))
         ++ subProofBlocks (fun p : Fin shape.numProofs => absorbPoints (ps.lookupProduct p))
-        ++ [TranscriptElt.point ps.vanishingRandom]
+        ++ [TranscriptElt.point ps.vanishingRandom] ++ [.challenge]
       let y := fs.squeeze t
-      let t := t ++ [.scalar y] ++ absorbPoints ps.hPieces
+      let t := t ++ absorbPoints ps.hPieces ++ [.challenge]
       let x := fs.squeeze t
       let evalElts := subProofBlocks (fun p : Fin shape.numProofs =>
         absorbScalars (ps.instanceEvals p))
@@ -228,25 +216,24 @@ theorem deriveChallenges_parametric_numProofs {shape : Shape} {F G : Type*} [Zer
             absorbPermSet (ps.permutationSetEvals p s)))
         ++ subProofBlocks (fun p : Fin shape.numProofs =>
           subProofBlocks (fun l : Fin shape.numLookups => absorbLookup (ps.lookupEvals p l)))
-      let t := t ++ [.scalar x] ++ evalElts
+      let t := t ++ evalElts ++ [.challenge]
       let x1 := fs.squeeze t
-      let t := t ++ [.scalar x1]
+      let t := t ++ [.challenge]
       let x2 := fs.squeeze t
-      let t := t ++ [.scalar x2] ++ [TranscriptElt.point ps.multiopenQPrime]
+      let t := t ++ [TranscriptElt.point ps.multiopenQPrime] ++ [.challenge]
       let x3 := fs.squeeze t
-      let t := t ++ [.scalar x3] ++ absorbScalars ps.multiopenU
+      let t := t ++ absorbScalars ps.multiopenU ++ [.challenge]
       let x4 := fs.squeeze t
-      let t := t ++ [.scalar x4] ++ [TranscriptElt.point ps.ipaS]
+      let t := t ++ [TranscriptElt.point ps.ipaS] ++ [.challenge]
       let xi := fs.squeeze t
-      let t := t ++ [.scalar xi]
+      let t := t ++ [.challenge]
       let z := fs.squeeze t
-      let t := t ++ [.scalar z]
       let ipaRes := (List.finRange shape.k).foldl
         (fun (st : List (TranscriptElt F G) × List F) j =>
           let t := st.1 ++ [TranscriptElt.point (ps.ipaRounds j).1,
-            TranscriptElt.point (ps.ipaRounds j).2]
+            TranscriptElt.point (ps.ipaRounds j).2, TranscriptElt.challenge]
           let uj := fs.squeeze t
-          (t ++ [TranscriptElt.scalar uj], st.2 ++ [uj])) (t, [])
+          (t, st.2 ++ [uj])) (t, [])
       { theta := theta, beta := beta, gamma := gamma, y := y, x := x,
         x1 := x1, x2 := x2, x3 := x3, x4 := x4, xi := xi, z := z,
         ipaRound := fun j => ipaRes.2.getD j.val 0 } := by

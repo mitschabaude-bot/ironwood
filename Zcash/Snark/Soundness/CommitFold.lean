@@ -1,14 +1,14 @@
-import Mathlib
+import Mathlib.Tactic
 import Zcash.Snark.Soundness.InnerProduct
+import Zcash.Common.DiscreteLogRelation
 
 /-!
 # The commitment respects the IPA round fold
 
-This closes the consistency seam of the soundness argument: that an accepting transcript yields a tree
-consistent with the witness (`Zcash.Snark.extract_correct`'s hypothesis). The structural fact is that
-the polynomial
-commitment is compatible with one IPA round — folding the witness by `u⁻¹` and the generators by `u`
-sends the parent commitment to the folded one plus the cross terms `L`/`R` the verifier accounts for.
+This closes the consistency seam of the soundness argument: that an accepting transcript folds the
+witness the way the extractor assumes. The structural fact is that the polynomial commitment is
+compatible with one IPA round — folding the witness by `u⁻¹` and the generators by `u` sends the
+parent commitment to the folded one plus the cross terms `L`/`R` the verifier accounts for.
 
 * `commitGen` — the commitment over arbitrary generators (`commit urs = commitGen urs.g`).
 * `commitGen_{add,smul}_{left,gen}` — bilinearity in the witness and in the generators.
@@ -20,34 +20,13 @@ namespace Zcash.Snark
 
 variable {F G : Type*} [Field F] [AddCommGroup G] [Module F G]
 
-/-- The commitment over arbitrary generators `g`: `⟨a, g⟩ = Σᵢ aᵢ • gᵢ`. Specialises to the URS
-commitment: `commit urs = commitGen urs.g`. -/
-def commitGen {n : ℕ} (g : Fin n → G) (a : Fin n → F) : G := ∑ i, a i • g i
-
 /-- The fingerprint/URS commitment is the generator-commitment at the URS generators. -/
 theorem commit_eq_commitGen (urs : URS G) (a : Fin (2 ^ urs.k) → F) :
     commit urs a = commitGen urs.g a := rfl
 
-/-- Additivity in the witness. -/
-theorem commitGen_add_left {n : ℕ} (g : Fin n → G) (a a' : Fin n → F) :
-    commitGen g (a + a') = commitGen g a + commitGen g a' := by
-  simp only [commitGen, Pi.add_apply, add_smul, Finset.sum_add_distrib]
 
-/-- Homogeneity in the witness. -/
-theorem commitGen_smul_left {n : ℕ} (g : Fin n → G) (c : F) (a : Fin n → F) :
-    commitGen g (c • a) = c • commitGen g a := by
-  simp only [commitGen, Pi.smul_apply, smul_eq_mul, mul_smul, Finset.smul_sum]
 
-/-- Additivity in the generators. -/
-theorem commitGen_add_gen {n : ℕ} (g g' : Fin n → G) (a : Fin n → F) :
-    commitGen (g + g') a = commitGen g a + commitGen g' a := by
-  simp only [commitGen, Pi.add_apply, smul_add, Finset.sum_add_distrib]
 
-/-- Homogeneity in the generators. -/
-theorem commitGen_smul_gen {n : ℕ} (c : F) (g : Fin n → G) (a : Fin n → F) :
-    commitGen (c • g) a = c • commitGen g a := by
-  simp only [commitGen, Pi.smul_apply, Finset.smul_sum]
-  exact Finset.sum_congr rfl fun i _ => smul_comm (a i) c (g i)
 
 /-- **One IPA round's commitment fold (completeness).** Folding the witness by `u⁻¹` and the generators
 by `u` sends the parent commitment to the folded commitment plus the two cross terms `⟨aLo, gHi⟩` and
@@ -65,7 +44,7 @@ theorem commitGen_round {m : ℕ} (gLo gHi : Fin m → G) (aLo aHi : Fin m → F
 /-- **The binding step: an accepting round response is the true fold.** If the folded-generator
 commitment is binding and the prover's response `a'` opens the verifier's folded commitment —
 which by `commitGen_round` is exactly what the true fold opens — then `a' = aLo + u⁻¹ • aHi`.
-This is the per-node step promoting an accepting transcript to a `Zcash.Snark.Consistent` tree,
+This is the per-node step promoting an accepting transcript to the extractor's fold relation,
 leaving binding (DLR hardness) at the folded generators as the only hypothesis. -/
 theorem accepting_fold_eq {m : ℕ} (gLo gHi : Fin m → G) (aLo aHi a' : Fin m → F) {u : F} (hu : u ≠ 0)
     (hbind : Function.Injective (commitGen (F := F) (gLo + u • gHi)))
@@ -77,7 +56,7 @@ theorem accepting_fold_eq {m : ℕ} (gLo gHi : Fin m → G) (aLo aHi a' : Fin m 
 
 /-- `accepting_fold_eq` in the extractor's fold convention (witness by `u`, generators by `u⁻¹`):
 an accepting round response equals `foldVec aLo aHi u` — with `aLo := loHalf a`, `aHi := hiHalf a`,
-exactly the per-node condition of `Zcash.Snark.Consistent`. Derived at `u⁻¹` via `(u⁻¹)⁻¹ = u`. -/
+the per-node fold the extractor inverts. Derived at `u⁻¹` via `(u⁻¹)⁻¹ = u`. -/
 theorem accepting_fold_eq_foldVec {m : ℕ} (gLo gHi : Fin m → G) (aLo aHi a' : Fin m → F) {u : F}
     (hu : u ≠ 0) (hbind : Function.Injective (commitGen (F := F) (gLo + u⁻¹ • gHi)))
     (haccept : commitGen (gLo + u⁻¹ • gHi) a'
@@ -104,10 +83,6 @@ reduction extends this to the augmented `(g, U, W)` generators
 computational/AGM layer — is outside this
 development. -/
 
-/-- Additivity over subtraction in the witness. -/
-theorem commitGen_sub {n : ℕ} (g : Fin n → G) (a a' : Fin n → F) :
-    commitGen g (a - a') = commitGen g a - commitGen g a' := by
-  simp only [commitGen, Pi.sub_apply, sub_smul, Finset.sum_sub_distrib]
 
 /-- A nontrivial discrete-log relation among the URS generators, as data: a nonzero coefficient
 vector the generators send to `0`. DLR hardness is the assumption that no feasible adversary can

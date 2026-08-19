@@ -1,4 +1,4 @@
-import Mathlib
+import Mathlib.Tactic
 
 /-!
 # The verifier's challenges
@@ -7,11 +7,16 @@ The fingerprint MSM's coefficients are assembled from the proof's evaluation sca
 verifier's challenges; this module records the challenges: `θ, β, γ, y, x` (the main verifier),
 `x₁…x₄` (the multiopen), and `ξ, z` plus the `k` round challenges `uⱼ` (the IPA opening).
 
-We do not model the transcript. How the challenges are derived — Fiat–Shamir over a Blake2b hash
-of the proof so far — is hand-waved (project scope; the deployed non-interactive derivation is
-related to the interactive verifier separately). All the fingerprint needs is that the challenges
-are the verifier's randomness: free `F_p` variables the soundness argument (Schwartz–Zippel,
-special soundness) quantifies over.
+This structure only records the sampled values: all the fingerprint needs is that the challenges
+are the verifier's randomness, free `F_p` variables the soundness argument (Schwartz–Zippel,
+special soundness) quantifies over. How the deployed verifier derives them — Fiat–Shamir over a
+Blake2b hash of the proof so far — is modeled at the typed level by `deriveChallenges` in
+`Verifier/FiatShamir.lean` (the absorb/squeeze schedule over transcript elements), while
+`Soundness.FiatShamir` models its random-oracle execution and query accounting; the fixtures
+check the schedule model against the captured schedule and fold it into the fingerprint
+(`deriveChallenges_matches_captured_schedule`, `nonInteractiveFingerprint_matches`). What stays
+idealized: Blake2b itself, the byte serialization of absorbed points and scalars, and the
+challenge domain-prefix byte (the typed `.challenge` marker carries no data).
 -/
 
 namespace Zcash.Snark

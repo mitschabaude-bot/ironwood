@@ -3,3 +3,4 @@
 .vscode
 /.lake
 /.elan
+/scripts/generated/

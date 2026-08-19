@@ -1,4 +1,4 @@
-import Mathlib
+import Zcash.Snark.Core.Shape
 
 /-!
 # The proof string as opaque field and group elements
@@ -17,39 +17,12 @@ instances to `plonk::verify_proof`, which reads the per-action elements `N` time
 shared set of challenges and a single multiopen/IPA opening. So the proof string splits into
 per-sub-proof vectors and shared elements; the field order below is the verifier's read order.
 
-`Shape` records the per-circuit counts that fix every vector length; `ProofString shape F G` is
-the proof itself, generic over the field and group carriers, with concrete instantiation
-`F = F_p`, `G = E_q`.
+`Shape` records the circuit and invocation counts that fix every vector length;
+`ProofString shape F G` is the proof itself, generic over the field and group carriers,
+with concrete instantiation `F = F_p`, `G = E_q`.
 -/
 
 namespace Zcash.Snark
-
-/-- Per-circuit element counts, read off the verifying key; they fix every vector length in a
-`ProofString` and the read schedule.
-
-* `k` — `log₂` of the domain size (`n = 2 ^ k`); the IPA opening has `k` rounds.
-* `numProofs` — sub-proofs verified together: the bundle's Orchard action count (`instances.len()`).
-* `numAdviceColumns` — `vk.cs.num_advice_columns` (`10` for Orchard).
-* `numLookups` — `vk.cs.lookups`.
-* `numPermutationSets` — permutation product-commitment chunks,
-  `vk.cs.permutation.columns.chunks(cs_degree − 2)`.
-* `numPermutationColumns` — `vk.permutation.commitments`, one common eval each.
-* `numQuotientPieces` — `vk.domain.get_quotient_poly_degree()`.
-* `numInstanceQueries` / `numAdviceQueries` / `numFixedQueries` —
-  `vk.cs.{instance,advice,fixed}_queries`.
-* `numPointSets` — multiopen point sets, one `u` scalar each. -/
-structure Shape where
-  k : ℕ
-  numProofs : ℕ
-  numAdviceColumns : ℕ
-  numLookups : ℕ
-  numPermutationSets : ℕ
-  numPermutationColumns : ℕ
-  numQuotientPieces : ℕ
-  numInstanceQueries : ℕ
-  numAdviceQueries : ℕ
-  numFixedQueries : ℕ
-  numPointSets : ℕ
 
 /-- Per-set permutation product evaluations (halo2 `EvaluatedSet`): the product polynomial `zᵢ` at
 `x` (`eval`) and `ω x` (`nextEval`), plus — for every set except the last — at `ω^{last} x`
@@ -58,6 +31,11 @@ structure PermSetEval (F : Type*) where
   eval : F
   nextEval : F
   lastEval : Option F
+
+/-- Map a permutation set's evaluations along `f` — used to evaluate a polynomial-carrier set at a
+point, turning the polynomial-level constraint terms into the verifier's value-level ones. -/
+def PermSetEval.map {F G : Type*} (f : F → G) (e : PermSetEval F) : PermSetEval G :=
+  { eval := f e.eval, nextEval := f e.nextEval, lastEval := e.lastEval.map f }
 
 /-- Per-lookup evaluations (halo2 lookup `Evaluated`): the product `z` at `x` (`productEval`) and
 `ω x` (`productNextEval`); the permuted input `a'` at `x` (`permutedInputEval`) and `ω⁻¹ x`
@@ -68,6 +46,12 @@ structure LookupEval (F : Type*) where
   permutedInputEval : F
   permutedInputInvEval : F
   permutedTableEval : F
+
+/-- Map a lookup's evaluations along `f`, as `PermSetEval.map`. -/
+def LookupEval.map {F G : Type*} (f : F → G) (e : LookupEval F) : LookupEval G :=
+  { productEval := f e.productEval, productNextEval := f e.productNextEval,
+    permutedInputEval := f e.permutedInputEval, permutedInputInvEval := f e.permutedInputInvEval,
+    permutedTableEval := f e.permutedTableEval }
 
 /-- The proof string, over a field carrier `F` and group carrier `G`, with the fields declared in the
 verifier's read order. Group elements are commitments (Vesta points, `E_q`); field elements are

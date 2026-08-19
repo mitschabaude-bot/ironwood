@@ -1,34 +1,82 @@
 name = "Zcash"
 version = "0.1.0"
 keywords = ["cryptography", "math", "protocols"]
-defaultTargets = ["Zcash", "FixtureCheck"]
+defaultTargets = ["Zcash", "FixtureCheck", "CircuitCheck", "MetaCheck", "SecurityCheck"]
 
 [leanOptions]
 pp.unicode.fun = true # pretty-prints `fun a ↦ b`
 autoImplicit = false
 
 [[require]]
-name = "mathlib"
-scope = "leanprover-community"
-rev = "v4.30.0-rc2"
+name = "Clean"
+git = "https://github.com/Verified-zkEVM/clean"
+rev = "e4bf8019"
 
 [[require]]
 name = "CompElliptic"
 git = "https://github.com/daira/CompElliptic"
-rev = "f5f420f4b090b9f65be398d82ad29cfd96710aa3"
+rev = "fd9977340d728b704436894f87f9967f117ad5f7"
+
+# mathlib last, so that its pinned versions of the common transitive dependencies
+# (batteries, aesop, Qq, proofwidgets, ...) take precedence over CompPoly's.
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.30.0"
 
 [[lean_lib]]
 name = "Zcash"
 
+# Test-only adversarial declarations for `Zcash.Meta.AxiomCheck`. This is a separate library so
+# forged axioms used to exercise the rejection paths never enter the production `Zcash` import
+# graph, while the default build still runs the regression checks in CI.
+[[lean_lib]]
+name = "MetaCheck"
+globs = ["Zcash.Meta.Tests.+"]
+
 # Everything under `Zcash/Snark/Fixtures/` is instance-level: the generated Rust<->Lean captures
-# (per-capture subdirectories like `SingleAction`/`MultiAction`, holding the fixture data plus its
-# Fiat-Shamir schedule, faithfulness, and negative checks) and the hand-written consensus-max shape
-# instantiation (`MaxShape`). The `Zcash` library deliberately does not import them (the captures are
+# (per-capture subdirectories -- `SingleAction/Honest`, `MultiAction/Honest`, and their match-only
+# `Random` siblings -- holding the fixture data plus its Fiat–Shamir schedule, faithfulness, and
+# negative checks) plus the shared helpers (`Shared/`) and the cross-capture provenance modules
+# (`PostNu63`, `PostNu63Random`). The `Zcash` library deliberately does not import them (the captures are
 # large, generated, and slow); `Zcash/Snark/Fingerprint/` keeps the reusable match/soundness theory.
 # This dedicated target keeps the fixtures out of `lake build Zcash` for local dev, while plain
 # `lake build` (the default targets -- what CI runs) compiles them, so the empirical checks are
 # exercised alongside the parametric verifier obligations in `Zcash`. New modules under `Fixtures/`
-# are picked up by the glob automatically.
+# are picked up by the glob automatically. Through their imports the capstone entries pull in the
+# verifying-key COMMITMENT certificate chain `Keygen/Certificate`.
+#
+# `Keygen/Certificate` and `Keygen/InstanceCapture` (the ironwood#86 join of the captured
+# instance commitments to the circuit-derived family) are pinned explicitly: InstanceCapture has
+# no importer, and Certificate is otherwise reachable only through the capstone entries' imports.
 [[lean_lib]]
 name = "FixtureCheck"
-globs = ["Zcash.Snark.Fixtures.+"]
+globs = [
+  "Zcash.Snark.Fixtures.+",
+  "Zcash.Snark.Keygen.Certificate",
+  "Zcash.Snark.Keygen.InstanceCapture",
+]
+
+# The circuit-side VK matching and layout tests: `Zcash/Circuits/Tests/TestVk*` compare the
+# ported `configure`/`synthesize` against the CS and layout fixtures dumped from the actual
+# Rust circuit (see `Zcash/Circuits/Fixtures/`). Like `FixtureCheck`, these are `#eval`-checked
+# empirical bindings kept out of `lake build Zcash`, but compiled by plain `lake build`
+# (what CI runs) so a divergence between the Lean circuit model and the deployed VK fails the
+# build. The glob covers the whole directory, so a newly added test cannot land in no target
+# at all; that also pulls in `BenchFixedBase`, a pure kernel-`decide` benchmark, which is
+# cheap enough at its current size to keep honest alongside the rest.
+[[lean_lib]]
+name = "CircuitCheck"
+globs = ["Zcash.Circuits.Tests.+"]
+
+# `Zcash/Security/Ledger/BridgeTests.lean` — the regression checks guarding the protocol
+# distinctions a type-correct refinement can silently erase (signed value semantics, scalar
+# randomization, raw Merkle encodings, the dummy-spend guard, the three-valued cross-address flag).
+# Same reason as `MetaCheck`: a check module is where a smoke lemma stated too strongly, or an
+# axiom added to reproduce a bug, is least likely to draw review, so it does not belong in the
+# production `Zcash` import graph that downstream users get. It is not reached from `Zcash.Security`
+# (nothing outside the file references its declarations), and its own `assert_axioms` entries pin
+# its trusted base either way; this target keeps the default build running them.
+[[lean_lib]]
+name = "SecurityCheck"
+globs = ["Zcash.Security.Ledger.BridgeTests"]

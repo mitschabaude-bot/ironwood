@@ -1,13 +1,13 @@
-import Mathlib
+import Mathlib.Tactic
 
 /-!
 # Random-oracle collision vocabulary (classical ROM)
 
-Shared Layer-A foundation for the classical-ROM security arguments (key-binding `H^*`, and — reused
-by the Layer-B games — note-commitment / nullifier `H^rcm`). We follow the *deterministic-exhibition*
+Shared foundation for the classical-ROM security arguments (key-binding `H^*`, and — reused
+by the ledger-model games — note-commitment / nullifier `H^rcm`). We follow the *deterministic-exhibition*
 style of `BindingSignature/Balance.lean`: a security theorem reduces a break to an *exhibited*
 random-oracle collision, and the probability that such a collision occurs within `q` oracle queries —
-the birthday bound `q(q-1)/|F|` — is a separate concern (Layer C), carried as a named quantity
+the birthday bound `q(q-1)/|F|` — is a separate concern, carried as a named quantity
 until discharged.
 
 An abstract oracle is any function `O : Q → F` from queries to field outputs; "randomness" enters only
@@ -63,5 +63,17 @@ structure CollisionUpToSign [Neg F] (O : Q → F) where
 /-- Every collision is a `±`-collision. -/
 def Collision.upToSign [Neg F] {O : Q → F} (c : Collision O) : CollisionUpToSign O :=
   ⟨c.q₁, c.q₂, c.ne, Or.inl c.eq⟩
+
+/-- A collision of a partial oracle `O`, as data: two distinct queries on which `O` is
+defined, with equal outputs.  For a totalized partial function, plain `Collision` would
+also accept two undefined queries mapped to the same sentinel; requiring the successful
+evaluations keeps the event a genuine collision. -/
+structure DefinedCollision (O : Q → Option F) where
+  q₁ : Q
+  q₂ : Q
+  ne : q₁ ≠ q₂
+  output : F
+  eval₁ : O q₁ = some output
+  eval₂ : O q₂ = some output
 
 end Zcash.Security.RandomOracle

@@ -6,8 +6,10 @@ extend-exclude = [
   "*.json",
   "*.svg",
   "*.lock",
+  "SHA256SUMS",
   "LICENSE-*",
   "book/book/",
+  "scripts/generated/",
   "target/",
 ]
 
@@ -22,4 +24,15 @@ extend-exclude = [
 extend-ignore-identifiers-re = [
   "^[A-Za-z0-9_]{1,3}$",
   "^H[A-Za-z0-9]{3}$",
+  # Git revisions are opaque hexadecimal identifiers, not prose.
+  "^[0-9a-f]{8,40}$",
 ]
+
+[default.extend-words]
+thr = "thr"  # threshold identifiers (`thr`, `thr1`, `thr4`) in Composition/Completeness
+hsi = "hsi"  # hypothesis identifiers (`hsiN`) in Verifier/Assemble
+henc = "henc"  # hypothesis identifier (`henc`) in Circuits/Integration/ActionCopyWitness
+padd = "padd"  # projective point addition (`padd`) in Vendor/CompPoly/ScalarFftDefs
+Hom = "Hom"  # `RingHom`, `evalRingHom` — Mathlib's homomorphism naming
+advices = "advices"
+colinear = "colinear"  # deliberate English spelling; we are not writing Latin

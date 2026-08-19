@@ -147,13 +147,13 @@ theorem saplingVSumBound_lt_jubjubScalarOrder : saplingVSumBound < (jubjubScalar
 bundle — `≤ saplingMaxSpends` spends and `≤ saplingMaxOutputs` outputs, each value in
 `[0, 2^64−1]`, signed-64-bit `vBalance` — that does not balance over ℤ
 (`∑ v_old − ∑ v_new − vBalance ≠ 0`) yields an explicit nontrivial discrete-log relation between
-`V` and `R`, as data. The no-overflow bound is discharged here by `sapling_natAbs_lt`; there is no
+`Vbase` and `Rbase`, as data. The no-overflow bound is discharged here by `sapling_natAbs_lt`; there is no
 binding assumption (RedDSA extractability `hExtract` is the only cryptographic input). The
 computed relation is discharged against DLR hardness at the computational layer, and Sapling
 bundle balance is the contrapositive. -/
 def NontrivialRelation.ofSaplingImbalance {M : Type*} [AddCommGroup M]
     [Module (ZMod jubjubScalarOrder) M]
-    (V R : M) (spends outputs : List (ℤ × ZMod jubjubScalarOrder)) (vBalance : ℤ)
+    (Vbase Rbase : M) (spends outputs : List (ℤ × ZMod jubjubScalarOrder)) (vBalance : ℤ)
     (bsk : ZMod jubjubScalarOrder)
     (hne : (spends.map Prod.fst).sum - (outputs.map Prod.fst).sum - vBalance ≠ 0)
     (hOld : ∀ v ∈ spends.map Prod.fst, 0 ≤ v ∧ v ≤ 2^64 - 1)
@@ -161,11 +161,11 @@ def NontrivialRelation.ofSaplingImbalance {M : Type*} [AddCommGroup M]
     (hnOld : spends.length ≤ saplingMaxSpends)
     (hnNew : outputs.length ≤ saplingMaxOutputs)
     (hvBalance : |vBalance| ≤ 2^63)
-    (hExtract : bindingVK V R (castBundle spends) (castBundle outputs) (vBalance : ZMod jubjubScalarOrder)
-      = bsk • R) :
-    NontrivialRelation (F := ZMod jubjubScalarOrder) V R :=
+    (hExtract : bindingVK Vbase Rbase (castBundle spends) (castBundle outputs) (vBalance : ZMod jubjubScalarOrder)
+      = bsk • Rbase) :
+    NontrivialRelation (F := ZMod jubjubScalarOrder) Vbase Rbase :=
   have hbound := sapling_natAbs_lt (spends.map Prod.fst) (outputs.map Prod.fst) vBalance
     hOld hNew (by simpa using hnOld) (by simpa using hnNew) hvBalance saplingVSumBound_lt_jubjubScalarOrder
-  NontrivialRelation.ofBundleIntImbalance V R spends outputs vBalance bsk hne hbound hExtract
+  NontrivialRelation.ofBundleIntImbalance Vbase Rbase spends outputs vBalance bsk hne hbound hExtract
 
 end Zcash.Security.BindingSignature

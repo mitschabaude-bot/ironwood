@@ -49,24 +49,24 @@ theorem orchardVSumBound_lt_pallasScalarOrder : orchardVSumBound < (pallasScalar
 /-- **Orchard integer balance reduction (§4.14), as a computed relation.** A verifying Orchard
 bundle of `≤ 2^16 − 1` actions — each committing a net value `v ∈ [−2^64+1, 2^64−1]`, with
 signed-64-bit `vBalance` — that does not balance over ℤ (`∑ v_net − vBalance ≠ 0`) yields an
-explicit nontrivial discrete-log relation between `V` and `R`, as data. The no-overflow bound is
+explicit nontrivial discrete-log relation between `Vbase` and `Rbase`, as data. The no-overflow bound is
 discharged here by `orchard_natAbs_lt`; there is no binding assumption (RedDSA extractability
 `hExtract` is the only cryptographic input). The computed relation is discharged against DLR
 hardness at the computational layer, and Orchard bundle balance is the contrapositive. -/
 def NontrivialRelation.ofOrchardImbalance {M : Type*} [AddCommGroup M]
     [Module (ZMod pallasScalarOrder) M]
-    (V R : M) (actions : List (ℤ × ZMod pallasScalarOrder)) (vBalance : ℤ)
+    (Vbase Rbase : M) (actions : List (ℤ × ZMod pallasScalarOrder)) (vBalance : ℤ)
     (bsk : ZMod pallasScalarOrder)
     (hne : (actions.map Prod.fst).sum - vBalance ≠ 0)
     (hv : ∀ v ∈ actions.map Prod.fst, |v| ≤ 2^64 - 1)
     (hn : actions.length ≤ 2^16 - 1)
     (hvBalance : |vBalance| ≤ 2^63)
-    (hExtract : bindingVK V R (castBundle actions) (castBundle []) (vBalance : ZMod pallasScalarOrder)
-      = bsk • R) :
-    NontrivialRelation (F := ZMod pallasScalarOrder) V R :=
+    (hExtract : bindingVK Vbase Rbase (castBundle actions) (castBundle []) (vBalance : ZMod pallasScalarOrder)
+      = bsk • Rbase) :
+    NontrivialRelation (F := ZMod pallasScalarOrder) Vbase Rbase :=
   have hbound := orchard_natAbs_lt (actions.map Prod.fst) vBalance hv (by simpa using hn) hvBalance
     orchardVSumBound_lt_pallasScalarOrder
-  NontrivialRelation.ofBundleIntImbalance V R actions [] vBalance bsk (by simpa using hne)
+  NontrivialRelation.ofBundleIntImbalance Vbase Rbase actions [] vBalance bsk (by simpa using hne)
     (by simpa using hbound) hExtract
 
 end Zcash.Security.BindingSignature
