@@ -526,6 +526,8 @@ assert_axioms Zcash.Circuits.Specs.Sinsemilla.noteCommitChunks_inj
 assert_axioms Zcash.Circuits.Specs.Sinsemilla.merkleChunks_inj
 assert_axioms Zcash.Security.Ledger.Bridge.preCoeffs_inj
 assert_axioms Zcash.Security.Concrete.PallasGroup.eq_of_toPoint_x_eq_of_y_parity_eq
+assert_computable Zcash.Security.Ledger.Bridge.toOrchardPoints +choice +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 assert_computable Zcash.Security.Ledger.Bridge.relationOfChainPmEq +choice +native(
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 assert_computable Zcash.Security.Ledger.Bridge.relationOfKeyBindingBreak +choice +native(
@@ -696,6 +698,7 @@ assert_computable Zcash.Security.Ledger.Model.kappaPrimitivesAt +choice
 assert_computable Zcash.Security.Ledger.Model.kappaShapeAt +choice
 assert_computable Zcash.Security.Ledger.Model.kappaBindingAt +choice
 assert_computable Zcash.Security.Ledger.Model.kappaExtractor +choice
+assert_computable Zcash.Security.Ledger.Model.extractorAtBasis +choice
 assert_computable Zcash.Security.Ledger.Model.bvkAt +choice
 assert_computable Zcash.Security.Ledger.Model.failTxOfAnn
 assert_computable Zcash.Security.Ledger.Model.kappaOut +choice
@@ -787,7 +790,11 @@ as the table, and the named `ε_valuedlr` bounds the deployed finder's relation 
 the named 𝒱/ℛ slots. In the deployed integrity form, `ε_sinsemilladlr` bounds the event
 that a valid ledger's Merkle, note-commitment, or key-binding break computes a nontrivial
 relation among the fixed Sinsemilla bases at some prefix, routed through the
-basis-parametric Orchard reducer (`deployedSinsemillaRelationEvent`). -/
+basis-parametric Orchard reducer (`deployedSinsemillaRelationEvent`). The reduction
+producers of this layer are pinned computable: the break transports to the fixed primitives
+(`noteCommitBreakAtBasis`, `noteCommitBreakOfKappa`), the basis-parametric Balance-subset
+reducer (`orchardBalanceSubsetOrRelationAtBasis`), and the deployed finders
+(`conservationFinder`, `valueDLRFinder`). -/
 
 assert_computable Zcash.Security.Ledger.Bridge.kappaOrchardBalanceSubsetOrRelation +choice +native(
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
@@ -808,6 +815,16 @@ assert_axioms Zcash.Security.Ledger.Bridge.orchardBalanceConservation_measure_le
 assert_axioms Zcash.Security.Ledger.Bridge.orchardShieldedBalanceCap_measure_le_idealizedks_deployed +native(
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 assert_axioms Zcash.Security.Ledger.Bridge.orchardBalanceIntegrity_measure_le_idealizedks_deployed +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_computable Zcash.Security.Ledger.Bridge.noteCommitBreakAtBasis +choice +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_computable Zcash.Security.Ledger.Bridge.noteCommitBreakOfKappa +choice +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_computable Zcash.Security.Ledger.Bridge.orchardBalanceSubsetOrRelationAtBasis +choice +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_computable Zcash.Security.Ledger.Bridge.IdealizedKSBalanceAdversary.conservationFinder +choice +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_computable Zcash.Security.Ledger.Bridge.IdealizedKSBalanceAdversary.valueDLRFinder +choice +native(
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 
 /-! ## The Orchard extraction experiment
@@ -980,6 +997,10 @@ assert_computable Zcash.discreteLogOfChallenge_of_relation +choice
 assert_computable Zcash.programmedExtractOrMiss +choice
 assert_computable Zcash.Snark.relationWitnessOfCollision +choice
 assert_computable Zcash.discreteLogOfAugmentedRelationAtChallenge +choice
+assert_computable Zcash.discreteLogOfU_of_augmentedRelation +choice
+assert_computable Zcash.discreteLogOfW_of_augmentedRelation +choice
+assert_computable Zcash.NontrivialRelation.ofParts +choice
+assert_computable Zcash.AlgebraicRelationWitness.embed +choice
 assert_computable Zcash.Snark.separateOrRelationWitness +choice
 assert_computable Zcash.Snark.algebraicPowerBatchWithSourceOrRelation +choice
 assert_computable Zcash.Snark.finForallOrRelationWitness
