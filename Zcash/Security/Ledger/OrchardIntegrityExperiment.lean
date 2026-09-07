@@ -447,7 +447,7 @@ The idealizations are the sampled `violationEvent`'s, with two differences:
   computed by `H_bind`.
 * On the composed route, the Fiat–Shamir transcript oracle is presented finitely, one
   independent table per bundle size (the `OrchardExtractionExperiment` module doc states
-  why that presentation is sound). -/
+  what that presentation rests on, and that the experiment does not yet consume it). -/
 def deployedViolationEvent (A : IdealizedKSBalanceAdversary MSG spendAuthVerify H_bind)
     (issuance : ℕ → ℕ) (maxActions : ℕ)
     (E : ∀ P : Primitives Fq PallasGroup Fp Fp Fp Fp Fp Encoding MSG

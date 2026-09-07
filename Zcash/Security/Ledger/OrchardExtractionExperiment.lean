@@ -25,16 +25,19 @@ function of its coins —which include the sampled runs— and that is the only 
 sound composition can take.
 
 The bundle size is selected adaptively, and the oracle tables are shared per bundle
-size. The deployed verifier absorbs the verifying key digest, every instance
-commitment, and every advice commitment before squeezing its first challenge, so the
-pre-challenge transcript determines the bundle size and distinct sizes never share a
-squeeze input. Sampling one independent transcript per size is therefore a sound
-finite presentation of one random oracle — and every chain position's proof at a
-given size reads that size's one shared table, as a real adversary's proofs against
-one oracle would. The ledger machine may select each position's size after seeing the
-runs. The cost is that the knowledge-soundness terms of the composed bound sum over
-the slot-size pairs — a factor `k * maxActions` — counting the extraction targets
-this model hands the adversary. Removing the factor is tracked as #214.
+size: every chain position's proof at a given size reads that size's one shared table,
+and the ledger machine may select each position's size after seeing the runs.
+The oracle of this model is the typed squeeze on transcript elements, and one table per
+size is a faithful presentation of one such oracle exactly when the schedules of
+different sizes never squeeze the same transcript. The deployed verifier absorbs the
+verifying key digest and every instance and advice commitment before its first squeeze,
+so the pre-θ transcripts of different action counts are prefix-incomparable, and so are
+their byte encodings under the deployed hash; #215 proves both facts. This experiment
+does not yet consume them, so the per-size presentation stands here as a modelling
+claim of the module. The cost of the per-size tables is that the knowledge-soundness
+terms of the composed bound sum over the slot-size pairs — a factor `k * maxActions` —
+counting the extraction targets this model hands the adversary. Removing the factor is
+tracked as #214.
 
 The composed endpoints run at the deployed value bases (`deployedViolationEvent` over
 `deployedExperiment`): the extracted witnesses open the value commitments at the
