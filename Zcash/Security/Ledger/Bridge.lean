@@ -1012,7 +1012,8 @@ def ActionLedgerSuccess.ofSpec
             simpa [w, inst, path, Pool.extract, hroot] using hp
           nf_old_eq := by
             simpa [inst, w, Pool.primitives, Pool.keyBinding,
-              KeyBinding.Pool.toInterface, commitIvkWitness, Pool.deriveNullifier]
+              KeyBinding.Pool.toInterface, commitIvkWitness, Pool.deriveNullifier,
+              Pool.nullifierScalar]
               using hnf'
           key_binding := by
             simpa [w] using (commitIvkWitness_kb hgdOld hakP hpkdOld hkwDef hivk).1

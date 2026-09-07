@@ -528,6 +528,9 @@ assert_axioms Zcash.Security.Ledger.Bridge.preCoeffs_inj
 assert_axioms Zcash.Security.Concrete.PallasGroup.eq_of_toPoint_x_eq_of_y_parity_eq
 assert_computable Zcash.Security.Ledger.Bridge.toOrchardPoints +choice +native(
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_axioms Zcash.Security.Ledger.Bridge.note_eq_of_noteScalars_words_eq
+assert_computable Zcash.Security.Ledger.Bridge.relationOfChainVecPmEq +choice +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 assert_computable Zcash.Security.Ledger.Bridge.relationOfChainPmEq +choice +native(
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 assert_computable Zcash.Security.Ledger.Bridge.relationOfKeyBindingBreak +choice +native(

@@ -140,10 +140,14 @@ theorem toPoint_randomizePublic (α : Fq) (ak : PallasGroup) :
       α.val • Ecc.MulFixed.Certs.spendAuthG.point + PallasGroup.toPoint ak := by
   simp [randomizePublic]
 
+/-- The scalar the nullifier derivation multiplies 𝒦^Orchard by: the Poseidon hash of
+`(nk, ρ)` plus `ψ`, added in the base field and reinterpreted as a scalar (§4.16). -/
+def nullifierScalar (nk rho psi : Fp) : Fq :=
+  ((Poseidon.Hash.ConstantLength.value #v[nk, rho] + psi).val : Fq)
+
 def deriveNullifier (nk rho psi : Fp) (cm : PallasGroup) : Fp :=
   (PallasGroup.toPoint cm +
-    ((Poseidon.Hash.ConstantLength.value #v[nk, rho] + psi).val : Fq).val
-      • Ecc.MulFixed.Certs.nullifierK.point).x
+    (nullifierScalar nk rho psi).val • Ecc.MulFixed.Certs.nullifierK.point).x
 
 def intScalar (z : ℤ) : Fq := (z : Fq)
 

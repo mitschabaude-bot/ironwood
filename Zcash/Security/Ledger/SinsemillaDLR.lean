@@ -1,3 +1,5 @@
+import Mathlib.Tactic.LinearCombination
+import Mathlib.Tactic.Module
 import Zcash.Security.Ledger.Bridge
 import Zcash.Security.Ledger.Pool
 import Zcash.Common.DiscreteLogRelation
@@ -35,6 +37,7 @@ open Zcash.Circuits.Specs (K)
 open Zcash.Circuits.Specs.Sinsemilla
 open Zcash.Security.Concrete
 open Zcash.Security.Ledger.Pool
+open scoped Zcash.Security.RandomOracle
 
 /-! ## The lifted generator table -/
 
@@ -726,14 +729,81 @@ theorem preCoeffs_inj {l₁ l₂ : List ℕ}
       exact ht (hEq ▸ hbl _ hmem)
     rw [hz l₁ hb₁, hz l₂ hb₂]
 
+/-- **The chain-collision reducer, over any vector of blinding points.** Two defined
+Sinsemilla chains at the same domain point, each blinded by a combination `∑ i, c i • V i`
+of the fixed points `V`, whose blinded outputs `X₁` and `X₂` agree up to sign, compute a
+nontrivial relation among the table, the domain point, and `V` — provided the pair
+`(word list, coefficient vector)` differs. The outputs are named terms with their
+decompositions as hypotheses, so a caller passes whatever form it holds them in. The
+equality case rests on `preCoeffs_inj` — word lists of length at most 253 are determined
+by their coefficients, and every Orchard-protocol Sinsemilla message is far shorter. The
+negation case is unconditional: the domain-point coefficients `2^n` and `-2^n` cannot agree
+because `2^(n+1) ≠ 0` in the odd-order scalar field. The one-point instance is
+`relationOfChainPmEq`. -/
+def relationOfChainVecPmEq {Q : Point Fp} (hQ : Q.Valid) {j : ℕ} {V : Fin j → PallasGroup}
+    {l₁ l₂ : List ℕ} (hb₁ : ∀ m ∈ l₁, m < 2^K) (hb₂ : ∀ m ∈ l₂, m < 2^K)
+    (hlen : l₁.length = l₂.length)
+    {p₁ p₂ : Point Fp}
+    (h₁ : hashToPoint orchardGenerators.S Q l₁ = some p₁) (hv₁ : p₁.Valid)
+    (h₂ : hashToPoint orchardGenerators.S Q l₂ = some p₂) (hv₂ : p₂.Valid)
+    {c₁ c₂ : Fin j → Fq} {X₁ X₂ : PallasGroup}
+    (hX₁ : X₁ = PallasGroup.ofPoint p₁ hv₁ + ∑ i, c₁ i • V i)
+    (hX₂ : X₂ = PallasGroup.ofPoint p₂ hv₂ + ∑ i, c₂ i • V i)
+    (heq : X₁ =± X₂)
+    (hn : l₁.length ≤ 253)
+    (hne : ¬(l₁ = l₂ ∧ c₁ = c₂)) :
+    NontrivialRelation (F := Fq) pallasS (Fin.cons (PallasGroup.ofPoint Q hQ) V) :=
+  have hchain₁ : PallasGroup.ofPoint p₁ hv₁
+      = commitGen pallasS (preCoeffs l₁) + ((2 : Fq)^l₁.length) • PallasGroup.ofPoint Q hQ := by
+    simpa using blinded_chain_eq hQ (0 : PallasGroup) hb₁ h₁ hv₁ (0 : Fq)
+  have hchain₂ : PallasGroup.ofPoint p₂ hv₂
+      = commitGen pallasS (preCoeffs l₂) + ((2 : Fq)^l₂.length) • PallasGroup.ofPoint Q hQ := by
+    simpa using blinded_chain_eq hQ (0 : PallasGroup) hb₂ h₂ hv₂ (0 : Fq)
+  if hplus : X₁ = X₂ then
+    NontrivialRelation.ofParts (preCoeffs l₁ - preCoeffs l₂)
+      (Fin.cons ((2 : Fq)^l₁.length - (2 : Fq)^l₂.length) (c₁ - c₂))
+      (by
+        by_cases ha : preCoeffs l₁ = preCoeffs l₂
+        · have hc : c₁ ≠ c₂ := fun hc => hne ⟨preCoeffs_inj hb₁ hb₂ hlen hn ha, hc⟩
+          obtain ⟨i, hi⟩ := Function.ne_iff.mp hc
+          refine Or.inr (Function.ne_iff.mpr ⟨i.succ, ?_⟩)
+          simp only [Fin.cons_succ, Pi.sub_apply, Pi.zero_apply]
+          exact sub_ne_zero.mpr hi
+        · exact Or.inl (sub_ne_zero.mpr ha))
+      (by
+        have h := hplus
+        rw [hX₁, hX₂, hchain₁, hchain₂] at h
+        rw [Fin.sum_univ_succ]
+        simp only [Fin.cons_zero, Fin.cons_succ, Pi.sub_apply, sub_smul,
+          Finset.sum_sub_distrib]
+        rw [commitGen_sub]
+        linear_combination (norm := module) h)
+  else
+    NontrivialRelation.ofParts (preCoeffs l₁ + preCoeffs l₂)
+      (Fin.cons ((2 : Fq)^l₁.length + (2 : Fq)^l₂.length) (c₁ + c₂))
+      (by
+        refine Or.inr (Function.ne_iff.mpr ⟨0, ?_⟩)
+        simp only [Fin.cons_zero, Pi.zero_apply]
+        intro hα
+        rw [hlen] at hα
+        have h0 : (2 : Fq)^(l₂.length + 1) = 0 := by
+          rw [pow_succ, mul_two]
+          exact hα
+        exact two_pow_ne_zero _ h0)
+      (by
+        have h := heq.resolve_left hplus
+        rw [hX₁, hX₂, hchain₁, hchain₂] at h
+        rw [Fin.sum_univ_succ]
+        simp only [Fin.cons_zero, Fin.cons_succ, Pi.add_apply, add_smul,
+          Finset.sum_add_distrib]
+        rw [commitGen_add_left]
+        linear_combination (norm := module) h)
+
 /-- **The chain-collision reducer.** Two defined Sinsemilla chains at the same domain
 point, blinded by `r₁ • W` and `r₂ • W`, whose outputs agree up to sign, compute a
 nontrivial relation among the table, the domain point, and `W` — provided the pair
-`(chunk list, blinding scalar)` differs. The equality case rests on
-`preCoeffs_inj` — chunk lists of length at most 253 are determined by their
-coefficients, and every Orchard-protocol Sinsemilla message is far shorter. The
-negation case is unconditional: the domain-point coefficients `2^n` and `-2^n` cannot
-agree because `2^(n+1) ≠ 0` in the odd-order scalar field. -/
+`(word list, blinding scalar)` differs. The one-point instance of
+`relationOfChainVecPmEq`, at the blinding point `W`. -/
 def relationOfChainPmEq {Q : Point Fp} (hQ : Q.Valid) {W : PallasGroup}
     {l₁ l₂ : List ℕ} (hb₁ : ∀ m ∈ l₁, m < 2^K) (hb₂ : ∀ m ∈ l₂, m < 2^K)
     (hlen : l₁.length = l₂.length)
@@ -741,41 +811,15 @@ def relationOfChainPmEq {Q : Point Fp} (hQ : Q.Valid) {W : PallasGroup}
     (h₁ : hashToPoint orchardGenerators.S Q l₁ = some p₁) (hv₁ : p₁.Valid)
     (h₂ : hashToPoint orchardGenerators.S Q l₂ = some p₂) (hv₂ : p₂.Valid)
     {r₁ r₂ : Fq}
-    (heq : PallasGroup.ofPoint p₁ hv₁ + r₁ • W = PallasGroup.ofPoint p₂ hv₂ + r₂ • W ∨
-      PallasGroup.ofPoint p₁ hv₁ + r₁ • W = -(PallasGroup.ofPoint p₂ hv₂ + r₂ • W))
+    (heq : PallasGroup.ofPoint p₁ hv₁ + r₁ • W =± PallasGroup.ofPoint p₂ hv₂ + r₂ • W)
     (hn : l₁.length ≤ 253)
     (hne : ¬(l₁ = l₂ ∧ r₁ = r₂)) :
     NontrivialRelation (F := Fq) pallasS ![PallasGroup.ofPoint Q hQ, W] :=
-  if hplus : PallasGroup.ofPoint p₁ hv₁ + r₁ • W = PallasGroup.ofPoint p₂ hv₂ + r₂ • W then
-    NontrivialRelation.ofCombinationCollision
-      (a := preCoeffs l₁) (a' := preCoeffs l₂)
-      (α := (2 : Fq)^l₁.length) (α' := (2 : Fq)^l₂.length)
-      (β := r₁) (β' := r₂)
-      (by
-        have h := hplus
-        rw [blinded_chain_eq hQ W hb₁ h₁ hv₁ r₁,
-          blinded_chain_eq hQ W hb₂ h₂ hv₂ r₂] at h
-        exact h)
-      (by rintro ⟨ha, -, hr⟩; exact hne ⟨preCoeffs_inj hb₁ hb₂ hlen hn ha, hr⟩)
-  else
-    NontrivialRelation.ofCombinationCollision
-      (a := preCoeffs l₁) (a' := -(preCoeffs l₂))
-      (α := (2 : Fq)^l₁.length) (α' := -((2 : Fq)^l₂.length))
-      (β := r₁) (β' := -r₂)
-      (by
-        have h := heq.resolve_left hplus
-        rw [blinded_chain_eq hQ W hb₁ h₁ hv₁ r₁,
-          blinded_chain_eq hQ W hb₂ h₂ hv₂ r₂] at h
-        rw [h, commitGen_neg, neg_smul, neg_smul]
-        abel)
-      (by
-        rintro ⟨-, hα, -⟩
-        rw [hlen] at hα
-        have h0 : (2 : Fq)^(l₂.length + 1) = 0 := by
-          rw [pow_succ, mul_two]
-          exact add_eq_zero_iff_eq_neg.mpr hα
-        exact two_pow_ne_zero _ h0)
-
+  relationOfChainVecPmEq hQ (V := ![W]) hb₁ hb₂ hlen h₁ hv₁ h₂ hv₂
+    (c₁ := ![r₁]) (c₂ := ![r₂])
+    (X₁ := PallasGroup.ofPoint p₁ hv₁ + r₁ • W) (X₂ := PallasGroup.ofPoint p₂ hv₂ + r₂ • W)
+    (by simp) (by simp) heq hn
+    (fun ⟨hl, hc⟩ => hne ⟨hl, by simpa using congrFun hc 0⟩)
 
 /-- With zero blinding scalars, the reducer's randomness-base coefficient is zero. -/
 theorem relationOfChainPmEq_zero_beta {Q : Point Fp} (hQ : Q.Valid) {W : PallasGroup}
@@ -785,15 +829,12 @@ theorem relationOfChainPmEq_zero_beta {Q : Point Fp} (hQ : Q.Valid) {W : PallasG
     (h₁ : hashToPoint orchardGenerators.S Q l₁ = some p₁) (hv₁ : p₁.Valid)
     (h₂ : hashToPoint orchardGenerators.S Q l₂ = some p₂) (hv₂ : p₂.Valid)
     (heq : PallasGroup.ofPoint p₁ hv₁ + (0 : Fq) • W
-        = PallasGroup.ofPoint p₂ hv₂ + (0 : Fq) • W ∨
-      PallasGroup.ofPoint p₁ hv₁ + (0 : Fq) • W
-        = -(PallasGroup.ofPoint p₂ hv₂ + (0 : Fq) • W))
+      =± PallasGroup.ofPoint p₂ hv₂ + (0 : Fq) • W)
     (hn : l₁.length ≤ 253) (hne : ¬(l₁ = l₂ ∧ (0 : Fq) = 0)) :
     (relationOfChainPmEq hQ hb₁ hb₂ hlen h₁ hv₁ h₂ hv₂ heq hn hne).β = 0 := by
-  unfold relationOfChainPmEq
-  split <;> simp [Zcash.NontrivialRelation.β,
-    Zcash.NontrivialRelation.ofCombinationCollision,
-    Zcash.NontrivialRelation.ofParts, augmentedCoeffs, BasisIndex.w]
+  unfold relationOfChainPmEq relationOfChainVecPmEq
+  split <;> simp [Zcash.NontrivialRelation.β, Zcash.NontrivialRelation.ofParts,
+    augmentedCoeffs, BasisIndex.w]
 
 
 end Zcash.Security.Ledger.Bridge
