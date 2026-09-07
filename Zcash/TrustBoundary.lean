@@ -45,6 +45,7 @@ import Zcash.Snark.Soundness.Relation.ConstraintRelations
 import Zcash.Snark.Soundness.Pricing.ChallengePricing
 import Zcash.Security.Ledger.KeyBindingDLR
 import Zcash.Security.Ledger.NoteCommitDLR
+import Zcash.Security.Ledger.NullifierDLR
 import Zcash.Security.Ledger.MerkleDLR
 import Zcash.Security.Ledger.OrchardCapstone
 import Zcash.Security.Ledger.OrchardIntegrityExperiment
@@ -455,13 +456,25 @@ assert_axioms Zcash.Security.Ledger.Model.validLedger_append
 
 /-! ## The nullifier-binding reduction
 
-Computed break reduction: a nullifier collision between distinct notes, over the
-additive shape of the deployed derivation, computes a nontrivial relation among the
-commitment bases, the nullifier base, and the randomness base — the balance
-argument's terminal. `+choice` is the erased-positions tier: choice arrives with the
-`abel`/`simp` proof terms in the relation's `Prop` fields, never the data path. -/
+Computed break reductions: a nullifier collision between distinct openings computes a
+nontrivial relation among the commitment bases, the nullifier base, and the randomness
+base. `ofNullifierCollision` works over the additive shape of the derivation
+(`NullifierShape`). `relationOfNullifierCollision` works at the deployed Orchard
+primitives directly. Its relation lands in the combined deployed basis, at the
+`NoteCommit` domain point, its randomness base, and the nullifier base 𝒦^Orchard
+(`idxNullifierK`). It rewrites the deployed derivation as a shifted commitment
+(`deriveNullifier_eq_extract`) and applies the chain-collision reducer at two blinding
+points (`relationOfChainVecPmEq`).
+
+`+choice` is the erased-positions tier: choice arrives with the `abel`/`simp` proof terms
+in the relation's `Prop` fields, never the data path. The deployed reducers' `+native`
+owner is the curve-order certificate, as for their Sinsemilla siblings. -/
 
 assert_computable Zcash.Security.Ledger.Model.NontrivialRelation.ofNullifierCollision +choice
+assert_axioms Zcash.Security.Ledger.Bridge.deriveNullifier_eq_extract +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_computable Zcash.Security.Ledger.Bridge.relationOfNullifierCollision +choice +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 
 /-! ## Spend Authority
 

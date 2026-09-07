@@ -81,6 +81,12 @@ def noteCommitRpt : PallasGroup :=
 /-- The Merkle domain point `Q("z.cash:Orchard-MerkleCRH")`, as a group element. -/
 def merkleQpt : PallasGroup := PallasGroup.ofPoint Pool.merkleQ (Or.inl Pool.merkleQ_onCurve)
 
+/-- The deployed nullifier base 𝒦^Orchard (§4.16,
+<https://zips.z.cash/protocol/protocol.pdf#commitmentsandnullifiers>), as a group element. -/
+def nullifierKpt : PallasGroup :=
+  PallasGroup.ofPoint Ecc.MulFixed.Certs.nullifierK.point
+    (Or.inl Ecc.MulFixed.Certs.nullifierK.onCurve)
+
 /-- The named slots of the combined deployed basis's distinguished points. The `idx`
 prefix keeps the slot names apart from the points they refer to. -/
 inductive OrchardPointIndex where
@@ -91,17 +97,19 @@ inductive OrchardPointIndex where
   | idxMerkleQ
   | idxValueCommitV
   | idxValueCommitR
+  | idxNullifierK
   deriving DecidableEq
 
 instance : Fintype OrchardPointIndex :=
   ⟨⟨[OrchardPointIndex.idxIvkQ, .idxCommitIvkR, .idxNoteQ, .idxNoteCommitR, .idxMerkleQ,
-      .idxValueCommitV, .idxValueCommitR], by decide⟩,
+      .idxValueCommitV, .idxValueCommitR, .idxNullifierK], by decide⟩,
     fun x => by cases x <;> decide⟩
 
 /-- **The combined deployed basis's distinguished points.** Every relation arm of the
-Balance route lands among the Sinsemilla generator table and these seven deployed
-points: the three Sinsemilla domain points, their two commitment randomness bases, and
-the two value-commitment bases. -/
+Balance route, and the nullifier arm of Spendability, lands among the Sinsemilla
+generator table and these eight deployed points: the three Sinsemilla domain points,
+their two commitment randomness bases, the two value-commitment bases, and the
+nullifier base. -/
 def orchardPoints : OrchardPointIndex → PallasGroup
   | .idxIvkQ => ivkQpt
   | .idxCommitIvkR => commitIvkRpt
@@ -110,6 +118,7 @@ def orchardPoints : OrchardPointIndex → PallasGroup
   | .idxMerkleQ => merkleQpt
   | .idxValueCommitV => valueCommitV
   | .idxValueCommitR => valueCommitR
+  | .idxNullifierK => nullifierKpt
 
 /-- Embed a relation over the generator table and a sub-vector of the deployed points
 into the combined basis: the table slots map identically, and each distinguished slot
@@ -739,7 +748,8 @@ equality case rests on `preCoeffs_inj` — word lists of length at most 253 are 
 by their coefficients, and every Orchard-protocol Sinsemilla message is far shorter. The
 negation case is unconditional: the domain-point coefficients `2^n` and `-2^n` cannot agree
 because `2^(n+1) ≠ 0` in the odd-order scalar field. The one-point instance is
-`relationOfChainPmEq`. -/
+`relationOfChainPmEq`; the nullifier arm uses two points, the randomness and nullifier
+bases. -/
 def relationOfChainVecPmEq {Q : Point Fp} (hQ : Q.Valid) {j : ℕ} {V : Fin j → PallasGroup}
     {l₁ l₂ : List ℕ} (hb₁ : ∀ m ∈ l₁, m < 2^K) (hb₂ : ∀ m ∈ l₂, m < 2^K)
     (hlen : l₁.length = l₂.length)

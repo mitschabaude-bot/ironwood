@@ -63,7 +63,11 @@ the randomness base. The opening distinctness `ne` is exactly what that reductio
 consumes for nontriviality — distinct notes give distinct coefficient vectors, and
 equal notes force distinct randomness — so no separate distinct-notes premiss is
 needed. Drop the openings and `cm` is a free group element the affine `extract` lets
-`cm₂` be solved to match, certifying nothing. -/
+`cm₂` be solved to match, certifying nothing.
+
+The value bounds travel with the openings, as in `NoteCommitBreak`: they are the 64-bit type
+of a note's value, which the model's `Note` holds as an unbounded `ℕ`, and the deployed
+reducer (`relationOfNullifierCollision`) recovers the notes from their words under them. -/
 structure NullifierCollision (P : Primitives F G IVK NK RHO PSI MHASH MENC MSG SIG) where
   nk₁ : NK
   rcm₁ : F
@@ -78,6 +82,8 @@ structure NullifierCollision (P : Primitives F G IVK NK RHO PSI MHASH MENC MSG S
   ne : (rcm₁, note₁) ≠ (rcm₂, note₂)
   eq : P.deriveNullifier nk₁ note₁.ρ note₁.ψ cm₁
     = P.deriveNullifier nk₂ note₂.ρ note₂.ψ cm₂
+  v₁_lt : note₁.v < P.valueBound
+  v₂_lt : note₂.v < P.valueBound
 
 /-- **The Faerie-Gold core.** Two satisfied spends with distinct openings and equal
 revealed nullifiers compute a break: when the derive-inputs coincide the same
@@ -97,9 +103,8 @@ def faerieGoldCore [DecidableEq G] [DecidableEq NK] [DecidableEq RHO] [Decidable
       exact noteCommitBreakOfNe h₁ h₂ (congrArg P.extract hin.2.2.2) hne)
   else
     .inr ⟨kv.nk w₁.kw, w₁.rcm_old, w₁.note_old, w₁.cm_old, h₁.commit_old,
-          kv.nk w₂.kw, w₂.rcm_old, w₂.note_old, w₂.cm_old, h₂.commit_old, hne, by
-      rw [← h₁.nf_old_eq, ← h₂.nf_old_eq]
-      exact hnf⟩
+          kv.nk w₂.kw, w₂.rcm_old, w₂.note_old, w₂.cm_old, h₂.commit_old, hne,
+          (by rw [← h₁.nf_old_eq, ← h₂.nf_old_eq]; exact hnf), h₁.v_old_lt, h₂.v_old_lt⟩
 
 /-- **The roadblock inversion.** An action revealing the same nullifier as a satisfied
 spend either re-spends the same opening (the case Spend Authority handles) or computes

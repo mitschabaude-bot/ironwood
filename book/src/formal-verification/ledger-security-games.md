@@ -63,7 +63,7 @@ flowchart TD
   CDLR -->|"<a target='_blank' href='https://github.com/zcash/ironwood/blob/main/Zcash/Security/BindingSignature/DiscreteLog.lean'>independent<br/>group-hash bases<br/>(Pallas)</a>"| DL
   KS KStoDL@===>|"<a target='_blank' href='https://github.com/zcash/ironwood/blob/main/Zcash/Snark/Soundness/Action/AdaptiveStatementKnowledge.lean'>independent<br/>group-hash bases<br/>(Vesta)</a>"| DL
   MC --> CDLR
-  NFC -->|"<a target='_blank' href='https://github.com/zcash/ironwood/blob/main/Zcash/Security/Ledger/Nullifier.lean'>distinct-note openings<br/>compute</a>"| CDLR
+  NFC -->|"<a target='_blank' href='https://github.com/zcash/ironwood/blob/main/Zcash/Security/Ledger/NullifierDLR.lean'>distinct openings<br/>compute</a>"| CDLR
   SAF ---> RDSA["RedDSA unforgeability,<br/>±-randomized keys"]
   RDSA RDSAtoDL@===>|"re-rand reduction<br/><a target='_blank' href='https://eprint.iacr.org/2015/395'>[FKMSSS2016]</a> +<br/><a target='_blank' href='https://eprint.iacr.org/2019/877'>straight-line AGM extraction</a>"| DL
 
