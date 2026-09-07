@@ -33,6 +33,7 @@ import Zcash.Security.BindingSignature.DiscreteLog
 import Zcash.Snark.Soundness.AGM.DeployedConstraintSupply
 import Zcash.Snark.Soundness.AGM.ProbabilityVesta
 import Zcash.Snark.Soundness.FiatShamir.Adversary
+import Zcash.Snark.Soundness.FiatShamir.ActionCount
 import Zcash.Snark.Soundness.Composition.Bridge
 import Zcash.Snark.Soundness.Composition.DeployedConstraintContainment
 import Zcash.Snark.Soundness.Composition.DeployedRootContainment
@@ -1393,6 +1394,15 @@ assert_axioms Zcash.Snark.hstab_of_xPrefixDetermined +native(
 -- pins every field absorbed before it — the toolkit for the deployed squeeze-invariance
 -- schedules, which need each root-set datum emitted strictly before its own squeeze.
 assert_axioms Zcash.Snark.preXSqueezePoint_inj
+-- Separation across action counts (`Soundness/FiatShamir/ActionCount.lean`), at the typed level:
+-- the schedule's oracle locality, the disjointness of the pre-`θ` cones at different counts, and
+-- the reprogramming corollary. This is the fact the extraction experiment's per-size Fiat–Shamir
+-- tables rest on; its consumption in that experiment's sample space is #224.
+assert_axioms Zcash.Snark.deriveChallenges_congr_of_agree_on_cone
+assert_axioms Zcash.Snark.preTheta_not_prefix_of_numProofs_lt
+assert_axioms Zcash.Snark.preTheta_cones_disjoint
+assert_axioms Zcash.Snark.preTheta_prefixFree_of_numProofs_ne
+assert_axioms Zcash.Snark.deriveChallenges_reprogram_other_count
 assert_axioms Zcash.Snark.preX1SqueezePoint_inj
 assert_axioms Zcash.Snark.preX2SqueezePoint_inj
 assert_axioms Zcash.Snark.preX3SqueezePoint_inj

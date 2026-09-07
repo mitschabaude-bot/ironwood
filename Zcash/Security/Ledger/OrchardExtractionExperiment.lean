@@ -24,20 +24,22 @@ to a prover execution. The constructed adversary's annotations are therefore a
 function of its coins —which include the sampled runs— and that is the only shape a
 sound composition can take.
 
-The bundle size is selected adaptively, and the oracle tables are shared per bundle
-size: every chain position's proof at a given size reads that size's one shared table,
-and the ledger machine may select each position's size after seeing the runs.
-The oracle of this model is the typed squeeze on transcript elements, and one table per
-size is a faithful presentation of one such oracle exactly when the schedules of
-different sizes never squeeze the same transcript. The deployed verifier absorbs the
-verifying key digest and every instance and advice commitment before its first squeeze,
-so the pre-θ transcripts of different action counts are prefix-incomparable, and so are
-their byte encodings under the deployed hash; #215 proves both facts. This experiment
-does not yet consume them, so the per-size presentation stands here as a modelling
-claim of the module. The cost of the per-size tables is that the knowledge-soundness
-terms of the composed bound sum over the slot-size pairs — a factor `k * maxActions` —
-counting the extraction targets this model hands the adversary. Removing the factor is
-tracked as #214.
+The bundle size is selected adaptively, and the oracle tables are shared per bundle size:
+every chain position's proof at a given size reads that size's one shared table, and the
+ledger machine may select each position's size after seeing the runs. The oracle of this
+model is the typed squeeze on transcript elements, and one table per size is a faithful
+presentation of one such oracle exactly when the schedules of different sizes never
+squeeze the same transcript. The deployed verifier absorbs the verifying key digest and
+every instance and advice commitment before its first squeeze, so the pre-θ transcripts of
+different action counts are prefix-incomparable and their query cones disjoint
+(`Zcash.Snark.preTheta_cones_disjoint`), and reprogramming one count's cone changes no
+other count's challenge (`Zcash.Snark.deriveChallenges_reprogram_other_count`); that the
+byte encodings under the deployed hash separate likewise is part of #215. This
+experiment's sample space does not consume the typed separation (#224), so the per-size
+presentation remains a modeling caveat of this module, one that rests on a proved fact.
+The cost of the per-size tables is that the knowledge-soundness terms of the composed
+bound sum over the slot-size pairs — a factor `k * maxActions` — counting the extraction
+targets this model hands the adversary. Removing the factor is tracked as #214.
 
 The composed endpoints run at the deployed value bases (`deployedViolationEvent` over
 `deployedExperiment`): the extracted witnesses open the value commitments at the
