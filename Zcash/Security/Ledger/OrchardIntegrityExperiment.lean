@@ -317,10 +317,10 @@ adversary class of the deployed KS-idealized Balance experiments.
 
 * `LA`: per coin, a labeled challenge-oracle machine from the presented bases to a
   **witness-annotated** ledger — every Action carries the witness for the Action statement,
-  and each transaction its announced binding representation. The annotation is a stated
-  **gap in the proof, not a modelling trade-off**: the composition with Halo 2
-  knowledge soundness —extracting these witnesses from accepting proofs— is unproved
-  (tracked in #147).
+  and each transaction its announced binding representation. The annotations are supplied
+  here and computed on the composed route: `OrchardExtractionExperiment` extracts them from
+  a proof-emitting adversary's accepting proofs, so this adversary class is the intermediate
+  step the composed endpoints consume.
 * `queryBound`: at most `qH` challenge-oracle queries — the random-oracle resource, priced
   in the bounds.
 * `algebraic`: algebraic at the two binding-signature points (`AlgebraicAtBindingPoints`).
@@ -496,8 +496,8 @@ output ledger violates balance integrity at some prefix `i < k` with probability
 `ε_sinsemilladlr + (ε_dl + (qH+2)/#F)`.
 
 The experiment's idealizations are described at `IdealizedKSBalanceAdversary.violationEvent`;
-critically, they include idealizing knowledge soundness for the Action circuit verifier.
-Connecting this up to the Action-circuit knowledge-soundness proof is tracked as #147.
+they include the witness annotations, which the Orchard extraction experiment discharges by
+extracting them from accepting proofs (`orchardBalanceIntegrityExtraction_measure_le`).
 
 The action cap `maxActions < 2^16` is the dedicated consensus rule on the action count —
 `nActionsOrchard` and `nActionsIronwood` are each less than `2^16` (§7.1.2,

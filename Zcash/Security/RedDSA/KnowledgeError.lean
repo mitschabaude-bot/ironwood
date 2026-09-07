@@ -5,10 +5,14 @@ import Zcash.Snark.Soundness.AGM.AdaptiveOnline
 /-!
 # The binding-signature knowledge error: κ ≤ (qH+1)/|F| + (ε_DL + 1/|F|)
 
-Throughout, κ is the knowledge error: the probability that the adversary's output verifies
-while the extractor fails to produce the witness — here, a verifying binding signature whose
-announced representations do not yield the binding key. Definitions prefixed with `kappa` build
-this event and its bound.
+Throughout, κ is the knowledge error: a bound on the probability that the adversary's output
+verifies while the extractor fails to produce the witness — here, the binding key. The module
+obtains that bound as the measure of the pivot event: a verifying binding signature whose
+effective representation has a key coefficient off the ℛ slot. Every extraction failure lies
+in that event, since a pivot-free key is read off the ℛ slot directly. A sample lies in it
+without failing only when its off-ℛ coefficients are nonzero yet cancel as a group element,
+which is a nontrivial relation among the presented bases. Definitions prefixed with `kappa`
+build the event and its bound.
 
 The κ-discharge for the extraction arm, composing the deterministic core
 (`bindingSig_relation_of_nontrivial`) with the labeled adaptive squeeze
@@ -69,11 +73,12 @@ section Composition
 variable {Q F ι : Type*} [Fintype Q] [DecidableEq Q] [Fintype F] [Nonempty F]
   [Fintype ι] [DecidableEq ι]
 
-/-- **The κ bound: the two extraction arms combined.** The extraction-failure event sits in the
-bad-challenge event (`badFiber logs`, on the challenge-table factor `Q → F`, per basis-log
-vector `logs`) union the relation event (`relFiber table`, on the basis-log factor `ι → F`, per
-challenge table `table` — the extracted relation's coefficients read the challenge). Each arm is
-bounded on its own factor, so a union bound gives `κ ≤ qH/|F| + (ε + 1/|F|)`. -/
+/-- **The κ bound: the two extraction arms combined.** The pivot event, which contains every
+extraction failure, sits in the bad-challenge event (`badFiber logs`, on the challenge-table
+factor `Q → F`, per basis-log vector `logs`) union the relation event (`relFiber table`, on the
+basis-log factor `ι → F`, per challenge table `table` — the extracted relation's coefficients
+read the challenge). Each arm is bounded on its own factor, so a union bound gives
+`κ ≤ qH/|F| + (ε + 1/|F|)`. -/
 theorem kappa_le_of_arms
     {κEvent : Set ((Q → F) × (ι → F))}
     (badFiber : (ι → F) → Set (Q → F)) (relFiber : (Q → F) → Set (ι → F)) {qH ε : ℝ≥0∞}

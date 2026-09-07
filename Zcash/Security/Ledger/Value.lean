@@ -35,7 +35,7 @@ vBalanceBound < r` (deployed: the Orchard `vSumBound`, far below `r ≈ 2^254`).
 hypothesis —every verifying `bvk` comes with its scalar— would carry no computational content: in a
 cyclic group every `bvk` is some multiple of `Rbase`, so the total form holds for a
 choose-the-witness extractor that no one can run. That is why the extractor is a bare function and
-its failures are events with a named probability `κ`, discharged in `RedDSA/KnowledgeError` and
+its failures are events that the named bound `κ` covers, discharged in `RedDSA/KnowledgeError` and
 consumed by the conservation experiment through its combined finder.
 -/
 

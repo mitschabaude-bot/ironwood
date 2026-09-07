@@ -10,11 +10,13 @@ import Zcash.Security.KeyBinding.Probability
 # The extraction-failure arm's κ in the oracle model
 
 The capstone layer bounds the conservation reduction's extraction-failure arm by the named
-knowledge error κ — the probability that a binding signature verifies while binding-key
-extraction fails (`Zcash.Security.RedDSA.KnowledgeError`). This module places that arm in
-the challenge-oracle model, at the reduction's own events: for any `qH`-query-bounded
-labeled algebraic ledger adversary, an extraction-failure sample lands in the knowledge-error
-event of the composite machine at an unchanged query count (`extractFail_mem_kappaEventAt`).
+knowledge error κ — a bound on the probability that a binding signature verifies while
+binding-key extraction fails, obtained in `Zcash.Security.RedDSA.KnowledgeError` as the
+measure of the pivot event: a verifying signature whose effective representation has a key
+coefficient off the ℛ slot. This module places that arm in the challenge-oracle model, at
+the reduction's own events: for any `qH`-query-bounded labeled algebraic ledger adversary,
+an extraction-failure sample lands in the knowledge-error event of the composite machine at
+an unchanged query count (`extractFail_mem_kappaEventAt`).
 The knowledge-error layer splits that event into two fibres. The bad-challenge fibre is
 counted at `(qH+1)/#F`. The relation fibre is covered by the conservation experiment's
 combined finder, under one discrete-log bound. As with the key-binding arm, the bounds here

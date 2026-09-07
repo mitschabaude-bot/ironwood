@@ -6,12 +6,13 @@ import Zcash.Security.Ledger.ValueRelationArm
 
 The capstones bound the conservation and cap violations by `ε_dlr + κ`, over an abstract
 `PMF (ValidAnnotated …)` with the two arms' bounds as named hypotheses. (κ is the knowledge
-error: the probability that a binding signature verifies while binding-key extraction fails —
-see `Zcash.Security.RedDSA.KnowledgeError`.) This module instantiates that composition in
-the challenge-oracle model, in one experiment: over the adversary's coins, the challenge
-table, and the logs of the `m` presented bases, the probability that the output ledger is
-valid *and* violates conservation (or the cap) at some prefix `i < k` is at most
-`ε_dl + (qH+2)/#F`.
+error: a bound on the probability that a binding signature verifies while binding-key
+extraction fails, obtained in `Zcash.Security.RedDSA.KnowledgeError` as the measure of the
+pivot event, a verifying signature whose effective representation has a key coefficient off
+the ℛ slot.) This module instantiates that composition in the challenge-oracle model, in one
+experiment: over the adversary's coins, the challenge table, and the logs of the `m`
+presented bases, the probability that the output ledger is valid *and* violates conservation
+(or the cap) at some prefix `i < k` is at most `ε_dl + (qH+2)/#F`.
 
 The composition is at the reduction layer. Both arms' finders return relations over the same
 presented basis. One combined machine (`conservationRelFinder`) therefore replays the adversary

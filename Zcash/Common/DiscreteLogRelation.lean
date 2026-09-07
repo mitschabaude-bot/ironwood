@@ -20,9 +20,10 @@ computational layer.
 `AlgebraicRelationWitness` is the single underlying type: an explicit nonzero coefficient
 vector over an arbitrary finite index whose MSM over the presented basis is zero. Every
 basis family in the development has a finite index — a fixed generator family is indexed by
-`Fin`, and the group-hash family is indexed by hash inputs of concretely bounded length. No
-reduction enumerates an index type: proofs and reductions read coefficients at the slots
-they name.
+`Fin`, and the group-hash family is indexed by hash inputs of concretely bounded length. The
+break-producing reductions read coefficients at the slots they name rather than enumerating
+an index type; the known-log dischargers below do sum over the finite index
+(`relationLogExcept`).
 
 The commitment schemes here present a generator family `g` alongside distinguished points
 `V` — the basis `(g, U, W)` of a Pedersen-with-blinding scheme, or `(g, U)` for a

@@ -602,13 +602,15 @@ assert_computable Zcash.Security.RedDSA.bindingSig_relation_of_nontrivial +choic
 
 /-! ## The binding-signature knowledge error
 
-The discharge of the knowledge error κ (the probability that a binding signature verifies
-while binding-key extraction fails) in the challenge-oracle model. Over the whole challenge
-table and the logs of the `m` presented bases, a labeled algebraic adversary within query
-budget `qH` produces a verifying binding signature. Its effective representation has a
-pivot only with a probability linear in the query budget, with a denominator of #F above
-the discrete-log advantage (`kappaEvent_measure_le`). This is the straight-line AGM+ROM
-extraction of Fuchsbauer–Plouviez–Seurin, in the key-only setting. The same split
+The discharge of the knowledge error κ (a bound on the probability that a binding signature
+verifies while binding-key extraction fails) in the challenge-oracle model, as the measure of
+the pivot event: a verifying signature whose effective representation has a key coefficient
+off the ℛ slot, which contains every extraction failure. Over the whole challenge table and
+the logs of the `m` presented bases, a labeled algebraic adversary within query budget `qH`
+produces a verifying binding signature. Its effective representation has a pivot only with
+a probability linear in the query budget, with a denominator of #F above the discrete-log
+advantage (`kappaEvent_measure_le`). This is the straight-line AGM+ROM extraction of
+Fuchsbauer–Plouviez–Seurin, in the key-only setting. The same split
 composes at a single presented basis with no log sampling, with the relation arm as a
 named hypothesis at that basis (`kappaEventAt_measure_le`). Challenge queries carry the
 adversary's representations as labels the oracle never sees. The representation in effect
@@ -782,9 +784,11 @@ the discrete-log base (`pallasGen`, not the identity), and the challenge query a
 literal signature triple (`orchardQueryOf`, injective by construction). This leaves as
 free parameters the adversary, an action cap giving no-overflow, and one named advantage
 per side. Its names carry `idealizedks` because knowledge soundness of the Action circuit
-is idealized by the witness annotations — a formalization gap tracked as #147, not an
-accepted modelling trade-off. The conservation and cap experiments are pinned at the same
-choices. The `deployed` forms run at the deployed value bases (`orchardValueBases`):
+is idealized by the witness annotations; the Orchard extraction experiment discharges that
+idealization by extracting the annotations from a proof-emitting adversary's runs, so these
+forms are the intermediate step its endpoints consume. The conservation and cap experiments
+are pinned at the same choices. The `deployed` forms run at the deployed value bases
+(`orchardValueBases`):
 validity is at the deployed value commitment, only the binding challenge hash is idealized
 as the table, and the named `ε_valuedlr` bounds the deployed finder's relation event over
 the named 𝒱/ℛ slots. In the deployed integrity form, `ε_sinsemilladlr` bounds the event
