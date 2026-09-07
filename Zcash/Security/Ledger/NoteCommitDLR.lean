@@ -35,7 +35,7 @@ theorem smul_eq_val_nsmul (r : Fq) (P : PallasGroup) : r • P = r.val • P := 
   rw [← Nat.cast_smul_eq_nsmul Fq, ZMod.natCast_zmod_val]
 
 /-- Every note value below the Orchard-protocol bound is below the base-field order. -/
-theorem valueBound_lt_card {v : ℕ} (hv : v < 2 ^ 64) :
+theorem valueBound_lt_card {v : ℕ} (hv : v < 2^64) :
     v < CompElliptic.Fields.Pasta.PALLAS_BASE_CARD :=
   lt_trans hv (by norm_num [CompElliptic.Fields.Pasta.PALLAS_BASE_CARD])
 
