@@ -378,9 +378,9 @@ The experiment's idealizations live here:
   with the annotations computed by the Action-circuit extractors from the sampled runs,
   and its endpoints bound the deployed form of this event at the constructed adversary
   together with the extraction-failure arm. At a directly supplied adversary the
-  annotations remain a modelling input.
+  annotations remain a modeling input.
 
-The remaining idealizations are accepted as modelling trade-offs:
+The remaining idealizations are accepted as modeling trade-offs:
 
 * The uniform challenge table is `H_bind` —the RedPallas binding challenge hash— modeled
   as a random oracle.

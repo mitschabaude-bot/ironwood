@@ -53,6 +53,7 @@ def pallasSAt (m : ℕ) : PallasGroup :=
 to its index range. -/
 def pallasS (t : Fin (2^K)) : PallasGroup := pallasSAt t.1
 
+/-- On the table's index range, the lifted table is the lifted table point. -/
 theorem pallasSAt_of_lt {m : ℕ} (h : m < 2^K) :
     pallasSAt m =
       PallasGroup.ofPoint (orchardGenerators.S m) (orchardGenerators.valid h) :=
@@ -232,6 +233,7 @@ def indicator (c t : Fin (2^K)) : Fq := if t = c then 1 else 0
 def wordIdx (br : BreakData) : Fin (2^K) :=
   ⟨br.chunk % 2^K, Nat.mod_lt _ (Nat.two_pow_pos K)⟩
 
+/-- An in-range escape word is its own table index. -/
 theorem wordIdx_of_lt {br : BreakData} (h : br.chunk < 2^K) :
     (wordIdx br).1 = br.chunk :=
   Nat.mod_eq_of_lt h

@@ -79,7 +79,7 @@ control how the honest parties create transactions, generate keys (without telli
 adversary those keys), etc. That is how these properties were originally defined at
 Zcon3 in [Understanding the Security of Zcash](https://raw.githubusercontent.com/daira/zcash-security/main/zcash-security.pdf).
 
-The formalization of *Balance integrity* is in better shape (modelling honest parties is
+The formalization of *Balance integrity* is in better shape (modeling honest parties is
 not an issue for Balance properties; the adversary merely has to exhibit an unbalanced
 consensus-valid ledger). All the important pieces have been completed, and the ledger
 security arguments are now tied into the Action circuit knowledge soundness proof: the

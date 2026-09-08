@@ -212,10 +212,6 @@ theorem commitGen_neg {n : ℕ} (g : Fin n → G) (a : Fin n → F) :
     commitGen g (-a) = -commitGen g a := by
   simpa using commitGen_smul_left g (-1) a
 
-/-- `representationEval` specializes to the `commitGen` MSM over `Fin n`. -/
-theorem representationEval_fin {n : ℕ} (basis : Fin n → G) (coeffs : Fin n → F) :
-    representationEval basis coeffs = commitGen basis coeffs := rfl
-
 /-! ### Presented bases with distinguished slots
 
 The named index type identifies the slots of a basis `(g, V)`, so the fixed shapes below

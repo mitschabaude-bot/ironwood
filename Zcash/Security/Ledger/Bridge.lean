@@ -352,6 +352,7 @@ inductive ActionBreak (wit : ActionData) : Prop
       hashToPointB orchardGenerators.S orchardBases.merkleQ (merkleQuery wit i) = .inr br →
       ValidBreak orchardGenerators.S orchardBases.merkleQ br → ActionBreak wit
 
+/-- Every word of a Merkle compression message indexes an on-curve table point. -/
 private theorem merkle_words_onCurve {i lv rv m : ℕ}
     (hm : m ∈ merkleChunks i lv rv) : (orchardGenerators.S m).OnCurve := by
   apply orchardGenerators.S_onCurve
@@ -359,10 +360,12 @@ private theorem merkle_words_onCurve {i lv rv m : ℕ}
   obtain ⟨j, -, rfl⟩ := hm
   exact Nat.mod_lt _ (Nat.two_pow_pos _)
 
+/-- Every word of a witness's `Commit^ivk` query indexes an on-curve table point. -/
 private theorem ivk_words_onCurve {wit : ActionData} {m : ℕ}
     (hm : m ∈ ivkQuery wit) : (orchardGenerators.S m).OnCurve :=
   orchardGenerators.S_onCurve (chunksOf_mem_lt hm)
 
+/-- Every word of a note-commitment message indexes an on-curve table point. -/
 private theorem note_words_onCurve {gd pkd : Point Fp} {v rho psi : Fp} {m : ℕ}
     (hm : m ∈ (NoteCommit.noteScalars gd pkd v rho psi).chunks) :
     (orchardGenerators.S m).OnCurve :=

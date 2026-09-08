@@ -147,7 +147,7 @@ deployed one, with no reference-string step on the value side. Their accepted
 trade-offs —the binding challenge hash as a random oracle, the per-size finite
 presentation of the Fiat–Shamir oracle, and elided byte encodings— are documented at
 `IdealizedKSBalanceAdversary.deployedViolationEvent`. For Spendability and Spend
-Authority the annotations remain a modelling assumption: those games are not yet
+Authority the annotations remain a modeling assumption: those games are not yet
 composed with the circuit layer, and
 [#155](https://github.com/zcash/ironwood/issues/155) tracks the oracle-machine layer
 for their capstone slots.
