@@ -16,8 +16,8 @@ Sinsemilla table, the `NoteCommit` domain point, and the randomness base. The
 reduction unpacks the two openings into their defined Sinsemilla chains and blinding
 scalars and applies the chain-collision reducer `relationOfChainPmEq`.
 
-The reduction is hypothesis-free. The chunk-coefficient injectivity is `preCoeffs_inj`
-and the 109-chunk message encoding is injective by `noteCommitChunks_inj`. Recovering
+The reduction is hypothesis-free. The word-coefficient injectivity is `preCoeffs_inj`
+and the 109-word message encoding is injective by `noteCommitChunks_inj`. Recovering
 the note from its scalars additionally uses `eq_of_toPoint_x_eq_of_y_parity_eq`,
 because the message carries each point as its `x`-coordinate and `y`-parity bit.
 -/
@@ -30,21 +30,12 @@ open Zcash.Circuits.Specs.Sinsemilla
 open Zcash.Security.Concrete
 open Zcash.Security.Ledger.Pool
 
-/-- The `NoteCommit` domain point `Q("z.cash:Orchard-NoteCommit-M")`, as a group
-element. -/
-def noteQpt : PallasGroup := PallasGroup.ofPoint noteQ (Or.inl noteQ_onCurve)
-
-/-- The `NoteCommit` randomness base, as a group element. -/
-def noteCommitRpt : PallasGroup :=
-  PallasGroup.ofPoint Ecc.MulFixed.Certs.noteCommitR.point
-    (Or.inl Ecc.MulFixed.Certs.noteCommitR.onCurve)
-
 /-- A scalar acts on the group as its canonical natural representative. -/
 theorem smul_eq_val_nsmul (r : Fq) (P : PallasGroup) : r • P = r.val • P := by
   rw [← Nat.cast_smul_eq_nsmul Fq, ZMod.natCast_zmod_val]
 
 /-- Every note value below the Orchard-protocol bound is below the base-field order. -/
-theorem valueBound_lt_card {v : ℕ} (hv : v < 2 ^ 64) :
+theorem valueBound_lt_card {v : ℕ} (hv : v < 2^64) :
     v < CompElliptic.Fields.Pasta.PALLAS_BASE_CARD :=
   lt_trans hv (by norm_num [CompElliptic.Fields.Pasta.PALLAS_BASE_CARD])
 
@@ -79,6 +70,42 @@ theorem noteCommit_get_eq {rcm : Fq} {n : Note PallasGroup Fp Fp}
       (Point.valid_nsmul (Or.inl Ecc.MulFixed.Certs.noteCommitR.onCurve) rcm.val)]
   exact Option.some_inj.mp (h.symm.trans hsome)
 
+/-- **A note is determined by its commitment message.** Two notes whose Sinsemilla message
+words agree are equal. The bounds `v < 2^64` say that the notes are protocol notes: the
+protocol types a note's value as a 64-bit unsigned integer and the encoding writes exactly
+those 64 bits, while the model's `Note` holds `v` as an unbounded `ℕ`, so the type is
+carried as a hypothesis. `noteCommitChunks_inj` recovers the encoded coordinates, parities,
+value, ρ, and ψ, and each point from its `x`-coordinate and `y`-parity. Shared by the
+note-commitment and nullifier reducers, whose nontriviality in the equal-chains case comes
+down to this. -/
+theorem note_eq_of_noteScalars_words_eq {n₁ n₂ : Note PallasGroup Fp Fp}
+    (hv₁ : n₁.v < 2^64) (hv₂ : n₂.v < 2^64)
+    (hl : (noteScalars n₁).chunks = (noteScalars n₂).chunks) : n₁ = n₂ := by
+  simp only [Pool.noteScalars, NoteCommit.noteScalars] at hl
+  obtain ⟨hgx, hgy, hpx, hpy, hv, hrho, hpsi⟩ := noteCommitChunks_inj
+    (fp_val_lt _) (Nat.mod_lt _ (by norm_num)) (fp_val_lt _)
+    (Nat.mod_lt _ (by norm_num))
+    (by
+      rw [ZMod.val_natCast_of_lt (valueBound_lt_card hv₁)]
+      exact hv₁)
+    (fp_val_lt _) (fp_val_lt _)
+    (fp_val_lt _) (Nat.mod_lt _ (by norm_num)) (fp_val_lt _)
+    (Nat.mod_lt _ (by norm_num))
+    (by
+      rw [ZMod.val_natCast_of_lt (valueBound_lt_card hv₂)]
+      exact hv₂)
+    (fp_val_lt _) (fp_val_lt _) hl
+  have hgd : n₁.gd = n₂.gd :=
+    PallasGroup.eq_of_toPoint_x_eq_of_y_parity_eq (ZMod.val_injective _ hgx) hgy
+  have hpkd : n₁.pkd = n₂.pkd :=
+    PallasGroup.eq_of_toPoint_x_eq_of_y_parity_eq (ZMod.val_injective _ hpx) hpy
+  have hvv : n₁.v = n₂.v := by
+    rwa [ZMod.val_natCast_of_lt (valueBound_lt_card hv₁),
+      ZMod.val_natCast_of_lt (valueBound_lt_card hv₂)] at hv
+  have hrho' : n₁.ρ = n₂.ρ := ZMod.val_injective _ hrho
+  have hpsi' : n₁.ψ = n₂.ψ := ZMod.val_injective _ hpsi
+  rw [show n₁ = ⟨n₁.gd, n₁.pkd, n₁.v, n₁.ρ, n₁.ψ⟩ from rfl, hgd, hpkd, hvv, hrho', hpsi']
+
 /-- **The Orchard-protocol note-commitment break computes a discrete-log relation.** Two
 openings with distinct `(rcm, note)` pairs whose commitments share an extracted
 coordinate: the reduction unpacks them into their defined Sinsemilla chains and blinding
@@ -87,7 +114,15 @@ randomness base. -/
 def relationOfNoteCommitBreak {MSG SIG : Type*}
     (spendAuthVerify bindingVerify : PallasGroup → MSG → SIG → Prop)
     (brk : NoteCommitBreak (primitives (MSG := MSG) (SIG := SIG) spendAuthVerify bindingVerify)) :
-    NontrivialRelation (F := Fq) pallasS noteQpt noteCommitRpt :=
+    NontrivialRelation (F := Fq) pallasS orchardPoints :=
+  toOrchardPoints (V := ![noteQpt, noteCommitRpt])
+    (g := ![.idxNoteQ, .idxNoteCommitR])
+    (gr := fun s => match s with
+      | .idxNoteQ => some 0
+      | .idxNoteCommitR => some 1
+      | _ => none)
+    (hg := by intro x y; fin_cases x <;> cases y <;> decide)
+    (hpt := fun i => by fin_cases i <;> rfl) <|
   relationOfChainPmEq (Q := noteQ) (Or.inl noteQ_onCurve) (W := noteCommitRpt)
     (fun _ hm => chunksOf_mem_lt hm) (fun _ hm => chunksOf_mem_lt hm)
     (by simp [Pool.noteScalars])
@@ -102,33 +137,7 @@ def relationOfNoteCommitBreak {MSG SIG : Type*}
     (by simp [Pool.noteScalars])
     (by
       rintro ⟨hl, hr⟩
-      simp only [Pool.noteScalars, NoteCommit.noteScalars] at hl
-      obtain ⟨hgx, hgy, hpx, hpy, hv, hrho, hpsi⟩ := noteCommitChunks_inj
-        (fp_val_lt _) (Nat.mod_lt _ (by norm_num)) (fp_val_lt _)
-        (Nat.mod_lt _ (by norm_num))
-        (by
-          rw [ZMod.val_natCast_of_lt (valueBound_lt_card brk.v₁_lt)]
-          exact brk.v₁_lt)
-        (fp_val_lt _) (fp_val_lt _)
-        (fp_val_lt _) (Nat.mod_lt _ (by norm_num)) (fp_val_lt _)
-        (Nat.mod_lt _ (by norm_num))
-        (by
-          rw [ZMod.val_natCast_of_lt (valueBound_lt_card brk.v₂_lt)]
-          exact brk.v₂_lt)
-        (fp_val_lt _) (fp_val_lt _) hl
-      have hgd : brk.n₁.gd = brk.n₂.gd :=
-        PallasGroup.eq_of_toPoint_x_eq_of_y_parity_eq (ZMod.val_injective _ hgx) hgy
-      have hpkd : brk.n₁.pkd = brk.n₂.pkd :=
-        PallasGroup.eq_of_toPoint_x_eq_of_y_parity_eq (ZMod.val_injective _ hpx) hpy
-      have hvv : brk.n₁.v = brk.n₂.v := by
-        rwa [ZMod.val_natCast_of_lt (valueBound_lt_card brk.v₁_lt),
-          ZMod.val_natCast_of_lt (valueBound_lt_card brk.v₂_lt)] at hv
-      have hrho' : brk.n₁.ρ = brk.n₂.ρ := ZMod.val_injective _ hrho
-      have hpsi' : brk.n₁.ψ = brk.n₂.ψ := ZMod.val_injective _ hpsi
-      refine brk.ne ?_
-      have hn : brk.n₁ = brk.n₂ := by
-        rw [show brk.n₁ = ⟨brk.n₁.gd, brk.n₁.pkd, brk.n₁.v, brk.n₁.ρ, brk.n₁.ψ⟩ from rfl,
-          hgd, hpkd, hvv, hrho', hpsi']
-      rw [hn, hr])
+      exact brk.ne (by
+        rw [note_eq_of_noteScalars_words_eq brk.v₁_lt brk.v₂_lt hl, hr]))
 
 end Zcash.Security.Ledger.Bridge

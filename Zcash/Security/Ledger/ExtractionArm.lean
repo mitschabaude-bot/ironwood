@@ -33,8 +33,8 @@ computational content (see the module doc of `Zcash.Security.Ledger.Value`).
   against DL hardness via the AGM layer) and `κ` bounding the extraction-failure
   arm.
 
-What stays named: `κ` itself — the RedDSA knowledge error, the probability that an
-adversary produces a verifying signature that the extractor misses. The known
+What stays named: `κ` itself — the RedDSA knowledge error, a bound on the probability that
+an adversary produces a verifying signature that the extractor misses. The known
 discharge routes and their losses are described in the module doc of
 `Zcash.Security.RedDSA.Basic`. None is chosen here. The `Extractor` interface
 consumes only the verifying triple `(vk, m, σ)`: a straight-line AGM discharge

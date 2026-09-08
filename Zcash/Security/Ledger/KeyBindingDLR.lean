@@ -30,15 +30,6 @@ open Zcash.Circuits.Specs.Sinsemilla
 open Zcash.Security.Concrete
 open Zcash.Security.Ledger.Pool
 
-/-- The `CommitIvk` domain point `Q("z.cash:Orchard-CommitIvk-M")`, as a group element. -/
-def ivkQpt : PallasGroup := PallasGroup.ofPoint ivkQ (Or.inl ivkQ_onCurve)
-
-/-- The `CommitIvk` randomness base, as a group element — the `commitIvkR` argument of
-the Orchard-protocol `keyBinding` interface. -/
-def commitIvkRpt : PallasGroup :=
-  PallasGroup.ofPoint Ecc.MulFixed.Certs.commitIvkR.point
-    (Or.inl Ecc.MulFixed.Certs.commitIvkR.onCurve)
-
 /-- A defined `commitIvkHash` hit names a defined, valid `hashToPoint` chain. -/
 theorem commitIvkHash_isSome {a n : Fp} {g : PallasGroup}
     (h : commitIvkHash a n = some g) :
@@ -66,16 +57,24 @@ theorem commitIvkHash_get_eq {a n : Fp} {g : PallasGroup}
 valid `Commit^ivk` openings of the same `ivk` disagreeing on their opening projection:
 the reduction unpacks them into their defined Sinsemilla chains and blinding scalars
 and applies the chain-collision reducer at the `CommitIvk` domain point and randomness
-base. The reduction is hypothesis-free: the chunk-coefficient injectivity is
+base. The reduction is hypothesis-free: the word-coefficient injectivity is
 `preCoeffs_inj` (spec Theorem 5.4.3's binary-expansion core, proven) and the
-chunk-encoding injectivity is `commitIvkChunks_inj`. -/
+word-encoding injectivity is `commitIvkChunks_inj`. -/
 def relationOfKeyBindingBreak
     {w₁ w₂ : KeyBinding.Pool.Witness Fq PallasGroup Fp}
     (brk : KeyBinding.Pool.CommitIvkCollision extract commitIvkHash commitIvkRpt w₁ w₂)
  :
-    NontrivialRelation (F := Fq) pallasS ivkQpt commitIvkRpt :=
+    NontrivialRelation (F := Fq) pallasS orchardPoints :=
   let hs₁ := commitIvkHash_isSome brk.kb₁.hash_eq
   let hs₂ := commitIvkHash_isSome brk.kb₂.hash_eq
+  toOrchardPoints (V := ![ivkQpt, commitIvkRpt])
+    (g := ![.idxIvkQ, .idxCommitIvkR])
+    (gr := fun s => match s with
+      | .idxIvkQ => some 0
+      | .idxCommitIvkR => some 1
+      | _ => none)
+    (hg := by intro x y; fin_cases x <;> cases y <;> decide)
+    (hpt := fun i => by fin_cases i <;> rfl) <|
   relationOfChainPmEq (Q := ivkQ) (Or.inl ivkQ_onCurve) (W := commitIvkRpt)
     (fun _ hm => chunksOf_mem_lt hm) (fun _ hm => chunksOf_mem_lt hm)
     (by simp)
