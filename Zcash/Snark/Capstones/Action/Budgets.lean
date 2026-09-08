@@ -590,8 +590,6 @@ theorem adaptiveActionXDegree_bound (numProofs : ℕ)
     actionCircuit.toVerifierKey_blindingFactors_lt_n
       (ursOfAugmentedBasis
         actionCircuit.domainExponent basis)
-  have hn : 0 < actionCircuit.n :=
-    Nat.pos_of_ne_zero actionCircuit.n_ne_zero
   have hlookups : ∀ p, ∀ lk ∈ lookupEntriesOfResolver avk poly p,
       (lk.1.productEval.natDegree ≤ 2047 ∧ lk.1.productNextEval.natDegree ≤ 2047 ∧
         lk.1.permutedInputEval.natDegree ≤ 2047 ∧
@@ -659,18 +657,18 @@ theorem adaptiveActionXDegree_bound (numProofs : ℕ)
         exact ⟨hpermutationColumn _ _, hpoly _⟩
     · intro p
       simpa only [VerifyingKey.constraintModel_lookups] using hlookups p
-    · simpa only [avk, ActionTerminal.vkAt,
+    · simpa only [VerifyingKey.constraintModel_l0, canonicalLagrangePolynomials,
+        avk, ActionTerminal.vkAt,
         actionCircuit.toVerifierKey_omega] using
-        le_trans (Nat.le_pred_of_lt (by
-          simpa [rowSelectorPolynomial] using rowPolynomial_natDegree_lt hrows hn)) hnB
-    · simpa only [avk, ActionTerminal.vkAt,
+        le_trans (Nat.le_pred_of_lt (rowSelectorPolynomial_natDegree_lt hrows _)) hnB
+    · simpa only [VerifyingKey.constraintModel_lLast, canonicalLagrangePolynomials,
+        avk, ActionTerminal.vkAt,
         actionCircuit.toVerifierKey_omega] using
-        le_trans (Nat.le_pred_of_lt (by
-          simpa [rowSelectorPolynomial] using rowPolynomial_natDegree_lt hrows hn)) hnB
-    · simpa only [avk, ActionTerminal.vkAt,
+        le_trans (Nat.le_pred_of_lt (rowSelectorPolynomial_natDegree_lt hrows _)) hnB
+    · simpa only [VerifyingKey.constraintModel_lBlind, canonicalLagrangePolynomials,
+        avk, ActionTerminal.vkAt,
         actionCircuit.toVerifierKey_omega] using
-        le_trans (Nat.le_pred_of_lt (by
-          simpa [blindSelectorPolynomial] using rowPolynomial_natDegree_lt hrows hn)) hnB
+        le_trans (Nat.le_pred_of_lt (blindSelectorPolynomial_natDegree_lt hrows _)) hnB
     · norm_num
     · norm_num
     · norm_num
@@ -1131,8 +1129,6 @@ private theorem adaptive_action_x_degree_of_le_for (numProofs : ℕ)
     actionCircuit.toVerifierKey_blindingFactors_lt_n
       (ursOfAugmentedBasis
         actionCircuit.domainExponent basis)
-  have hn : 0 < actionCircuit.n :=
-    Nat.pos_of_ne_zero actionCircuit.n_ne_zero
   have hlookups : ∀ p, ∀ lk ∈ lookupEntriesOfResolver avk poly p,
       (lk.1.productEval.natDegree ≤ 2047 ∧ lk.1.productNextEval.natDegree ≤ 2047 ∧
         lk.1.permutedInputEval.natDegree ≤ 2047 ∧
@@ -1199,18 +1195,18 @@ private theorem adaptive_action_x_degree_of_le_for (numProofs : ℕ)
         exact ⟨hpermutationColumn _ _, hpoly _⟩
     · intro p
       simpa only [VerifyingKey.constraintModel_lookups] using hlookups p
-    · simpa only [avk, ActionTerminal.vkAt,
+    · simpa only [VerifyingKey.constraintModel_l0, canonicalLagrangePolynomials,
+        avk, ActionTerminal.vkAt,
         actionCircuit.toVerifierKey_omega] using
-        le_trans (Nat.le_pred_of_lt (by
-          simpa [rowSelectorPolynomial] using rowPolynomial_natDegree_lt hrows hn)) hnB
-    · simpa only [avk, ActionTerminal.vkAt,
+        le_trans (Nat.le_pred_of_lt (rowSelectorPolynomial_natDegree_lt hrows _)) hnB
+    · simpa only [VerifyingKey.constraintModel_lLast, canonicalLagrangePolynomials,
+        avk, ActionTerminal.vkAt,
         actionCircuit.toVerifierKey_omega] using
-        le_trans (Nat.le_pred_of_lt (by
-          simpa [rowSelectorPolynomial] using rowPolynomial_natDegree_lt hrows hn)) hnB
-    · simpa only [avk, ActionTerminal.vkAt,
+        le_trans (Nat.le_pred_of_lt (rowSelectorPolynomial_natDegree_lt hrows _)) hnB
+    · simpa only [VerifyingKey.constraintModel_lBlind, canonicalLagrangePolynomials,
+        avk, ActionTerminal.vkAt,
         actionCircuit.toVerifierKey_omega] using
-        le_trans (Nat.le_pred_of_lt (by
-          simpa [blindSelectorPolynomial] using rowPolynomial_natDegree_lt hrows hn)) hnB
+        le_trans (Nat.le_pred_of_lt (blindSelectorPolynomial_natDegree_lt hrows _)) hnB
     · norm_num
     · norm_num
     · norm_num

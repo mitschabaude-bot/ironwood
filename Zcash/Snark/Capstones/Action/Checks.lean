@@ -68,20 +68,14 @@ theorem derived_scalars :
       vk.permutationChunks := by
   have hcast := castVk_field actionCircuitShape_eq_fixtureCircuitShape
     (actionCircuit.toVerifierKey capturedURS)
-  simp only [actionCircuit.toVerifierKey_omega, actionCircuit.toVerifierKey_n,
-    actionCircuit.toVerifierKey_gates, actionCircuit.toVerifierKey_instanceQueryLayout,
-    actionCircuit.toVerifierKey_adviceQueryLayout, actionCircuit.toVerifierKey_fixedQueryLayout,
-    actionCircuit.toVerifierKey_permutationChunks] at hcast
   have hvk : (actionCircuitShape_eq_fixtureCircuitShape ▸
       actionCircuit.toVerifierKey capturedURS :
       VerifyingKey shape Fp VestaG) = vk := vk_eq_toVerifierKey.symm
-  exact ⟨hcast.1.trans (congrArg VerifyingKey.omega hvk),
-    hcast.2.1.trans (congrArg VerifyingKey.n hvk),
-    hcast.2.2.1.trans (congrArg VerifyingKey.gates hvk),
-    hcast.2.2.2.1.trans (congrArg VerifyingKey.instanceQueryLayout hvk),
-    hcast.2.2.2.2.1.trans (congrArg VerifyingKey.adviceQueryLayout hvk),
-    hcast.2.2.2.2.2.1.trans (congrArg VerifyingKey.fixedQueryLayout hvk),
-    hcast.2.2.2.2.2.2.trans (congrArg VerifyingKey.permutationChunks hvk)⟩
+  rw [hvk] at hcast
+  simpa only [actionCircuit.toVerifierKey_omega, actionCircuit.toVerifierKey_n,
+    actionCircuit.toVerifierKey_gates, actionCircuit.toVerifierKey_instanceQueryLayout,
+    actionCircuit.toVerifierKey_adviceQueryLayout, actionCircuit.toVerifierKey_fixedQueryLayout,
+    actionCircuit.toVerifierKey_permutationChunks] using hcast
 
 /-- The Action circuit and captured shape have the same lookup count. -/
 theorem action_numLookups_eq :
@@ -106,13 +100,12 @@ theorem derived_lookups
       vk.lookupTableExprs (Fin.cast actionShape_numLookups_eq l) := by
   have hcast := castVk_lookup actionCircuitShape_eq_fixtureCircuitShape
     (actionCircuit.toVerifierKey capturedURS) l
-  simp only [actionCircuit.toVerifierKey_lookupInputExprs,
-    actionCircuit.toVerifierKey_lookupTableExprs] at hcast
   have hvk : (actionCircuitShape_eq_fixtureCircuitShape ▸
       actionCircuit.toVerifierKey capturedURS :
       VerifyingKey shape Fp VestaG) = vk := vk_eq_toVerifierKey.symm
   rw [hvk] at hcast
-  exact hcast
+  simpa only [actionCircuit.toVerifierKey_lookupInputExprs,
+    actionCircuit.toVerifierKey_lookupTableExprs] using hcast
 
 /-! ## The captured checks and schedule at the derived shape -/
 

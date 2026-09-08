@@ -305,10 +305,8 @@ def preXIdentityRelation?V {pp : ProofParams}
       (view.output.toAlgebraicWfProof).proof.1
       (chRecord (k := (AdaptiveActionStatementShape pp).k) view.pre view.rounds) <
         scalarFieldOrder) : Option (AlgebraicRelationWitness (F := Fp) basis) :=
-  match family.preXIdentityOutcome?V basis view hfacts witness rawDecode hbatches
-      haccepts hchar with
-  | some (Sum.inr relation) => some relation
-  | _ => none
+  (family.preXIdentityOutcome?V basis view hfacts witness rawDecode hbatches
+    haccepts hchar).bind Sum.getRight?
 
 theorem preXIdentityOutcomeV_isSome_of {pp : ProofParams}
     (family : ComputedAdaptiveActionStatementFSFamily pp)
