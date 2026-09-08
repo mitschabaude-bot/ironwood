@@ -280,7 +280,7 @@ distinguished points `V`: `AlgebraicRelationWitness` at the augmented basis. Bui
 its parts with `NontrivialRelation.ofParts`; at a two-point basis `![U, W]`, read the
 distinguished coefficients back with the `α`/`β` accessors. The one-point form
 `NontrivialRelation g ![U]` is the shape of a Sinsemilla discrete-log break (protocol spec
-Theorem 5.4.4): a relation among the per-chunk generator table and the domain point `Q`,
+Theorem 5.4.4): a relation among the per-word generator table and the domain point `Q`,
 produced as data by the escape reduction
 (`Zcash.Security.Ledger.Bridge.relationOfBreakData`). -/
 abbrev NontrivialRelation {n : ℕ} {J : Type*} [Fintype J] (g : Fin n → G) (V : J → G) :

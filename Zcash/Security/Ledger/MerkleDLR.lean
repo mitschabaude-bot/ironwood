@@ -16,8 +16,8 @@ reduction unpacks both children into their defined Sinsemilla chains and applies
 chain-collision reducer with zero blinding. The resulting relation has no
 randomness-base component, so it converts to the one-generator form.
 
-The reduction is hypothesis-free: the chunk-coefficient injectivity is
-`preCoeffs_inj`, and the 52-chunk compression encoding is injective by
+The reduction is hypothesis-free: the word-coefficient injectivity is
+`preCoeffs_inj`, and the 52-word compression encoding is injective by
 `merkleChunks_inj`.
 -/
 
@@ -31,7 +31,7 @@ open Zcash.Circuits.Specs.Sinsemilla
 open Zcash.Security.Concrete
 open Zcash.Security.Ledger.Pool
 
-/-- The chunk values of a Merkle compression message are table indices. -/
+/-- The word values of a Merkle compression message are table indices. -/
 theorem merkleChunks_mem_lt {l lv rv m : ℕ} (hm : m ∈ merkleChunks l lv rv) :
     m < 2 ^ K :=
   chunksOf_mem_lt (merkleChunks_eq_chunksOf l lv rv ▸ hm)

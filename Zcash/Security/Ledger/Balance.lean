@@ -106,7 +106,7 @@ theorem findPair_none {α β : Type*} [DecidableEq β] (f : α → β) :
 
 /-! ## List plumbing: sublists and prefixes through the ledger's flat maps -/
 
-/-- A pointwise sublist of chunks is a sublist of the flat maps. -/
+/-- A pointwise sublist of words is a sublist of the flat maps. -/
 theorem flatMap_sublist {α β : Type*} {l : List α} {g g' : α → List β}
     (h : ∀ x ∈ l, List.Sublist (g x) (g' x)) :
     List.Sublist (l.flatMap g) (l.flatMap g') := by
@@ -452,7 +452,7 @@ def issuanceTotal (issuance : ℕ → ℕ)
 
 section SumToolbox
 
-/-- Summing over a flat map is summing the per-chunk sums. -/
+/-- Summing over a flat map is summing the per-word sums. -/
 private theorem sum_flatMap {α β : Type*} (g : α → List β) (f : β → ℤ) (l : List α) :
     ((l.flatMap g).map f).sum = (l.map fun x => ((g x).map f).sum).sum := by
   induction l with

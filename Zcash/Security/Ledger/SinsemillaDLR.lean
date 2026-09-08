@@ -42,8 +42,8 @@ open scoped Zcash.Security.RandomOracle
 /-! ## The lifted generator table -/
 
 /-- The Orchard-protocol Sinsemilla generator table, lifted into the Pallas group.
-Total on `ℕ` for convenient use under chunk lists; off-table indices (never produced
-by a `K`-bit chunk) map to the identity. -/
+Total on `ℕ` for convenient use under word lists; off-table indices (never produced
+by a `K`-bit word) map to the identity. -/
 def pallasSAt (m : ℕ) : PallasGroup :=
   if h : m < 2^K then
     PallasGroup.ofPoint (orchardGenerators.S m) (orchardGenerators.valid h)
@@ -161,15 +161,15 @@ private theorem ofPointChain_step {m : ℕ} (hm : m < 2^K) {Q Q' : Point Fp}
   abel
 
 /-- The chain-combination lemma, in the `∀`-form convenient for forward induction. -/
-private theorem ofPointChain_hash : ∀ (chunks : List ℕ) {Q acc : Point Fp} (hQ : Q.Valid),
-    (∀ m ∈ chunks, m < 2^K) →
-    hashToPoint orchardGenerators.S Q chunks = some acc → ∀ (hacc : acc.Valid),
+private theorem ofPointChain_hash : ∀ (words : List ℕ) {Q acc : Point Fp} (hQ : Q.Valid),
+    (∀ m ∈ words, m < 2^K) →
+    hashToPoint orchardGenerators.S Q words = some acc → ∀ (hacc : acc.Valid),
     PallasGroup.ofPoint acc hacc =
-      2^chunks.length • PallasGroup.ofPoint Q hQ +
-        ∑ j ∈ Finset.range chunks.length,
-          2^(chunks.length - 1 - j) • pallasSAt (chunks.getD j 0) := by
-  intro chunks
-  induction chunks with
+      2^words.length • PallasGroup.ofPoint Q hQ +
+        ∑ j ∈ Finset.range words.length,
+          2^(words.length - 1 - j) • pallasSAt (words.getD j 0) := by
+  intro words
+  induction words with
   | nil =>
     intro Q acc hQ hb h hacc
     rw [hashToPoint_nil, Option.some.injEq] at h
@@ -204,22 +204,22 @@ private theorem ofPointChain_hash : ∀ (chunks : List ℕ) {Q acc : Point Fp} (
       abel
 
 /-- A defined Sinsemilla chain value is the explicit generator combination
-`2^n • Q + ∑ⱼ 2^(n−1−j) • S(mⱼ)` (`n = chunks.length`), in the Pallas group.  This
+`2^n • Q + ∑ⱼ 2^(n−1−j) • S(mⱼ)` (`n = words.length`), in the Pallas group.  This
 is the "explicit combination" reading of the honest prefix chain used informally by
 `ValidBreak`'s documentation, now as a theorem. -/
-theorem ofPoint_hashToPoint {Q acc : Point Fp} (hQ : Q.Valid) {chunks : List ℕ}
-    (hb : ∀ m ∈ chunks, m < 2^K)
-    (h : hashToPoint orchardGenerators.S Q chunks = some acc) (hacc : acc.Valid) :
+theorem ofPoint_hashToPoint {Q acc : Point Fp} (hQ : Q.Valid) {words : List ℕ}
+    (hb : ∀ m ∈ words, m < 2^K)
+    (h : hashToPoint orchardGenerators.S Q words = some acc) (hacc : acc.Valid) :
     PallasGroup.ofPoint acc hacc =
-      2^chunks.length • PallasGroup.ofPoint Q hQ +
-        ∑ j ∈ Finset.range chunks.length,
-          2^(chunks.length - 1 - j) • pallasSAt (chunks.getD j 0) :=
-  ofPointChain_hash chunks hQ hb h hacc
+      2^words.length • PallasGroup.ofPoint Q hQ +
+        ∑ j ∈ Finset.range words.length,
+          2^(words.length - 1 - j) • pallasSAt (words.getD j 0) :=
+  ofPointChain_hash words hQ hb h hacc
 
 /-! ## Relation coefficients -/
 
 /-- The table coefficient contributed by the consumed prefix `l`: generator `t`
-receives `2^(n−1−j)` for every position `j` of `l` holding chunk value `t`. -/
+receives `2^(n−1−j)` for every position `j` of `l` holding word value `t`. -/
 def preCoeffs (l : List ℕ) (t : Fin (2^K)) : Fq :=
   ∑ j ∈ Finset.range l.length,
     if l.getD j 0 = t.1 then (2 : Fq)^(l.length - 1 - j) else 0
@@ -227,13 +227,13 @@ def preCoeffs (l : List ℕ) (t : Fin (2^K)) : Fq :=
 /-- The indicator coefficient vector of a single table generator. -/
 def indicator (c t : Fin (2^K)) : Fq := if t = c then 1 else 0
 
-/-- The escape chunk as a table index.  The reduction only consumes it under the
+/-- The escape word as a table index.  The reduction only consumes it under the
 `< 2^K` bound of the real query families, where the reduction is the identity. -/
-def chunkIdx (br : BreakData) : Fin (2^K) :=
+def wordIdx (br : BreakData) : Fin (2^K) :=
   ⟨br.chunk % 2^K, Nat.mod_lt _ (Nat.two_pow_pos K)⟩
 
-theorem chunkIdx_of_lt {br : BreakData} (h : br.chunk < 2^K) :
-    (chunkIdx br).1 = br.chunk :=
+theorem wordIdx_of_lt {br : BreakData} (h : br.chunk < 2^K) :
+    (wordIdx br).1 = br.chunk :=
   Nat.mod_eq_of_lt h
 
 private theorem coeffs_two_ne_zero : (2 : Fq) ≠ 0 := by
@@ -296,14 +296,14 @@ correctness is `breakCoeffs_relation`, nontriviality `breakCoeffs_nontrivial`. -
 def breakCoeffs (br : BreakData) : (Fin (2^K) → Fq) × Fq :=
   match br.kind with
   | .accZero => (preCoeffs br.pre, 2^br.pre.length)
-  | .genZero => (indicator (chunkIdx br), 0)
+  | .genZero => (indicator (wordIdx br), 0)
   | .collision neg =>
-      (fun t => preCoeffs br.pre t + (if neg then 1 else -1) * indicator (chunkIdx br) t,
+      (fun t => preCoeffs br.pre t + (if neg then 1 else -1) * indicator (wordIdx br) t,
         2^br.pre.length)
   | .sumZero =>
-      (fun t => preCoeffs br.pre t + indicator (chunkIdx br) t, 2^br.pre.length)
+      (fun t => preCoeffs br.pre t + indicator (wordIdx br) t, 2^br.pre.length)
   | .doubleCollision =>
-      (fun t => 2 * preCoeffs br.pre t + indicator (chunkIdx br) t,
+      (fun t => 2 * preCoeffs br.pre t + indicator (wordIdx br) t,
         2^(br.pre.length + 1))
 
 /-- The computed coefficients are never all zero: every kind but `genZero` carries
@@ -316,7 +316,7 @@ theorem breakCoeffs_nontrivial (br : BreakData) :
   · exact Or.inr (two_pow_ne_zero _)
   · refine Or.inl ?_
     intro h
-    have := congrFun h (chunkIdx br)
+    have := congrFun h (wordIdx br)
     simp only [indicator, if_pos, Pi.zero_apply] at this
     exact one_ne_zero this
   · exact Or.inr (two_pow_ne_zero _)
@@ -327,7 +327,7 @@ theorem breakCoeffs_nontrivial (br : BreakData) :
 query, the coefficients satisfy the discrete-log relation in the Pallas group. -/
 theorem breakCoeffs_relation {Qpt : Point Fp} (hQ : Qpt.Valid) {br : BreakData}
     (hvb : ValidBreak orchardGenerators.S Qpt br)
-    (hpre : ∀ m ∈ br.pre, m < 2^K) (hchunk : br.chunk < 2^K) :
+    (hpre : ∀ m ∈ br.pre, m < 2^K) (hword : br.chunk < 2^K) :
     (∑ t : Fin (2^K), (breakCoeffs br).1 t • pallasS t) +
       (breakCoeffs br).2 • PallasGroup.ofPoint Qpt hQ = 0 := by
   obtain ⟨hchain, hPointEq⟩ := hvb
@@ -340,11 +340,11 @@ theorem breakCoeffs_relation {Qpt : Point Fp} (hQ : Qpt.Valid) {br : BreakData}
     rw [sum_preCoeffs_smul hpre, ofPoint_hashToPoint hQ hpre hchain hacc]
     congr 1
     exact Finset.sum_congr rfl (fun j _ => (two_pow_smul_eq_nsmul _ _).symm)
-  -- The escape chunk generator, as a table element.
-  have hSC : pallasS (chunkIdx br) =
-      PallasGroup.ofPoint (orchardGenerators.S br.chunk) (orchardGenerators.valid hchunk) := by
-    show pallasSAt (chunkIdx br).1 = _
-    rw [chunkIdx_of_lt hchunk, pallasSAt_of_lt hchunk]
+  -- The escape word generator, as a table element.
+  have hSC : pallasS (wordIdx br) =
+      PallasGroup.ofPoint (orchardGenerators.S br.chunk) (orchardGenerators.valid hword) := by
+    show pallasSAt (wordIdx br).1 = _
+    rw [wordIdx_of_lt hword, pallasSAt_of_lt hword]
   cases hkind : br.kind with
   | accZero =>
     simp only [BreakData.PointEq, hkind] at hPointEq
@@ -358,7 +358,7 @@ theorem breakCoeffs_relation {Qpt : Point Fp} (hQ : Qpt.Valid) {br : BreakData}
     simp only [BreakData.PointEq, hkind] at hPointEq
     simp only [breakCoeffs, hkind]
     rw [sum_indicator_smul, zero_smul, add_zero, hSC]
-    exact PallasGroup.ofPoint_eq_zero (orchardGenerators.valid hchunk) hPointEq
+    exact PallasGroup.ofPoint_eq_zero (orchardGenerators.valid hword) hPointEq
   | collision neg =>
     simp only [BreakData.PointEq, hkind] at hPointEq
     simp only [breakCoeffs, hkind]
@@ -369,20 +369,20 @@ theorem breakCoeffs_relation {Qpt : Point Fp} (hQ : Qpt.Valid) {br : BreakData}
     cases neg with
     | false =>
       simp only [Bool.false_eq_true, if_false] at hPointEq ⊢
-      have hAeq : PallasGroup.ofPoint br.acc hacc = pallasS (chunkIdx br) := by
-        rw [hSC]; exact lift_eq_of_point_eq hacc (orchardGenerators.valid hchunk) hPointEq
+      have hAeq : PallasGroup.ofPoint br.acc hacc = pallasS (wordIdx br) := by
+        rw [hSC]; exact lift_eq_of_point_eq hacc (orchardGenerators.valid hword) hPointEq
       rw [hAcc] at hAeq
       rw [neg_one_smul, ← hAeq]
       abel
     | true =>
       simp only [if_true] at hPointEq ⊢
-      have hAeq : PallasGroup.ofPoint br.acc hacc = -pallasS (chunkIdx br) := by
-        rw [hSC, ← PallasGroup.ofPoint_neg (orchardGenerators.valid hchunk)]
+      have hAeq : PallasGroup.ofPoint br.acc hacc = -pallasS (wordIdx br) := by
+        rw [hSC, ← PallasGroup.ofPoint_neg (orchardGenerators.valid hword)]
         exact lift_eq_of_point_eq hacc _ hPointEq
       rw [hAcc] at hAeq
       rw [one_smul]
       have hz : 2^br.pre.length • PallasGroup.ofPoint Qpt hQ +
-          (∑ t : Fin (2^K), preCoeffs br.pre t • pallasS t) + pallasS (chunkIdx br) = 0 := by
+          (∑ t : Fin (2^K), preCoeffs br.pre t • pallasS t) + pallasS (wordIdx br) = 0 := by
         rw [hAeq]; abel
       rw [← hz]; abel
   | sumZero =>
@@ -390,8 +390,8 @@ theorem breakCoeffs_relation {Qpt : Point Fp} (hQ : Qpt.Valid) {br : BreakData}
     simp only [breakCoeffs, hkind]
     simp_rw [add_smul]
     rw [Finset.sum_add_distrib, sum_indicator_smul, two_pow_smul_eq_nsmul]
-    have hKind0 : PallasGroup.ofPoint br.acc hacc + pallasS (chunkIdx br) = 0 := by
-      rw [hSC, ← PallasGroup.ofPoint_add hacc (orchardGenerators.valid hchunk)]
+    have hKind0 : PallasGroup.ofPoint br.acc hacc + pallasS (wordIdx br) = 0 := by
+      rw [hSC, ← PallasGroup.ofPoint_add hacc (orchardGenerators.valid hword)]
       exact PallasGroup.ofPoint_eq_zero _ hPointEq
     rw [hAcc] at hKind0
     rw [← hKind0]; abel
@@ -405,9 +405,9 @@ theorem breakCoeffs_relation {Qpt : Point Fp} (hQ : Qpt.Valid) {br : BreakData}
     have h2Pre := two_pow_smul_eq_nsmul 1 (∑ t : Fin (2^K), preCoeffs br.pre t • pallasS t)
     simp only [pow_one] at h2Pre
     rw [h2Pre]
-    have hKind0 : (2 : ℕ) • PallasGroup.ofPoint br.acc hacc + pallasS (chunkIdx br) = 0 := by
+    have hKind0 : (2 : ℕ) • PallasGroup.ofPoint br.acc hacc + pallasS (wordIdx br) = 0 := by
       rw [hSC, ← PallasGroup.ofPoint_nsmul 2 br.acc hacc,
-        ← PallasGroup.ofPoint_add (Point.valid_nsmul hacc 2) (orchardGenerators.valid hchunk)]
+        ← PallasGroup.ofPoint_add (Point.valid_nsmul hacc 2) (orchardGenerators.valid hword)]
       exact PallasGroup.ofPoint_eq_zero _ hPointEq
     rw [hAcc, smul_add, smul_smul] at hKind0
     rw [pow_succ, mul_comm (2^br.pre.length) 2, ← hKind0]
@@ -418,7 +418,7 @@ are the computed `breakCoeffs`; the `Prop` obligations are discharged from the b
 validity alone. -/
 def relationOfValidBreak {Qpt : Point Fp} (hQ : Qpt.Valid) (br : BreakData)
     (hvb : ValidBreak orchardGenerators.S Qpt br)
-    (hpre : ∀ m ∈ br.pre, m < 2^K) (hchunk : br.chunk < 2^K) :
+    (hpre : ∀ m ∈ br.pre, m < 2^K) (hword : br.chunk < 2^K) :
     NontrivialRelation (F := Fq) pallasS ![PallasGroup.ofPoint Qpt hQ] :=
   NontrivialRelation.ofParts (breakCoeffs br).1 ![(breakCoeffs br).2]
     (by
@@ -426,7 +426,7 @@ def relationOfValidBreak {Qpt : Point Fp} (hQ : Qpt.Valid) (br : BreakData)
       · exact Or.inl ha
       · exact Or.inr (Function.ne_iff.mpr ⟨0, by simpa using hα⟩))
     (by
-      have h := breakCoeffs_relation hQ hvb hpre hchunk
+      have h := breakCoeffs_relation hQ hvb hpre hword
       simpa [commitGen, Fin.sum_univ_one] using h)
 
 /-! ## Site dispatch
@@ -461,7 +461,7 @@ def siteQuery (wit : ActionData) : BreakSite → List ℕ
   | .noteCommitNew => noteNewQuery wit
   | .merkle i => merkleQuery wit i
 
-/-- Every chunk of every site query indexes the generator table. -/
+/-- Every word of every site query indexes the generator table. -/
 theorem siteQuery_bounded (wit : ActionData) (s : BreakSite) :
     ∀ m ∈ siteQuery wit s, m < 2^K := by
   cases s with
@@ -513,8 +513,8 @@ theorem classify_query_inr {wit : ActionData} {abr : ActionBreakData}
           injection hi with hi'; subst hi'
           exact hm
 
-/-- The escape datum of a site query is bounded: its prefix and escape chunk are
-chunks of the query itself. -/
+/-- The escape datum of a site query is bounded: its prefix and escape word are
+words of the query itself. -/
 theorem break_bounds {wit : ActionData} {s : BreakSite} {br : BreakData}
     (h : hashToPointB orchardGenerators.S (siteQ s) (siteQuery wit s) = .inr br) :
     (∀ m ∈ br.pre, m < 2^K) ∧ br.chunk < 2^K := by
@@ -623,7 +623,7 @@ defined chains at the same domain point whose blinded outputs agree up to sign
 compute a relation among the table, the domain point, and the blinding base. -/
 
 /-- A defined, blinded Sinsemilla chain as the explicit `(table, Q, W)`-combination
-determined by its chunk list. -/
+determined by its word list. -/
 theorem blinded_chain_eq {Q : Point Fp} (hQ : Q.Valid) (W : PallasGroup)
     {l : List ℕ} (hb : ∀ m ∈ l, m < 2^K)
     {p : Point Fp} (h : hashToPoint orchardGenerators.S Q l = some p) (hv : p.Valid)
@@ -640,8 +640,8 @@ theorem blinded_chain_eq {Q : Point Fp} (hQ : Q.Valid) (W : PallasGroup)
 theorem fp_val_lt (x : Fp) : x.val < 2^255 :=
   lt_trans (ZMod.val_lt x) (by norm_num [CompElliptic.Fields.Pasta.PALLAS_BASE_CARD])
 
-/-- The `ℕ`-level chunk coefficients: generator `t` receives `2^(n−1−j)` for every
-position `j` holding chunk value `t`, summed in `ℕ`. -/
+/-- The `ℕ`-level word coefficients: generator `t` receives `2^(n−1−j)` for every
+position `j` holding word value `t`, summed in `ℕ`. -/
 def natCoeffs (l : List ℕ) (t : ℕ) : ℕ :=
   ∑ j ∈ Finset.range l.length,
     if l.getD j 0 = t then 2^(l.length - 1 - j) else 0
@@ -704,8 +704,8 @@ theorem natCoeffs_inj : ∀ {l₁ l₂ : List ℕ}, l₁.length = l₂.length �
       exact Nat.add_left_cancel ht
     rw [ih hrl htail]
 
-/-- **The chunk coefficients determine the list** — the binary-expansion core of spec
-Theorem 5.4.3, over the scalar field: for chunk lists of equal length at most 253, the
+/-- **The word coefficients determine the list** — the binary-expansion core of spec
+Theorem 5.4.3, over the scalar field: for word lists of equal length at most 253, the
 `ℕ`-level coefficient sums stay below the field order, so the cast is faithful and
 `natCoeffs_inj` applies. -/
 theorem preCoeffs_inj {l₁ l₂ : List ℕ}

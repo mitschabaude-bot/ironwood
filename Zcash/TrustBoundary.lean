@@ -1314,7 +1314,7 @@ assert_computable Zcash.Snark.topLevelStatements_or_relation_of_circuitSat +choi
 assert_computable Zcash.Snark.topLevelStatements_or_relation_of_decodedMemberPolynomial_eq +choice +native(
   CompElliptic.Fields.Pasta.pallasBase)
 -- The last links: the point check lifted to the polynomial identity, the permutation taken to be the
--- one keygen builds from the circuit's copy constraints, the cells of every chunk covered at once,
+-- one keygen builds from the circuit's copy constraints, the cells of every word covered at once,
 -- and circuit satisfaction defined by the whole constraint list rather than the gates alone.
 assert_axioms Zcash.Snark.constraint_identity_of_hfold
 assert_axioms Zcash.Snark.declared_equalities_of_running_product
@@ -1331,8 +1331,8 @@ assert_axioms Zcash.Snark.snarkRelation_constraints
 assert_axioms Zcash.Snark.declared_equalities_of_circuitSat
 assert_axioms Zcash.Snark.lookup_relation_of_circuitSat
 assert_axioms Zcash.Snark.lookup_tuple_of_circuitSat
--- Several permutation chunks, not one: the chaining rule located in the list, read at row zero, and
--- the chunks flattened into a single running product so the permutation acts on every cell.
+-- Several permutation words, not one: the chaining rule located in the list, read at row zero, and
+-- the words flattened into a single running product so the permutation acts on every cell.
 assert_axioms Zcash.Snark.chain_mem_permutationExpressions
 assert_axioms Zcash.Snark.running_product_chain
 assert_axioms Zcash.Snark.deployed_copy_constraints_of_identity_chunks
@@ -1408,7 +1408,7 @@ assert_axioms Zcash.Snark.preX2SqueezePoint_inj
 assert_axioms Zcash.Snark.preX3SqueezePoint_inj
 assert_axioms Zcash.Snark.preX4SqueezePoint_inj
 -- The degree walk (`Soundness.DegreeWalk`): every constraint family's polynomial stays under an
--- explicit cap — gates by `Expr.degreeBound`, permutation chunks by width, lookups by their
+-- explicit cap — gates by `Expr.degreeBound`, permutation words by width, lookups by their
 -- compressed expressions — the combined bound the `x`-squeeze schedule's `epsilonX` prices.
 assert_axioms Zcash.Snark.natDegree_combineConstraints_le
 -- The quantified random match, generic half (`Fingerprint/SampleSpace`,

@@ -270,20 +270,20 @@ the classifier, and the correctness theorems cannot silently drift apart.  The
 Merkle queries consume the raw 255-bit child encodings verbatim; a noncanonical
 representative is never reduced before hashing. -/
 
-/-- The exact `Commit^ivk` chunk query of a witness (§5.4.8.4). -/
+/-- The exact `Commit^ivk` word query of a witness (§5.4.8.4). -/
 abbrev ivkQuery (wit : ActionData) : List ℕ :=
   commitIvkChunks wit.akP.x.val wit.nk.val
 
-/-- The exact old-note commitment chunk query (`NoteCommit`, §5.4.8.4). -/
+/-- The exact old-note commitment word query (`NoteCommit`, §5.4.8.4). -/
 abbrev noteOldQuery (wit : ActionData) : List ℕ :=
   (NoteCommit.noteScalars wit.gdOld wit.pkdOld wit.vOld wit.rhoOld wit.psiOld).chunks
 
-/-- The exact new-note commitment chunk query (`NoteCommit` with `ρ_new = nf_old`,
+/-- The exact new-note commitment word query (`NoteCommit` with `ρ_new = nf_old`,
 §5.4.8.4). -/
 abbrev noteNewQuery (wit : ActionData) : List ℕ :=
   (NoteCommit.noteScalars wit.gdNew wit.pkdNew wit.vNew wit.nfOld wit.psiNew).chunks
 
-/-- The exact layer-`i` Merkle chunk query, over the raw 255-bit child encodings
+/-- The exact layer-`i` Merkle word query, over the raw 255-bit child encodings
 (`MerkleCRH`, §5.4.1.4). -/
 abbrev merkleQuery (wit : ActionData) (i : Fin 32) : List ℕ :=
   merkleChunks i.1 (wit.leftEncoding i) (wit.rightEncoding i)
@@ -352,18 +352,18 @@ inductive ActionBreak (wit : ActionData) : Prop
       hashToPointB orchardGenerators.S orchardBases.merkleQ (merkleQuery wit i) = .inr br →
       ValidBreak orchardGenerators.S orchardBases.merkleQ br → ActionBreak wit
 
-private theorem merkle_chunk_onCurve {i lv rv m : ℕ}
+private theorem merkle_words_onCurve {i lv rv m : ℕ}
     (hm : m ∈ merkleChunks i lv rv) : (orchardGenerators.S m).OnCurve := by
   apply orchardGenerators.S_onCurve
   simp only [merkleChunks, List.mem_map, List.mem_range] at hm
   obtain ⟨j, -, rfl⟩ := hm
   exact Nat.mod_lt _ (Nat.two_pow_pos _)
 
-private theorem ivk_chunk_onCurve {wit : ActionData} {m : ℕ}
+private theorem ivk_words_onCurve {wit : ActionData} {m : ℕ}
     (hm : m ∈ ivkQuery wit) : (orchardGenerators.S m).OnCurve :=
   orchardGenerators.S_onCurve (chunksOf_mem_lt hm)
 
-private theorem note_chunk_onCurve {gd pkd : Point Fp} {v rho psi : Fp} {m : ℕ}
+private theorem note_words_onCurve {gd pkd : Point Fp} {v rho psi : Fp} {m : ℕ}
     (hm : m ∈ (NoteCommit.noteScalars gd pkd v rho psi).chunks) :
     (orchardGenerators.S m).OnCurve :=
   orchardGenerators.S_onCurve (chunksOf_mem_lt hm)
@@ -376,7 +376,7 @@ theorem commitIvk_break_of_inr {wit : ActionData} (br : BreakData)
     ActionBreak wit :=
   .commitIvk br hb
     (validBreak_of_inr (Or.inl orchardBases.ivkQ_onCurve)
-      (fun _ hm => ivk_chunk_onCurve hm) hb)
+      (fun _ hm => ivk_words_onCurve hm) hb)
 
 /-- Package an old-note commitment escape of the witness's exact query. -/
 theorem noteCommitOld_break_of_inr {wit : ActionData} (br : BreakData)
@@ -384,7 +384,7 @@ theorem noteCommitOld_break_of_inr {wit : ActionData} (br : BreakData)
     ActionBreak wit :=
   .noteCommitOld br hb
     (validBreak_of_inr (Or.inl orchardBases.noteQ_onCurve)
-      (fun _ hm => note_chunk_onCurve hm) hb)
+      (fun _ hm => note_words_onCurve hm) hb)
 
 /-- Package a new-note commitment escape of the witness's exact query. -/
 theorem noteCommitNew_break_of_inr {wit : ActionData} (br : BreakData)
@@ -392,7 +392,7 @@ theorem noteCommitNew_break_of_inr {wit : ActionData} (br : BreakData)
     ActionBreak wit :=
   .noteCommitNew br hb
     (validBreak_of_inr (Or.inl orchardBases.noteQ_onCurve)
-      (fun _ hm => note_chunk_onCurve hm) hb)
+      (fun _ hm => note_words_onCurve hm) hb)
 
 /-- Package an exact raw-encoding Merkle escape in the circuit-facing break
 vocabulary.  The `hashToPointB` equation certifies that this is the escape of the
@@ -403,7 +403,7 @@ theorem merkle_break_of_inr {wit : ActionData} (i : Fin 32) (br : BreakData)
     ActionBreak wit :=
   .merkle i br hb
     (validBreak_of_inr (Or.inl orchardBases.merkleQ_onCurve)
-      (fun _ hm => merkle_chunk_onCurve hm) hb)
+      (fun _ hm => merkle_words_onCurve hm) hb)
 
 /-! ### The computable break classifier
 

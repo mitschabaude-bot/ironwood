@@ -57,9 +57,9 @@ theorem commitIvkHash_get_eq {a n : Fp} {g : PallasGroup}
 valid `Commit^ivk` openings of the same `ivk` disagreeing on their opening projection:
 the reduction unpacks them into their defined Sinsemilla chains and blinding scalars
 and applies the chain-collision reducer at the `CommitIvk` domain point and randomness
-base. The reduction is hypothesis-free: the chunk-coefficient injectivity is
+base. The reduction is hypothesis-free: the word-coefficient injectivity is
 `preCoeffs_inj` (spec Theorem 5.4.3's binary-expansion core, proven) and the
-chunk-encoding injectivity is `commitIvkChunks_inj`. -/
+word-encoding injectivity is `commitIvkChunks_inj`. -/
 def relationOfKeyBindingBreak
     {w₁ w₂ : KeyBinding.Pool.Witness Fq PallasGroup Fp}
     (brk : KeyBinding.Pool.CommitIvkCollision extract commitIvkHash commitIvkRpt w₁ w₂)

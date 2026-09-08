@@ -34,7 +34,7 @@ idealized as the table. The relation arm is the named `ε_valuedlr`: the probabi
 deployed finder returns a nontrivial relation over the named 𝒱/ℛ slots.
 -/
 
--- The Orchard reducers carry Sinsemilla chunk exponents beyond the default threshold, as in
+-- The Orchard reducers carry Sinsemilla word exponents beyond the default threshold, as in
 -- `MerkleDLR`; raise it so the relation terms elaborate without an unevaluated-power warning.
 set_option exponentiation.threshold 600
 
