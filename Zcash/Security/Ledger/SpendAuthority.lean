@@ -138,9 +138,9 @@ theorem spendAuthorityOrBreak_pair [DecidableEq G] [NoZeroSMulDivisors F G]
     {wV : KW} (hKB : kv.KB wV)
     (hrecv : a.w.note_old.pkd = P.emb (kv.ivk wV) • a.w.note_old.gd)
     {Signed : MSG → Prop} (hfresh : ¬ Signed tx.sighash)
-    {b : KeyBindingBreakData kv}
-    (hb : spendAuthorityOrBreak hval htx ha hKB hrecv hfresh = .inr b) :
-    b.w₁ = a.w.kw ∧ b.w₂ = wV := by
+    {brk : KeyBindingBreakData kv}
+    (hb : spendAuthorityOrBreak hval htx ha hKB hrecv hfresh = .inr brk) :
+    brk.w₁ = a.w.kw ∧ brk.w₂ = wV := by
   rw [spendAuthorityOrBreak, spendAuthForgeryOrBreak] at hb
   split_ifs at hb
   simp_all only [PSum.inr.injEq]
@@ -166,9 +166,9 @@ structure SpendAuthorityKBArm [DecidableEq G] [NoZeroSMulDivisors F G]
   hKB : kv.KB wV
   hrecv : a.w.note_old.pkd = P.emb (kv.ivk wV) • a.w.note_old.gd
   hfresh : ¬ Signed tx.sighash
-  b : KeyBindingBreakData kv
+  brk : KeyBindingBreakData kv
   hb : spendAuthorityOrBreak hval (List.mem_of_getElem? htx)
-    (List.mem_of_getElem? ha) hKB hrecv hfresh = .inr b
+    (List.mem_of_getElem? ha) hKB hrecv hfresh = .inr brk
 
 end Validity
 

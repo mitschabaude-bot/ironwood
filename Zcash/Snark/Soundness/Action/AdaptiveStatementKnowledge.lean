@@ -226,9 +226,8 @@ def adaptiveStatementKnowledgeExtractorV {pp : ProofParams}
     (finderResult : Option (AlgebraicRelationWitness (F := Fp) basis))
     (hfacts : finderResult = none → family.SemanticStageFacts basis view) :
     Option (ActionTerminal.ActionBundleWitness view.output.inputs) :=
-  match family.adaptiveStatementKnowledgeOutcomeV basis view hcharV finderResult hfacts with
-  | some (Sum.inl witness) => some witness
-  | _ => none
+  (family.adaptiveStatementKnowledgeOutcomeV basis view hcharV finderResult hfacts).bind
+    Sum.getLeft?
 
 /-- Witness-only projection of the complete selected-statement outcome. -/
 abbrev adaptiveStatementKnowledgeExtractor {pp : ProofParams}
@@ -245,6 +244,45 @@ abbrev adaptiveStatementKnowledgeExtractor {pp : ProofParams}
     (family.relationFinder hchar basis O)
     (fun hrelation => family.semanticStageFacts_of_sourceFinder_none basis O
       (family.relationFinder_none_provenance hchar basis O hrelation).2.2.2.2.1)
+
+/-- The witness projection over one run view returns nothing exactly when the complete
+outcome carries no witness: on its undefined and relation arms. -/
+theorem adaptiveStatementKnowledgeExtractorV_eq_none_iff {pp : ProofParams}
+    (family : ComputedAdaptiveActionStatementFSFamily pp)
+    (basis : AugmentedIndex (2 ^ (AdaptiveActionStatementShape pp).k) → VestaG)
+    (view : RunView pp family basis)
+    (hcharV : deployedX4PairCount (adaptiveActionStatementVk pp basis)
+      (adaptiveActionStatementInstanceCommitment pp basis view.output.inputs)
+      view.output.toAlgebraicWfProof.proof.1
+      (chRecord (k := (AdaptiveActionStatementShape pp).k) view.pre view.rounds) <
+        scalarFieldOrder)
+    (finderResult : Option (AlgebraicRelationWitness (F := Fp) basis))
+    (hfacts : finderResult = none → family.SemanticStageFacts basis view) :
+    family.adaptiveStatementKnowledgeExtractorV basis view hcharV finderResult hfacts = none ↔
+      ∀ witness,
+        family.adaptiveStatementKnowledgeOutcomeV basis view hcharV finderResult hfacts ≠
+          some (Sum.inl witness) := by
+  unfold adaptiveStatementKnowledgeExtractorV
+  cases h : family.adaptiveStatementKnowledgeOutcomeV basis view hcharV finderResult hfacts with
+  | none => simp
+  | some outcome =>
+      cases outcome with
+      | inl witness => exact iff_of_false (by simp) (fun hne => hne witness rfl)
+      | inr relation => simp
+
+/-- The witness projection returns nothing exactly when the complete outcome carries no
+witness: on its undefined and relation arms. -/
+theorem adaptiveStatementKnowledgeExtractor_eq_none_iff {pp : ProofParams}
+    (family : ComputedAdaptiveActionStatementFSFamily pp)
+    (hchar : ∀ basis O, deployedX4PairCount (adaptiveActionStatementVk pp basis)
+      (adaptiveActionStatementInstanceCommitment pp basis (family.runOutput basis O).inputs)
+      (family.runProof basis O).proof.1 (family.runRecord basis O) < scalarFieldOrder)
+    (basis : AugmentedIndex (2 ^ (AdaptiveActionStatementShape pp).k) → VestaG)
+    (O : family.Coins) :
+    family.adaptiveStatementKnowledgeExtractor hchar basis O = none ↔
+      ∀ witness, family.adaptiveStatementKnowledgeOutcome hchar basis O ≠
+        some (Sum.inl witness) :=
+  family.adaptiveStatementKnowledgeExtractorV_eq_none_iff basis (runView family basis O) _ _ _
 
 /-- Acceptance for a selected statement with failure of the executable witness projection. -/
 def adaptiveStatementKnowledgeFailureEvent {pp : ProofParams}
@@ -417,9 +455,8 @@ theorem adaptiveStatementKnowledgeExtractor_isSome_of_no_events {pp : ProofParam
             have hrelationSome : (family.preXIdentityRelation?V basis
                 (runView family basis O) hfacts witness rawDecode hbatches hacceptsFull
                 hcharFull).isSome := by
-              unfold preXIdentityRelation?V
-              rw [houtcomeEq]
-              rfl
+              simp only [preXIdentityRelation?V, houtcomeEq, Option.bind_some,
+                Sum.getRight?_inr, Option.isSome_some]
             have hfinderSome := family.identityRelationFinder_isSome_of hchar basis O
               hprovenance.2.2.2.2.1 witness hout hroots haccepts hz hattack hrelationSome
             rw [hidentityNone] at hfinderSome

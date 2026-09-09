@@ -26,6 +26,8 @@ member-node binding.
 
 namespace Zcash.Snark
 
+universe u
+
 open Zcash.Arithmetic (Msm)
 
 open CompPoly.CPolynomial
@@ -476,8 +478,9 @@ lemma assembledQueryRoutingConditions_of_assemble?_eq_some
     exact absurd hm (by simp)
 
 /-- If every routed member is node-bound, the decoded resolver opens every query in `queries`;
-otherwise the existing augmented-basis relation branch is retained. -/
+otherwise the caller's computed failure branch is retained. -/
 def decodedPolynomialResolver_opens_or_relation [DecidableEq G] [Inhabited G]
+    {R : Sort u}
     (urs : URS G) (hk : shape.k = urs.k)
     (vk : VerifyingKey shape Fp G) (ps : ProofString shape Fp G)
     (ch : Challenges shape.k Fp)
@@ -502,11 +505,11 @@ def decodedPolynomialResolver_opens_or_relation [DecidableEq G] [Inhabited G]
           urs hk vk ps ch memberDecode slot).eval point
           = deployedMemberClaim (instanceCommitment := instanceCommitment)
               vk ps ch slot point
-        ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w) :
+        ⊕' R) :
     (∀ q ∈ queries,
       (decodedPolynomialResolver (instanceCommitment := instanceCommitment)
         urs hk vk ps ch memberDecode route q.commId).eval q.point = q.eval)
-      ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w :=
+      ⊕' R :=
   listForallOrRelationWitness queries fun q hq =>
     let hroute := hrouted q hq
     bindOrRelationWitness (hbind hroute.slot q.point hroute.point_mem) fun hb => by
@@ -542,7 +545,7 @@ def eval_lookupEntriesOfDecodedResolver_or_relation
           urs hk vk ps ch memberDecode slot).eval point
           = deployedMemberClaim (instanceCommitment := instanceCommitment)
               vk ps ch slot point
-        ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w)
+        ⊕' AugmentedRelationWitness (F := Fp) urs.g urs.u urs.w)
     (p : Fin shape.numProofs) :
     (lookupEntriesOfResolver vk
         (decodedPolynomialResolver (instanceCommitment := instanceCommitment)
@@ -551,7 +554,7 @@ def eval_lookupEntriesOfDecodedResolver_or_relation
             vk ps ch hcount hdup)) p).map
         (fun lk => (lk.1.map (fun q => q.eval ch.x), lk.2.1, lk.2.2))
         = subProofLookups vk ps p
-      ⊕' NontrivialRelation (F := Fp) urs.g urs.u urs.w :=
+      ⊕' AugmentedRelationWitness (F := Fp) urs.g urs.u urs.w :=
   bindOrRelationWitness
     (decodedPolynomialResolver_opens_or_relation
       (instanceCommitment := instanceCommitment)

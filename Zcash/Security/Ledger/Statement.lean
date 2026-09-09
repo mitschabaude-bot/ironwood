@@ -51,8 +51,8 @@ variable {G : Type*} [AddCommGroup G] [Module F G]
 variable {IVK NK RHO PSI MHASH MENC MSG SIG : Type*} {KW : Type*}
 
 /-- An Orchard-shaped note. Point encodings and type conversions are abstracted away:
-`gd` and `pkd` are group elements, `ρ` and `ψ` base-field values, `v` a natural number
-(range-bounded by the statement). -/
+`gd` and `pkd` are group elements, `ρ` and `ψ` base-field values, and `v` a natural number
+standing for the protocol's 64-bit unsigned value, whose range the statement carries. -/
 structure Note (G RHO PSI : Type*) where
   gd : G
   pkd : G
@@ -83,6 +83,8 @@ and lemmas. `emb` is the embedding of base-field values used as scalars
 (`[0, q) ⊆ [0, r)` concretely). `MSG` and `SIG` are the sighash and signature types of the
 spend-authorization scheme. -/
 structure Primitives (F G IVK NK RHO PSI MHASH MENC MSG SIG : Type*) where
+  /-- The exclusive bound on a note's value: the protocol's 64-bit unsigned value type,
+  `2^64` at the intended instantiation, which the model's `Note` holds as an unbounded `ℕ`. -/
   valueBound : ℕ
   /-- The magnitude bound on a transaction's declared value balance
   (`|vBalance| ≤ vBalanceBound`; the signed two's-complement endpoint `2^63` at the
@@ -167,11 +169,11 @@ satisfy this interface (the latter enforces strictly more).
 
 This is the security-game statement — the abstract ledger meaning of a successful
 action — and it is deliberately separate from the circuit-facing `ActionSpec`:
-`Bridge.actionSpec_to_ledger` verifies that every `ActionSpec` case becomes either this
-statement or an exhibited `Bridge.ActionBreak`. The interface itself stays
-`Prop`-only; the breaks-as-computed-data pattern applies at the bridge
-(`Bridge.classifyAction`, reduced onward to the games-facing discrete-log-relation
-object by `Bridge.relationOfBreakData`), not here.
+`Bridge.actionSpecToLedgerData` turns every `ActionSpec` case into either a ledger
+action satisfying this statement (`Bridge.ActionLedgerSuccess`, with the instance and
+witness as data) or the computed discrete-log relation of a Sinsemilla escape
+(`Bridge.ActionDLBreak`). The interface itself stays `Prop`-only; the
+everything-as-computed-data pattern applies at the bridge, not here.
 
 TODO: Verify the exact Action interface the Balance and Spendability games consume.
 The NU6.3 flag conditions belong in the game instance rather than a circuit-facing
@@ -216,12 +218,13 @@ development reduces it further. The intended onward reductions are a Sinsemilla/
 relation pre-quantum (spec Theorems 5.4.3 and 5.4.4), and an `H^rcm` ±-collision for the
 Recovery Statement (via the Pedersen lift and the `extract` ±-property).
 
-The value bounds travel with the break object: `Note.v` is an unbounded `ℕ` while the
-concrete commitment consumes it through a 64-bit encoding, so without them the structure
-would be inhabitable by value-overflow aliasing (`v` versus `v + 2^64`) with no
-cryptographic content, and the onward reductions above would be false as stated.  The
-producers mint breaks from `ActionSatisfied` pairs, whose `v_old_lt`/`v_new_lt` conjuncts
-supply the bounds directly. -/
+The value bounds travel with the break object: they are the 64-bit type of a note's value,
+which the protocol fixes and the model's `Note` holds as an unbounded `ℕ`. The concrete
+commitment writes exactly those 64 bits, so without the bounds the structure would be
+inhabitable by value-overflow aliasing (`v` versus `v + 2^64`) with no cryptographic
+content, and the onward reductions above would be false as stated. The producers mint
+breaks from `ActionSatisfied` pairs, whose `v_old_lt`/`v_new_lt` conjuncts supply the
+bounds directly. -/
 structure NoteCommitBreak (P : Primitives F G IVK NK RHO PSI MHASH MENC MSG SIG) where
   rcm₁ : F
   n₁ : Note G RHO PSI

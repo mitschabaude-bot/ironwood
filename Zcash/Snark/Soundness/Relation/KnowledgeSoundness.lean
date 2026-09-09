@@ -31,14 +31,14 @@ open CompPoly.CPolynomial
 
 variable {G : Type*} [AddCommGroup G] [Module Fp G]
 
--- Decode gap (closed by the multiopen decode layer): the two conjuncts of `SnarkRelation` share
--- only the symbol `a`, so a free decode function feeding `circuitSatViaConstraints` could be
--- instantiated independently of `a` and `circuitSat a` would not constrain the extracted witness.
--- `DeployedConstraintWitness` closes that coupling for this payload by building both conjuncts
--- from one `DeployedAlgebraicDecode`. The Action capstones do not consume `SnarkRelation`; their
--- canonical and Action terminals instead consume that retained decode directly, via
--- `OpenedBatchOpenings` and `DeployedAlgebraicDecode.toMemberDecode`.
-/-- A witness that both opens the IPA commitment and satisfies the circuit predicate. -/
+/-- A witness that both opens the IPA commitment and satisfies the circuit predicate.
+
+Caution: The two conjuncts of `SnarkRelation` share only the symbol `a`, so a free decode function
+feeding `circuitSatViaConstraints` could be instantiated independently of `a`, and then `circuitSat a`
+would not constrain the extracted witness. `DeployedConstraintWitness` supplies that coupling for
+this payload by building both conjuncts from one `DeployedAlgebraicDecode`. The Action capstones do
+not consume `SnarkRelation`; their canonical and Action terminals instead consume that retained
+decode directly, via `OpenedBatchOpenings` and `DeployedAlgebraicDecode.toMemberDecode`. -/
 structure SnarkRelation (urs : URS G) (P : G) (b : Fin (2 ^ urs.k) → Fp) (v : Fp)
     (circuitSat : (Fin (2 ^ urs.k) → Fp) → Prop) (a : Fin (2 ^ urs.k) → Fp) : Prop where
   opens : IpaRelation urs P b v a

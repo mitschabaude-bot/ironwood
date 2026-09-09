@@ -58,7 +58,7 @@ inside the complete program. Equality/list work and random-oracle queries are se
 DLOG group-operation budget. Direct-coordinate work is derived from the family's required
 fixed-representation cap; this generic endpoint does not construct the concrete family instance
 that must satisfy it. The older
-declared-resource endpoint remains pinned alongside the `2^123` and `2^125` staged forms.
+declared-resource instantiation remains pinned as a rung alongside the `2^125` staged form.
 -/
 
 -- The adaptive lane's live breaks and witnesses must remain computed data. The two complete
@@ -417,7 +417,6 @@ assert_axioms Zcash.Snark.Fixture2.orchard_deployed_straightline_captured_direct
 -- them, so transitive endpoint pins cannot bound their trusted bases.  Keep each one directly
 -- censused rather than relying on the endpoint name regex to classify internal public claims.
 assert_axioms Zcash.Snark.Capstone.actionProofShape_eq_maxShape +native(
-  Zcash.Snark.Keygen.certificate,
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 assert_axioms Zcash.Snark.Capstone.actionStaticChecks +native(
   CompElliptic.Fields.Pasta.pallasBase,
@@ -425,10 +424,8 @@ assert_axioms Zcash.Snark.Capstone.actionStaticChecks +native(
 assert_axioms Zcash.Snark.Capstone.capturedActionThetaBudget +native(
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 assert_axioms Zcash.Snark.Capstone.capturedActionBetaBudget +native(
-  Zcash.Snark.Keygen.certificate,
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 assert_axioms Zcash.Snark.Capstone.capturedActionGammaBudget +native(
-  Zcash.Snark.Keygen.certificate,
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 assert_axioms Zcash.Snark.Capstone.capturedActionYBudget +native(
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
@@ -447,7 +444,6 @@ assert_axioms Zcash.Snark.Capstone.adaptiveActionXDegree_bound +native(
   Zcash.Snark.Keygen.certificate,
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt, CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
 assert_axioms Zcash.Snark.Capstone.actionStatisticalModel_at_2pow123 +native(
-  Zcash.Snark.Keygen.certificate,
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 assert_axioms Zcash.Snark.Capstone.actionDlogOracleQueryCost_bound +native(
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt, CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
@@ -504,23 +500,27 @@ assert_axioms Zcash.Snark.Capstone.orchard_action_adaptiveStatement_certified_kn
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt, CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
 
 -- The same bound priced at the `2^123` work-factor target, with the extractor's random-oracle and
--- group-work envelopes and the finder's certified read set discharged alongside it.
-assert_axioms Zcash.Snark.Capstone.orchard_action_adaptiveStatement_2pow123_knowledge_finite_security +native(
+-- group-work envelopes and the finder's certified read set discharged alongside it.  A rung, not
+-- an endpoint: the deployed endpoint transports it, and it is pinned directly so that transport
+-- cannot silently widen its base.
+assert_axioms Zcash.Snark.Capstone.adaptiveStatementKnowledgeFailure_le_at_2pow123 +native(
   CompElliptic.Fields.Pasta.pallasBase,
   Zcash.Snark.Fixture.vk_chunk_width_le, Zcash.Snark.Fixture.vk_gates_degree_le,
   Zcash.Snark.Fixture.vk_lookup_input_degree_le, Zcash.Snark.Fixture.vk_lookup_table_degree_le,
   Zcash.Snark.Keygen.certificate,
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt, CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
 
--- The deployment-record consumer adds the kernel-checked joint Challenge255 hybrid and no new
--- trusted axiom owner beyond the ideal work-factor capstone it transports.
-assert_axioms Zcash.Snark.Capstone.orchard_action_adaptiveStatement_deployed_2pow123_knowledge_finite_security +native(
+-- The deployment-record consumers add the kernel-checked joint Challenge255 hybrid and its
+-- `2^-136` pricing, and no new trusted axiom owner beyond the ideal work-factor capstone they
+-- transport: the rung leaves the charge symbolic, the endpoint states the closed number.
+assert_axioms Zcash.Snark.Capstone.adaptiveStatementDeployedKnowledgeFailure_le_jointCharge +native(
   CompElliptic.Fields.Pasta.pallasBase,
   Zcash.Snark.Fixture.vk_chunk_width_le, Zcash.Snark.Fixture.vk_gates_degree_le,
   Zcash.Snark.Fixture.vk_lookup_input_degree_le, Zcash.Snark.Fixture.vk_lookup_table_degree_le,
   Zcash.Snark.Keygen.certificate,
-  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt, CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
-assert_axioms Zcash.Snark.Capstone.orchard_action_adaptiveStatement_certified_2pow123_knowledge_finite_security +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+assert_axioms Zcash.Snark.Capstone.orchard_action_adaptiveStatement_deployed_2pow123_knowledge_finite_security +native(
   CompElliptic.Fields.Pasta.pallasBase,
   Zcash.Snark.Fixture.vk_chunk_width_le, Zcash.Snark.Fixture.vk_gates_degree_le,
   Zcash.Snark.Fixture.vk_lookup_input_degree_le, Zcash.Snark.Fixture.vk_lookup_table_degree_le,
@@ -621,7 +621,6 @@ assert_axioms Zcash.Snark.Fixture2.capturedInit
 assert_axioms Zcash.Snark.deriveChallenges
 assert_axioms Zcash.Snark.nonInteractiveFingerprint
 assert_axioms Zcash.Snark.Fixture2.derivedVk +native(
-  Zcash.Snark.Keygen.certificate,
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 assert_axioms Zcash.Snark.Fixture2.nonInteractiveFingerprint_matches_derived +native(
   CompElliptic.Fields.Pasta.pallasBase,
@@ -674,6 +673,13 @@ assert_axioms Zcash.Snark.Fixture2.straightLineInterface_nonempty_at_captured_sh
 -- hypotheses rather than discharging them from the capture, so they reach no fixture native
 -- certificate — only the Vesta point count, through the `Fp`-module structure on the curve.
 assert_axioms Zcash.Snark.FixtureMax.orchard_deployed_straightline_consensus_2pow123_generatorRO_finite_security +native(
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+-- The compressed-identity bounds the package is assembled from: the generator-random-oracle form
+-- is its direct input, the plain form the leaf nothing consumes. Both carry the `_prob_le` marker
+-- under an `_at_consensus_max` qualifier, which the census matches, so both are pinned here.
+assert_axioms Zcash.Snark.FixtureMax.straightLineConstraintFailure_prob_le_at_consensus_max +native(
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+assert_axioms Zcash.Snark.FixtureMax.straightLineConstraintFailure_prob_le_at_consensus_max_generatorRO +native(
   CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
 
 -- `whitespace := lax` collapses all whitespace, so the pin is insensitive to how

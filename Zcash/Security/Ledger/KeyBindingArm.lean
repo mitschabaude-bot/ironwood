@@ -63,12 +63,12 @@ variable [AddCommGroup G] [Field IVK] [Field RIVK] [Module RIVK G]
 /-- The games-facing key-binding interface at a sampled oracle assignment: the two
 sampled key tables plus the three components of the combined `rivk` oracle. -/
 abbrev kvAt (Extract : Extractor G IVK AK) (S : G) (hfn : AK → NK → RIVK) (Ggen : G)
-    (Hask : SK → ASK) (Hnk : SK → NK) (O : FinalQuery AK NK RIVK QK SK → RIVK) :
+    (Hask : SK → ASK) (Hnk : SK → NK) (table : FinalQuery AK NK RIVK QK SK → RIVK) :
     KeyBindingInterface (KeyBinding.Witness G IVK AK NK RIVK QK SK) G IVK NK :=
   KeyBinding.toInterface Extract S hfn Ggen
-    ⟨Hask, Hnk, fun sk => O (.legacy sk),
-      fun qk ak nk => O (.ext qk ak nk),
-      fun rivk_ext ak nk => O (.int rivk_ext ak nk)⟩
+    ⟨Hask, Hnk, fun sk => table (.legacy sk),
+      fun qk ak nk => table (.ext qk ak nk),
+      fun rivk_ext ak nk => table (.int rivk_ext ak nk)⟩
 
 /-- **The key-binding arm's ε, discharged.** For any `n`-query-bounded ledger adversary
 in the key-binding oracle model, the probability that its output ledger is valid and the
@@ -93,9 +93,9 @@ theorem balanceSubset_keyBindingArm_measure_le {ι : Type u}
             MSG SIG P.depth)}
     {n : ℕ} (hQ : ∀ j Hask Hnk, (LA j Hask Hnk).QueryBound n) :
     ((kbExperiment p)).toOuterMeasure
-        (setOf fun (j, Hask, Hnk, O) =>
-          ∃ hval : ValidLedger P (kvAt Extract S hfn Ggen Hask Hnk O)
-              issuance maxActions ((LA j Hask Hnk).run O),
+        (setOf fun (j, Hask, Hnk, table) =>
+          ∃ hval : ValidLedger P (kvAt Extract S hfn Ggen Hask Hnk table)
+              issuance maxActions ((LA j Hask Hnk).run table),
             ∃ w₁ w₂ h, balanceSubsetOrBreak hval i
               = PSum.inr (BalanceBreak.keyBinding w₁ w₂ h))
       ≤ ((n + 4) * (n + 3) : ℕ) / Fintype.card RIVK := by
@@ -103,9 +103,9 @@ theorem balanceSubset_keyBindingArm_measure_le {ι : Type u}
     (toInterface_break_measure_le Extract S hfn Ggen hS p
       (A := fun j Hask Hnk => (LA j Hask Hnk).bind fun L => .pure ((kbPairOf L i).getD default))
       (n := n) (fun j Hask Hnk => ?_))
-  · rintro ⟨j, Hask, Hnk, O⟩ ⟨hval, w₁, w₂, h, heq⟩
+  · rintro ⟨j, Hask, Hnk, table⟩ ⟨hval, w₁, w₂, h, heq⟩
     simp only [Set.mem_setOf_eq, OracleComp.run_bind, OracleComp.run_pure]
-    have hkp : kbPairOf ((LA j Hask Hnk).run O) i = some (w₁, w₂) := by
+    have hkp : kbPairOf ((LA j Hask Hnk).run table) i = some (w₁, w₂) := by
       have := balanceSubsetOrBreak_kbPair hval i heq
       simpa [BalanceBreak.kbPair] using this.symm
     rw [hkp]
@@ -138,25 +138,25 @@ theorem spendAuthority_keyBindingArm_measure_le {ι : Type u}
           × ℕ × ℕ)}
     {n : ℕ} (hQ : ∀ j Hask Hnk, (LA j Hask Hnk).QueryBound n) :
     ((kbExperiment p)).toOuterMeasure
-        (setOf fun (j, Hask, Hnk, O) =>
-          Nonempty (SpendAuthorityKBArm P (kvAt Extract S hfn Ggen Hask Hnk O)
-            issuance maxActions ((LA j Hask Hnk).run O).1
-            ((LA j Hask Hnk).run O).2.1 ((LA j Hask Hnk).run O).2.2 wV Signed))
+        (setOf fun (j, Hask, Hnk, table) =>
+          Nonempty (SpendAuthorityKBArm P (kvAt Extract S hfn Ggen Hask Hnk table)
+            issuance maxActions ((LA j Hask Hnk).run table).1
+            ((LA j Hask Hnk).run table).2.1 ((LA j Hask Hnk).run table).2.2 wV Signed))
       ≤ ((n + 4) * (n + 3) : ℕ) / Fintype.card RIVK := by
   refine le_trans (MeasureTheory.measure_mono ?_)
     (toInterface_break_measure_le Extract S hfn Ggen hS p
       (A := fun j Hask Hnk => (LA j Hask Hnk).bind fun out =>
         .pure ((kwAt out.1 out.2.1 out.2.2).getD default, wV))
       (n := n) (fun j Hask Hnk => ?_))
-  · rintro ⟨j, Hask, Hnk, O⟩ ⟨hf⟩
+  · rintro ⟨j, Hask, Hnk, table⟩ ⟨hf⟩
     simp only [Set.mem_setOf_eq, OracleComp.run_bind, OracleComp.run_pure]
     obtain ⟨hw₁, hw₂⟩ :=
       spendAuthorityOrBreak_pair hf.hval _ _ hf.hKB hf.hrecv hf.hfresh hf.hb
-    have hkw : kwAt ((LA j Hask Hnk).run O).1 ((LA j Hask Hnk).run O).2.1
-        ((LA j Hask Hnk).run O).2.2 = some hf.a.w.kw := by
+    have hkw : kwAt ((LA j Hask Hnk).run table).1 ((LA j Hask Hnk).run table).2.1
+        ((LA j Hask Hnk).run table).2.2 = some hf.a.w.kw := by
       simp [kwAt, hf.htx, hf.ha]
     rw [hkw]
-    simpa [hw₁, hw₂] using hf.b.h
+    simpa [hw₁, hw₂] using hf.brk.h
   · exact OracleComp.queryBound_bind (hQ j Hask Hnk)
       fun out => OracleComp.QueryBound.pure _ 0
 

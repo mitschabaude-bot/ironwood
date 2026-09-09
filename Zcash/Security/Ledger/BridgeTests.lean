@@ -108,7 +108,7 @@ theorem path_layers_defined
     {B E : Type*} {P : Merkle.MerklePrimitives B E} {leaf root : B}
     {children : Fin P.depth → E × E} {side : Fin P.depth → Bool}
     (h : Merkle.Path P leaf root children side) (i : Fin P.depth) :
-    ∃ b, P.compress i (children i) = some b :=
+    (P.compress i (children i)).isSome :=
   Merkle.Path.compress_isSome h i
 
 /-- Flag zero leaves the post-NU6.3 address condition inert. -/
@@ -162,20 +162,18 @@ theorem path_iff_guarded_smoke
     (side : Fin Pool.merkle.depth → Bool) :
     Merkle.Path Pool.merkle leaf root children side ↔
       Merkle.GuardedPath Pool.merkle leaf root children side ∧
-        ∀ i, ∃ b, Pool.merkle.compress i (children i) = some b :=
+        ∀ i, (Pool.merkle.compress i (children i)).isSome :=
   Merkle.path_iff_guarded_defined
 
-/-- The circuit-level postcondition refines directly to the ledger action alternative. -/
-theorem actionSpec_bridge_smoke {MSG SIG : Type*}
+/-- The circuit-level postcondition refines directly to ledger action data or a computed
+discrete-log relation. -/
+def actionSpec_bridge_smoke {MSG SIG : Type*}
     (spendAuthVerify bindingVerify : PallasGroup → MSG → SIG → Prop)
     (input : PublicInputs Fp) (wit : PrivateWitness)
     (h : ActionSpec input wit) :
-    ActionBreak (combine input wit) ∨
-      ∃ inst w, PublicProjection (combine input wit) inst ∧
-        ActionSatisfied (Pool.primitives spendAuthVerify bindingVerify) Pool.keyBinding inst w ∧
-        CrossAddressSatisfied (combine input wit) w ∧
-        EnableFlagsSatisfied (combine input wit) w :=
-  actionSpec_to_ledger spendAuthVerify bindingVerify input wit h
+    ActionLedgerSuccess spendAuthVerify bindingVerify (combine input wit) ⊕'
+      ActionDLBreak :=
+  actionSpecToLedgerData spendAuthVerify bindingVerify input wit h
 
 open Zcash.Meta
 
@@ -218,7 +216,7 @@ assert_axioms Zcash.Security.Ledger.BridgeTests.or_break_iff_guarded_smoke +nati
 assert_axioms Zcash.Security.Ledger.BridgeTests.path_iff_guarded_smoke
 assert_axioms Zcash.Security.Ledger.Bridge.guardedPath_of_exact +native(
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
-assert_axioms Zcash.Security.Ledger.BridgeTests.actionSpec_bridge_smoke +native(
+assert_computable Zcash.Security.Ledger.BridgeTests.actionSpec_bridge_smoke +choice +native(
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 
 -- The onward reduction from classified break data to the games-facing
@@ -232,6 +230,17 @@ assert_computable Zcash.Security.Ledger.Bridge.breakCoeffs +choice
 assert_computable Zcash.Security.Ledger.Bridge.relationOfBreakData +choice +native(
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 assert_computable Zcash.Security.Ledger.Bridge.classifyRelation +choice +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+
+-- The full Action-to-ledger bridge is data end to end: the key-binding witness, the
+-- success construction, and the dispatching bridge are plain compiled `def`s, at the
+-- same budget as the classifiers they consume (`Classical.choice` and the Pallas
+-- point-count certificate enter only through erased `Prop` positions).
+assert_computable Zcash.Security.Ledger.Bridge.commitIvkWitness +choice +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_computable Zcash.Security.Ledger.Bridge.ActionLedgerSuccess.ofSpec +choice +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_computable Zcash.Security.Ledger.Bridge.actionSpecToLedgerData +choice +native(
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 
 end Zcash.Security.Ledger.BridgeTests

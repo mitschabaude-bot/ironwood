@@ -24,9 +24,10 @@
 #
 # Scope: this guards against accidental omissions, NOT adversarial code. A declaration whose
 # name does not match a pattern is not an endpoint as far as this check is concerned. New endpoint
-# families must either extend the protocol-family alternatives below or use one of the semantic
-# suffixes `_error_bound`, `_finite_security`, or `_capstone`. The declaration's name must be on
-# the same line as its declaration keyword. Run from the repository root; exits non-zero on
+# families must either extend the protocol-family alternatives below or carry one of the semantic
+# markers `_error_bound`, `_finite_security`, `_prob_le`, or `_capstone` — in any position, so a
+# qualifier such as `_of_<premise>` or `_at_<instance>` may follow it. The declaration's name must
+# be on the same line as its declaration keyword. Run from the repository root; exits non-zero on
 # violation.
 #
 # The same rule is enforced a second time from the elaborated environment:
@@ -44,13 +45,13 @@ cd "$(dirname "$0")/.."
 # (`orchard_verifier_*`), the composed Action probability endpoints (`orchard_action_*`), the
 # captured knowledge-error endpoints (`orchard_deployed_*`), the concrete-statement terminals
 # (`*bundleStatement_or_relation*`), and the profiled work-factor packages (`*workFactor*`). The
-# final alternative is deliberately protocol-independent: the standardized semantic suffixes keep a
+# final alternative is deliberately protocol-independent: the standardized semantic markers keep a
 # new capstone family inside the census without requiring another prefix to be added here.
 # `_measure_le` and `_probability_bound` are the two older spellings for a probability bound, kept
 # matching so a capstone that still carries either is demanded rather than silently unpinned; they
 # also match surface, root-set, and per-challenge measures inside the AGM, Action, and pricing
 # layers, which are pinned for that reason rather than as independent claims. `_capstone` is the
-# explicit suffix for endpoints that are neither an error formula nor a concrete finite-security
+# explicit marker for endpoints that are neither an error formula nor a concrete finite-security
 # statement.
 #
 # The Rust-to-Lean boundary contributes three more families, all leaves in the same sense: the
@@ -69,18 +70,25 @@ cd "$(dirname "$0")/.."
 # what matches them now.
 #
 # `_prob_le` is the current spelling for a probability bound, alongside the two older ones; it is
-# matched for the same reason they are. The optional trailing `_for` covers the consensus-generic
-# forms, which take the bundle size as a parameter instead of fixing it at the captured shape:
-# without it a `_measure_le` endpoint disappeared from this check the moment it was generalized
-# over `numProofs`, which is the opposite of the intended direction — generalizing an endpoint
-# should never retire its census obligation. The other optional trailers keep qualified endpoint
-# names inside the census for the same reason: `_experiment` marks a bound placed in the
-# challenge-oracle experiment, `_idealizedks` marks a capstone that names the
-# knowledge-soundness idealization, and the two compose. Anchoring the suffix group rather than
-# the whole name keeps `_prob_le_of_<premise>` spellings out: those name the premise they are
-# conditional on, are pinned under their full names where they are deliverable, and are not
-# leaves.
-ENDPOINT_RE='(^orchard_(verifier|action|deployed)_)|(^competing_)|(^nonInteractiveFingerprint_matches_derived)|(bundleStatement_or_relation)|(workFactor)|(fingerprint_matches_positional)|(_(error_bound|finite_security|measure_le|probability_bound|prob_le|capstone)(_for|_experiment|_idealizedks|_experiment_idealizedks)?$)'
+# matched for the same reason they are.
+#
+# A semantic marker matches in any position, provided what follows it is the end of the name or a
+# non-alphanumeric character (`_` or `'`): `attack_prob_le`, `attack_prob_le'`,
+# `bound_measure_le_for`, and `attack_prob_le_of_textbookDL` all carry a marker;
+# `attack_prob_lemma` does not. The marker used to be anchored at the end of the name, and that
+# anchor lost endpoints twice. A `_measure_le` endpoint disappeared from this check the moment it
+# was generalized over `numProofs` and gained a `_for` suffix, so `_for` was admitted (and later
+# `_experiment` and `_idealizedks`, the experiment-placement and idealization qualifiers, in the
+# same way). The anchor then deliberately kept the `_prob_le_of_<premise>` spellings out, on the
+# reasoning that a bound conditional on a named premise is consumed by some unconditional
+# capstone and is never itself a leaf — which is false: the straight-line AGM binding and
+# deployed-root capstones are stated exactly in that form, as a probability bound *of*
+# textbook-DL hardness, nothing consumes them, and no census entry disclosed their
+# `native_decide` base until they were pinned. Generalizing, instantiating, or conditioning an
+# endpoint must never retire its census obligation: a name that carries a marker states a
+# probability, error, or security claim, and its pin states that claim's trusted base whatever
+# qualifier follows.
+ENDPOINT_RE='(^orchard_(verifier|action|deployed)_)|(^competing_)|(^nonInteractiveFingerprint_matches_derived)|(bundleStatement_or_relation)|(workFactor)|(fingerprint_matches_positional)|(_(error_bound|finite_security|measure_le|probability_bound|prob_le|capstone)([^A-Za-z0-9]|$))'
 
 # Sources scanned for endpoint declarations. `Zcash/Meta/Tests/` is excluded: it holds forged
 # adversarial declarations that exercise the rejection paths of the census macros themselves.
@@ -94,10 +102,40 @@ if [[ -z "$census" ]]; then
 fi
 
 # Every pinned name, fully qualified, one per line. An optional `_root_.` prefix is accepted by
-# the macros, so strip it here too.
-pins=$(echo "$census" | xargs grep -hE '^assert_(axioms|computable) ' \
-  | sed -E 's/^assert_(axioms|computable)[[:space:]]+//; s/^_root_\.//; s/[[:space:]].*$//' \
-  | sort -u)
+# the macros, so strip it here too. A pin may wrap its name onto the following line (the
+# assert command alone, then the indented name) to keep long names within the line-width
+# convention; accept both layouts.
+# A name that fails to parse (an empty continuation, or a token carrying syntax like
+# `+native(`) is reported as a violation rather than skipped: a silently dropped pin would
+# make a pinned endpoint read as unpinned — or, combined with a declaration-side parse gap,
+# read as nothing at all. The elaborated `CensusCheck` remains the backstop for the
+# declaration side.
+pins=$(echo "$census" | xargs awk '
+  /^assert_(axioms|computable)[[:space:]]+[^[:space:]]/ {
+    name = $2
+    sub(/^_root_\./, "", name)
+    if (name == "" || name ~ /[+(),]/) name = "PARSE_ERROR"
+    print name
+    next
+  }
+  /^assert_(axioms|computable)[[:space:]]*$/ { pending = 1; next }
+  pending {
+    name = $1
+    sub(/^_root_\./, "", name)
+    if (name == "" || name ~ /[+(),]/) name = "PARSE_ERROR"
+    print name
+    pending = 0
+  }
+  END { if (pending) print "PARSE_ERROR" }
+' | sort -u)
+
+# A herestring rather than a pipe: `grep -q` exits at the first match, and under
+# `pipefail` the SIGPIPE it sends a still-writing `echo` would turn a MATCH into a
+# failed pipeline, silently skipping this guard.
+if grep -q '^PARSE_ERROR$' <<< "$pins"; then
+  echo "VIOLATION: unparseable assert_axioms/assert_computable entry layout in census files" >&2
+  exit 1
+fi
 
 status=0
 count=0
@@ -123,7 +161,12 @@ while IFS= read -r file; do
       fi
       continue
     fi
-    # A top-level declaration: column 0, optional modifiers, then the name.
+    # A top-level declaration: column 0, optional modifiers, then the name. The name class is
+    # ASCII-only, so a declaration whose name carries a Unicode character before its marker
+    # escapes this scan. A Unicode character after the marker instead truncates the extracted
+    # name, so the pin lookup fails loud on the truncated spelling. The elaborated
+    # `CensusCheck` sees the real names and remains the backstop that demands a name this
+    # scan misses.
     [[ $line =~ ^(private[[:space:]]+|protected[[:space:]]+)?(noncomputable[[:space:]]+|partial[[:space:]]+|unsafe[[:space:]]+)?(theorem|lemma|def|abbrev|instance|axiom|opaque|inductive|structure|class)[[:space:]]+([A-Za-z0-9_\']+) ]] || continue
     # A private helper is not a deliverable endpoint.
     if [[ ${BASH_REMATCH[1]} == private* ]]; then continue; fi

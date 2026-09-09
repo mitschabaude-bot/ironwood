@@ -33,23 +33,24 @@ def algebraicPointOfCommit {k : ℕ} {basis : AugmentedIndex (2 ^ k) → VestaG}
     AlgebraicPoint (F := Fp) basis where
   point := P
   repr :=
-    { coeffs := augmentedCoeffs coeffs 0 blind
+    { coeffs := augmentedCoeffs coeffs ![0, blind]
       hEq := by
         calc
-          representationEval basis (augmentedCoeffs coeffs 0 blind) =
+          representationEval basis (augmentedCoeffs coeffs ![0, blind]) =
               representationEval
                 (augmentedBasis (ursOfAugmentedBasis k basis).g
-                  (ursOfAugmentedBasis k basis).u (ursOfAugmentedBasis k basis).w)
-                (augmentedCoeffs coeffs 0 blind) :=
-            congrArg (fun b => representationEval b (augmentedCoeffs coeffs 0 blind))
+                  ![(ursOfAugmentedBasis k basis).u, (ursOfAugmentedBasis k basis).w])
+                (augmentedCoeffs coeffs ![0, blind]) :=
+            congrArg (fun b => representationEval b (augmentedCoeffs coeffs ![0, blind]))
               (augmentedBasis_ursOfAugmentedBasis k basis).symm
           _ = commitGen (ursOfAugmentedBasis k basis).g coeffs +
-                (0 : Fp) • (ursOfAugmentedBasis k basis).u +
-                blind • (ursOfAugmentedBasis k basis).w :=
-            representationEval_augmentedBasis _ _ _ coeffs 0 blind
+                ((0 : Fp) • (ursOfAugmentedBasis k basis).u +
+                  blind • (ursOfAugmentedBasis k basis).w) := by
+            rw [representationEval_augmentedBasis, Fin.sum_univ_two]
+            simp only [Matrix.cons_val_zero, Matrix.cons_val_one]
           _ = commit (ursOfAugmentedBasis k basis) coeffs +
                 blind • (ursOfAugmentedBasis k basis).w := by
-            simp only [zero_smul, add_zero, commit]
+            simp only [zero_smul, zero_add, commit]
             rfl
           _ = P := hP }
 
@@ -101,9 +102,15 @@ theorem adaptiveStatementLagrangePrefix :
               (omegaOf (ursOfAugmentedBasis (AdaptiveActionStatementShape pp).k basis).k)
               (Pi.single i (1 : Fp)))) :=
   ofPrefix_setup_of_closed _
-    (Nat.le_of_lt_succ ActionConstraintBounds.domainExponent_lt)
+    (by
+      simpa only [ursOfAugmentedBasis_k, AdaptiveActionStatementShape,
+        Halo2.CircuitShape.withProofParams_k] using
+          Nat.le_of_lt_succ ActionConstraintBounds.domainExponent_lt)
     (derivedUrsGLagrange_generator_eq _
-      (Nat.le_of_lt_succ ActionConstraintBounds.domainExponent_lt))
+      (by
+        simpa only [ursOfAugmentedBasis_k, AdaptiveActionStatementShape,
+          Halo2.CircuitShape.withProofParams_k] using
+            Nat.le_of_lt_succ ActionConstraintBounds.domainExponent_lt))
 
 /-- The canonical augmented-basis representation of a fixed-column commitment, using the dense
 keygen row and Halo2's default blind `1`. -/
@@ -149,39 +156,43 @@ def canonicalActionPermutationRepresentation
     1
     ((adaptiveActionStatementVk pp basis).permutationCommonCommitment c)
     (by
-      have hc : (c : ℕ) < (permColsOf actionCircuit.constraintSystem).length := by
-        have hlen : (permColsOf actionCircuit.constraintSystem).length =
-            actionCircuit.permutationColumnCount := by
-          simp [permColsOf, TopLevelCircuit.permutationColumnCount,
-            TopLevelCircuit.permutationColumns]
-        rw [hlen]
-        exact c.isLt
-      calc
-        commit (ursOfAugmentedBasis (AdaptiveActionStatementShape pp).k basis)
-              (instanceCoefficients (2 ^ (AdaptiveActionStatementShape pp).k) actionCircuit.omega
-                ((permPolysOf (AdaptiveActionStatementShape pp).k actionCircuit.constraintSystem
-                  actionCircuit.operations).getD (c : ℕ) [])) +
-              (1 : Fp) • (ursOfAugmentedBasis (AdaptiveActionStatementShape pp).k basis).w =
-            (LagrangeCommitmentKey.ofPrefix
-              (ursOfAugmentedBasis (AdaptiveActionStatementShape pp).k basis)
-              (omegaOf (AdaptiveActionStatementShape pp).k)
-              (derivedUrsGLagrange
-                (ursOfAugmentedBasis (AdaptiveActionStatementShape pp).k basis))
-              (adaptiveStatementLagrangePrefix pp basis)).commitInstance
-                ((permPolysOf (AdaptiveActionStatementShape pp).k
-                  actionCircuit.constraintSystem actionCircuit.operations).getD (c : ℕ) []) 1 :=
-          (LagrangeCommitmentKey.commitInstance_eq _ _ 1).symm
-        _ = (permutationCommitmentsOf
-              (ursOfAugmentedBasis (AdaptiveActionStatementShape pp).k basis).w
-              (derivedUrsGLagrange
-                (ursOfAugmentedBasis (AdaptiveActionStatementShape pp).k basis))
-              (AdaptiveActionStatementShape pp).k actionCircuit.constraintSystem
-              actionCircuit.operations).getD (c : ℕ) 0 :=
-          (permutationCommitmentsOf_getD_eq_commitInstance _ _ _
-            (derivedUrsGLagrange_length _) (adaptiveStatementLagrangePrefix pp basis)
-            (c : ℕ) hc).symm
-        _ = (adaptiveActionStatementVk pp basis).permutationCommonCommitment c :=
-          (actionCircuit.toVerifierKey_permutationCommonCommitment _ c).symm)
+      let urs := ursOfAugmentedBasis (AdaptiveActionStatementShape pp).k basis
+      have hk : actionCircuit.domainExponent = urs.k := rfl
+      have hkUrs : urs.k ≤ 32 := by
+        rw [← hk]
+        exact Nat.le_of_lt_succ ActionConstraintBounds.domainExponent_lt
+      let setup := LagrangePrefixSetup.ofDerived urs hkUrs
+      have hcTop : (c : ℕ) < actionCircuit.permutationColumnCount := by
+        simpa only [AdaptiveActionStatementShape,
+          Halo2.CircuitShape.withProofParams_numPermutationColumns] using c.isLt
+      have hcommit := PermutationCommitmentCoherence.commitment_ofKeygen
+        actionCircuit urs hk setup (c : ℕ) hcTop
+      rw [topLevelPermutationCommitment] at hcommit
+      have hrows :
+          commit urs
+                (instanceCoefficients (2 ^ urs.k) (omegaOf urs.k)
+                  (topLevelPermutationRows actionCircuit (c : ℕ))) +
+                (1 : Fp) • urs.w =
+              (actionCircuit.permutationCommitments urs).getD (c : ℕ) 0 := by
+        calc
+          _ = (LagrangeCommitmentKey.ofPrefix urs (omegaOf urs.k)
+                (derivedUrsGLagrange urs) setup.generator_eq).commitInstance
+                  (topLevelPermutationRows actionCircuit (c : ℕ)) 1 :=
+            (LagrangeCommitmentKey.commitInstance_eq _ _ 1).symm
+          _ = _ := hcommit.symm
+      let cTop : Fin actionCircuit.permutationColumnCount :=
+        ⟨c, by simpa only [AdaptiveActionStatementShape,
+          Halo2.CircuitShape.withProofParams_numPermutationColumns] using c.isLt⟩
+      have hVk :
+          commit urs
+                (instanceCoefficients (2 ^ urs.k) (omegaOf urs.k)
+                  (topLevelPermutationRows actionCircuit (c : ℕ))) +
+                (1 : Fp) • urs.w =
+              (actionCircuit.toVerifierKey urs).permutationCommonCommitment cTop := by
+        rw [actionCircuit.toVerifierKey_permutationCommonCommitment]
+        simpa only [cTop, Fin.val_cast] using hrows
+      simpa only [urs, adaptiveActionStatementVk, topLevelPermutationRows,
+        TopLevelCircuit.omega, hk] using hVk)
 
 @[simp] theorem canonicalActionPermutationRepresentation_point
     (c : Fin (AdaptiveActionStatementShape pp).numPermutationColumns) :
@@ -644,7 +655,6 @@ theorem zeroAdaptiveFixedRepresentations_length_le (pp : ProofParams)
     List.length_ofFn, AdaptiveActionStatementShape,
     CircuitShape.withProofParams_numPermutationColumns,
     adaptiveStatementFixedRepresentationLimit]
-  rw [Halo2.TopLevelCircuit.shape_numPermutationColumns]
   have hfixed : actionCircuit.fixedColumnCount ≤ 70 := by
     calc
       actionCircuit.fixedColumnCount ≤

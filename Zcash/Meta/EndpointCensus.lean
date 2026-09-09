@@ -45,22 +45,27 @@ initialize censusPinExt : SimplePersistentEnvExtension Name NameSet ←
 def recordCensusPin (name : Name) : CommandElabM Unit :=
   modifyEnv fun env => censusPinExt.addEntry env name
 
-/-- The semantic endpoint suffixes of `ENDPOINT_RE`, each also matched with one of the
-`endpointTrailers`. -/
-def endpointSuffixes : List String :=
+/-- The semantic endpoint markers of `ENDPOINT_RE`: the three spellings of a probability bound
+(`_prob_le`, and the older `_measure_le` and `_probability_bound`), an error formula, a concrete
+finite-security statement, and the explicit `_capstone`. -/
+def endpointMarkers : List String :=
   ["_error_bound", "_finite_security", "_measure_le", "_probability_bound", "_prob_le",
     "_capstone"]
-
-/-- The qualifier trailers an endpoint suffix may carry: the consensus-generic forms take
-the bundle size as a parameter (`_for`), `_experiment` marks a bound placed in the
-challenge-oracle experiment, `_idealizedks` marks a capstone that names the
-knowledge-soundness idealization, and the last two compose. -/
-def endpointTrailers : List String :=
-  ["", "_for", "_experiment", "_idealizedks", "_experiment_idealizedks"]
 
 /-- Whether `pat` occurs anywhere in `s`. -/
 def containsSubstring (s pat : String) : Bool :=
   (s.splitOn pat).length > 1
+
+/-- Whether `marker` occurs in `s` as a whole name component — followed by the end of the name or
+by a non-alphanumeric character (`_` or `'`) — in any position.  `attack_prob_le`,
+`attack_prob_le'`, `bound_measure_le_for`, and `attack_prob_le_of_textbookDL` all carry a marker;
+`attack_prob_lemma` does not.  Any position rather than the end of the name, because a qualifier
+after the marker (`_for`, `_of_<premise>`, `_at_<instance>`) generalizes, conditions, or
+instantiates the claim, and doing so must never retire the census obligation: the end-anchored
+rule let the straight-line AGM capstones, stated as probability bounds *of* textbook-DL hardness,
+escape the census with an undisclosed `native_decide` base. -/
+def hasMarker (s marker : String) : Bool :=
+  (s.splitOn marker).tail.any fun rest => rest.isEmpty || !rest.front.isAlphanum
 
 /-- The endpoint naming convention, applied to a declaration's base name: the Lean port of
 `ENDPOINT_RE` in `scripts/check_endpoint_census.sh`.  Keep the two in sync. -/
@@ -72,7 +77,7 @@ def isEndpointBaseName (s : String) : Bool :=
   containsSubstring s "bundleStatement_or_relation" ||
   containsSubstring s "workFactor" ||
   containsSubstring s "fingerprint_matches_positional" ||
-  endpointSuffixes.any fun suf => endpointTrailers.any fun tr => s.endsWith (suf ++ tr)
+  endpointMarkers.any (hasMarker s)
 
 /-- Every elaborated constant kind can carry an endpoint-shaped declaration.  Keeping this match
 exhaustive makes a new Lean declaration kind fail closed until it is classified, while inductive

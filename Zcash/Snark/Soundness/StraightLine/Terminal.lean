@@ -50,11 +50,12 @@ def topLevelStatements_or_relation_of_decode
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
+    [TopLevelShape top]
     (pp : ProofParams) (urs : URS G)
-    (hk : top.shape.k = urs.k)
+    (hk : top.domainExponent = urs.k)
     (inputs : Fin pp.numProofs → PublicInput Fp)
     (ps : ProofString (top.shape.withProofParams pp) Fp G)
-    (ch : Challenges top.shape.k Fp)
+    (ch : Challenges top.domainExponent Fp)
     (pU pW : Fp) (a : Fin (2 ^ urs.k) → Fp)
     (decode : DeployedAlgebraicDecode (top.shape.withProofParams pp) urs hk
       (top.toVerifierKey urs)
@@ -111,9 +112,9 @@ def topLevelStatements_or_relation_of_decode
         (CanonicalMemberConstraintRelation.acceptedPolynomial
           (memberDecode := memberDecode) haccepts)
         cell
-        (NontrivialRelation (F := Fp) urs.g urs.u urs.w)) :
+        (AugmentedRelationWitness (F := Fp) urs.g urs.u urs.w)) :
     (∀ proofIndex, top.Statement (inputs proofIndex)) ⊕'
-      NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
+      AugmentedRelationWitness (F := Fp) urs.g urs.u urs.w := by
   let memberDecode := fun i hi => decode.toMemberDecode hchar i hi
   exact topLevelStatements_or_relation_of_decodedMemberPolynomial_eq
     top pp urs hk inputs ps ch pU pW a

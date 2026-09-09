@@ -42,6 +42,7 @@ def topLevelPermutationRows
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
+    [TopLevelShape top]
     (column : ℕ) : List Fp :=
   (Keygen.permPolysOf top.domainExponent top.constraintSystem
     (top.operations)).getD column []
@@ -53,6 +54,7 @@ def topLevelPermutationCommitment
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
+    [TopLevelShape top]
     (urs : URS G) (column : ℕ) : G :=
   (top.permutationCommitments urs).getD column 0
 
@@ -134,6 +136,7 @@ theorem commitment_ofKeygen
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
+    [TopLevelShape top]
     (urs : URS G)
     (hk : top.domainExponent = urs.k)
     (setup : LagrangePrefixSetup urs)
@@ -148,8 +151,9 @@ theorem commitment_ofKeygen
   unfold topLevelPermutationCommitment
   have hcolumn' :
       column < (Keygen.permColsOf top.constraintSystem).length := by
-    simpa [TopLevelCircuit.permutationColumnCount,
-      TopLevelCircuit.permutationColumns, Keygen.permColsOf] using hcolumn
+    rw [top.permutationColumnCount_eq_permutationColumns_length] at hcolumn
+    simpa only [TopLevelCircuit.permutationColumns,
+      Keygen.permColsOf, List.length_map] using hcolumn
   have hcommit :=
     Keygen.permutationCommitmentsOf_getD_eq_commitInstance
       urs top.constraintSystem (top.operations)
@@ -235,7 +239,7 @@ def permCommon_eq_rowPolynomial_or_relation
       fun i : Fin (2 ^ urs.k) => vk.omega ^ (i : ℕ)) :
     relation.polynomial (.permCommon (c : ℕ)) =
         instanceRowPolynomial (2 ^ urs.k) vk.omega rows ⊕'
-      NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
+      AugmentedRelationWitness (F := Fp) urs.g urs.u urs.w := by
   have hquery := assembleQueries_permCommon_query vk instanceCommitment ps ch c
   have hsome : (relation.route (.permCommon (c : Nat))).isSome := by
     obtain ⟨q, hq, hqid⟩ := hquery
@@ -324,7 +328,7 @@ def permCommon_eq_keygenSigmaColumn_or_relation
         (sigma ⟨chunk, i, column⟩).2.2) :
     relation.polynomial (.permCommon (c : ℕ)) =
         keygenSigmaColumn vk.omega vk.delta vk.chunkLen sigma chunk column ⊕'
-      NontrivialRelation (F := Fp) urs.g urs.u urs.w :=
+      AugmentedRelationWitness (F := Fp) urs.g urs.u urs.w :=
   bindOrRelationWitness
     (relation.permCommon_eq_rowPolynomial_or_relation c key rows hcommit hrows)
     fun heq => heq.trans
@@ -408,7 +412,7 @@ def resolverPermutationPairs_snd_eq_keygenSigmaColumn_or_relation
     ((ResolverPermutationPairs vk relation.polynomial p cIdx)[j]'
         (by simpa [ResolverPermutationPairs, permutationChunkPairsOfResolver] using hj)).2 =
         keygenSigmaColumn vk.omega vk.delta vk.chunkLen sigma chunk column ⊕'
-      NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
+      AugmentedRelationWitness (F := Fp) urs.g urs.u urs.w := by
   refine bindOrRelationWitness
     (relation.permCommon_eq_keygenSigmaColumn_or_relation
       c key rows hcommit hrows sigma chunk column hval) fun heq => ?_
@@ -452,7 +456,7 @@ def resolverPermutationPairs_snd_eq_keygenSigmaColumn_or_relation_of_size
         (by simpa [ResolverPermutationPairs,
           permutationChunkPairsOfResolver] using hj)).2 =
         keygenSigmaColumn vk.omega vk.delta vk.chunkLen sigma chunk column ⊕'
-      NontrivialRelation (F := Fp) urs.g urs.u urs.w := by
+      AugmentedRelationWitness (F := Fp) urs.g urs.u urs.w := by
   subst n
   exact relation.resolverPermutationPairs_snd_eq_keygenSigmaColumn_or_relation
     p cIdx j hj c hidx key rows hcommit hrows sigma chunk column hval

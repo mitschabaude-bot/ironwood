@@ -1,4 +1,5 @@
 import Zcash.Circuits.Action.TopLevel
+import Zcash.Circuits.Action.Shape.Anchors
 import Zcash.Circuits.Integration.FixedColumns
 import Zcash.Common.RelationWitness
 import Zcash.Circuits.Integration.InstanceColumns
@@ -9,7 +10,6 @@ import Zcash.Circuits.Integration.TopLevelCircuit
 import Zcash.Circuits.Integration.TopLevelGates
 import Zcash.Circuits.Integration.TopLevelCorrectness
 import Zcash.Circuits.Integration.ActionCopyReplay
-import Zcash.Circuits.Integration.FixedColumns
 import Zcash.Circuits.Integration.ActionConstraintBounds
 import Zcash.Snark.Keygen.Pipeline
 import Mathlib.Util.AssertNoSorry
@@ -46,14 +46,14 @@ presentation.
 def actionTopLevelCircuitCorrectness
     (pp : ProofParams) (urs : URS G)
     (hk :
-      actionCircuit.shape.k = urs.k)
+      actionCircuit.domainExponent = urs.k)
     (instanceCommitment :
       Fin pp.numProofs →
         ℕ → G)
     (ps : ProofString
       (actionCircuit.shape.withProofParams pp) Fp G)
     (ch : Challenges
-      actionCircuit.shape.k Fp)
+      actionCircuit.domainExponent Fp)
     (pU pW : Fp) (a : Fin (2 ^ urs.k) → Fp)
     (batchOpenings :
       OpenedBatchOpenings urs (evalVector urs.k ch.x3)
@@ -99,11 +99,11 @@ def actionTopLevelCircuitCorrectness
     TopLevelCircuitCorrectness
       actionCircuit pp urs ch relation.polynomial
       (FlatCell actionNumPermCols actionDomainSize)
-      (NontrivialRelation (F := Fp) urs.g urs.u urs.w) := by
+      (AugmentedRelationWitness (F := Fp) urs.g urs.u urs.w) := by
   classical
   have hdomainExponent :
       actionCircuit.domainExponent = urs.k := by
-    exact actionCircuit.shape_k.symm.trans hk
+    exact hk
   have fixedCoherence :
       TopLevelFixedCoherence actionCircuit urs :=
     TopLevelFixedCoherence.ofDerived actionCircuit urs hdomainExponent
@@ -196,7 +196,7 @@ def actionTopLevelCircuitCorrectness
               actionCircuit.fixedRows.getD column [])
             hfixedRows hdomainSize
             (Bad :=
-              NontrivialRelation (F := Fp) urs.g urs.u urs.w)
+              AugmentedRelationWitness (F := Fp) urs.g urs.u urs.w)
             (fun column hcolumn =>
               relation.fixedColumn_eq_rowPolynomial_or_relation
                 column

@@ -35,7 +35,7 @@ vBalanceBound < r` (deployed: the Orchard `vSumBound`, far below `r ≈ 2^254`).
 hypothesis —every verifying `bvk` comes with its scalar— would carry no computational content: in a
 cyclic group every `bvk` is some multiple of `Rbase`, so the total form holds for a
 choose-the-witness extractor that no one can run. That is why the extractor is a bare function and
-its failures are events with a named probability `κ`, discharged in `RedDSA/KnowledgeError` and
+its failures are events that the named bound `κ` covers, discharged in `RedDSA/KnowledgeError` and
 consumed by the conservation experiment through its combined finder.
 -/
 
@@ -70,19 +70,20 @@ theorem txBundle_fst_sum (tx : Tx KW (ZMod r) G RHO PSI MHASH MENC MSG SIG d) :
 
 /-- On a statement-satisfying transaction, the model's binding verification key is the
 binding-signature layer's `bindingVK` of the witnessed bundle. -/
-theorem bvk_eq (S : ValueShape P)
+theorem bvk_eq (shape : ValueShape P)
     {tx : Tx KW (ZMod r) G RHO PSI MHASH MENC MSG SIG P.depth}
     (hsat : ∀ a ∈ tx.actions, ActionSatisfied P kv a.inst a.w) :
     tx.bvk P
-      = bindingVK S.Vbase S.Rbase (castBundle (txBundle tx)) [] (tx.vBalance : ZMod r) := by
+      = bindingVK shape.Vbase shape.Rbase (castBundle (txBundle tx)) [] (tx.vBalance : ZMod r) := by
   have hsum : (tx.actions.map fun a => a.inst.cv_net).sum
-      = ((castBundle (txBundle tx)).map fun p => valueCommit S.Vbase S.Rbase p.1 p.2).sum := by
+      = ((castBundle (txBundle tx)).map
+          fun p => valueCommit shape.Vbase shape.Rbase p.1 p.2).sum := by
     simp only [castBundle, txBundle, List.map_map]
     refine congrArg List.sum (List.map_congr_left fun a ha => ?_)
-    rw [Function.comp_apply, Function.comp_apply, (hsat a ha).cv_net_eq, S.commit_eq]
+    rw [Function.comp_apply, Function.comp_apply, (hsat a ha).cv_net_eq, shape.commit_eq]
     rfl
-  have hvb : P.valueCommit tx.vBalance 0 = (tx.vBalance : ZMod r) • S.Vbase := by
-    rw [S.commit_eq]
+  have hvb : P.valueCommit tx.vBalance 0 = (tx.vBalance : ZMod r) • shape.Vbase := by
+    rw [shape.commit_eq]
     simp
   rw [Tx.bvk, bindingVK, hsum, hvb]
   simp

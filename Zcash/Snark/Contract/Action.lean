@@ -28,7 +28,8 @@ That profile carries caller-supplied prover and reduction work labels; operation
 the separate `AdaptiveStatementAdversaryCostCertificate` and
 `CertifiedAdaptiveStatementDlogProfile` route consumed by
 `orchard_action_adaptiveStatement_certified_knowledge_error_bound`. The ledger continuation begins
-per Action at `Zcash.Security.Ledger.Bridge.actionSpec_to_ledger`; it is not part of this contract.
+per Action at `Zcash.Security.Ledger.Bridge.actionSpecToLedgerData`; it is not part of this
+contract.
 -/
 
 open scoped ENNReal

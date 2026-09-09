@@ -56,8 +56,8 @@ abbrev AdaptiveActionStatementShape (pp : ProofParams) : Shape :=
 theorem adaptiveActionStatement_numInstanceColumns (pp : ProofParams) :
     (AdaptiveActionStatementShape pp).numInstanceColumns = 1 := by
   rw [actionCircuit.shape.withProofParams_numInstanceColumns pp,
-    actionCircuit.shape_numInstanceColumns]
-  exact actionCircuit_numInstanceColumns_eq
+    actionCircuit_shape_eq]
+  rfl
 
 /-- A zero public-instance column commits only to its blinding generator, for any verifier URS. -/
 theorem adaptiveCommitInstance_of_rows_zero {G : Type*} [AddCommGroup G] [Module Fp G]
@@ -169,25 +169,36 @@ def canonicalAdaptiveStatementInstanceRepresentation (pp : ProofParams)
     (actionCircuit.publicInputRows (inputs proofIndex) instanceColumn)
   { point := adaptiveActionStatementInstanceCommitment pp basis inputs p column
     repr :=
-      { coeffs := augmentedCoeffs coeffs 0 1
+      { coeffs := augmentedCoeffs coeffs ![0, 1]
         hEq := by
           calc
-            representationEval basis (augmentedCoeffs coeffs 0 1) =
-                representationEval (augmentedBasis urs.g urs.u urs.w)
-                  (augmentedCoeffs coeffs 0 1) := by
-              exact congrArg (fun b => representationEval b (augmentedCoeffs coeffs 0 1))
+            representationEval basis (augmentedCoeffs coeffs ![0, 1]) =
+                representationEval (augmentedBasis urs.g ![urs.u, urs.w])
+                  (augmentedCoeffs coeffs ![0, 1]) := by
+              exact congrArg (fun b => representationEval b (augmentedCoeffs coeffs ![0, 1]))
                 (augmentedBasis_ursOfAugmentedBasis
                   (AdaptiveActionStatementShape pp).k basis).symm
-            _ = commitGen urs.g coeffs + 0 • urs.u + 1 • urs.w :=
-              representationEval_augmentedBasis urs.g urs.u urs.w coeffs 0 1
+            _ = commitGen urs.g coeffs + (0 • urs.u + 1 • urs.w) := by
+              rw [representationEval_augmentedBasis, Fin.sum_univ_two]
+              simp only [Matrix.cons_val_zero, Matrix.cons_val_one]
+              rfl
             _ = commit urs coeffs + urs.w := by
-              simp only [zero_smul, add_zero, one_smul, commit]
+              simp only [zero_smul, zero_add, one_smul, commit]
               rfl
             _ = adaptiveActionStatementInstanceCommitment pp basis inputs p column := by
               change commit urs coeffs + urs.w =
                 actionCircuit.instanceCommitment urs inputs proofIndex instanceColumn.index
               exact (actionCircuit.instanceCommitment_column_eq_commit
                 pp urs inputs proofIndex instanceColumn).symm } }
+
+@[simp] theorem canonicalAdaptiveStatementInstanceRepresentation_point
+    (pp : ProofParams)
+    (basis : AugmentedIndex (2 ^ (AdaptiveActionStatementShape pp).k) → VestaG)
+    (inputs : Fin pp.numProofs → PublicInputs Fp)
+    (p : Fin (AdaptiveActionStatementShape pp).numProofs)
+    (column : Fin (AdaptiveActionStatementShape pp).numInstanceColumns) :
+    (canonicalAdaptiveStatementInstanceRepresentation pp basis inputs p column).point =
+      adaptiveActionStatementInstanceCommitment pp basis inputs p column := rfl
 
 /-- An online-AGM output that selects both the Action public statement and its proof. -/
 structure AdaptiveActionStatementOutput (pp : ProofParams)

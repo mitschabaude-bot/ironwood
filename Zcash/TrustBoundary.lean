@@ -2,6 +2,7 @@ import Zcash.Circuits.Action.RealBases
 import Zcash.Circuits.Action.Separation
 import Zcash.Security.Ledger.Bridge
 import Zcash.Security.Ledger.SinsemillaDLR
+import Zcash.Security.Ledger.ActionBundleBridge
 import Zcash.Arithmetic.FastMsm
 import Zcash.Security.KeyBinding.Instance
 import Zcash.Security.KeyBinding.Probability
@@ -32,6 +33,7 @@ import Zcash.Security.BindingSignature.DiscreteLog
 import Zcash.Snark.Soundness.AGM.DeployedConstraintSupply
 import Zcash.Snark.Soundness.AGM.ProbabilityVesta
 import Zcash.Snark.Soundness.FiatShamir.Adversary
+import Zcash.Snark.Soundness.FiatShamir.ActionCount
 import Zcash.Snark.Soundness.Composition.Bridge
 import Zcash.Snark.Soundness.Composition.DeployedConstraintContainment
 import Zcash.Snark.Soundness.Composition.DeployedRootContainment
@@ -44,9 +46,11 @@ import Zcash.Snark.Soundness.Relation.ConstraintRelations
 import Zcash.Snark.Soundness.Pricing.ChallengePricing
 import Zcash.Security.Ledger.KeyBindingDLR
 import Zcash.Security.Ledger.NoteCommitDLR
+import Zcash.Security.Ledger.NullifierDLR
 import Zcash.Security.Ledger.MerkleDLR
 import Zcash.Security.Ledger.OrchardCapstone
 import Zcash.Security.Ledger.OrchardIntegrityExperiment
+import Zcash.Security.Ledger.OrchardExtractionExperiment
 import Zcash.Snark.Soundness.Pricing.DegreeWalk
 import Zcash.Snark.Soundness.Composition.ScheduleBudget
 import Zcash.Snark.Soundness.AGM.PinnedRootWitness
@@ -126,10 +130,13 @@ Both commands are built on `Lean.collectAxioms`, which walks a declaration's tra
 depends on is checked by nothing, however prominent it is. Deliverable endpoints are exactly the
 top-level leaves, so they must be pinned *directly* — never left to inherit coverage from some
 dependent, which would vanish the moment that dependent is refactored.
-`scripts/check_endpoint_census.sh` enforces this in CI for the capstone naming families. A new
-public endpoint must either belong to one of the listed protocol families or end in the semantic
-suffix `_error_bound`, `_finite_security`, `_measure_le`, `_probability_bound`, or `_capstone`; the
-last keeps new protocol families covered without another prefix-specific regex edit.
+`scripts/check_endpoint_census.sh` enforces this in CI for the capstone naming families, and
+`Zcash/CensusCheck.lean` enforces it a second time from the elaborated environment. A new public
+endpoint must either belong to one of the listed protocol families or carry one of the semantic
+markers `_error_bound`, `_finite_security`, `_prob_le` (or its older spellings `_measure_le` and
+`_probability_bound`), or `_capstone`; the last keeps new protocol families covered without another
+prefix-specific regex edit. A marker counts in any position, so qualifying a claim —
+`_prob_le_of_textbookDL`, `_prob_le_at_consensus_max`, `_measure_le_for` — never retires its pin.
 
 The reusable census in this file reaches six native owners, all from CompElliptic: the Pallas and
 Vesta base-field root data (`Fields.Pasta.pallasBase`, `Fields.Pasta.vestaBase`), the two curve
@@ -165,11 +172,13 @@ assert_axioms Zcash.Common.steeredCharge_context_sum_mul_le
 assert_axioms Zcash.Common.steeredCharge_context_sum_mul_le_table_budget
 assert_axioms Zcash.Common.steeredCharge_sum_mul_le
 assert_axioms Zcash.Common.escapesDuringC_measure_le
+assert_axioms Zcash.Common.escapesDuringC_measure_le'
 
 -- Model.lean: the one-sided bias interfaces
 assert_axioms Zcash.Common.PMFWeightedBiasLE
 assert_axioms Zcash.Common.PMFWeightedBiasLE.eventBiasLE
 assert_axioms Zcash.Common.PMFEventBiasLE.bind_same
+assert_axioms Zcash.Common.event_measure_le_of_bias
 
 -- Hybrid.lean: the adaptive fresh-answer hybrid
 assert_axioms Zcash.Common.OracleComp.runFreshPMF
@@ -448,13 +457,25 @@ assert_axioms Zcash.Security.Ledger.Model.validLedger_append
 
 /-! ## The nullifier-binding reduction
 
-Computed break reduction: a nullifier collision between distinct notes, over the
-additive shape of the deployed derivation, computes a nontrivial relation among the
-commitment bases, the nullifier base, and the randomness base — the balance
-argument's terminal. `+choice` is the erased-positions tier: choice arrives with the
-`abel`/`simp` proof terms in the relation's `Prop` fields, never the data path. -/
+Computed break reductions: a nullifier collision between distinct openings computes a
+nontrivial relation among the commitment bases, the nullifier base, and the randomness
+base. `ofNullifierCollision` works over the additive shape of the derivation
+(`NullifierShape`). `relationOfNullifierCollision` works at the deployed Orchard
+primitives directly. Its relation lands in the combined deployed basis, at the
+`NoteCommit` domain point, its randomness base, and the nullifier base 𝒦^Orchard
+(`idxNullifierK`). It rewrites the deployed derivation as a shifted commitment
+(`deriveNullifier_eq_extract`) and applies the chain-collision reducer at two blinding
+points (`relationOfChainVecPmEq`).
+
+`+choice` is the erased-positions tier: choice arrives with the `abel`/`simp` proof terms
+in the relation's `Prop` fields, never the data path. The deployed reducers' `+native`
+owner is the curve-order certificate, as for their Sinsemilla siblings. -/
 
 assert_computable Zcash.Security.Ledger.Model.NontrivialRelation.ofNullifierCollision +choice
+assert_axioms Zcash.Security.Ledger.Bridge.deriveNullifier_eq_extract +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_computable Zcash.Security.Ledger.Bridge.relationOfNullifierCollision +choice +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 
 /-! ## Spend Authority
 
@@ -519,6 +540,11 @@ assert_axioms Zcash.Circuits.Specs.Sinsemilla.noteCommitChunks_inj
 assert_axioms Zcash.Circuits.Specs.Sinsemilla.merkleChunks_inj
 assert_axioms Zcash.Security.Ledger.Bridge.preCoeffs_inj
 assert_axioms Zcash.Security.Concrete.PallasGroup.eq_of_toPoint_x_eq_of_y_parity_eq
+assert_computable Zcash.Security.Ledger.Bridge.toOrchardPoints +choice +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_axioms Zcash.Security.Ledger.Bridge.note_eq_of_noteScalars_words_eq
+assert_computable Zcash.Security.Ledger.Bridge.relationOfChainVecPmEq +choice +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 assert_computable Zcash.Security.Ledger.Bridge.relationOfChainPmEq +choice +native(
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 assert_computable Zcash.Security.Ledger.Bridge.relationOfKeyBindingBreak +choice +native(
@@ -593,12 +619,17 @@ assert_computable Zcash.Security.RedDSA.bindingSig_relation_of_nontrivial +choic
 
 /-! ## The binding-signature knowledge error
 
-The κ-discharge in the challenge-oracle model. Over the whole challenge table and the logs
-of the `m` presented bases, a labeled algebraic adversary within query budget `qH`
+The discharge of the knowledge error κ (a bound on the probability that a binding signature
+verifies while binding-key extraction fails) in the challenge-oracle model, as the measure of
+the pivot event: a verifying signature whose effective representation has a key coefficient
+off the ℛ slot, which contains every extraction failure. Over the whole challenge table and
+the logs of the `m` presented bases, a labeled algebraic adversary within query budget `qH`
 produces a verifying binding signature. Its effective representation has a pivot only with
 a probability linear in the query budget, with a denominator of #F above the discrete-log
 advantage (`kappaEvent_measure_le`). This is the straight-line AGM+ROM extraction of
-Fuchsbauer–Plouviez–Seurin, in the key-only setting. Challenge queries carry the
+Fuchsbauer–Plouviez–Seurin, in the key-only setting. The same split
+composes at a single presented basis with no log sampling, with the relation arm as a
+named hypothesis at that basis (`kappaEventAt_measure_le`). Challenge queries carry the
 adversary's representations as labels the oracle never sees. The representation in effect
 at the output's query point is the first annotation there, or the announced output
 representation when the run never queried the point. That is the squeeze's fallback
@@ -612,7 +643,10 @@ assert_computable Zcash.Security.RedDSA.dischargeChallenge
 assert_computable Zcash.Security.RedDSA.effectiveRep
 assert_computable Zcash.Security.RedDSA.relFinder +choice
 assert_axioms Zcash.Security.RedDSA.kappa_le_of_arms
+assert_axioms Zcash.Security.RedDSA.kappaEventAt_subset
 assert_axioms Zcash.Security.RedDSA.kappaEvent_subset
+assert_axioms Zcash.Security.RedDSA.badFiberAt_measure_le
+assert_axioms Zcash.Security.RedDSA.kappaEventAt_measure_le
 assert_axioms Zcash.Security.RedDSA.badFiber_measure_le
 assert_axioms Zcash.Security.RedDSA.relFiber_subset_relSet
 assert_axioms Zcash.Security.RedDSA.relFiber_measure_le
@@ -625,17 +659,18 @@ assert_axioms Zcash.Security.RedDSA.textbookDLAdvantageLE_base_zero
 
 The transaction-balance premiss discharge with a fallible extractor: the extractor is an
 arbitrary function, its failures are exhibited `RedDSA.ExtractionFailure` data, and the Balance
-capstones bound the violation by `εdlr + κ`, per prefix and at all prefixes with no factor of
+capstones bound the violation by `ε_dlr + κ`, per prefix and at all prefixes with no factor of
 `k`. The premiss lands in the binding-signature layer's nontrivial `(Vbase, Rbase)` relation
 via `ofBundleIntImbalance`, with the no-overflow bound discharged from the statement's value
 ranges, validity's action-count and `vBalance` range rules, and the named numeric hypothesis in
 the `vSum` shape, `maxActions * (valueBound - 1) + vBalanceBound < r`. The Orchard
 instantiation names the same bounds at the Orchard-protocol primitives; the integrity bound
-takes `εdlr + κ` in place of the opaque `ε_bindsig`. `+choice` is the erased-positions tier. -/
+takes `ε_dlr + κ` in place of the opaque `ε_bindsig`. `+choice` is the erased-positions tier. -/
 
 assert_computable Zcash.Security.Ledger.Model.ValueShape.premissOrBreakFallible +choice
 assert_computable Zcash.Security.Ledger.Model.txBalancePremissFallible +choice
-assert_axioms Zcash.Security.Ledger.Model.extractFailEvent_failure
+assert_computable Zcash.Security.Ledger.Model.extractFailureOf +choice
+assert_axioms Zcash.Security.Ledger.Model.extractFailureOf_isSome
 assert_axioms Zcash.Security.Ledger.Model.txBalanceBreakEvent_fallible_subset
 assert_axioms Zcash.Security.Ledger.Model.balanceConservation_measure_le_kerr
 assert_axioms Zcash.Security.Ledger.Model.shieldedBalanceCap_measure_le_kerr
@@ -670,7 +705,7 @@ assert_axioms Zcash.Security.Ledger.Model.spendAuthority_keyBindingArm_measure_l
 
 The conservation reduction's extraction-failure arm, placed in the challenge-oracle model:
 an extraction-failure sample lands in the knowledge-error event of the composite machine at
-an unchanged query count (`extractFail_mem_kappaEvent`), which the conservation experiment
+an unchanged query count (`extractFail_mem_kappaEventAt`), which the conservation experiment
 consumes through its combined finder. The extractor (`kappaExtractor`) reads the `key`
 coefficient at the ℛ slot off the representation in effect at the signature's query point.
 The composite machine recovers the failing transaction and its announced representation
@@ -682,6 +717,7 @@ assert_computable Zcash.Security.Ledger.Model.kappaPrimitivesAt +choice
 assert_computable Zcash.Security.Ledger.Model.kappaShapeAt +choice
 assert_computable Zcash.Security.Ledger.Model.kappaBindingAt +choice
 assert_computable Zcash.Security.Ledger.Model.kappaExtractor +choice
+assert_computable Zcash.Security.Ledger.Model.extractorAtBasis +choice
 assert_computable Zcash.Security.Ledger.Model.bvkAt +choice
 assert_computable Zcash.Security.Ledger.Model.failTxOfAnn
 assert_computable Zcash.Security.Ledger.Model.kappaOut +choice
@@ -690,12 +726,12 @@ assert_axioms Zcash.Security.Ledger.Model.bvkAt_eq
 assert_axioms Zcash.Security.Ledger.Model.kappaComposite_queryBound
 assert_computable Zcash.Security.Ledger.Model.allConservedOrBreak_extractFail +choice
 assert_computable Zcash.Security.Ledger.Model.balanceConservationOrBreak_extractFail +choice
-assert_axioms Zcash.Security.Ledger.Model.extractFail_mem_kappaEvent
+assert_axioms Zcash.Security.Ledger.Model.extractFail_mem_kappaEventAt
 
 /-! ## The conservation relation arm in the oracle model
 
 The conservation reduction's relation arm, placed in the challenge-oracle model: on every
-relation-arm sample the finder returns a relation (`valueRelation_finder_isSome`), with no
+relation-arm sample the finder returns a relation (`valueRelation_finder_isSomeAt`), with no
 bad-challenge accounting — the arm's witness is oracle-free data. The finder
 (`valueRelFinder`) rebuilds the reduction's relation behind decidable guards and lands it
 in the generic AGM witness type at the two value-commitment slots
@@ -706,7 +742,7 @@ arm at every prefix. -/
 assert_computable Zcash.Security.Ledger.Model.valueRelFinder +choice
 assert_computable Zcash.Security.Ledger.Model.allConservedOrBreak_valueRelation +choice
 assert_computable Zcash.Security.Ledger.Model.balanceConservationOrBreak_valueRelation +choice
-assert_axioms Zcash.Security.Ledger.Model.valueRelation_finder_isSome
+assert_axioms Zcash.Security.Ledger.Model.valueRelation_finder_isSomeAt
 
 /-! ## The conservation experiment
 
@@ -718,13 +754,23 @@ an additive loss linear in the query budget with a denominator of #F
 (`balanceConservationBefore_measure_le_experiment`,
 `shieldedBalanceCapBefore_measure_le_experiment`). The discrete-log hypothesis is a single
 bound for the combined coin-consuming finder, per adversary coin — no supremum over
-challenge tables remains in the experiment. -/
+challenge tables remains in the experiment. The `At` forms run the same composition at a
+single presented basis, over the coins and the table alone, with the relation arm as a
+named per-basis hypothesis (`balanceConservationBefore_measure_le_experimentAt` and the
+cap sibling). What that named advantage costs against textbook discrete log is stated once,
+on the standalone programmed relation game, as the isolated Jaeger–Tessaro terminal step
+(`valueRelationWithCoins_prob_le_of_textbookDL`); the deployed experiments do not take that
+step. -/
 
 assert_computable Zcash.Security.Ledger.Model.conservationRelFinder +choice
 assert_axioms Zcash.Security.Ledger.Model.conservationRelFinder_isSome
 assert_axioms Zcash.Security.Ledger.Model.conservationRelOrBadChallenge_measure_le
+assert_axioms Zcash.Security.Ledger.Model.conservationRelOrBadChallengeAt_measure_le
 assert_axioms Zcash.Security.Ledger.Model.balanceConservationBefore_measure_le_experiment
 assert_axioms Zcash.Security.Ledger.Model.shieldedBalanceCapBefore_measure_le_experiment
+assert_axioms Zcash.Security.Ledger.Model.balanceConservationBefore_measure_le_experimentAt
+assert_axioms Zcash.Security.Ledger.Model.shieldedBalanceCapBefore_measure_le_experimentAt
+assert_axioms Zcash.Security.Ledger.Model.valueRelationWithCoins_prob_le_of_textbookDL
 
 /-! ## The integrity experiment
 
@@ -733,9 +779,12 @@ valid output ledger violates balance integrity at some prefix — the shielded p
 negative, or the pools failing to sum to the minted issuance — except with a probability
 bounded by the non-negativity side plus the conservation side. The non-negativity side is one
 named bound on the combined Balance-subset arm event; the conservation side is the combined
-coin-consuming finder's discrete-log bound. -/
+coin-consuming finder's discrete-log bound. The `At` form runs the same composition at a
+single presented basis, over the coins and the table alone
+(`balanceIntegrityBefore_measure_le_experimentAt`). -/
 
 assert_axioms Zcash.Security.Ledger.Model.balanceIntegrityBefore_measure_le_experiment
+assert_axioms Zcash.Security.Ledger.Model.balanceIntegrityBefore_measure_le_experimentAt
 
 /-! ## The Orchard integrity experiment
 
@@ -752,9 +801,21 @@ the discrete-log base (`pallasGen`, not the identity), and the challenge query a
 literal signature triple (`orchardQueryOf`, injective by construction). This leaves as
 free parameters the adversary, an action cap giving no-overflow, and one named advantage
 per side. Its names carry `idealizedks` because knowledge soundness of the Action circuit
-is idealized by the witness annotations — a formalization gap tracked as #147, not an
-accepted modelling trade-off. The conservation and cap experiments are pinned at the same
-choices. -/
+is idealized by the witness annotations; the Orchard extraction experiment discharges that
+idealization by extracting the annotations from a proof-emitting adversary's runs, so these
+forms are the intermediate step its endpoints consume. The conservation and cap experiments
+are pinned at the same choices. The `deployed` forms run at the deployed value bases
+(`orchardValueBases`):
+validity is at the deployed value commitment, only the binding challenge hash is idealized
+as the table, and the named `ε_valuedlr` bounds the deployed finder's relation event over
+the named 𝒱/ℛ slots. In the deployed integrity form, `ε_sinsemilladlr` bounds the event
+that a valid ledger's Merkle, note-commitment, or key-binding break computes a nontrivial
+relation among the fixed Sinsemilla bases at some prefix, routed through the
+basis-parametric Orchard reducer (`deployedSinsemillaRelationEvent`). The reduction
+producers of this layer are pinned computable: the break transports to the fixed primitives
+(`noteCommitBreakAtBasis`, `noteCommitBreakOfKappa`), the basis-parametric Balance-subset
+reducer (`orchardBalanceSubsetOrRelationAtBasis`), and the deployed finders
+(`conservationFinder`, `valueDLRFinder`). -/
 
 assert_computable Zcash.Security.Ledger.Bridge.kappaOrchardBalanceSubsetOrRelation +choice +native(
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
@@ -770,6 +831,109 @@ assert_axioms Zcash.Security.Ledger.Bridge.orchardBalanceConservation_measure_le
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 assert_axioms Zcash.Security.Ledger.Bridge.orchardShieldedBalanceCap_measure_le_idealizedks +native(
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_axioms Zcash.Security.Ledger.Bridge.orchardBalanceConservation_measure_le_idealizedks_deployed +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_axioms Zcash.Security.Ledger.Bridge.orchardShieldedBalanceCap_measure_le_idealizedks_deployed +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_axioms Zcash.Security.Ledger.Bridge.orchardBalanceIntegrity_measure_le_idealizedks_deployed +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_computable Zcash.Security.Ledger.Bridge.noteCommitBreakAtBasis +choice +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_computable Zcash.Security.Ledger.Bridge.noteCommitBreakOfKappa +choice +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_computable Zcash.Security.Ledger.Bridge.orchardBalanceSubsetOrRelationAtBasis +choice +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_computable Zcash.Security.Ledger.Bridge.IdealizedKSBalanceAdversary.conservationFinder +choice +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_computable Zcash.Security.Ledger.Bridge.IdealizedKSBalanceAdversary.valueDLRFinder +choice +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+
+/-! ## The Orchard extraction experiment
+
+The composed adversary model, with its data chain computable end to end: the ledger
+machine's requests are assembled with the extracted ledger data into the annotated
+chain (`assembleTx`, `assembleChain`), and the constructed annotated adversary runs
+the ledger machine and assembles its output (`toLA`). The laws (`runsLaw`,
+`toIdealizedKS`) are noncomputable measures over that chain. The `_of_dlogProfiles`
+endpoints discharge the per-slot-and-size knowledge hypotheses against the
+adaptive-statement capstone and carry every relation arm in the single combined term
+(`combinedDLRAdvantage`, over the combined deployed basis), with no named-ε
+hypotheses; only the knowledge arm keeps the `k * maxActions` factor. -/
+
+assert_computable Zcash.Security.Ledger.OrchardExtractionExperiment.ExtractionBalanceAdversary.assembleTx +choice +native(
+  CompElliptic.Fields.Pasta.pallasBase,
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+assert_computable Zcash.Security.Ledger.OrchardExtractionExperiment.ExtractionBalanceAdversary.assembleChain +choice +native(
+  CompElliptic.Fields.Pasta.pallasBase,
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+assert_computable Zcash.Security.Ledger.OrchardExtractionExperiment.ExtractionBalanceAdversary.toLA +choice +native(
+  CompElliptic.Fields.Pasta.pallasBase,
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+assert_axioms Zcash.Security.Ledger.OrchardExtractionExperiment.ExtractionBalanceAdversary.extractionFailureEvent_measure_le +native(
+  CompElliptic.Fields.Pasta.pallasBase,
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+assert_axioms Zcash.Security.Ledger.OrchardExtractionExperiment.orchardBalanceIntegrityExtraction_measure_le +native(
+  CompElliptic.Fields.Pasta.pallasBase,
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+assert_axioms Zcash.Security.Ledger.OrchardExtractionExperiment.orchardBalanceConservationExtraction_measure_le +native(
+  CompElliptic.Fields.Pasta.pallasBase,
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+assert_axioms Zcash.Security.Ledger.OrchardExtractionExperiment.orchardShieldedBalanceCapExtraction_measure_le +native(
+  CompElliptic.Fields.Pasta.pallasBase,
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+assert_axioms Zcash.Security.Ledger.OrchardExtractionExperiment.knowledgeFailureUnion_measure_le +native(
+  CompElliptic.Fields.Pasta.pallasBase,
+  Zcash.Snark.Fixture.vk_chunk_width_le,
+  Zcash.Snark.Fixture.vk_gates_degree_le,
+  Zcash.Snark.Fixture.vk_lookup_input_degree_le,
+  Zcash.Snark.Fixture.vk_lookup_table_degree_le,
+  Zcash.Snark.Keygen.certificate,
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+assert_axioms Zcash.Security.Ledger.Model.challengeTableExperiment_badFiberAt_measure_le
+assert_axioms Zcash.Security.Ledger.OrchardExtractionExperiment.runKnowledgeFailure_measure_le_of_dlogProfile +native(
+  CompElliptic.Fields.Pasta.pallasBase,
+  Zcash.Snark.Fixture.vk_chunk_width_le,
+  Zcash.Snark.Fixture.vk_gates_degree_le,
+  Zcash.Snark.Fixture.vk_lookup_input_degree_le,
+  Zcash.Snark.Fixture.vk_lookup_table_degree_le,
+  Zcash.Snark.Keygen.certificate,
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+assert_axioms Zcash.Security.Ledger.OrchardExtractionExperiment.orchardBalanceIntegrityExtraction_measure_le_of_dlogProfiles +native(
+  CompElliptic.Fields.Pasta.pallasBase,
+  Zcash.Snark.Fixture.vk_chunk_width_le,
+  Zcash.Snark.Fixture.vk_gates_degree_le,
+  Zcash.Snark.Fixture.vk_lookup_input_degree_le,
+  Zcash.Snark.Fixture.vk_lookup_table_degree_le,
+  Zcash.Snark.Keygen.certificate,
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+assert_axioms Zcash.Security.Ledger.OrchardExtractionExperiment.orchardBalanceConservationExtraction_measure_le_of_dlogProfiles +native(
+  CompElliptic.Fields.Pasta.pallasBase,
+  Zcash.Snark.Fixture.vk_chunk_width_le,
+  Zcash.Snark.Fixture.vk_gates_degree_le,
+  Zcash.Snark.Fixture.vk_lookup_input_degree_le,
+  Zcash.Snark.Fixture.vk_lookup_table_degree_le,
+  Zcash.Snark.Keygen.certificate,
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+assert_axioms Zcash.Security.Ledger.OrchardExtractionExperiment.orchardShieldedBalanceCapExtraction_measure_le_of_dlogProfiles +native(
+  CompElliptic.Fields.Pasta.pallasBase,
+  Zcash.Snark.Fixture.vk_chunk_width_le,
+  Zcash.Snark.Fixture.vk_gates_degree_le,
+  Zcash.Snark.Fixture.vk_lookup_input_degree_le,
+  Zcash.Snark.Fixture.vk_lookup_table_degree_le,
+  Zcash.Snark.Keygen.certificate,
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
 
 /-! ## Binding-signature relation reductions
 
@@ -852,9 +1016,12 @@ pinned under their `Zcash.` names; the AGM restriction enters with the represent
 assert_computable Zcash.discreteLogOfBasis_of_relation +choice
 assert_computable Zcash.discreteLogOfChallenge_of_relation +choice
 assert_computable Zcash.programmedExtractOrMiss +choice
-assert_computable Zcash.AugmentedRelationWitness.toAlgebraicRelationWitness +choice
 assert_computable Zcash.Snark.relationWitnessOfCollision +choice
 assert_computable Zcash.discreteLogOfAugmentedRelationAtChallenge +choice
+assert_computable Zcash.discreteLogOfU_of_augmentedRelation +choice
+assert_computable Zcash.discreteLogOfW_of_augmentedRelation +choice
+assert_computable Zcash.NontrivialRelation.ofParts +choice
+assert_computable Zcash.AlgebraicRelationWitness.embed +choice
 assert_computable Zcash.Snark.separateOrRelationWitness +choice
 assert_computable Zcash.Snark.algebraicPowerBatchWithSourceOrRelation +choice
 assert_computable Zcash.Snark.finForallOrRelationWitness
@@ -894,7 +1061,6 @@ assert_axioms Zcash.Snark.orchardGeneratorROSetup
 assert_axioms Zcash.Snark.orchardGeneratorROBasis
 assert_axioms Zcash.Snark.orchard_uniformURSIdentification_of_generatorRO +native(
   CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
-assert_axioms Zcash.AlgebraicRelationWitness.augment
 assert_axioms Zcash.Snark.bindingWin_unbounded_measure_le +native(
   CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
 assert_axioms Zcash.Snark.fsWinsFull_restrictSum_le
@@ -1001,6 +1167,7 @@ assert_axioms Zcash.Snark.challenge255_eventBias_le
 assert_axioms Zcash.Snark.challenge255_weightedBias_le
 assert_axioms Zcash.Snark.challenge255_joint_eventBias_le
 assert_axioms Zcash.Snark.challenge255Bias_le
+assert_axioms Zcash.Snark.challenge255_joint_charge_le_at_2pow123
 assert_axioms Zcash.Snark.challenge255_badSet_le
 -- Zero-basis acceptance scaffolding (`Soundness.Composition.ZeroBasisAcceptance`): structural,
 -- computation-free steps toward an accepting run of the adaptive knowledge machinery.
@@ -1010,7 +1177,14 @@ assert_axioms Zcash.Snark.deployedAccepts_of_assembles_of_zeroBases
 -- bridge a deployment interpretation supplies, one identification field per model floor.
 assert_axioms Zcash.Snark.ActionDeploymentInstantiation +native(
   CompElliptic.Fields.Pasta.pallasBase,
-  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt, CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+-- The record's certified query ceiling at its profile's work limit; it reaches the circuit
+-- certificates only through the record's type, as the record itself does.
+assert_axioms Zcash.Snark.ActionDeploymentInstantiation.challengeQueryBound_le_workLimit +native(
+  CompElliptic.Fields.Pasta.pallasBase,
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
 -- Deterministic verifier routing used by the rewind-free deployed constraint decoder.
 assert_axioms Zcash.Snark.vanishing_query_mem_assembleQueries
 assert_axioms Zcash.Snark.assembleQueries_vanishingH_unique
@@ -1140,7 +1314,7 @@ assert_computable Zcash.Snark.topLevelStatements_or_relation_of_circuitSat +choi
 assert_computable Zcash.Snark.topLevelStatements_or_relation_of_decodedMemberPolynomial_eq +choice +native(
   CompElliptic.Fields.Pasta.pallasBase)
 -- The last links: the point check lifted to the polynomial identity, the permutation taken to be the
--- one keygen builds from the circuit's copy constraints, the cells of every chunk covered at once,
+-- one keygen builds from the circuit's copy constraints, the cells of every word covered at once,
 -- and circuit satisfaction defined by the whole constraint list rather than the gates alone.
 assert_axioms Zcash.Snark.constraint_identity_of_hfold
 assert_axioms Zcash.Snark.declared_equalities_of_running_product
@@ -1157,8 +1331,8 @@ assert_axioms Zcash.Snark.snarkRelation_constraints
 assert_axioms Zcash.Snark.declared_equalities_of_circuitSat
 assert_axioms Zcash.Snark.lookup_relation_of_circuitSat
 assert_axioms Zcash.Snark.lookup_tuple_of_circuitSat
--- Several permutation chunks, not one: the chaining rule located in the list, read at row zero, and
--- the chunks flattened into a single running product so the permutation acts on every cell.
+-- Several permutation words, not one: the chaining rule located in the list, read at row zero, and
+-- the words flattened into a single running product so the permutation acts on every cell.
 assert_axioms Zcash.Snark.chain_mem_permutationExpressions
 assert_axioms Zcash.Snark.running_product_chain
 assert_axioms Zcash.Snark.deployed_copy_constraints_of_identity_chunks
@@ -1220,12 +1394,21 @@ assert_axioms Zcash.Snark.hstab_of_xPrefixDetermined +native(
 -- pins every field absorbed before it — the toolkit for the deployed squeeze-invariance
 -- schedules, which need each root-set datum emitted strictly before its own squeeze.
 assert_axioms Zcash.Snark.preXSqueezePoint_inj
+-- Separation across action counts (`Soundness/FiatShamir/ActionCount.lean`), at the typed level:
+-- the schedule's oracle locality, the disjointness of the pre-`θ` cones at different counts, and
+-- the reprogramming corollary. This is the fact the extraction experiment's per-size Fiat–Shamir
+-- tables rest on; its consumption in that experiment's sample space is #224.
+assert_axioms Zcash.Snark.deriveChallenges_congr_of_agree_on_cone
+assert_axioms Zcash.Snark.preTheta_not_prefix_of_numProofs_lt
+assert_axioms Zcash.Snark.preTheta_cones_disjoint
+assert_axioms Zcash.Snark.preTheta_prefixFree_of_numProofs_ne
+assert_axioms Zcash.Snark.deriveChallenges_reprogram_other_count
 assert_axioms Zcash.Snark.preX1SqueezePoint_inj
 assert_axioms Zcash.Snark.preX2SqueezePoint_inj
 assert_axioms Zcash.Snark.preX3SqueezePoint_inj
 assert_axioms Zcash.Snark.preX4SqueezePoint_inj
 -- The degree walk (`Soundness.DegreeWalk`): every constraint family's polynomial stays under an
--- explicit cap — gates by `Expr.degreeBound`, permutation chunks by width, lookups by their
+-- explicit cap — gates by `Expr.degreeBound`, permutation words by width, lookups by their
 -- compressed expressions — the combined bound the `x`-squeeze schedule's `epsilonX` prices.
 assert_axioms Zcash.Snark.natDegree_combineConstraints_le
 -- The quantified random match, generic half (`Fingerprint/SampleSpace`,
@@ -1827,19 +2010,21 @@ assert_axioms Zcash.Circuits.Action.orchardActionCircuit +native(
 
 /-! ## The circuit → ledger bridge — exported refinement theorems
 
-The refinement from the Action circuit's postcondition to the games-facing ledger statement
-(`ActionBreak … ∨ ∃ inst w, …`), together with the two correctness directions of the
-break classifier `classifyAction`: an escape it returns is a break of the witness's own hash
-query, and a `none` return — no escape at any of the four sites — means every Sinsemilla query
-of the witness is defined. `actionBreak_iff_classify_isSome` packages both directions as the
-consumer-boundary equivalence. Same budget as the circuit layer above: standard tier plus only
+The refinement from the Action circuit's postcondition to the games-facing ledger statement,
+together with the two correctness directions of the break classifier `classifyAction`: an
+escape it returns is a break of the witness's own hash query, and a `none` return — no escape
+at any of the four sites — means every Sinsemilla query of the witness is defined.
+`actionBreak_iff_classify_isSome` packages both directions as the consumer-boundary
+equivalence. Same budget as the circuit layer above: standard tier plus only
 CompElliptic's Pallas point-count witness.
 
-`actionSpec_to_ledger` is the bridge's whole consumer surface: composition with circuit
-satisfaction lives on the Circuits side, where the `Constraints` predicate it would consume
-is actually produced. -/
+`actionSpecToLedgerData` is the bridge's whole consumer surface, and it returns data: the
+refined ledger action (`ActionLedgerSuccess`, carrying the instance and witness) or the
+computed discrete-log relation of the first Sinsemilla escape (`ActionDLBreak`). Composition
+with circuit satisfaction lives on the Circuits side, where the `Constraints` predicate it
+would consume is actually produced. -/
 
-assert_axioms Zcash.Security.Ledger.Bridge.actionSpec_to_ledger +native(
+assert_axioms Zcash.Security.Ledger.Bridge.actionSpecToLedgerData +native(
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 assert_axioms Zcash.Security.Ledger.Bridge.actionBreak_of_classify +native(
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
@@ -1854,12 +2039,12 @@ The onward step from a classified Action escape to the games-facing relation obj
 the census above stops short of: the escaped chain is turned into an explicit generator
 combination (`ofPoint_hashToPoint`), the coefficient vector is computed from the break data
 (`breakCoeffs`, with its relation and nontriviality facts), and the two headline reductions
-package that as a `NontrivialRelationOne` at the escaped site's domain point.
+package that as a one-point `NontrivialRelation` at the escaped site's domain point.
 
 `relationOfBreakData` and `classifyRelation` are asserted computable, per the
-breaks-as-computed-data convention. `+native` covers the deployed bases' on-curve certificates
-carried in their erased `Prop` fields; `+choice` is the same erased-positions tier the classifier
-itself sits at.
+breaks-as-computed-data convention. `+native` is the Pallas point-count witness that reaches
+their erased `Prop` fields through the group structure; `+choice` is the same erased-positions
+tier that the classifier itself sits at.
 
 `ofPoint_hashToPoint` and `breakCoeffs_nontrivial` stay at the standard tier: the chain
 combination reasons in `ℕ`-multiples of the lifted table, and nontriviality only in the scalar
@@ -1873,6 +2058,38 @@ assert_computable Zcash.Security.Ledger.Bridge.relationOfBreakData +choice +nati
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
 assert_computable Zcash.Security.Ledger.Bridge.classifyRelation +choice +native(
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+
+/-! ## The bundle-level Action-to-ledger bridge
+
+Every accepted bundle member's extracted witness refines to its ledger data —the full
+private witness together with its refined ledger action— or the computed discrete-log
+relation of its first Sinsemilla escape (`memberLedgerData`); the bundle traversal
+returns every member's data or the first escape (`bundleLedgerData`).
+`memberSatisfying` transports the extracted witness across the circuit boundary as a
+satisfying witness of `ActionSpec`. Composed with the adaptive-statement knowledge
+outcome, one run yields every member's ledger data, a ledger Sinsemilla escape, or the
+circuit-side algebraic relation (`actionLedgerOutcome`), with `actionLedgerExtractor`
+its ledger projection and `actionLedgerEscapeFinder` its computed escape arm; the
+composition adds no new undefinedness. Data end to end. -/
+
+assert_computable Zcash.Security.Ledger.ActionBundleBridge.memberSatisfying +choice +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_computable Zcash.Security.Ledger.ActionBundleBridge.memberLedgerData +choice +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_computable Zcash.Security.Ledger.ActionBundleBridge.bundleLedgerData +choice +native(
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
+assert_computable Zcash.Security.Ledger.ActionBundleBridge.actionLedgerOutcome +choice +native(
+  CompElliptic.Fields.Pasta.pallasBase,
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+assert_computable Zcash.Security.Ledger.ActionBundleBridge.actionLedgerExtractor +choice +native(
+  CompElliptic.Fields.Pasta.pallasBase,
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+assert_computable Zcash.Security.Ledger.ActionBundleBridge.actionLedgerEscapeFinder +choice +native(
+  CompElliptic.Fields.Pasta.pallasBase,
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
 assert_axioms Zcash.Security.Ledger.Bridge.ofPoint_hashToPoint
 assert_axioms Zcash.Security.Ledger.Bridge.breakCoeffs_relation +native(
   CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt)
@@ -1968,8 +2185,11 @@ assert_axioms Zcash.Snark.adaptivePrefixBad_measure_le
 assert_axioms Zcash.Snark.deployedX1AllRootSet_measure_le
 assert_axioms Zcash.Snark.deployedX1RootSet_measure_le
 assert_axioms Zcash.Snark.deployedX2RootSet_measure_le
+assert_axioms Zcash.Snark.deployedX2RootSet_measure_le_shape
 assert_axioms Zcash.Snark.deployedX3RootSet_measure_le
+assert_axioms Zcash.Snark.deployedX3RootSet_measure_le_shape
 assert_axioms Zcash.Snark.deployedX4RootSet_measure_le
+assert_axioms Zcash.Snark.deployedX4RootSet_measure_le_shape
 
 -- AGM/ShiftRecovery.lean
 assert_axioms Zcash.Snark.ipaShiftXi_badSet_measure_le
@@ -2022,10 +2242,10 @@ assert_axioms Zcash.Snark.adaptiveRootSurfaceAt_measure_le +native(CompElliptic.
 /-! ## Probability bounds spelled `_prob_le`
 
 `scripts/check_endpoint_census.sh` matches `_prob_le` alongside the older `_measure_le` and
-`_probability_bound` spellings, and matches the consensus-generic `_for` forms of all three.
-These entries are the bounds that spelling newly reaches. Like the `_measure_le` surface and
-root-set measures above, they are pinned because the census pattern reaches them, not as
-independent claims: each is consumed by a capstone that carries its own pin. -/
+`_probability_bound` spellings. These entries are the bounds that spelling reaches when it ends the
+name. Like the `_measure_le` surface and root-set measures above, they are pinned because the
+census pattern reaches them, not as independent claims: each is consumed by a capstone that
+carries its own pin — for the straight-line ones, the qualified capstones of the next section. -/
 
 assert_axioms Zcash.Snark.ComputedStraightLineIpaFSFamily.straightLineBindingZero_prob_le +native(CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
 assert_axioms Zcash.Snark.ComputedStraightLineDeployedFSFamily.straightLineRootZero_prob_le +native(CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
@@ -2033,6 +2253,57 @@ assert_axioms Zcash.Snark.ComputedStraightLineDeployedFSFamily.straightLineDeplo
 assert_axioms Zcash.Snark.ComputedStraightLineDeployedFSFamily.straightLineConstraintBadX_prob_le +native(CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
 assert_axioms Zcash.Snark.ComputedAdaptiveActionStatementFSFamily.statisticalSurfaceEvent_prob_le +native(CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt, CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
 assert_axioms Zcash.Snark.ComputedAdaptiveActionStatementFSFamily.adaptiveStatementKnowledgeFailure_prob_le +native(CompElliptic.Fields.Pasta.pallasBase, CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt, CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+
+/-! ## Probability bounds qualified by a premise or an instance
+
+A semantic marker is matched in any position, so a bound whose name goes on to state the premise it
+is conditional on (`_prob_le_of_textbookDL`, `_probability_bound_of_dlogProfile`), the instance it
+is stated at (`_prob_le_at_consensus_max`), or a variant (`_measure_le'`, `_measure_le_shape`) is
+demanded like the unqualified form. The end-anchored pattern that preceded it deliberately left the
+`_of_<premise>` spellings out, on the reasoning that a conditional bound is always consumed by an
+unconditional capstone with its own pin. The straight-line capstones refuted that: they are stated
+exactly as probability bounds *of* textbook-DL hardness, nothing consumes them, and until these
+entries no census entry disclosed their `native_decide` base.
+
+Within each file group the independent claims are the capstones — the straight-line AGM binding
+capstone `straightLineBindingAttack_prob_le_of_textbookDL`, the straight-line deployed root
+capstone `straightLineRootDecodeFailure_prob_le_of_textbookDL`, and the profiled Action base-union
+bound `actionBaseUnion_probability_bound_of_dlogProfile`. The rest are rungs those capstones or an
+already-pinned endpoint consume, pinned because the pattern reaches them. The consensus-maximum
+compressed-identity bounds (`straightLineConstraintFailure_prob_le_at_consensus_max` and its
+generator-random-oracle form) are the same kind of leaf, but their module reaches a census only
+through `Capstones.Action`, so they are pinned beside the consensus-maximum work-factor package in
+`Zcash/Snark/Fixtures/MultiAction/Honest/TrustBoundary.lean`. -/
+
+-- AGM/StraightLinePinnedRoots.lean
+assert_axioms Zcash.Snark.ComputedStraightLineIpaFSFamily.straightLineIpaRelation_prob_le_of_textbookDL +native(CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+assert_axioms Zcash.Snark.ComputedStraightLineIpaFSFamily.straightLineBindingAttackZ_prob_le_of_textbookDL +native(CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+assert_axioms Zcash.Snark.ComputedStraightLineIpaFSFamily.straightLineBindingAttack_prob_le_of_textbookDL +native(CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+
+-- Composition/StraightLineDeployed.lean
+assert_axioms Zcash.Snark.ComputedStraightLineDeployedFSFamily.straightLineDeployedRelation_prob_le_of_textbookDL +native(CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+assert_axioms Zcash.Snark.ComputedStraightLineDeployedFSFamily.straightLineRootDecodeFailure_prob_le_of_textbookDL +native(CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+
+-- Composition/StraightLineConstraint.lean
+assert_axioms Zcash.Snark.ComputedStraightLineDeployedFSFamily.straightLineConstraintRelation_prob_le_of_textbookDL +native(CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+assert_axioms Zcash.Snark.ComputedStraightLineDeployedFSFamily.straightLineConstraintFailure_prob_le_of_textbookDL +native(CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+assert_axioms Zcash.Snark.ComputedStraightLineDeployedFSFamily.straightLineConstraintFailure_prob_le_of_fixedCallsTextbookDL +native(CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+assert_axioms Zcash.Snark.ComputedStraightLineDeployedFSFamily.straightLineConstraintFailure_union_relation_prob_le_of_relationSupersetTextbookDL +native(CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+
+-- AGM/StraightLineFiniteSecurity.lean
+assert_axioms Zcash.Snark.ComputedStraightLineDeployedFSFamily.straightLineConstraintFailure_prob_le_of_dlogProfile +native(CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+
+-- Action/StraightLineEvent.lean
+assert_axioms Zcash.Snark.ActionTerminal.actionBaseUnion_probability_bound_of_dlogProfile +native(
+  CompElliptic.Fields.Pasta.pallasBase,
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
+
+-- Action/AdaptiveStatementEvent.lean
+assert_axioms Zcash.Snark.ComputedAdaptiveActionStatementFSFamily.relation_prob_le_of_textbookDL +native(
+  CompElliptic.Fields.Pasta.pallasBase,
+  CompElliptic.Curves.Pasta.Pallas.q_nsmul_Gpt,
+  CompElliptic.Curves.Pasta.Vesta.p_nsmul_Gpt)
 
 /-! ## Pre- and post-NU6.3 circuit separation
 

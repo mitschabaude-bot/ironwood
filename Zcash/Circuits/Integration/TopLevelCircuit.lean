@@ -1,6 +1,7 @@
 import Clean.Halo2.TopLevel
 import Zcash.Circuits.Integration.CircuitIntegration
 import Zcash.Common.RelationWitness
+import Zcash.Common.Satisfying
 
 /-!
 # Generic SNARK-to-top-level-circuit endpoint
@@ -36,15 +37,16 @@ theorem topLevelSoundness
 
 end FullCircuitSatisfaction
 
-/-- Type-valued semantic evidence for a top-level circuit.  Unlike
-`TopLevelCircuit.Statement`, this retains the private witness as executable data. -/
-structure TopLevelSemanticWitness
+/-- Type-valued semantic evidence for a top-level circuit: the private witness as
+executable data, together with its specification proof — `Zcash.Common.Satisfying`
+at the circuit's own specification. Unlike `TopLevelCircuit.Statement`, nothing is
+truncated. -/
+abbrev TopLevelSemanticWitness
     {Config : Type} {PublicInput : TypeMap}
     [ProvableType PublicInput]
     (top : TopLevelCircuit Fp Config PublicInput)
-    (publicInput : PublicInput Fp) where
-  privateWitness : top.PrivateWitness
-  valid : top.Spec publicInput privateWitness
+    (publicInput : PublicInput Fp) : Type :=
+  Zcash.Common.Satisfying top.Spec publicInput
 
 namespace TopLevelSemanticWitness
 
@@ -56,7 +58,7 @@ theorem statement
     {publicInput : PublicInput Fp}
     (witness : TopLevelSemanticWitness top publicInput) :
     top.Statement publicInput :=
-  ⟨witness.privateWitness, witness.valid⟩
+  ⟨witness.w, witness.satisfied⟩
 
 end TopLevelSemanticWitness
 
@@ -130,9 +132,8 @@ def semanticWitness_or_bad
     TopLevelSemanticWitness top
       (top.extractPublicInput (top.environment assignment)) ⊕' Bad :=
   bindOrRelationWitness witness.bridge.satisfaction_or_bad fun hsatisfied =>
-    { privateWitness :=
-        top.extractPrivateWitness (top.placedEnvironment assignment)
-      valid := top.soundness assignment
+    { w := top.extractPrivateWitness (top.placedEnvironment assignment)
+      satisfied := top.soundness assignment
         (by
           rw [witness.operations_eq]
           exact FullCircuitSatisfaction.constraints

@@ -271,11 +271,12 @@ theorem adaptiveStatementActive_point_mem_stage {pp : ProofParams}
           n ⟨p, hp⟩ ⟨l, hl⟩
           (by simpa [adaptiveActionCommitmentAvailable] using havailable)
   | permCommon c =>
-      have hc : c < actionCircuit.permutationColumnCount := hactive
+      have hc : c < (AdaptiveActionStatementShape pp).numPermutationColumns := by
+        simpa only [adaptiveActionCommitmentActive] using hactive
       obtain ⟨ap, hap, hpoint⟩ := family.permutationCommonRepresented basis ⟨c, hc⟩
       refine ⟨(adaptiveActionStatementVk pp basis).permutationCommonCommitment ⟨c, hc⟩,
         ?_, ap, List.mem_append.mpr (Or.inr hap), hpoint⟩
-      simp [assembledCommitment, finFnG, hc]
+      simp only [assembledCommitment, finFnG, dif_pos hc]
   | vanishingH => exact False.elim hactive
   | randomPoly => exact False.elim hactive
 
@@ -614,7 +615,7 @@ def statementQuotientRelationFinderV {pp : ProofParams}
   | PSum.inl _ => none
   | PSum.inr relation =>
       some (augmentedBasis_ursOfAugmentedBasis (AdaptiveActionStatementShape pp).k basis ▸
-        relation.toAlgebraicRelationWitness)
+        relation)
 
 /-- Quotient relation projection at one table. -/
 abbrev statementQuotientRelationFinder {pp : ProofParams}

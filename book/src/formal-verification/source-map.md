@@ -25,15 +25,14 @@ directory level, naming the notable modules as entry points.
 ## Top level — `Zcash/`
 
 - **`Common/`** — shared leaves that two tiers need and neither should import the other for.
-  `DiscreteLogRelation` carries a nontrivial `F`-linear (discrete-log) relation among a family of
-  generators as *computed data* — the coefficients — so the reduction-style security arguments can
-  produce a break rather than merely assert one exists (see *breaks as computed data* on the
-  [Formal Verification](../formal-verification.md) page). `AlgebraicRelation` carries the same
-  relation over an arbitrary indexed basis (`AlgebraicRelationWitness`) and turns one into a
-  discrete log, either against known slot logs or against a basis programmed from the DL challenge
-  (Jaeger–Tessaro, [Expected-Time Cryptography: Generic Techniques and Applications to Concrete
-  Soundness](https://eprint.iacr.org/2020/1213), Lemma 3); `RelationProbability`
-  and `RelationProbabilityCoins` price that reduction's single miss hyperplane at `1/|F|`, and
+  `DiscreteLogRelation` carries a nontrivial `F`-linear (discrete-log) relation over an arbitrary
+  indexed basis (`AlgebraicRelationWitness`) as *computed data* — the coefficients — so the
+  reduction-style security arguments can produce a break rather than merely assert one exists (see
+  *breaks as computed data* on the [Formal Verification](../formal-verification.md) page), and
+  turns one into a discrete log against known slot logs. `ProgrammedBasis` turns a relation into a
+  discrete log against a basis programmed from the DL challenge (Jaeger–Tessaro,
+  [Expected-Time Cryptography: Generic Techniques and Applications to Concrete Soundness](https://eprint.iacr.org/2020/1213), Lemma 3);
+  `RelationProbability` and `RelationProbabilityCoins` price that reduction's single miss hyperplane at `1/|F|`, and
   `UniformMeasure` holds the distribution facts they count with. None of these restrict the
   adversary — they consume relation coefficients from any source, and what scopes them is how the
   basis is sampled — so they sit here rather than under `Snark/Soundness/AGM/`. `Expr` is the
@@ -198,9 +197,10 @@ build-time obligations; `SingleAction/Honest/VkMatch` computes the capture's con
 to the ones derived end to end from the ported `configure` as a standalone diagnostic, not a
 soundness or fixture-trust input. The multi-action capture additionally
 carries the shape/VK **faithfulness** checks, the adversarial **negative** fixtures, the degree,
-schedule and static-check modules, the adaptive-statement knowledge-failure endpoints — its `2^123`
-work-factor instantiation and the conditionally staged-certified `2^123` and `2^125` adversary-work
-ones — data-coupled programmed-basis and verifier-commitment accounting, explicit adversary and
+schedule and static-check modules, the adaptive-statement knowledge-failure endpoints — the
+conditionally staged-certified `2^125` adversary-work one and the deployed `2^123` one, with the
+declared-profile `2^123` instantiation pinned as the latter's rung — data-coupled programmed-basis
+and verifier-commitment accounting, explicit adversary and
 complete-program staging-fidelity obligations, mechanically composed reduction work, a direct-decode
 bound derived from a required family invariant, and a separate oracle-query budget, and
 `CapturedZeroFamily` — the shape-generic zero prover instantiated at the
@@ -248,8 +248,10 @@ decode to the concrete Action statement and carry a failure as explicit relation
 `Action/AdaptiveStatement*` is the adaptive-statement stack, the strongest Action notion: one
 online-AGM adversary returns the public inputs and proof together. `DeploymentRecord` states the
 machine-readable deployment-instantiation record — one identification field per model floor
-(challenge law, basis law, key digest, typed acceptance, discrete-log advantage) — that a
-deployed interpretation of the capstones supplies. `AdaptiveStatementModel`
+(challenge law, basis law, key digest, typed acceptance, discrete-log advantage), plus a
+certified ceiling on the failure observer's query budget, without which the joint Challenge255
+charge would be a free multiple — that a deployed interpretation of the capstones supplies.
+`AdaptiveStatementModel`
 defines the game and binds the verifying key and selected instance commitments before `theta`;
 `Accounting`, `Terminal`, and `Surfaces` decode arbitrary statement prefixes and price the
 root, IPA, and semantic surfaces under the single `(Q + 1)` query factor; `Provenance`,
@@ -280,7 +282,8 @@ Six subtrees carry the heavier machinery:
 - **`AGM/`** — the algebraic-group-model layer: what it adds is the restriction on the *prover*,
   namely that it emits a representation alongside every group element (Fuchsbauer–Kiltz–Loss,
   [The Algebraic Group Model and its Applications](https://eprint.iacr.org/2017/620)). The
-  relation-to-discrete-log machinery itself is model-free and lives in `Common/AlgebraicRelation`;
+  known-log relation-to-discrete-log machinery is model-free and lives in
+  `Common/DiscreteLogRelation`, and the programmed-basis adapter in `Common/ProgrammedBasis`;
   `Adapter` supplies only the view of the deployed URS as an augmented basis `(g, U, W)`. This
   subtree adds the algebraic coefficients to the online prover interfaces (`OnlineMembers`,
   `OnlineMultiopen`), reifies erasable group-work events for adaptive programs (`CostedOracle`),
@@ -375,10 +378,11 @@ Six subtrees carry the heavier machinery:
 
 Where the deployed Action circuit's own statements are stated. `Action.lean` states the
 endpoints — knowledge-soundness bounds for every consensus-valid bundle size, in compositional
-error-formula form, in resource-accounted finite-security form at the `2^123` work factor, in
-the staged-certified forms carrying their group-work accounting at `2^123` and `2^125` adversary
-work, and in the deployed form that consumes an `ActionDeploymentInstantiation` and charges the
-joint Challenge255 bias explicitly. Knowledge soundness is the only property advertised: it implies
+error-formula form with declared and with staged-certified group-work accounting, in the
+staged-certified finite-security form at `2^125` adversary work, and in
+the deployed form that consumes an `ActionDeploymentInstantiation`, charges the
+joint Challenge255 bias once for the whole transcript, and prices that charge at `2^-136` against
+the record's certified query ceiling. Knowledge soundness is the only property advertised: it implies
 the plain-soundness statement, so that is not stated separately. Legacy fixed-statement endpoints
 and their events are retired.
 
@@ -522,3 +526,9 @@ computed data.
   against the binding-signature layer, `KeyBindingArm` discharges the key-binding ε in the oracle
   model, `Capstone` lifts the deterministic layer to a distribution over valid annotated ledgers,
   and `Completeness` checks the other direction — that an honest wallet's spend actually verifies.
+  The experiment lane places those capstones in the challenge-oracle model.
+  `ConservationExperiment` and `IntegrityExperiment` compose the arms in one sample space
+  —at the sampled bases and, in their `At` forms, at the deployed value bases— and
+  `OrchardIntegrityExperiment` instantiates them at the deployed choices.
+  `OrchardExtractionExperiment` builds the annotated adversary from a proof-emitting one,
+  annotating its chain with the Action circuit's extracted witnesses.

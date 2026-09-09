@@ -32,8 +32,11 @@ Check all six failure modes; each has occurred in a merged or nearly-merged PR.
    bare `foo`; an unqualified census entry can silently resolve to the wrong homonym. Census
    entries write the full path.
 4. **Endpoint names fit the census regex.** `scripts/check_endpoint_census.sh` only sees the
-   listed families and suffixes. A new endpoint is renamed to fit the pattern — the regex is
-   not widened ad hoc. Refine the regex only when genuinely needed.
+   listed families and semantic markers (`_prob_le`, `_error_bound`, `_finite_security`,
+   `_capstone`, ...), matched in any position — a qualified name such as
+   `_prob_le_of_textbookDL` or `_prob_le_at_consensus_max` is demanded, not exempt. A new
+   endpoint is renamed to fit the pattern — the regex is not widened ad hoc. Refine the regex
+   only when genuinely needed.
 5. **Rebases drop entries silently.** After any rebase or merge, read
    `git diff main...HEAD -- Zcash/TrustBoundary.lean` and account for every *deleted* line by
    name. A consolidation that loses another PR's pins passes CI and loses the guarantee.

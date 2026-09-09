@@ -119,7 +119,7 @@ evaluation at every height. -/
 theorem Path.compress_isSome {P : MerklePrimitives B E} {leaf root : B}
     {children : Fin P.depth → E × E} {side : Fin P.depth → Bool}
     (h : Path P leaf root children side) (i : Fin P.depth) :
-    ∃ b, P.compress i (children i) = some b := by
+    (P.compress i (children i)).isSome := by
   have hnode : node P leaf children i.succ = P.compress i (children i) := by
     simp [node, Fin.cases_succ]
   rcases Nat.lt_or_ge (i.1 + 1) P.depth with hlt | hge
@@ -128,14 +128,14 @@ theorem Path.compress_isSome {P : MerklePrimitives B E} {leaf root : B}
       simp [Fin.val_succ]
     have hstep := h.1 ⟨i.1 + 1, hlt⟩
     rw [hcast, hnode] at hstep
-    exact ⟨_, hstep⟩
+    exact hstep ▸ rfl
   · have heq : i.1 + 1 = P.depth := by have := i.isLt; omega
     have hlast : i.succ = Fin.last P.depth := by
       apply Fin.ext
       simp [Fin.val_succ, Fin.val_last, heq]
     have hroot := h.2
     rw [← hlast, hnode] at hroot
-    exact ⟨_, hroot⟩
+    exact hroot ▸ rfl
 
 /-! ## The guarded (⊥-model) path
 
@@ -174,7 +174,7 @@ theorem Path.toGuarded {P : MerklePrimitives B E} {leaf root : B}
 theorem Path.of_guarded_of_defined {P : MerklePrimitives B E} {leaf root : B}
     {children : Fin P.depth → E × E} {side : Fin P.depth → Bool}
     (hg : GuardedPath P leaf root children side)
-    (hdef : ∀ i, ∃ b, P.compress i (children i) = some b) :
+    (hdef : ∀ i, (P.compress i (children i)).isSome) :
     Path P leaf root children side := by
   -- Every running node is defined: index `0` is `some leaf`, and each successor
   -- index is a compression, defined by `hdef`.
@@ -183,7 +183,7 @@ theorem Path.of_guarded_of_defined {P : MerklePrimitives B E} {leaf root : B}
     induction k using Fin.cases with
     | zero => exact ⟨leaf, by simp [node]⟩
     | succ j =>
-        obtain ⟨b, hb⟩ := hdef j
+        obtain ⟨b, hb⟩ := Option.isSome_iff_exists.mp (hdef j)
         exact ⟨b, by simp [node, Fin.cases_succ, hb]⟩
   refine ⟨fun i => ?_, ?_⟩
   · -- Pin the defined running node with the guarded selected-child clause.
@@ -199,7 +199,7 @@ theorem path_iff_guarded_defined {P : MerklePrimitives B E} {leaf root : B}
     {children : Fin P.depth → E × E} {side : Fin P.depth → Bool} :
     Path P leaf root children side ↔
       GuardedPath P leaf root children side ∧
-        ∀ i, ∃ b, P.compress i (children i) = some b :=
+        ∀ i, (P.compress i (children i)).isSome :=
   ⟨fun h => ⟨h.toGuarded, h.compress_isSome⟩,
    fun ⟨hg, hdef⟩ => Path.of_guarded_of_defined hg hdef⟩
 

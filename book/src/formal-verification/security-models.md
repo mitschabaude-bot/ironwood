@@ -31,14 +31,28 @@ A capstone is assembled from several sub-reductions, called "arms", each with it
 own bound. The composition happens at the **reduction layer** (Layer B), not the
 probability layer (Layer C).
 
-We use that approach because probability statements over *different* sample spaces
-don't combine straightforwardly — conditioning on a sub-event reweights the measure,
-and product measures and marginals get in the way. Computable reductions cause no
-such friction. A reduction is a total function from the adversary's output to a
-break, and so "run the adversary, then run the reduction" is just another machine
-(algebraic if both its components are) at an unchanged query count. Reductions
-compose by ordinary function composition —the path of least resistance that Lean's
-proof tactics handle well— and probability is taken *once*, at the end.
+We use that approach for two reasons:
+
+- Probability statements over *different* sample spaces don't combine
+  straightforwardly — conditioning on a sub-event reweights the measure, and product
+  measures and marginals get in the way.
+- Directly combining results expressed in terms of probability often results in an
+  unnecessarily loose reduction. The issue is that giving an adversary $n$ problems
+  in parallel, of which they only have to find one solution, *may or may not*
+  fundamentally help them depending on the detail of those problems. Black-box
+  reasoning using the probability bounds for the individual problems has to assume
+  the worst case, which loses a factor of $n$ in tightness (via a union bound).
+
+Composing at the level of computable reductions makes it easier to handle both issues.
+A reduction is a total function from the adversary's output to a break, and so "run
+the adversary, then run the reduction" is just another machine (algebraic if both its
+components are) at an unchanged query count. Reductions compose by ordinary function
+composition — the path of least resistance that Lean's proof tactics handle well. And
+the reduction has the *actual break data* from the adversary's solution to one of the
+source problems. The tightness loss, if any, that the reduction incurs to solve the
+target problem will depend on the particular case, but this approach avoids throwing
+away information that is likely to be needed to get the best available reduction. The
+overall probability bound is then taken *once* at the end.
 
 Three pieces of structure make that last step essentially mechanical:
 
@@ -57,14 +71,18 @@ Three pieces of structure make that last step essentially mechanical:
   lands in the event"; it preserves unions because $\exists$ distributes over
   $\lor$.
 
-So a composed bound is proved in two moves. First, a distribution-independent
-**set-level containment**: the bad event is contained in a union of per-arm
-events. This involves no probability over multiple sample spaces, so it is
-easily reusable. Second, lift to a probability, and sum:
+So a composed bound is proved like this:
 
-* monotonicity carries the containment into the sample space;
-* the join-homomorphism distributes it over the union;
-* subadditivity turns the union into the sum of the per-arm bounds.
+- First, a distribution-independent **set-level containment**: the bad event is
+  contained in a union of per-arm events. This involves no probability over
+  multiple sample spaces, so it is easily reusable.
+- At this point it might be possible to collapse together either multiple
+  possibilities for the same kind of event, or different events that rest on
+  the same or closely related cryptographic problems.
+- Finally, lift to a probability, and sum:
+  - monotonicity carries the containment into the sample space;
+  - the join-homomorphism distributes it over the union;
+  - subadditivity turns the union into the sum of the per-arm bounds.
 
 ### The Balance integrity argument as a worked example
 
@@ -73,17 +91,19 @@ shielded pool going negative, or the pools failing to sum to the minted
 issuance— is contained in the union of the three Balance-subset break arms
 (Merkle, note-commitment, key-binding) and the Balance conservation violation.
 That containment is `balanceIntegrityViolationBefore_subset_conservation`; it
-mentions no probabilities and holds at every prefix at once.
+mentions no probabilities and holds at every ledger prefix at once.
 
 Lifting it to the sample space through the join-homomorphism `sampledLedgerEvent`
 and applying subadditivity, gives the integrity experiment's bound as the sum
-of the non-negativity side and the conservation side. This is optimally tight
-and has no factor of the number of prefixes. The conservation side is reused
-wholesale — the conservation experiment is one arm dropped in as a black box.
-And at the Orchard instantiation, the three non-negativity arms collapse onto
-a single advantage, that of finding a nontrivial discrete-log relation among
-the fixed Sinsemilla bases. That is, each arm's break is routed through its
-deterministic reducer, so all three land in one event and are bounded once.
+of the non-negativity side and the conservation side. The conservation side is
+reused wholesale — the conservation experiment is one arm dropped in as a black
+box. And at the Orchard instantiation, the three non-negativity arms, at all
+possible prefixes at which they could occur, collapse onto a single advantage —
+that of finding a nontrivial discrete-log relation among the fixed Sinsemilla
+bases. That is, each arm's break is routed through its deterministic reducer,
+so all three land in one event and are bounded once. This gives a reduction for
+the `_idealizedks` capstones that is almost optimally tight — losing only a
+factor of $2$ in tightness, without any factor of the number of ledger prefixes.
 
 Naming the Boolean algebra, the subadditive measure, and the join-homomorphism
 is what turns per-composition plumbing into three reusable lemmas. This is an

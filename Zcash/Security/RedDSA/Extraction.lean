@@ -3,7 +3,7 @@ import Mathlib.Tactic.Linarith
 import Mathlib.Tactic.LinearCombination
 import Mathlib.Tactic.NormNum
 import Mathlib.Tactic.Ring
-import Zcash.Common.AlgebraicRelation
+import Zcash.Common.DiscreteLogRelation
 import Zcash.Security.RedDSA.Basic
 
 /-!
@@ -78,12 +78,13 @@ signature must prove knowledge of the discrete logarithm of the validating key w
 respect to the base ℛ" (spec §5.4.7.2) — is the named bound κ on the probability
 that an adversary exhibits this event; the known discharge routes are in the module
 doc of `Zcash.Security.RedDSA.Basic`. -/
-structure ExtractionFailure {MSG : Type*} (sch : Scheme F M MSG) (E : Extractor F M MSG) where
+structure ExtractionFailure {MSG : Type*} (sch : Scheme F M MSG)
+    (extractor : Extractor F M MSG) where
   vk : M
   m : MSG
   σ : Sig F M
   verifies : sch.Verify vk m σ
-  ne : vk ≠ E vk m σ • sch.base
+  ne : vk ≠ extractor vk m σ • sch.base
 
 /-! ### Signature representations over the public basis -/
 

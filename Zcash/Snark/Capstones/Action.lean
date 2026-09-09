@@ -6,12 +6,32 @@ import Zcash.Snark.Soundness.Action.DeploymentRecord
 
 Captured checks and executable terminals yield knowledge-soundness bounds against an adversary
 that chooses the public statement and proof together, for every consensus-valid Action bundle
-size. Six endpoints state them: the consensus-generic compositional error formula and its
-staged-certified counterpart, the instantiation at the `2^123` work-factor target, and the
-conditionally staged-certified forms at `2^123` and `2^125` adversary work, plus a deployed
-Challenge255 transport that consumes `ActionDeploymentInstantiation`.
+size. Four endpoints state them:
 
-All six are stated in the generator random-oracle model, over the URS that
+* `orchard_action_adaptiveStatement_knowledge_error_bound` — the consensus-generic compositional
+  error formula: the adversary's discrete-log advantage at its query and group-work counts, plus
+  `1/|F|`, plus the per-query Schwartz–Zippel budgets of each challenge surface, with prover and
+  reduction group work declared as profile premises.
+* `orchard_action_adaptiveStatement_certified_knowledge_error_bound` — the same formula with the
+  group-work accounting checked: the adversary is a staged costed program and Lean composes the
+  counters, conditional on the staging's fidelity.
+* `orchard_action_adaptiveStatement_certified_2pow125_knowledge_finite_security` — the certified
+  formula evaluated at `Q ≤ 2^123` queries and `2^125` adversary group work:
+  `Adv_DLOG(2^124, 2^126) + 2^-83`.
+* `orchard_action_adaptiveStatement_deployed_2pow123_knowledge_finite_security` — the deployed
+  form: an `ActionDeploymentInstantiation` identifies each model floor with its deployed
+  counterpart, and the declared-profile formula at the `2^123` work factor is transported to that
+  record's failure observer with the Challenge255 conversion priced:
+  `Adv_DLOG(2^126, 2^126) + 2^-83 + 2^-136`.
+
+The declared-profile formula's own `2^123` evaluation,
+`adaptiveStatementKnowledgeFailure_le_at_2pow123`, is the rung the deployed endpoint transports
+and the source of the number the knowledge contract quotes; it is not advertised separately.  The
+other rungs here are the pair-count bound the endpoints are stated under, the direct-decode
+budgets, the parametric certified endpoint, and the deployed bound with its Challenge255 charge
+left symbolic.
+
+All four are stated in the generator random-oracle model, over the URS that
 `orchard_uniformURSIdentification_of_generatorRO` identifies with the uniform one.  That model is
 shared by every endpoint here rather than distinguishing between them, so it is recorded once in
 this docstring instead of in each name.
@@ -69,7 +89,8 @@ rather than proved, with its known strengthening named where one exists:
 The bounds these endpoints prove are exact inside that model. The machine-readable shape for a
 deployed interpretation is `ActionDeploymentInstantiation`
 (`Soundness/Action/DeploymentRecord.lean`), one identification field per floor; the deployed
-endpoint below consumes it and charges the joint Challenge255 bias explicitly.
+endpoint below consumes it, charges the joint Challenge255 bias once for the whole adaptive
+transcript, and prices that charge at `2^-136` against the record's certified query ceiling.
 
 Each is censused directly in `Fixtures/MultiAction/Honest/TrustBoundary.lean`.
 -/
@@ -108,7 +129,7 @@ theorem adaptiveStatement_pairCount_lt (numProofs : ℕ)
       (family.runProof basis O).proof.1 (family.runRecord basis O) < scalarFieldOrder := by
   intro basis O
   refine lt_of_le_of_lt (deployedX4PairCount_le_numPointSets _ _ _ _) ?_
-  rw [CircuitShape.withProofParams_numPointSets]
+  rw [Halo2.CircuitShape.withProofParams_numPointSets]
   norm_num [actionProofParamsFor, scalarFieldOrder,
     CompElliptic.Fields.Pasta.PALLAS_BASE_CARD]
 
@@ -169,7 +190,7 @@ theorem orchard_action_adaptiveStatement_knowledge_error_bound
   calc
     _ = _ := hevent
     _ ≤ _ := by
-      simpa only [epsilon, CircuitShape.withProofParams_k] using
+      simpa only [epsilon, Halo2.CircuitShape.withProofParams_k] using
         (family.adaptiveStatementKnowledgeFailure_prob_le
           (adaptiveStatement_pairCount_lt numProofs family) B epsilon
             profile.finderAdvantageLE hsurface)
@@ -243,18 +264,21 @@ theorem orchard_action_adaptiveStatement_certified_knowledge_error_bound
   calc
     _ = _ := hevent
     _ ≤ _ := by
-      simpa only [epsilon, CircuitShape.withProofParams_k] using
+      simpa only [epsilon, Halo2.CircuitShape.withProofParams_k] using
         (family.adaptiveStatementKnowledgeFailure_prob_le
           (adaptiveStatement_pairCount_lt numProofs family) B epsilon
             profile.finderAdvantageLE_current hsurface)
 
-/-- **Adaptive-statement knowledge capstone.**  At `Q ≤ 2^123`, joint statement/proof
-selection, the executable witness projection, and the shared relation finder fit a `2^126`
-random-oracle/group-work envelope and `2^-83` statistical remainder; the finder and the
-extractor consult the table only inside the certified read set.  Complete adversary and reduction
-group work are explicit profile premises; the separately costed assembly/basis component fits its
-derived formula at every table. -/
-theorem orchard_action_adaptiveStatement_2pow123_knowledge_finite_security
+/-- The declared-profile formula at the `2^123` work factor, the input the deployed endpoint
+transports.  At `Q ≤ 2^123`, joint statement/proof selection, the executable witness projection,
+and the shared relation finder fit a `2^126` random-oracle/group-work envelope and `2^-83`
+statistical remainder; the finder and the extractor consult the table only inside the certified
+read set.  Complete adversary and reduction group work are explicit profile premises; the
+separately costed assembly/basis component fits its derived formula at every table.  The final
+conjunct also records a generic whole-distribution `ε_bias` transport.  The deployed endpoint
+instead consumes the first conjunct and proves its dedicated joint Challenge255 observer hybrid
+below. -/
+theorem adaptiveStatementKnowledgeFailure_le_at_2pow123
     (numProofs : ℕ) (hn : numProofs ≤ orchardConsensusMaxProofs)
     {T : Type*} [DecidableEq T]
     (B : VestaG) (hB : B ≠ 0)
@@ -288,15 +312,15 @@ theorem orchard_action_adaptiveStatement_2pow123_knowledge_finite_security
           (family.adaptiveStatementKnowledgeExtractor
             (adaptiveStatement_pairCount_lt numProofs family) basis O).isSome) ∧
       ∀ (actual : PMF ((↥(Set.range query) → VestaG) × family.Coins))
-        (εBias : ENNReal),
+        (ε_bias : ENNReal),
         PMFEventBiasLE actual
           (independentProductPMF (orchardGeneratorROSetup query)
             (PMF.uniformOfFintype family.Coins))
-          εBias →
+          ε_bias →
         actual.toOuterMeasure
             ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
               family.adaptiveStatementKnowledgeFailureEvent (adaptiveStatement_pairCount_lt numProofs family)) ≤
-          (profile.advantage (2 ^ 126) (2 ^ 126) + 1 / (2 ^ 83 : ENNReal)) + εBias := by
+          (profile.advantage (2 ^ 126) (2 ^ 126) + 1 / (2 ^ 83 : ENNReal)) + ε_bias := by
   have hcost := profile.knowledgeExtractorCost_le
   have hqueries : adaptiveStatementKnowledgeExtractorRandomOracleQueries family ≤
       2 ^ 126 := by
@@ -348,7 +372,7 @@ theorem orchard_action_adaptiveStatement_2pow123_knowledge_finite_security
     refine le_trans ?_ (add_le_add le_rfl
       (adaptiveStatementStatisticalModelFor_le_action numProofs family.Q))
     unfold adaptiveStatementStatisticalModelFor actionSemanticModelFor
-    dsimp only
+    dsimp only [Halo2.TopLevelCircuit.domainExponent]
     push_cast
     simp only [div_eq_mul_inv]
     ring_nf
@@ -361,15 +385,17 @@ theorem orchard_action_adaptiveStatement_2pow123_knowledge_finite_security
       ⟨family.relationFinder_eq_of_agree (adaptiveStatement_pairCount_lt numProofs family) h,
         family.adaptiveStatementKnowledgeExtractor_isSome_eq_of_agree
           (adaptiveStatement_pairCount_lt numProofs family) h⟩, ?_⟩
-  intro actual εBias hbias
+  intro actual ε_bias hbias
   exact event_measure_le_of_bias hbias _ hprob
 
-/-- **Deployed adaptive-statement knowledge capstone.** A complete deployment record instantiates
-the basis, typed verifier, concrete DLOG profile, and a deduplicated finite failure observer.  The
-proved joint Challenge255 hybrid transports the ideal `2^123` work-factor bound to that observer,
-charging `challengeQueryBound * challenge255Bias` once for the whole adaptive transcript rather
-than assuming an unjustified one-squeeze event bound. -/
-theorem orchard_action_adaptiveStatement_deployed_2pow123_knowledge_finite_security
+/-- The deployed knowledge-failure bound with the joint Challenge255 charge left symbolic.  A
+complete deployment record instantiates the basis, typed verifier, concrete DLOG profile, and a
+deduplicated finite failure observer.  The proved joint Challenge255 hybrid transports the ideal
+`2^123` work-factor bound to that observer, charging `challengeQueryBound * challenge255Bias`
+once for the whole adaptive transcript rather than assuming an unjustified one-squeeze event
+bound.  The charge is a free multiple of the record's budget here — `OracleComp.QueryBound` is
+upward-closed, so nothing in this statement keeps it small; the endpoint below prices it. -/
+theorem adaptiveStatementDeployedKnowledgeFailure_le_jointCharge
     (numProofs : ℕ) (hn : numProofs ≤ orchardConsensusMaxProofs)
     {T : Type*} [DecidableEq T]
     (query : AugmentedIndex actionCircuit.n → T)
@@ -380,7 +406,7 @@ theorem orchard_action_adaptiveStatement_deployed_2pow123_knowledge_finite_secur
       (deployment.dlogAdvantage (2 ^ 126) (2 ^ 126) + 1 / (2 ^ 83 : ENNReal)) +
         deployment.challengeQueryBound * challenge255Bias := by
   have hcapstone :=
-    orchard_action_adaptiveStatement_2pow123_knowledge_finite_security
+    adaptiveStatementKnowledgeFailure_le_at_2pow123
       numProofs hn deployment.basisGenerator deployment.basisGenerator_ne_zero query
       deployment.queryInjective family deployment.profile
   have hideal :
@@ -420,6 +446,33 @@ theorem orchard_action_adaptiveStatement_deployed_2pow123_knowledge_finite_secur
     exact deployment.idealFailureMeasure_eq.trans_le hideal
   rw [deployment.dlogAdvantageAgrees]
   exact event_measure_le_of_bias hjoint {true} hidealObserver
+
+/-- **Deployed adaptive-statement knowledge capstone.** The joint Challenge255 charge of
+`adaptiveStatementDeployedKnowledgeFailure_le_jointCharge`, priced: the record certifies its
+observer's query budget no looser than one adversary run plus the verifier's squeezes
+(`challengeQueryBound_le`), the profile bounds the adversary's budget by `2^123`, and the exact
+bias is below `2^-260` (`challenge255Bias_le`), so the charge is below `2^-136`
+(`challenge255_joint_charge_le_at_2pow123`).  The deployed knowledge-failure probability is
+therefore within `2^-136` of the ideal `2^123` work-factor bound — a closed number, not a bound
+that a loose-but-valid budget could push past `1`. -/
+theorem orchard_action_adaptiveStatement_deployed_2pow123_knowledge_finite_security
+    (numProofs : ℕ) (hn : numProofs ≤ orchardConsensusMaxProofs)
+    {T : Type*} [DecidableEq T]
+    (query : AugmentedIndex actionCircuit.n → T)
+    (family : ComputedAdaptiveActionStatementFSFamily (actionProofParamsFor numProofs))
+    (deployment : ActionDeploymentInstantiation (actionProofParamsFor numProofs) family query
+      (adaptiveStatement_pairCount_lt numProofs family) (2 ^ 123)) :
+    deployment.deployedFailurePMF.toOuterMeasure {true} ≤
+      deployment.dlogAdvantage (2 ^ 126) (2 ^ 126) + 1 / (2 ^ 83 : ENNReal) +
+        1 / (2 ^ 136 : ENNReal) := by
+  refine le_trans
+    (adaptiveStatementDeployedKnowledgeFailure_le_jointCharge numProofs hn query family
+      deployment)
+    (add_le_add le_rfl ?_)
+  refine challenge255_joint_charge_le_at_2pow123 deployment.profile.queryBound ?_
+    deployment.challengeQueryBound_le
+  rw [Halo2.CircuitShape.withProofParams_k, ← Halo2.TopLevelCircuit.domainExponent]
+  exact ActionConstraintBounds.domainExponent_lt
 
 /-- The selected proof's direct-decode source fits the `2^90` endpoint envelope.  All
 proof-controlled and instance entries have shape-indexed lengths; the sole list-valued input is
@@ -503,7 +556,8 @@ theorem adaptiveStatementThreeDirectDecodes_le_two_pow_123
       gcongr
     _ ≤ 2 ^ 123 := by norm_num
 
-/-- Shared arithmetic and transfer proof for the two certified work ceilings below. -/
+/-- Arithmetic and transfer proof for the certified endpoint below, stated for any adversary work
+ceiling between `2^123` and `2^125`; the endpoint is its instance at `2^125`. -/
 private theorem adaptiveStatementCertifiedEndpoint
     (numProofs workLimit : ℕ) (hn : numProofs ≤ orchardConsensusMaxProofs)
     (hworkLower : 2 ^ 123 ≤ workLimit) (hworkUpper : workLimit ≤ 2 ^ 125)
@@ -594,7 +648,7 @@ private theorem adaptiveStatementCertifiedEndpoint
     refine le_trans ?_ (add_le_add le_rfl
       (adaptiveStatementStatisticalModelFor_le_action numProofs family.Q))
     unfold adaptiveStatementStatisticalModelFor actionSemanticModelFor
-    dsimp only
+    dsimp only [Halo2.TopLevelCircuit.domainExponent]
     push_cast
     simp only [div_eq_mul_inv]
     ring_nf
@@ -615,57 +669,6 @@ private theorem adaptiveStatementCertifiedEndpoint
     (adaptiveStatement_pairCount_lt numProofs family) certificate basis O]
   exact family.cachedKnowledgeExtractor_isSome_eq
     (adaptiveStatement_pairCount_lt numProofs family) basis O
-
-/-- **Conditionally staged-certified `2^123` adaptive-statement endpoint.** The costed program
-erases to the original algebraic adversary, and staging fidelity for both that adversary and each
-complete shallowly embedded execution remains explicit. Programmed reductions are mechanically
-composed with the exact selected path, the three direct-decode executions are derived from the
-required family cap, and the cached extractor costs at most `2^124` group operations. -/
-theorem orchard_action_adaptiveStatement_certified_2pow123_knowledge_finite_security
-    (numProofs : ℕ) (hn : numProofs ≤ orchardConsensusMaxProofs)
-    {T : Type*} [DecidableEq T]
-    (B : VestaG) (hB : B ≠ 0)
-    (query : AugmentedIndex actionCircuit.n → T)
-    (hquery : Function.Injective query)
-    (family : ComputedAdaptiveActionStatementFSFamily (actionProofParamsFor numProofs))
-    (hQ : family.Q ≤ 2 ^ 123)
-    (certificate :
-      ComputedAdaptiveActionStatementFSFamily.AdaptiveStatementAdversaryCostCertificate
-        family (2 ^ 123))
-    (profile : ComputedAdaptiveActionStatementFSFamily.CertifiedAdaptiveStatementDlogProfile
-      family (adaptiveStatement_pairCount_lt numProofs family) B (2 ^ 123) certificate) :
-    ((independentProductPMF (orchardGeneratorROSetup query)
-      (PMF.uniformOfFintype family.Coins)).toOuterMeasure
-        ((fun p => (orchardGeneratorROBasis query p.1, p.2)) ⁻¹'
-          family.adaptiveStatementKnowledgeFailureEvent
-            (adaptiveStatement_pairCount_lt numProofs family)) ≤
-      profile.advantage (2 ^ 124) (2 ^ 126) + 1 / (2 ^ 83 : ENNReal)) ∧
-      adaptiveStatementCachedRandomOracleQueries family ≤ 2 ^ 124 ∧
-      (∀ basis O, (family.relationFinderReads basis O).card ≤ 2 ^ 124) ∧
-      adaptiveStatementReductionGroupWork (actionProofParamsFor numProofs) ≤ 2 ^ 123 ∧
-      (∀ basis, (certificate.program basis).erase = family.adversary basis) ∧
-      (∀ basis, (certificate.program basis).StagedGroupWorkFaithful) ∧
-      ComputedAdaptiveActionStatementFSFamily.AdaptiveStatementExecutionStagingCoverage
-        family (adaptiveStatement_pairCount_lt numProofs family) B (2 ^ 123) certificate ∧
-      ComputedAdaptiveActionStatementFSFamily.AdaptiveStatementProgrammedReductionCoverage
-        family (adaptiveStatement_pairCount_lt numProofs family) B (2 ^ 123) certificate ∧
-      (∀ basis O, certificate.proverGroupWork basis O ≤ 2 ^ 123) ∧
-      (∀ basis O,
-        adaptiveStatementKnowledgeExtractorDirectDecodeSlots *
-          adaptiveStatementDirectDecodeOps family basis O ≤ 2 ^ 123) ∧
-      ∀ basis O,
-        (family.costedCachedKnowledgeExtractor
-          (adaptiveStatement_pairCount_lt numProofs family) certificate basis O).groupWork ≤
-            2 ^ 124 ∧
-        (family.costedCachedKnowledgeExtractor
-          (adaptiveStatement_pairCount_lt numProofs family) certificate basis O).value.isSome =
-            (family.adaptiveStatementKnowledgeExtractor
-              (adaptiveStatement_pairCount_lt numProofs family) basis O).isSome ∧
-        family.cachedRelationFinder (adaptiveStatement_pairCount_lt numProofs family) basis O =
-          family.relationFinder (adaptiveStatement_pairCount_lt numProofs family) basis O := by
-  simpa only [show 2 * 2 ^ 123 = 2 ^ 124 by norm_num] using
-    (adaptiveStatementCertifiedEndpoint numProofs (2 ^ 123) hn le_rfl (by norm_num)
-      B hB query hquery family hQ certificate profile)
 
 /-- **Conditionally staged-certified `2^125` adaptive-statement endpoint.** Faithfully staged
 adversary and complete execution programs, with mechanically composed data flow and counters, fit

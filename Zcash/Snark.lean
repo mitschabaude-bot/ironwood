@@ -33,8 +33,8 @@
 --   instance-level and cannot move under `Soundness/`, which is fixture-free by design: they are
 --   stated at the capture and reach it through their imports. The endpoints themselves are the
 --   knowledge-soundness bounds that nothing else depends on — the consensus-generic error
---   formula and its staged-certified counterpart, the `2^123` work-factor instantiation, and the
---   conditionally staged-certified `2^123` and `2^125` adversary-work forms. The verifier-level
+--   formula and its staged-certified counterpart, the deployed `2^123` work-factor instantiation,
+--   and the conditionally staged-certified `2^125` adversary-work form. The verifier-level
 --   endpoints are elsewhere, with the layer that proves them: the straight-line knowledge errors
 --   beside their capture, the consensus work factors in `Soundness/AGM/`.
 --

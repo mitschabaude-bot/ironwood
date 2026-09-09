@@ -20,8 +20,8 @@ verifying Recovery-Statement witness pins the key components — `ak` up to y-si
 
 The route, each step proven here:
 
-1. `commit_scalar_pm` — two openings of one `Commitivk` value force their Pedersen scalars equal
-   or negated; `CollisionUpToSign.ofOpeningBreak` packages this as computed data.
+1. `commit_scalar_pm` — two openings of one `Commitivk` value force their Pedersen scalars
+   equal or negated; `CollisionUpToSign.ofOpeningBreak` packages this as computed data.
 2. `rivk_eq_finalOracle` — under the derivation constraints, `rivk` is the combined final
    oracle's output at the witness's decoded query.
 3. `CollisionUpToSign.ofBreak` — a full `Break` computes a ±-collision of the shifted combined
@@ -31,9 +31,8 @@ The route, each step proven here:
 
 The probabilistic side — producing the computed collision is hard — is the birthday bound
 `ε_kb ≤ q(q-1)/|RIVK|` (`Birthday.lean`, with `|RIVK| = r_ℙ` at the intended Pallas
-instantiation), ZIP 2005's `ε_kb` as sharpened in zcash/zips#1338.
-nf-pinning, which the Spendability argument consumes, is the games'
-`nfOldEqOrBreak` (`Security/Ledger/Statement.lean`).
+instantiation), ZIP 2005's `ε_kb`. nf-pinning, which the Spendability argument consumes,
+is the games' `nfOldEqOrBreak` (`Security/Ledger/Statement.lean`).
 
 Abstract setting: a prime-order group `G` as an `RIVK`-vector space. The scalar types are
 `RIVK` (rivk values and the rivk-derivation oracle outputs) and `ASK` (`H^ask` outputs, acting
@@ -144,8 +143,8 @@ section Algebra
 variable [AddCommGroup G] [Field IVK] [Field RIVK] [Module RIVK G] [NoZeroSMulDivisors RIVK G]
 
 /-- The `ivk` commitment as a Pedersen lift:
-`Commitivk rivk ak nk = Extract.toIVK ((h ak nk + rivk) • S)`, with `h` abstract-but-non-querying and `S`
-a fixed base. Mirrors the `NoteCommit` repair `(H^rcm + f) • R`. -/
+`Commitivk rivk ak nk = Extract.toIVK ((h ak nk + rivk) • S)`, with `h` abstract-but-non-querying
+and `S` a fixed base. Mirrors the `NoteCommit` repair `(H^rcm + f) • R`. -/
 def Commitivk (Extract : Extractor G IVK AK) (S : G) (hfn : AK → NK → RIVK) (rivk : RIVK)
     (ak : AK) (nk : NK) : IVK :=
   Extract.toIVK ((hfn ak nk + rivk) • S)

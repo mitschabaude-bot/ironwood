@@ -287,11 +287,11 @@ transactions are not covered by the positioned outputs of the first `i` is at mo
 the sum of the three break-arm probabilities, each bounded by its named ε
 hypothesis. -/
 theorem balanceSubsetPerTx_measure_le (A : PMF (ValidAnnotated P kv issuance maxActions))
-    (i : ℕ) {εm εnc εkb : ℝ≥0∞}
-    (hm : A.toOuterMeasure (balanceSubsetBreakEvent i .merkle) ≤ εm)
-    (hnc : A.toOuterMeasure (balanceSubsetBreakEvent i .noteCommit) ≤ εnc)
-    (hkb : A.toOuterMeasure (balanceSubsetBreakEvent i .keyBinding) ≤ εkb) :
-    A.toOuterMeasure (balanceSubsetViolation i) ≤ εm + εnc + εkb :=
+    (i : ℕ) {ε_merkle ε_nc ε_kb : ℝ≥0∞}
+    (hm : A.toOuterMeasure (balanceSubsetBreakEvent i .merkle) ≤ ε_merkle)
+    (hnc : A.toOuterMeasure (balanceSubsetBreakEvent i .noteCommit) ≤ ε_nc)
+    (hkb : A.toOuterMeasure (balanceSubsetBreakEvent i .keyBinding) ≤ ε_kb) :
+    A.toOuterMeasure (balanceSubsetViolation i) ≤ ε_merkle + ε_nc + ε_kb :=
   le_trans (toOuterMeasure_le_add₃ A (balanceSubsetViolation_subset i))
     (add_le_add (add_le_add hm hnc) hkb)
 
@@ -329,11 +329,11 @@ adversary, the probability that the nonzero spends escape the earlier positioned
 at some step `i < k` is at most the sum of three ε's — one per arm, each hypothesized on
 that arm's shared all-prefixes event. The containment adds no factor of `k`. -/
 theorem balanceSubset_measure_le (A : PMF (ValidAnnotated P kv issuance maxActions))
-    (k : ℕ) {εm εnc εkb : ℝ≥0∞}
-    (hm : A.toOuterMeasure (balanceSubsetBreakEventUpTo k .merkle) ≤ εm)
-    (hnc : A.toOuterMeasure (balanceSubsetBreakEventUpTo k .noteCommit) ≤ εnc)
-    (hkb : A.toOuterMeasure (balanceSubsetBreakEventUpTo k .keyBinding) ≤ εkb) :
-    A.toOuterMeasure (balanceSubsetViolationUpTo k) ≤ εm + εnc + εkb :=
+    (k : ℕ) {ε_merkle ε_nc ε_kb : ℝ≥0∞}
+    (hm : A.toOuterMeasure (balanceSubsetBreakEventUpTo k .merkle) ≤ ε_merkle)
+    (hnc : A.toOuterMeasure (balanceSubsetBreakEventUpTo k .noteCommit) ≤ ε_nc)
+    (hkb : A.toOuterMeasure (balanceSubsetBreakEventUpTo k .keyBinding) ≤ ε_kb) :
+    A.toOuterMeasure (balanceSubsetViolationUpTo k) ≤ ε_merkle + ε_nc + ε_kb :=
   le_trans (toOuterMeasure_le_add₃ A (balanceSubsetViolationUpTo_subset k))
     (add_le_add (add_le_add hm hnc) hkb)
 
@@ -370,11 +370,11 @@ after a transaction: for any adversary, the probability that the shielded pool g
 negative after the first `i + 1` transactions is at most the three step-`i`
 Balance-subset arm ε's. -/
 theorem shieldedBalanceNonNegative_succ_measure_le
-    (A : PMF (ValidAnnotated P kv issuance maxActions)) (i : ℕ) {εm εnc εkb : ℝ≥0∞}
-    (hm : A.toOuterMeasure (balanceSubsetBreakEvent i .merkle) ≤ εm)
-    (hnc : A.toOuterMeasure (balanceSubsetBreakEvent i .noteCommit) ≤ εnc)
-    (hkb : A.toOuterMeasure (balanceSubsetBreakEvent i .keyBinding) ≤ εkb) :
-    A.toOuterMeasure (shieldedBalanceNonNegativeViolation (i + 1)) ≤ εm + εnc + εkb :=
+    (A : PMF (ValidAnnotated P kv issuance maxActions)) (i : ℕ) {ε_merkle ε_nc ε_kb : ℝ≥0∞}
+    (hm : A.toOuterMeasure (balanceSubsetBreakEvent i .merkle) ≤ ε_merkle)
+    (hnc : A.toOuterMeasure (balanceSubsetBreakEvent i .noteCommit) ≤ ε_nc)
+    (hkb : A.toOuterMeasure (balanceSubsetBreakEvent i .keyBinding) ≤ ε_kb) :
+    A.toOuterMeasure (shieldedBalanceNonNegativeViolation (i + 1)) ≤ ε_merkle + ε_nc + ε_kb :=
   le_trans
     (toOuterMeasure_le_add₃ A (shieldedBalanceNonNegativeViolation_succ_subset i))
     (add_le_add (add_le_add hm hnc) hkb)
@@ -497,12 +497,13 @@ theorem balanceIntegrity_measure_le {VB : Type*}
     (A : PMF (ValidAnnotated P kv issuance maxActions))
     (perTx : ∀ ω : ValidAnnotated P kv issuance maxActions,
       (tx : Tx KW F G RHO PSI MHASH MENC MSG SIG P.depth) → tx ∈ ω.1 →
-        (txNetValue tx = tx.vBalance) ⊕' VB) (k : ℕ) {εm εnc εkb ε_conservation : ℝ≥0∞}
-    (hm : A.toOuterMeasure (balanceSubsetBreakEventUpTo k .merkle) ≤ εm)
-    (hnc : A.toOuterMeasure (balanceSubsetBreakEventUpTo k .noteCommit) ≤ εnc)
-    (hkb : A.toOuterMeasure (balanceSubsetBreakEventUpTo k .keyBinding) ≤ εkb)
+        (txNetValue tx = tx.vBalance) ⊕' VB) (k : ℕ) {ε_merkle ε_nc ε_kb ε_conservation : ℝ≥0∞}
+    (hm : A.toOuterMeasure (balanceSubsetBreakEventUpTo k .merkle) ≤ ε_merkle)
+    (hnc : A.toOuterMeasure (balanceSubsetBreakEventUpTo k .noteCommit) ≤ ε_nc)
+    (hkb : A.toOuterMeasure (balanceSubsetBreakEventUpTo k .keyBinding) ≤ ε_kb)
     (hvb : A.toOuterMeasure (txBalanceBreakEventBefore perTx k) ≤ ε_conservation) :
-    A.toOuterMeasure (balanceIntegrityViolationBefore k) ≤ εm + εnc + εkb + ε_conservation :=
+    A.toOuterMeasure (balanceIntegrityViolationBefore k)
+      ≤ ε_merkle + ε_nc + ε_kb + ε_conservation :=
   le_trans (toOuterMeasure_le_add₂ A (balanceIntegrityViolationBefore_subset perTx k))
     (add_le_add
       (le_trans (toOuterMeasure_le_add₃ A subset_rfl)
@@ -560,10 +561,10 @@ theorem spendAuthorityViolation_subset (wV : KW) (hKB : kv.KB wV)
 some Action spends a note addressed to `wV` over an unsigned sighash is at most the
 forgery arm's ε plus the key-binding arm's ε. -/
 theorem spendAuthority_measure_le (A : PMF (ValidAnnotated P kv issuance maxActions))
-    (wV : KW) (hKB : kv.KB wV) (Signed : MSG → Prop) {εf εkb : ℝ≥0∞}
-    (hf : A.toOuterMeasure (spendAuthorityForgeryEvent wV hKB Signed) ≤ εf)
-    (hkb : A.toOuterMeasure (spendAuthorityBreakEvent wV hKB Signed) ≤ εkb) :
-    A.toOuterMeasure (spendAuthorityViolation wV Signed) ≤ εf + εkb :=
+    (wV : KW) (hKB : kv.KB wV) (Signed : MSG → Prop) {ε_forge ε_kb : ℝ≥0∞}
+    (hf : A.toOuterMeasure (spendAuthorityForgeryEvent wV hKB Signed) ≤ ε_forge)
+    (hkb : A.toOuterMeasure (spendAuthorityBreakEvent wV hKB Signed) ≤ ε_kb) :
+    A.toOuterMeasure (spendAuthorityViolation wV Signed) ≤ ε_forge + ε_kb :=
   le_trans (toOuterMeasure_le_add₂ A (spendAuthorityViolation_subset wV hKB Signed))
     (add_le_add hf hkb)
 
